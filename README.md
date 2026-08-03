@@ -7,15 +7,15 @@ firmados y facturación.
 
 ## Stack
 
-| Capa      | Tecnología |
-| --------- | ---------- |
-| Shell     | Tauri v2 (Rust) |
+| Capa | Tecnología |
+| --- | --- |
+| Shell | Tauri v2 (Rust) |
 | Base de datos | Firebird 5.0 **Embedded** (`rsfbclient` 0.27, `dynamic_loading`) |
-| Frontend  | React 19 + TypeScript + Vite |
-| Estilos   | Tailwind CSS v4 + shadcn/ui |
-| Estado    | Zustand + TanStack Query |
+| Frontend | React 19 + TypeScript + Vite |
+| Estilos | Tailwind CSS v4 + shadcn/ui |
+| Estado | Zustand + TanStack Query |
 | IPC type-safe | specta / tauri-specta (`src/bindings.ts` auto-generado) |
-| PDF       | `printpdf` (server-side, hito 2) |
+| PDF | `printpdf` (server-side, hito 2) |
 
 ## Requisitos
 
@@ -33,13 +33,14 @@ npm run tauri:dev      # compila Rust + arranca la app con la UI
 ```
 
 En el primer arranque válido la app:
+
 1. Crea `isalab.fdb` en `app_data` (si no existe) con página 16 KB.
 2. Aplica las migraciones versionadas (`src-tauri/migrations/*.sql`).
 3. Siembra el catálogo (especies, razas, analitos, rangos de referencia por
    especie/edad/sexo, configuración de clínica).
 4. Suscribe listeners a los **eventos nativos de Firebird** (`POST_EVENT`) y
    re-emite cambios de muestras/resultados al frontend en tiempo real.
-5. Siembra la contraseña del usuario `admin` (ver [Autenticación](#autenticación)).
+5. Siembra la contraseña del usuario `admin` (ver [Autenticación y Seguridad](#autenticación-y-seguridad)).
 
 > La base de datos nunca se commitea (`.gitignore`). Cada instalación la crea
 > localmente.
@@ -58,7 +59,7 @@ En el primer arranque válido la app:
 
 ## Estructura
 
-```
+```text
 src/                     # Frontend React
 ├── bindings.ts          # Tipos TS generados por specta (se regeneran en build)
 ├── lib/api.ts           # Wrappers tipados de los comandos (invoke)
