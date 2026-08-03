@@ -12,18 +12,6 @@ pub mod surgeries;
 pub mod users;
 pub mod vaccines;
 
-use crate::error::AppError;
-use crate::models::auth::SessionUser;
-use crate::state::AppState;
-
-/// Usuario de la sesión activa. Los registros clínicos (consultas, cirugías,
-/// vacunas) y las facturas se atribuyen al operador que inició sesión.
-pub fn current_user(state: &AppState) -> Result<SessionUser, AppError> {
-    let guard = state
-        .session
-        .lock()
-        .map_err(|_| AppError::Internal("Sesión bloqueada".into()))?;
-    guard
-        .clone()
-        .ok_or_else(|| AppError::Forbidden("Inicia sesión para continuar".into()))
-}
+// Nota: `current_user()` fue consolidado en `crate::auth::require_session()`.
+// Todos los comandos deben usar `crate::auth::require_session` o
+// `crate::auth::require_admin` para verificación de acceso.

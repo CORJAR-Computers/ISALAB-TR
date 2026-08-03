@@ -1,6 +1,7 @@
 use rsfbclient::prelude::*;
 use tauri::State;
 
+use crate::auth::require_session;
 use crate::error::AppError;
 use crate::models::species::{Analyte, Breed, SampleType, Species, VaccineType};
 use crate::state::AppState;
@@ -8,6 +9,7 @@ use crate::state::AppState;
 #[tauri::command]
 #[specta::specta]
 pub fn list_species(state: State<'_, AppState>) -> Result<Vec<Species>, AppError> {
+    require_session(&state)?;
     let mut pooled = state.pool.acquire()?;
     let rows: Vec<(i32, String, String)> = pooled
         .conn()
@@ -32,6 +34,7 @@ pub fn list_breeds(
     state: State<'_, AppState>,
     species_id: i32,
 ) -> Result<Vec<Breed>, AppError> {
+    require_session(&state)?;
     let mut pooled = state.pool.acquire()?;
     let rows: Vec<(i32, i32, String)> = pooled
         .conn()
@@ -54,6 +57,7 @@ pub fn list_breeds(
 #[tauri::command]
 #[specta::specta]
 pub fn list_sample_types(state: State<'_, AppState>) -> Result<Vec<SampleType>, AppError> {
+    require_session(&state)?;
     let mut pooled = state.pool.acquire()?;
     let rows: Vec<(i32, String, String)> = pooled
         .conn()
@@ -75,6 +79,7 @@ pub fn list_sample_types(state: State<'_, AppState>) -> Result<Vec<SampleType>, 
 #[tauri::command]
 #[specta::specta]
 pub fn list_analytes(state: State<'_, AppState>) -> Result<Vec<Analyte>, AppError> {
+    require_session(&state)?;
     let mut pooled = state.pool.acquire()?;
     let rows: Vec<(i32, String, String, Option<String>, Option<String>)> = pooled
         .conn()
@@ -100,6 +105,7 @@ pub fn list_analytes(state: State<'_, AppState>) -> Result<Vec<Analyte>, AppErro
 #[tauri::command]
 #[specta::specta]
 pub fn list_vaccine_types(state: State<'_, AppState>) -> Result<Vec<VaccineType>, AppError> {
+    require_session(&state)?;
     let mut pooled = state.pool.acquire()?;
     let rows: Vec<(i32, String, String)> = pooled
         .conn()

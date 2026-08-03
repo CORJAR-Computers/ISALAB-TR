@@ -357,28 +357,196 @@ pub fn format_cop(v: f64) -> String {
 mod tests {
     use super::*;
 
+    // ---- sanitize ----
+
     #[test]
-    fn test_sanitize() {
+    fn test_sanitize_em_dash() {
         assert_eq!(sanitize("Muestra – Test"), "Muestra - Test");
+    }
+
+    #[test]
+    fn test_sanitize_middle_dot() {
         assert_eq!(sanitize("· Punto"), " -  Punto");
     }
 
     #[test]
-    fn test_format_value() {
+    fn test_sanitize_typographic_quotes() {
+        assert_eq!(sanitize("'hola'"), "'hola'");
+        assert_eq!(sanitize("\u{201C}test\u{201D}"), "'test'");
+    }
+
+    #[test]
+    fn test_sanitize_ellipsis() {
+        assert_eq!(sanitize("esperando…"), "esperando...");
+    }
+
+    #[test]
+    fn test_sanitize_removes_arrows() {
+        assert_eq!(sanitize("→"), "");
+        assert_eq!(sanitize("↑↓←"), "");
+    }
+
+    #[test]
+    fn test_sanitize_control_chars() {
+        assert_eq!(sanitize("a\x00b"), "a?b");
+    }
+
+    // ---- format_value ----
+
+    #[test]
+    fn test_format_value_integer() {
         assert_eq!(format_value(12.0), "12");
+    }
+
+    #[test]
+    fn test_format_value_decimal() {
         assert_eq!(format_value(12.567), "12.57");
     }
 
     #[test]
-    fn test_format_cop() {
+    fn test_format_value_zero() {
+        assert_eq!(format_value(0.0), "0");
+    }
+
+    #[test]
+    fn test_format_value_exact_half() {
+        assert_eq!(format_value(3.50), "3.50");
+    }
+
+    // ---- format_cop ----
+
+    #[test]
+    fn test_format_cop_millions() {
         assert_eq!(format_cop(1500000.0), "$1.500.000,00");
+    }
+
+    #[test]
+    fn test_format_cop_with_cents() {
         assert_eq!(format_cop(4500.5), "$4.500,50");
     }
 
     #[test]
+    fn test_format_cop_zero() {
+        assert_eq!(format_cop(0.0), "$0,00");
+    }
+
+    #[test]
+    fn test_format_cop_small() {
+        assert_eq!(format_cop(99.99), "$99,99");
+    }
+
+    #[test]
+    fn test_format_cop_negative() {
+        assert_eq!(format_cop(-1500.0), "-$1.500,00");
+    }
+
+    // ---- status_label / status_color ----
+
+    #[test]
     fn test_status_label_and_color() {
         assert_eq!(status_label("ALTO"), "ALTO");
+        assert_eq!(status_label("BAJO"), "BAJO");
+        assert_eq!(status_label("NORMAL"), "NORMAL");
         assert_eq!(status_label("DESCONOCIDO"), "SIN RANGO");
         assert_eq!(status_color("ALTO"), C_ALTO);
+        assert_eq!(status_color("BAJO"), C_BAJO);
+        assert_eq!(status_color("NORMAL"), C_NORMAL);
+    }
+
+    // ---- truncate ----
+
+    #[test]
+    fn test_truncate_short() {
+        assert_eq!(truncate("hola", 10), "hola");
+    }
+
+    #[test]
+    fn test_truncate_exact() {
+        assert_eq!(truncate("12345", 5), "12345");
+    }
+
+    #[test]
+    fn test_truncate_long() {
+        assert_eq!(truncate("abcdefghij", 5), "abcde...");
+    }
+
+    // ---- wrap_text ----
+
+    #[test]
+    fn test_wrap_text_short() {
+        let lines = wrap_text("hola mundo", 80);
+        assert_eq!(lines.len(), 1);
+        assert_eq!(lines[0], "hola mundo");
+    }
+
+    #[test]
+    fn test_wrap_text_newline() {
+        let lines = wrap_text("línea 1\nlínea 2", 80);
+        assert_eq!(lines.len(), 2);
+        assert_eq!(lines[0], "línea 1");
+        assert_eq!(lines[1], "línea 2");
+    }
+
+    #[test]
+    fn test_wrap_text_long_line() {
+        let text = "a ".repeat(50);
+        let lines = wrap_text(&text, 20);
+        assert!(lines.len() > 1);
+    }
+
+    #[test]
+    fn test_wrap_text_empty() {
+        let lines = wrap_text("", 80);
+        assert_eq!(lines.len(), 1);
+    }
+
+    // ---- text_width_mm ----
+
+    #[test]
+    fn test_text_width_mm_positive() {
+        let w = text_width_mm("Test", 12.0);
+        assert!(w > 0.0);
+    }
+
+    #[test]
+    fn test_text_width_mm_empty() {
+        let w = text_width_mm("", 12.0);
+        assert!((w - 0.0).abs() < f32::EPSILON);
+    }
+
+    // ---- rgb ----
+
+    #[test]
+    fn test_rgb_black() {
+        let c = rgb((0, 0, 0));
+        if let Color::Rgb(rgb) = c {
+            assert!((rgb.r - 0.0).abs() < f32::EPSILON);
+            assert!((rgb.g - 0.0).abs() < f32::EPSILON);
+            assert!((rgb.b - 0.0).abs() < f32::EPSILON);
+        } else {
+            panic!("Expected Rgb color");
+        }
+    }
+
+    #[test]
+    fn test_rgb_white() {
+        let c = rgb((255, 255, 255));
+        if let Color::Rgb(rgb) = c {
+            assert!((rgb.r - 1.0).abs() < 0.01);
+            assert!((rgb.g - 1.0).abs() < 0.01);
+            assert!((rgb.b - 1.0).abs() < 0.01);
+        } else {
+            panic!("Expected Rgb color");
+        }
+    }
+
+    // ---- PdfBuilder ----
+
+    #[test]
+    fn test_pdf_builder_new_starts_at_margin() {
+        let pdf = PdfBuilder::new();
+        assert!((pdf.y - (PAGE_H - MARGIN)).abs() < f32::EPSILON);
+        assert!(pdf.ops.is_empty());
+        assert!(pdf.pages.is_empty());
     }
 }

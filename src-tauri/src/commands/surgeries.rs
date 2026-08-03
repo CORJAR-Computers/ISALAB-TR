@@ -1,6 +1,6 @@
 use tauri::State;
 
-use crate::commands::current_user;
+use crate::auth::require_session;
 use crate::error::AppError;
 use crate::models::surgery::{CreateSurgeryInput, Surgery};
 use crate::repositories::surgeries as surgeries_repo;
@@ -13,7 +13,7 @@ pub fn create_surgery(
     state: State<'_, AppState>,
     input: CreateSurgeryInput,
 ) -> Result<Surgery, AppError> {
-    let user = current_user(&state)?;
+    let user = require_session(&state)?;
     let mut pooled = state.pool.acquire()?;
     surgeries_repo::create(pooled.conn(), &input, Some(user.id))
 }
@@ -26,6 +26,7 @@ pub fn list_surgeries(
     status: Option<String>,
     search: Option<String>,
 ) -> Result<Vec<Surgery>, AppError> {
+    require_session(&state)?;
     let mut pooled = state.pool.acquire()?;
     surgeries_repo::list(pooled.conn(), status.as_deref(), search.as_deref())
 }
@@ -38,6 +39,21 @@ pub fn set_surgery_status(
     id: i32,
     status: String,
 ) -> Result<Surgery, AppError> {
+    let user = require_session(&state)?;
     let mut pooled = state.pool.acquire()?;
-    surgeries_repo::set_status(pooled.conn(), id, &status)
+    let surgery = surgeries_repo::set_status(pooled.conn(), id, &status)?;
+
+    // Auditoría de transición de estado de cirugía.
+    if let Ok(mut audit_conn) = state.pool.acquire() {
+        crate::repositories::auth::log_audit(
+            audit_conn.conn(),
+            Some(user.id),
+            &user.username,
+            "SURGERY_STATUS_CHANGE",
+            Some(&format!("Cirugía {} → estado {}", id, status)),
+        )
+        .ok();
+    }
+
+    Ok(surgery)
 }

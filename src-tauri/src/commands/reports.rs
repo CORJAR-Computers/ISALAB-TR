@@ -2,6 +2,7 @@ use chrono::{DateTime, Local};
 use rsfbclient::prelude::*;
 use tauri::{AppHandle, Manager, State};
 
+use crate::auth::require_session;
 use crate::error::AppError;
 use crate::models::report::ReportFile;
 use crate::models::settings::ClinicSettings;
@@ -67,6 +68,7 @@ pub fn generate_clinical_report(
     app: AppHandle,
     sample_id: i32,
 ) -> Result<ReportFile, AppError> {
+    require_session(&state)?;
     let mut pooled = state.pool.acquire()?;
     let conn = pooled.conn();
 
@@ -116,6 +118,7 @@ pub fn generate_formula_medica(
     app: AppHandle,
     consultation_id: i32,
 ) -> Result<ReportFile, AppError> {
+    require_session(&state)?;
     let mut pooled = state.pool.acquire()?;
     let conn = pooled.conn();
 
@@ -161,6 +164,7 @@ pub fn generate_consentimiento(
     app: AppHandle,
     surgery_id: i32,
 ) -> Result<ReportFile, AppError> {
+    require_session(&state)?;
     let mut pooled = state.pool.acquire()?;
     let conn = pooled.conn();
 
@@ -212,6 +216,7 @@ pub fn generate_recibo_invoice(
     app: AppHandle,
     invoice_id: i32,
 ) -> Result<ReportFile, AppError> {
+    require_session(&state)?;
     let mut pooled = state.pool.acquire()?;
     let conn = pooled.conn();
 
@@ -252,6 +257,7 @@ pub fn generate_certificado_cirugia(
     app: AppHandle,
     surgery_id: i32,
 ) -> Result<ReportFile, AppError> {
+    require_session(&state)?;
     let mut pooled = state.pool.acquire()?;
     let conn = pooled.conn();
 
@@ -294,6 +300,7 @@ pub fn generate_carnet_vacunacion(
     app: AppHandle,
     patient_id: i32,
 ) -> Result<ReportFile, AppError> {
+    require_session(&state)?;
     let mut pooled = state.pool.acquire()?;
     let conn = pooled.conn();
 
@@ -336,7 +343,11 @@ pub fn generate_carnet_vacunacion(
 /// Lista los informes ya generados (carpeta app_data/reports), más reciente primero.
 #[tauri::command]
 #[specta::specta]
-pub fn list_reports(app: AppHandle) -> Result<Vec<ReportFile>, AppError> {
+pub fn list_reports(
+    state: State<'_, AppState>,
+    app: AppHandle,
+) -> Result<Vec<ReportFile>, AppError> {
+    require_session(&state)?;
     let dir = reports_dir(&app)?;
 
     let mut reports: Vec<ReportFile> = Vec::new();

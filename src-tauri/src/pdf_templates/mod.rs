@@ -9,6 +9,7 @@ pub mod builder;
 pub mod clinical;
 pub mod financial;
 pub mod header;
+pub mod layout;
 pub mod surgical;
 pub mod vaccines;
 
@@ -16,5 +17,6 @@ pub use builder::*;
 pub use clinical::*;
 pub use financial::*;
 pub use header::*;
+pub use layout::*;
 pub use surgical::*;
 pub use vaccines::*;

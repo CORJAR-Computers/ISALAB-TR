@@ -51,6 +51,10 @@ En el primer arranque válido la app:
 
 - La sesión es local y única (una ventana, un operador a la vez).
 - Control de acceso basado en roles (RBAC: `ADMIN`, `VETERINARIO`, `AUXILIAR`) enforced en los comandos nativos de Rust.
+- Todos los comandos requieren sesión activa; las mutaciones críticas requieren rol `ADMIN`.
+- **Auditoría**: tabla `USER_AUDIT_LOG` registra inicios/cierres de sesión, intentos fallidos de login, cambios de contraseña, creación de usuarios, cambios de configuración y transiciones de estado en muestras, facturas, consultas y cirugías.
+- **CSP**: Content Security Policy configurado (`script-src 'self'`, sin eval).
+- **Tests**: unit tests en Rust (`cargo test`) + Vitest en frontend (`npm test`).
 
 ## Estructura
 

@@ -8,10 +8,8 @@ use crate::pdf_templates::builder::{
     draw_multiline, save_pdf, truncate, CONTENT_W, C_MUTED, C_RULE, C_TEXT, MARGIN, PAGE_W,
     PdfBuilder,
 };
-use crate::pdf_templates::clinical::{
-    draw_footer, draw_grid, draw_signature, section_title, ReportSignature,
-};
 use crate::pdf_templates::header::{draw_header, ClinicHeader};
+use crate::pdf_templates::layout::{draw_footer, draw_grid, draw_signature, section_title, ReportSignature};
 
 pub const CONSENT_DECLARATION: &str = "Autorizo al médico veterinario y al personal de la clínica a \
 realizar sobre mi mascota el procedimiento descrito. Declaro haber sido informado(a) de los \

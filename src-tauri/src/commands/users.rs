@@ -1,13 +1,13 @@
 use tauri::State;
 
+use crate::auth::{require_admin, require_session};
 use crate::error::AppError;
 use crate::models::auth::{
     ChangePasswordInput, CreateUserInput, SessionUser, UserListItem,
 };
+use crate::repositories::auth as auth_repo;
 use crate::repositories::users;
 use crate::state::AppState;
-
-use crate::auth::{require_admin, require_session};
 
 /// Listado de usuarios (sin hashes) — solo ADMIN.
 #[tauri::command]
@@ -26,9 +26,22 @@ pub fn create_user(
     state: State<'_, AppState>,
     input: CreateUserInput,
 ) -> Result<UserListItem, AppError> {
-    require_admin(&state)?;
+    let admin = require_admin(&state)?;
     let mut pooled = state.pool.acquire()?;
-    users::create(pooled.conn(), &input)
+    let new_user = users::create(pooled.conn(), &input)?;
+
+    // Auditoría de creación de usuario.
+    if let Ok(mut audit_conn) = state.pool.acquire() {
+        auth_repo::log_audit(
+            audit_conn.conn(),
+            Some(admin.id),
+            &admin.username,
+            "USER_CREATED",
+            Some(&format!("Usuario '{}' creado con rol {}", input.username, input.role)),
+        ).ok();
+    }
+
+    Ok(new_user)
 }
 
 /// Cambia la contraseña del usuario con la sesión activa. Verifica la
@@ -48,6 +61,17 @@ pub fn change_password(
         &input.current_password,
         &input.new_password,
     )?;
+
+    // Auditoría de cambio de contraseña.
+    if let Ok(mut audit_conn) = state.pool.acquire() {
+        auth_repo::log_audit(
+            audit_conn.conn(),
+            Some(user.id),
+            &user.username,
+            "PASSWORD_CHANGED",
+            Some("Contraseña actualizada"),
+        ).ok();
+    }
 
     let mut guard = state
         .session

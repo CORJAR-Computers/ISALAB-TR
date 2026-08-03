@@ -15,27 +15,67 @@ pub fn login(
     input: LoginInput,
 ) -> Result<SessionUser, AppError> {
     let mut pooled = state.pool.acquire()?;
-    let user = auth_repo::find_by_username(pooled.conn(), &input.username)?
-        .ok_or_else(|| AppError::Validation("Usuario o contraseña incorrectos".into()))?;
+    let user = match auth_repo::find_by_username(pooled.conn(), &input.username) {
+        Ok(Some(u)) => u,
+        Ok(None) => {
+            // Auditoría de login fallido (usuario no existe).
+            if let Ok(mut audit_conn) = state.pool.acquire() {
+                auth_repo::log_audit(
+                    audit_conn.conn(),
+                    None,
+                    &input.username,
+                    "LOGIN_FAILED",
+                    Some("Usuario no encontrado"),
+                ).ok();
+            }
+            return Err(AppError::Validation("Usuario o contraseña incorrectos".into()));
+        }
+        Err(e) => return Err(e),
+    };
 
     if !user.active {
+        if let Ok(mut audit_conn) = state.pool.acquire() {
+            auth_repo::log_audit(
+                audit_conn.conn(),
+                Some(user.id),
+                &user.username,
+                "LOGIN_FAILED",
+                Some("Usuario inactivo"),
+            ).ok();
+        }
         return Err(AppError::Validation("Usuario inactivo. Contacta al administrador.".into()));
     }
+
     let hash = user.password_hash.as_deref().ok_or_else(|| {
         AppError::Validation("Usuario sin contraseña configurada".into())
     })?;
+
     if !auth::verify_password(&input.password, hash)? {
+        // Auditoría de login fallido (contraseña incorrecta).
+        if let Ok(mut audit_conn) = state.pool.acquire() {
+            auth_repo::log_audit(
+                audit_conn.conn(),
+                Some(user.id),
+                &user.username,
+                "LOGIN_FAILED",
+                Some("Contraseña incorrecta"),
+            ).ok();
+        }
         return Err(AppError::Validation("Usuario o contraseña incorrectos".into()));
     }
 
     let session = auth_repo::to_session(&user);
-    let _ = auth_repo::log_audit(
-        pooled.conn(),
-        Some(session.id),
-        &session.username,
-        "LOGIN",
-        Some("Inicio de sesión exitoso"),
-    );
+
+    // Auditoría de login exitoso.
+    if let Ok(mut audit_conn) = state.pool.acquire() {
+        auth_repo::log_audit(
+            audit_conn.conn(),
+            Some(session.id),
+            &session.username,
+            "LOGIN",
+            Some("Inicio de sesión exitoso"),
+        ).ok();
+    }
 
     let mut guard = state
         .session
@@ -54,13 +94,13 @@ pub fn logout(state: State<'_, AppState>) -> Result<(), AppError> {
         .map_err(|_| AppError::Internal("Sesión bloqueada".into()))?;
     if let Some(user) = guard.as_ref() {
         if let Ok(mut pooled) = state.pool.acquire() {
-            let _ = auth_repo::log_audit(
+            auth_repo::log_audit(
                 pooled.conn(),
                 Some(user.id),
                 &user.username,
                 "LOGOUT",
                 Some("Cierre de sesión"),
-            );
+            ).ok();
         }
     }
     *guard = None;

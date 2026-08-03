@@ -1,6 +1,6 @@
 use tauri::State;
 
-use crate::commands::current_user;
+use crate::auth::require_session;
 use crate::error::AppError;
 use crate::models::vaccine::{CreateVaccineInput, Vaccine, VaccineListItem};
 use crate::repositories::vaccines as vaccines_repo;
@@ -14,7 +14,7 @@ pub fn create_vaccine(
     state: State<'_, AppState>,
     input: CreateVaccineInput,
 ) -> Result<Vaccine, AppError> {
-    let user = current_user(&state)?;
+    let user = require_session(&state)?;
     let mut pooled = state.pool.acquire()?;
     vaccines_repo::create(pooled.conn(), &input, Some(user.id))
 }
@@ -26,6 +26,7 @@ pub fn list_vaccines(
     state: State<'_, AppState>,
     search: Option<String>,
 ) -> Result<Vec<VaccineListItem>, AppError> {
+    require_session(&state)?;
     let mut pooled = state.pool.acquire()?;
     vaccines_repo::list(pooled.conn(), search.as_deref())
 }

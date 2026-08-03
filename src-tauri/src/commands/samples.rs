@@ -1,5 +1,6 @@
 use tauri::State;
 
+use crate::auth::require_session;
 use crate::error::AppError;
 use crate::models::sample::{CreateSampleInput, LabResult, RegisterResultInput, Sample};
 use crate::models::sample_list_item::SampleListItem;
@@ -14,6 +15,7 @@ pub fn create_sample(
     state: State<'_, AppState>,
     input: CreateSampleInput,
 ) -> Result<Sample, AppError> {
+    require_session(&state)?;
     let mut pooled = state.pool.acquire()?;
     history_repo::create_sample(pooled.conn(), &input)
 }
@@ -26,6 +28,7 @@ pub fn register_lab_result(
     state: State<'_, AppState>,
     input: RegisterResultInput,
 ) -> Result<LabResult, AppError> {
+    require_session(&state)?;
     let mut pooled = state.pool.acquire()?;
     history_repo::register_lab_result(pooled.conn(), &input)
 }
@@ -39,6 +42,7 @@ pub fn list_samples(
     status: Option<String>,
     search: Option<String>,
 ) -> Result<Vec<SampleListItem>, AppError> {
+    require_session(&state)?;
     let mut pooled = state.pool.acquire()?;
     samples_repo::list(pooled.conn(), status.as_deref(), search.as_deref())
 }
@@ -50,6 +54,7 @@ pub fn get_sample(
     state: State<'_, AppState>,
     id: i32,
 ) -> Result<Option<Sample>, AppError> {
+    require_session(&state)?;
     let mut pooled = state.pool.acquire()?;
     samples_repo::get(pooled.conn(), id)
 }
@@ -62,6 +67,21 @@ pub fn set_sample_status(
     id: i32,
     status: String,
 ) -> Result<Sample, AppError> {
+    let user = require_session(&state)?;
     let mut pooled = state.pool.acquire()?;
-    samples_repo::set_status(pooled.conn(), id, &status)
+    let sample = samples_repo::set_status(pooled.conn(), id, &status)?;
+
+    // Auditoría de transición de estado de muestra.
+    if let Ok(mut audit_conn) = state.pool.acquire() {
+        crate::repositories::auth::log_audit(
+            audit_conn.conn(),
+            Some(user.id),
+            &user.username,
+            "SAMPLE_STATUS_CHANGE",
+            Some(&format!("Muestra {} → estado {}", id, status)),
+        )
+        .ok();
+    }
+
+    Ok(sample)
 }

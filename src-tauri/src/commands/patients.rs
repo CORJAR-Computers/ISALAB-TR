@@ -1,5 +1,6 @@
 use tauri::State;
 
+use crate::auth::require_session;
 use crate::error::AppError;
 use crate::models::owner::Owner;
 use crate::models::patient::{CreatePatientInput, Patient};
@@ -12,6 +13,7 @@ pub fn list_patients(
     state: State<'_, AppState>,
     search: Option<String>,
 ) -> Result<Vec<Patient>, AppError> {
+    require_session(&state)?;
     let mut pooled = state.pool.acquire()?;
     patient_repo::list(pooled.conn(), search.as_deref())
 }
@@ -22,6 +24,7 @@ pub fn get_patient(
     state: State<'_, AppState>,
     id: i32,
 ) -> Result<Option<Patient>, AppError> {
+    require_session(&state)?;
     let mut pooled = state.pool.acquire()?;
     patient_repo::get(pooled.conn(), id)
 }
@@ -32,6 +35,7 @@ pub fn create_patient(
     state: State<'_, AppState>,
     input: CreatePatientInput,
 ) -> Result<Patient, AppError> {
+    require_session(&state)?;
     let mut pooled = state.pool.acquire()?;
     patient_repo::create(pooled.conn(), &input)
 }
@@ -43,6 +47,7 @@ pub fn list_owners(
     state: State<'_, AppState>,
     search: Option<String>,
 ) -> Result<Vec<Owner>, AppError> {
+    require_session(&state)?;
     let mut pooled = state.pool.acquire()?;
     patient_repo::list_owners(pooled.conn(), search.as_deref())
 }

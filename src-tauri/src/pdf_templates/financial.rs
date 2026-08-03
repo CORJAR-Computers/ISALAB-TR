@@ -6,8 +6,8 @@ use crate::pdf_templates::builder::{
     draw_multiline, format_cop, sanitize, save_pdf, text_right, truncate, CONTENT_W, C_HEADER_BG,
     C_MUTED, C_RULE, C_TEXT, MARGIN, PAGE_W, PdfBuilder,
 };
-use crate::pdf_templates::clinical::{draw_footer, draw_grid, section_title};
 use crate::pdf_templates::header::{draw_header, ClinicHeader};
+use crate::pdf_templates::layout::{draw_footer, draw_grid, section_title};
 
 /// Datos del comprobante de pago (recibo de factura).
 #[derive(Debug, Clone, Serialize, Deserialize)]

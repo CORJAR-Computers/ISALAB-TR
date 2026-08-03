@@ -2,9 +2,10 @@ use std::path::PathBuf;
 
 use tauri::{AppHandle, Manager, State};
 
-use crate::auth::require_admin;
+use crate::auth::{require_admin, require_session};
 use crate::error::AppError;
 use crate::models::settings::ClinicSettings;
+use crate::repositories::auth as auth_repo;
 use crate::repositories::settings as settings_repo;
 use crate::state::AppState;
 
@@ -17,6 +18,7 @@ const LOGO_EXTENSIONS: [&str; 4] = ["png", "jpg", "jpeg", "webp"];
 pub fn get_clinic_settings(
     state: State<'_, AppState>,
 ) -> Result<ClinicSettings, AppError> {
+    require_session(&state)?;
     let mut pooled = state.pool.acquire()?;
     settings_repo::get(pooled.conn())
 }
@@ -27,9 +29,22 @@ pub fn save_clinic_settings(
     state: State<'_, AppState>,
     input: ClinicSettings,
 ) -> Result<ClinicSettings, AppError> {
-    require_admin(&state)?;
+    let admin = require_admin(&state)?;
     let mut pooled = state.pool.acquire()?;
-    settings_repo::save(pooled.conn(), &input)
+    let result = settings_repo::save(pooled.conn(), &input)?;
+
+    // Auditoría de cambio de configuración.
+    if let Ok(mut audit_conn) = state.pool.acquire() {
+        auth_repo::log_audit(
+            audit_conn.conn(),
+            Some(admin.id),
+            &admin.username,
+            "SETTINGS_CHANGED",
+            Some(&format!("Clínica: {}", input.clinic_name)),
+        ).ok();
+    }
+
+    Ok(result)
 }
 
 /// Copia el logo seleccionado a la carpeta de datos de la app y devuelve su
@@ -41,7 +56,7 @@ pub fn import_clinic_logo(
     app: AppHandle,
     source_path: String,
 ) -> Result<String, AppError> {
-    require_admin(&state)?;
+    let admin = require_admin(&state)?;
     let src = PathBuf::from(&source_path);
     if !src.exists() {
         return Err(AppError::Validation(
@@ -73,5 +88,17 @@ pub fn import_clinic_logo(
     std::fs::copy(&src, &dest).map_err(|e| {
         AppError::Internal(format!("No se pudo copiar el logo: {e}"))
     })?;
+
+    // Auditoría de importación de logo.
+    if let Ok(mut audit_conn) = state.pool.acquire() {
+        auth_repo::log_audit(
+            audit_conn.conn(),
+            Some(admin.id),
+            &admin.username,
+            "LOGO_IMPORTED",
+            Some(&format!("Logo: {}", dest.display())),
+        ).ok();
+    }
+
     Ok(dest.display().to_string())
 }
