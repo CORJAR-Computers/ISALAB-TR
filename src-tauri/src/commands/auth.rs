@@ -29,6 +29,14 @@ pub fn login(
     }
 
     let session = auth_repo::to_session(&user);
+    let _ = auth_repo::log_audit(
+        pooled.conn(),
+        Some(session.id),
+        &session.username,
+        "LOGIN",
+        Some("Inicio de sesión exitoso"),
+    );
+
     let mut guard = state
         .session
         .lock()
@@ -44,6 +52,17 @@ pub fn logout(state: State<'_, AppState>) -> Result<(), AppError> {
         .session
         .lock()
         .map_err(|_| AppError::Internal("Sesión bloqueada".into()))?;
+    if let Some(user) = guard.as_ref() {
+        if let Ok(mut pooled) = state.pool.acquire() {
+            let _ = auth_repo::log_audit(
+                pooled.conn(),
+                Some(user.id),
+                &user.username,
+                "LOGOUT",
+                Some("Cierre de sesión"),
+            );
+        }
+    }
     *guard = None;
     Ok(())
 }

@@ -7,28 +7,7 @@ use crate::models::auth::{
 use crate::repositories::users;
 use crate::state::AppState;
 
-/// Devuelve el usuario de la sesión activa (todas las operaciones de usuarios
-/// exigen haber iniciado sesión).
-fn require_session(state: &AppState) -> Result<SessionUser, AppError> {
-    let guard = state
-        .session
-        .lock()
-        .map_err(|_| AppError::Internal("Sesión bloqueada".into()))?;
-    guard
-        .clone()
-        .ok_or_else(|| AppError::Forbidden("Inicia sesión para continuar".into()))
-}
-
-fn require_admin(state: &AppState) -> Result<(), AppError> {
-    let user = require_session(state)?;
-    if user.role == "ADMIN" {
-        Ok(())
-    } else {
-        Err(AppError::Forbidden(
-            "Solo el administrador puede gestionar usuarios".into(),
-        ))
-    }
-}
+use crate::auth::{require_admin, require_session};
 
 /// Listado de usuarios (sin hashes) — solo ADMIN.
 #[tauri::command]

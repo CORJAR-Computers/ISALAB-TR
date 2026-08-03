@@ -26,3 +26,43 @@ pub fn verify_password(password: &str, hash: &str) -> Result<bool, AppError> {
         .verify_password(password.as_bytes(), &parsed)
         .is_ok())
 }
+
+use crate::models::auth::SessionUser;
+use crate::state::AppState;
+
+/// Devuelve el usuario de la sesión activa o un error 403 Forbidden.
+pub fn require_session(state: &AppState) -> Result<SessionUser, AppError> {
+    let guard = state
+        .session
+        .lock()
+        .map_err(|_| AppError::Internal("Sesión bloqueada".into()))?;
+    guard
+        .clone()
+        .ok_or_else(|| AppError::Forbidden("Inicia sesión para continuar".into()))
+}
+
+/// Exige que la sesión activa pertenezca a un usuario con rol ADMIN.
+pub fn require_admin(state: &AppState) -> Result<SessionUser, AppError> {
+    let user = require_session(state)?;
+    if user.role == "ADMIN" {
+        Ok(user)
+    } else {
+        Err(AppError::Forbidden(
+            "Solo el administrador puede realizar esta acción".into(),
+        ))
+    }
+}
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+
+    #[test]
+    fn test_hash_and_verify_password() {
+        let password = "SecretPassword123!";
+        let hash = hash_password(password).expect("El hashing debe ser exitoso");
+        assert!(hash.starts_with("$argon2id$"));
+        assert!(verify_password(password, &hash).unwrap());
+        assert!(!verify_password("WrongPassword", &hash).unwrap());
+    }
+}

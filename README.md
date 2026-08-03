@@ -44,12 +44,13 @@ En el primer arranque válido la app:
 > La base de datos nunca se commitea (`.gitignore`). Cada instalación la crea
 > localmente.
 
-## Autenticación
+## Autenticación y Seguridad
 
-Al primer arranque el usuario **`admin`** queda habilitado con la contraseña
-por defecto **`admin123`** (Argon2id, se asigna solo si `PASSWORD_HASH` es
-NULL). Cámbiala desde el módulo futuro de usuarios; la sesión es local y única
-(una ventana, un operador a la vez).
+> [!CAUTION]
+> **IMPORTANTE**: Al primer arranque el usuario **`admin`** queda habilitado con la contraseña por defecto **`admin123`** (Argon2id). Por razones de seguridad en entorno clínico, **debes cambiar esta contraseña inmediatamente** en tu primer inicio de sesión desde el módulo de Usuarios o Configuración.
+
+- La sesión es local y única (una ventana, un operador a la vez).
+- Control de acceso basado en roles (RBAC: `ADMIN`, `VETERINARIO`, `AUXILIAR`) enforced en los comandos nativos de Rust.
 
 ## Estructura
 

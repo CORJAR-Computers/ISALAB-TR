@@ -2,6 +2,7 @@ use std::path::PathBuf;
 
 use tauri::{AppHandle, Manager, State};
 
+use crate::auth::require_admin;
 use crate::error::AppError;
 use crate::models::settings::ClinicSettings;
 use crate::repositories::settings as settings_repo;
@@ -26,6 +27,7 @@ pub fn save_clinic_settings(
     state: State<'_, AppState>,
     input: ClinicSettings,
 ) -> Result<ClinicSettings, AppError> {
+    require_admin(&state)?;
     let mut pooled = state.pool.acquire()?;
     settings_repo::save(pooled.conn(), &input)
 }
@@ -34,7 +36,12 @@ pub fn save_clinic_settings(
 /// ruta. De este modo el logo persiste aunque se mueva/borre el original.
 #[tauri::command]
 #[specta::specta]
-pub fn import_clinic_logo(app: AppHandle, source_path: String) -> Result<String, AppError> {
+pub fn import_clinic_logo(
+    state: State<'_, AppState>,
+    app: AppHandle,
+    source_path: String,
+) -> Result<String, AppError> {
+    require_admin(&state)?;
     let src = PathBuf::from(&source_path);
     if !src.exists() {
         return Err(AppError::Validation(

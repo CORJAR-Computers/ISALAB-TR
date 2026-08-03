@@ -56,3 +56,19 @@ pub fn to_session(user: &UserRecord) -> SessionUser {
         must_change_password: user.must_change_password,
     }
 }
+
+/// Registra una acción en la tabla de auditoría (USER_AUDIT_LOG).
+pub fn log_audit(
+    conn: &mut SimpleConnection,
+    user_id: Option<i32>,
+    username: &str,
+    action: &str,
+    details: Option<&str>,
+) -> Result<(), AppError> {
+    conn.execute(
+        "INSERT INTO USER_AUDIT_LOG (USER_ID, USERNAME, ACTION, DETAILS) VALUES (?, ?, ?, ?)",
+        (&user_id, &username, &action, &details),
+    )
+    .map_err(AppError::from)?;
+    Ok(())
+}
