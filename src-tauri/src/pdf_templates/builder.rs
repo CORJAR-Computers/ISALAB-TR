@@ -7,6 +7,7 @@ use printpdf::{
 };
 
 use crate::pdf_templates::header::{LEFT_LOGO_XOBJECT, RIGHT_LOGO_XOBJECT};
+pub use crate::pdf_templates::header::LOGO_W_MM;
 
 /// Ancho/alto Carta (US Letter: 8.5" x 11" = 215.9mm x 279.4mm) y márgenes (mm).
 /// printpdf usa el origen en la esquina inferior izquierda (y crece hacia arriba).
