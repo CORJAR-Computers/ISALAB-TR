@@ -1,0 +1,60 @@
+{
+  "$schema": "https://schema.tauri.app/config/2",
+  "productName": "ISALAB",
+  "version": "0.1.0",
+  "identifier": "com.isalab.clinic",
+  "build": {
+    "beforeDevCommand": "npm run dev",
+    "devUrl": "http://localhost:1420",
+    "beforeBuildCommand": "npm run build",
+    "frontendDist": "../dist"
+  },
+  "app": {
+    "windows": [
+      {
+        "label": "main",
+        "title": "ISALAB · Laboratorio Veterinario",
+        "width": 1280,
+        "height": 820,
+        "minWidth": 1024,
+        "minHeight": 640,
+        "resizable": true,
+        "center": true,
+        "visible": false
+      },
+      {
+        "label": "splash",
+        "title": "ISALAB",
+        "width": 480,
+        "height": 300,
+        "resizable": false,
+        "decorations": false,
+        "alwaysOnTop": true,
+        "skipTaskbar": true,
+        "center": true,
+        "visible": true
+      }
+    ],
+    "security": {
+      "csp": null,
+      "assetProtocol": {
+        "enable": true,
+        "scope": ["$APPDATA/**"]
+      }
+    }
+  },
+  "bundle": {
+    "active": true,
+    "targets": ["nsis"],
+    "icon": [
+      "icons/32x32.png",
+      "icons/128x128.png",
+      "icons/128x128@2x.png",
+      "icons/icon.ico",
+      "icons/icon.png"
+    ],
+    "resources": ["binaries/firebird/**/*"],
+    "shortDescription": "Sistema de gestión para laboratorios veterinarios",
+    "longDescription": "ISALAB — historiales clínicos, muestras analíticas, vacunación, reportes PDF y facturación. Tauri v2 · Rust · Firebird 5 Embedded."
+  }
+}

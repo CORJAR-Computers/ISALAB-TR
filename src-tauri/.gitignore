@@ -1,0 +1,9 @@
+# Rust build output
+/target/
+/gen/schemas
+
+# Firebird runtime artifacts
+*.fdb
+
+# Dependencias de frontend cuando se construye desde src-tauri
+/node_modules/

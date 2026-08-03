@@ -1,0 +1,13 @@
+# firebird.conf — configuración mínima para Firebird 5 Embedded (Windows)
+# Renombra este archivo a "firebird.conf" junto a fbclient.dll si necesitas
+# ajustar el motor. Con los valores por defecto el modo Embedded ya funciona.
+
+# Permite acceso de escritura únicamente dentro de la carpeta de datos
+# (ajústalo a tu app_data; comenta para permitir todo).
+#DatabaseAccess = Restrict C:/Users/<usuario>/AppData/Roaming/com.isalab.clinic
+
+# Proveedores de conexión habilitados (Embedded es suficiente).
+#Providers = Embedded, Local
+
+# Codificación por defecto (la app conecta con UTF8).
+#DefaultDbCachePages = 96K

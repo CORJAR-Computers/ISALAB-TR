@@ -1,0 +1,14 @@
+pub mod auth;
+pub mod clinical_history;
+pub mod consultation;
+pub mod dashboard;
+pub mod invoice;
+pub mod owner;
+pub mod patient;
+pub mod report;
+pub mod sample;
+pub mod sample_list_item;
+pub mod settings;
+pub mod species;
+pub mod surgery;
+pub mod vaccine;

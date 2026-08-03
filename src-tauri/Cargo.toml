@@ -1,0 +1,48 @@
+[package]
+name = "isalab"
+version = "0.1.0"
+description = "Sistema de gestión para laboratorios veterinarios (Firebird 5 Embedded)"
+authors = ["ISALAB"]
+edition = "2021"
+rust-version = "1.77.2"
+
+[lib]
+name = "isalab_lib"
+crate-type = ["staticlib", "cdylib", "rlib"]
+
+[build-dependencies]
+tauri-build = { version = "2", features = [] }
+
+[dependencies]
+tauri = { version = "2", features = ["protocol-asset"] }
+tauri-plugin-opener = "2"
+serde = { version = "1", features = ["derive"] }
+serde_json = "1"
+thiserror = "2"
+
+# ---- Reportes PDF (hito 2) ----
+# feature `png` para decodificar el logo del encabezado (RawImage::decode_from_bytes)
+printpdf = { version = "0.12", features = ["png"] }
+chrono = "0.4"
+
+# ---- Autenticación (hash de contraseñas) ----
+argon2 = "0.5"
+rand = "0.8"
+
+# ---- IPC type-safe (genera src/bindings.ts) ----
+specta = { version = "=2.0.0-rc.25", features = ["derive"] }
+tauri-specta = { version = "=2.0.0-rc.25", features = ["derive", "javascript"] }
+specta-typescript = "0.0.12"
+
+# ---- Firebird 5 Embedded ----
+# `dynamic_loading` localiza fbclient.dll en tiempo de ejecución (bundled en
+# src-tauri/binaries/firebird/). Sin `linking` para no requerir la lib en build.
+rsfbclient = { version = "0.27", default-features = false, features = ["dynamic_loading"] }
+tauri-plugin-dialog = "2"
+
+[profile.release]
+codegen-units = 1
+lto = true
+opt-level = "s"
+panic = "abort"
+strip = true
