@@ -4,13 +4,11 @@
 //! bloques de paciente, firmas, notas y pies de página) que antes estaban
 //! dispersos en `clinical.rs`, creando dependencias cruzadas innecesarias.
 
-use crate::models::owner::Owner;
 use crate::models::patient::Patient;
 use crate::pdf_templates::builder::{
-    draw_multiline, format_value, status_color, status_label,
+    format_value, status_color, status_label,
     CONTENT_W, C_HEADER_BG, C_MUTED, C_RULE, C_TEXT, MARGIN, PAGE_W, PdfBuilder,
 };
-use crate::pdf_templates::header::ClinicHeader;
 use serde::{Deserialize, Serialize};
 use specta::Type;
 
