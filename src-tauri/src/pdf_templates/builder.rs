@@ -6,7 +6,9 @@ use printpdf::{
     TextItem, WindingOrder, XObject, XObjectId,
 };
 
-use crate::pdf_templates::header::{LEFT_LOGO_XOBJECT, RIGHT_LOGO_XOBJECT};
+use crate::pdf_templates::header::{
+    LEFT_LOGO_XOBJECT, RIGHT_LOGO_XOBJECT, WATERMARK_LOGO_XOBJECT,
+};
 pub use crate::pdf_templates::header::LOGO_W_MM;
 
 /// Ancho/alto Carta (US Letter: 8.5" x 11" = 215.9mm x 279.4mm) y márgenes (mm).
@@ -96,6 +98,8 @@ pub struct PdfBuilder {
     pub left_logo: Option<RawImage>,
     /// Logo de la empresa/clínica cliente (esquina superior derecha).
     pub right_logo: Option<RawImage>,
+    /// Logo marca de agua suavizado (centro de la página).
+    pub watermark_logo: Option<RawImage>,
 }
 
 impl PdfBuilder {
@@ -106,6 +110,7 @@ impl PdfBuilder {
             y: PAGE_H - MARGIN,
             left_logo: None,
             right_logo: None,
+            watermark_logo: None,
         }
     }
 
@@ -246,6 +251,12 @@ pub fn save_pdf(mut pdf: PdfBuilder, out_path: &Path, doc_title: &str) -> Result
     if let Some(logo) = pdf.right_logo.take() {
         doc.resources.xobjects.map.insert(
             XObjectId(RIGHT_LOGO_XOBJECT.to_string()),
+            XObject::Image(logo),
+        );
+    }
+    if let Some(logo) = pdf.watermark_logo.take() {
+        doc.resources.xobjects.map.insert(
+            XObjectId(WATERMARK_LOGO_XOBJECT.to_string()),
             XObject::Image(logo),
         );
     }

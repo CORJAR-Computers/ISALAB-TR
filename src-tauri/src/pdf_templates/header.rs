@@ -12,6 +12,7 @@ pub const LOGO_W_MM: f32 = 30.0;
 /// Nombres de los XObjects de los logos en los recursos del PDF.
 pub const LEFT_LOGO_XOBJECT: &str = "ISALAB-LEFT-LOGO";
 pub const RIGHT_LOGO_XOBJECT: &str = "ISALAB-RIGHT-LOGO";
+pub const WATERMARK_LOGO_XOBJECT: &str = "ISALAB-WATERMARK-LOGO";
 
 /// Logo por defecto incrustado en el binario (logo_sidebar.png de la raíz).
 pub const DEFAULT_LOGO: &[u8] = include_bytes!("../../../logo_sidebar.png");
@@ -45,6 +46,46 @@ pub fn load_left_logo() -> Option<RawImage> {
     decode(DEFAULT_LOGO)
 }
 
+/// Carga el logo de ISALAB y le aplica un suavizado ultrasuave (~7% de intensidad) para la marca de agua.
+pub fn load_watermark_logo() -> Option<RawImage> {
+    let mut img = load_left_logo()?;
+    let factor = 0.07f32; // 7% de opacidad para que sea ultrasuave y no interfiera con el texto
+
+    if let printpdf::RawImageData::U8(ref mut data) = img.pixels {
+        let total_pixels = img.width * img.height;
+        if total_pixels > 0 && !data.is_empty() {
+            let chunk_size = data.len() / total_pixels;
+
+            if chunk_size == 3 || chunk_size == 4 {
+                for pixel in data.chunks_exact_mut(chunk_size) {
+                    let r = pixel[0] as f32;
+                    let g = pixel[1] as f32;
+                    let b = pixel[2] as f32;
+
+                    if chunk_size == 4 {
+                        let a = pixel[3];
+                        if a < 20 {
+                            // Mantener pixel transparente
+                            pixel[0] = 255;
+                            pixel[1] = 255;
+                            pixel[2] = 255;
+                            pixel[3] = 0;
+                            continue;
+                        }
+                    }
+
+                    // Blending suave de RGB hacia blanco puro (255)
+                    pixel[0] = (255.0 - (255.0 - r) * factor).round() as u8;
+                    pixel[1] = (255.0 - (255.0 - g) * factor).round() as u8;
+                    pixel[2] = (255.0 - (255.0 - b) * factor).round() as u8;
+                }
+            }
+        }
+    }
+
+    Some(img)
+}
+
 /// Carga el logo derecho (empresa cliente): primero `clinic.logo_path` y luego archivos en dist.
 pub fn load_right_logo(clinic: &ClinicHeader) -> Option<RawImage> {
     let decode = |bytes: &[u8]| -> Option<RawImage> {
@@ -72,10 +113,10 @@ pub fn load_right_logo(clinic: &ClinicHeader) -> Option<RawImage> {
 
 /// Dibuja una marca de agua central sutil con el logo institucional de ISALAB.
 pub fn draw_watermark(pdf: &mut PdfBuilder) {
-    if pdf.left_logo.is_none() {
-        pdf.left_logo = load_left_logo();
+    if pdf.watermark_logo.is_none() {
+        pdf.watermark_logo = load_watermark_logo();
     }
-    if let Some(logo) = &pdf.left_logo {
+    if let Some(logo) = &pdf.watermark_logo {
         let (w_px, h_px) = (logo.width as f32, logo.height as f32);
         let wm_w_mm = 85.0f32;
         let wm_h_mm = if w_px > 0.0 { (wm_w_mm * h_px / w_px).min(85.0) } else { wm_w_mm };
@@ -83,7 +124,7 @@ pub fn draw_watermark(pdf: &mut PdfBuilder) {
         let y_center = (PAGE_H - wm_h_mm) / 2.0;
 
         pdf.ops.push(Op::UseXobject {
-            id: XObjectId(LEFT_LOGO_XOBJECT.to_string()),
+            id: XObjectId(WATERMARK_LOGO_XOBJECT.to_string()),
             transform: XObjectTransform {
                 translate_x: Some(Pt(x_center * MM_TO_PT)),
                 translate_y: Some(Pt(y_center * MM_TO_PT)),
