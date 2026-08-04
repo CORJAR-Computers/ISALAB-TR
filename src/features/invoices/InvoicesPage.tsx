@@ -24,6 +24,7 @@ import { INVOICE_STATUS, PAYMENT_METHOD_LABEL } from "@/lib/status";
 import { cn, formatCOP, formatDateTime } from "@/lib/utils";
 import { InvoiceDetailDialog } from "./InvoiceDetailDialog";
 import { NewInvoiceDialog } from "./NewInvoiceDialog";
+import { usePermissions } from "@/hooks/use-permissions";
 
 const STATUS_TABS: Array<{ value: string | null; label: string }> = [
   { value: null, label: "Todas" },
@@ -39,6 +40,7 @@ export function InvoicesPage() {
   const [detailId, setDetailId] = useState<number | null>(null);
   const { data: invoices, isLoading, isError } = useInvoices(status, search);
   const { data: all } = useInvoiceCounts();
+  const { isVetOrAdmin } = usePermissions();
 
   // Contadores reales por estado (independientes de filtros/búsqueda).
   const counts = useMemo(() => {
@@ -74,10 +76,12 @@ export function InvoicesPage() {
             Emisión de facturas con IVA, métodos de pago y estados de cobro.
           </p>
         </div>
-        <Button onClick={() => setNewOpen(true)}>
-          <Plus className="size-4" />
-          Nueva factura
-        </Button>
+        {isVetOrAdmin && (
+          <Button onClick={() => setNewOpen(true)}>
+            <Plus className="size-4" />
+            Nueva factura
+          </Button>
+        )}
       </div>
 
       <div className="flex flex-col gap-3 lg:flex-row lg:items-center">

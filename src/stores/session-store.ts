@@ -1,5 +1,6 @@
 import { create } from "zustand";
 import type { SessionUser } from "@/bindings";
+import { api } from "@/lib/api";
 
 type SessionState = {
   /** Usuario autenticado (null = pantalla de login). */
@@ -12,6 +13,7 @@ type SessionState = {
   setHydrated: (v: boolean) => void;
   openChangePassword: () => void;
   closeChangePassword: () => void;
+  logout: () => Promise<void>;
 };
 
 export const useSessionStore = create<SessionState>((set) => ({
@@ -22,4 +24,13 @@ export const useSessionStore = create<SessionState>((set) => ({
   setHydrated: (hydrated) => set({ hydrated }),
   openChangePassword: () => set({ changePasswordOpen: true }),
   closeChangePassword: () => set({ changePasswordOpen: false }),
+  logout: async () => {
+    try {
+      await api.logout();
+    } catch (e) {
+      console.error("Error al cerrar sesión", e);
+    } finally {
+      set({ session: null });
+    }
+  },
 }));

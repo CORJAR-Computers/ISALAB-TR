@@ -22,11 +22,13 @@ import { Skeleton } from "@/components/ui/skeleton";
 import { useVaccines } from "@/hooks/use-queries";
 import { formatDateTime } from "@/lib/utils";
 import { NewVaccineDialog } from "./NewVaccineDialog";
+import { usePermissions } from "@/hooks/use-permissions";
 
 export function VaccinesPage() {
   const [search, setSearch] = useState("");
   const [dialogOpen, setDialogOpen] = useState(false);
   const { data: vaccines, isLoading, isError } = useVaccines(search);
+  const { isVetOrAdmin } = usePermissions();
 
   return (
     <div className="space-y-5">
@@ -39,10 +41,12 @@ export function VaccinesPage() {
             Esquemas de vacunación por paciente con control de refuerzos.
           </p>
         </div>
-        <Button onClick={() => setDialogOpen(true)}>
-          <Plus className="size-4" />
-          Registrar vacuna
-        </Button>
+        {isVetOrAdmin && (
+          <Button onClick={() => setDialogOpen(true)}>
+            <Plus className="size-4" />
+            Registrar vacuna
+          </Button>
+        )}
       </div>
 
       <div className="relative max-w-sm">

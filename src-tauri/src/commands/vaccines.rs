@@ -1,6 +1,6 @@
 use tauri::State;
 
-use crate::auth::require_session;
+use crate::auth::{require_session, require_vet_or_admin};
 use crate::error::AppError;
 use crate::models::vaccine::{CreateVaccineInput, Vaccine, VaccineListItem};
 use crate::repositories::vaccines as vaccines_repo;
@@ -14,7 +14,7 @@ pub fn create_vaccine(
     state: State<'_, AppState>,
     input: CreateVaccineInput,
 ) -> Result<Vaccine, AppError> {
-    let user = require_session(&state)?;
+    let user = require_vet_or_admin(&state)?;
     let mut pooled = state.pool.acquire()?;
     vaccines_repo::create(pooled.conn(), &input, Some(user.id))
 }

@@ -1,6 +1,6 @@
 use tauri::State;
 
-use crate::auth::require_session;
+use crate::auth::{require_session, require_vet_or_admin};
 use crate::error::AppError;
 use crate::models::invoice::{CreateInvoiceInput, Invoice, InvoiceListItem};
 use crate::repositories::invoices as invoices_repo;
@@ -13,7 +13,7 @@ pub fn create_invoice(
     state: State<'_, AppState>,
     input: CreateInvoiceInput,
 ) -> Result<Invoice, AppError> {
-    require_session(&state)?;
+    require_vet_or_admin(&state)?;
     let mut pooled = state.pool.acquire()?;
     invoices_repo::create(pooled.conn(), &input)
 }
@@ -51,7 +51,7 @@ pub fn set_invoice_status(
     id: i32,
     status: String,
 ) -> Result<Invoice, AppError> {
-    let user = require_session(&state)?;
+    let user = require_vet_or_admin(&state)?;
     let mut pooled = state.pool.acquire()?;
     let invoice = invoices_repo::set_status(pooled.conn(), id, &status)?;
 

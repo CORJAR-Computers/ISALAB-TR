@@ -12,6 +12,7 @@ import { PatientCard } from "./PatientCard";
 import { ClinicalTimeline } from "./ClinicalTimeline";
 import { NewConsultationDialog } from "./NewConsultationDialog";
 import { NewSampleDialog } from "./NewSampleDialog";
+import { usePermissions } from "@/hooks/use-permissions";
 
 export function ClinicalHistoryPage() {
   const activePatientId = useUiStore((s) => s.activePatientId);
@@ -21,6 +22,7 @@ export function ClinicalHistoryPage() {
   const [consultOpen, setConsultOpen] = useState(false);
   const [sampleOpen, setSampleOpen] = useState(false);
   const [vaccineOpen, setVaccineOpen] = useState(false);
+  const { isVetOrAdmin } = usePermissions();
 
   const { data: patients = [], isLoading: loadingPatients } =
     usePatients(search);
@@ -111,18 +113,22 @@ export function ClinicalHistoryPage() {
     <div className="space-y-5">
       {/* Acciones */}
       <div className="flex flex-wrap items-center gap-2">
-        <Button variant="default" onClick={() => setConsultOpen(true)}>
-          <Stethoscope className="size-4" />
-          Nueva consulta
-        </Button>
+        {isVetOrAdmin && (
+          <Button variant="default" onClick={() => setConsultOpen(true)}>
+            <Stethoscope className="size-4" />
+            Nueva consulta
+          </Button>
+        )}
         <Button variant="outline" onClick={() => setSampleOpen(true)}>
           <FlaskConical className="size-4" />
           Registrar muestra
         </Button>
-        <Button variant="outline" onClick={() => setVaccineOpen(true)}>
-          <Syringe className="size-4" />
-          Registrar vacuna
-        </Button>
+        {isVetOrAdmin && (
+          <Button variant="outline" onClick={() => setVaccineOpen(true)}>
+            <Syringe className="size-4" />
+            Registrar vacuna
+          </Button>
+        )}
         <Button
           variant="ghost"
           size="sm"

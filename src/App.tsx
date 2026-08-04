@@ -10,6 +10,9 @@ import { ChangePasswordDialog } from "@/features/auth/ChangePasswordDialog";
 import { useFirebirdEvents } from "@/hooks/use-firebird-events";
 import { useDbHealth } from "@/hooks/use-queries";
 import { useUiStore } from "@/stores/ui-store";
+import { ErrorBoundary } from "react-error-boundary";
+import { GlobalErrorFallback } from "@/components/layout/GlobalErrorBoundary";
+import { useSessionTimeout } from "@/hooks/use-session-timeout";
 import { useSessionStore } from "@/stores/session-store";
 import { api } from "@/lib/api";
 import { DashboardPage } from "@/features/dashboard/DashboardPage";
@@ -37,6 +40,7 @@ export default function App() {
   const { data: health, refetch: refetchHealth } = useDbHealth();
 
   useFirebirdEvents();
+  useSessionTimeout();
 
   // Aplica el tema guardado al montar.
   useEffect(() => {
@@ -83,89 +87,91 @@ export default function App() {
   const firebirdMissing = health && !health.ok && !health.fbclientFound;
 
   return (
-    <div className="min-h-svh">
-      <Sidebar />
-      <AboutDialog />
-      <ChangePasswordDialog
-        open={mustChangePassword || changePasswordOpen}
-        onOpenChange={mustChangePassword ? () => {} : closeChangePassword}
-        forced={mustChangePassword}
-      />
+    <ErrorBoundary FallbackComponent={GlobalErrorFallback}>
+      <div className="min-h-svh">
+        <Sidebar />
+        <AboutDialog />
+        <ChangePasswordDialog
+          open={mustChangePassword || changePasswordOpen}
+          onOpenChange={mustChangePassword ? () => {} : closeChangePassword}
+          forced={mustChangePassword}
+        />
 
-      <div className="lg:pl-64">
-        <TopBar />
+        <div className="lg:pl-64">
+          <TopBar />
 
-        {/* Banner de configuración de Firebird Embedded */}
-        {firebirdMissing && (
-          <div className="border-b bg-warning/10 px-4 py-3 lg:px-6">
-            <div className="mx-auto flex max-w-6xl flex-col gap-3 sm:flex-row sm:items-center">
-              <div className="flex items-start gap-3">
-                <span className="flex size-8 shrink-0 items-center justify-center rounded-lg bg-warning/20">
-                  <AlertTriangle className="size-4.5 text-warning" />
-                </span>
-                <div>
-                  <p className="text-sm font-semibold">
-                    Motor Firebird Embedded no encontrado
-                  </p>
-                  <p className="text-muted-foreground mt-0.5 text-xs leading-relaxed">
-                    Copia <code className="font-mono">fbclient.dll</code> de
-                    Firebird 5 en{" "}
-                    <code className="font-mono">src-tauri/binaries/firebird/</code>{" "}
-                    (ver README). La base de datos se creará automáticamente al
-                    primer arranque válido.
-                  </p>
+          {/* Banner de configuración de Firebird Embedded */}
+          {firebirdMissing && (
+            <div className="border-b bg-warning/10 px-4 py-3 lg:px-6">
+              <div className="mx-auto flex max-w-6xl flex-col gap-3 sm:flex-row sm:items-center">
+                <div className="flex items-start gap-3">
+                  <span className="flex size-8 shrink-0 items-center justify-center rounded-lg bg-warning/20">
+                    <AlertTriangle className="size-4.5 text-warning" />
+                  </span>
+                  <div>
+                    <p className="text-sm font-semibold">
+                      Motor Firebird Embedded no encontrado
+                    </p>
+                    <p className="text-muted-foreground mt-0.5 text-xs leading-relaxed">
+                      Copia <code className="font-mono">fbclient.dll</code> de
+                      Firebird 5 en{" "}
+                      <code className="font-mono">src-tauri/binaries/firebird/</code>{" "}
+                      (ver README). La base de datos se creará automáticamente al
+                      primer arranque válido.
+                    </p>
+                  </div>
                 </div>
+                <Button
+                  size="sm"
+                  variant="outline"
+                  className="shrink-0"
+                  onClick={() => refetchHealth()}
+                >
+                  <RefreshCw className="size-3.5" />
+                  Reintentar
+                </Button>
               </div>
-              <Button
-                size="sm"
-                variant="outline"
-                className="shrink-0"
-                onClick={() => refetchHealth()}
-              >
-                <RefreshCw className="size-3.5" />
-                Reintentar
-              </Button>
             </div>
-          </div>
-        )}
+          )}
 
-        {health?.ok && (
-          <div className="mx-auto max-w-6xl px-4 pt-4 lg:px-6">
-            <div className="flex flex-wrap items-center gap-2 text-xs text-muted-foreground">
-              <Badge variant="success" className="gap-1">
-                <span className="relative flex size-1.5">
-                  <span className="absolute inline-flex h-full w-full animate-ping rounded-full bg-success opacity-60" />
-                  <span className="relative inline-flex size-1.5 rounded-full bg-success" />
-                </span>
-                Firebird conectado
-              </Badge>
-              <Badge variant="secondary">
-                Schema v{health.schemaVersion}
-              </Badge>
-              <Badge variant="outline" className="font-mono max-w-72 truncate">
-                {health.dbPath}
-              </Badge>
+          {health?.ok && (
+            <div className="mx-auto max-w-6xl px-4 pt-4 lg:px-6">
+              <div className="flex flex-wrap items-center gap-2 text-xs text-muted-foreground">
+                <Badge variant="success" className="gap-1">
+                  <span className="relative flex size-1.5">
+                    <span className="absolute inline-flex h-full w-full animate-ping rounded-full bg-success opacity-60" />
+                    <span className="relative inline-flex size-1.5 rounded-full bg-success" />
+                  </span>
+                  Firebird conectado
+                </Badge>
+                <Badge variant="secondary">
+                  Schema v{health.schemaVersion}
+                </Badge>
+                <Badge variant="outline" className="font-mono max-w-72 truncate">
+                  {health.dbPath}
+                </Badge>
+              </div>
             </div>
-          </div>
-        )}
+          )}
 
-        <main className="mx-auto max-w-6xl px-4 py-6 lg:px-6">
-          <div key={view} className="animate-fade-in-up">
-            {view === "dashboard" && <DashboardPage />}
-            {view === "agenda" && <ConsultationsPage />}
-            {view === "patients" && <PatientsPage />}
-            {view === "clinical-history" && <ClinicalHistoryPage />}
-            {view === "samples" && <SamplesPage />}
-            {view === "surgeries" && <SurgeriesPage />}
-            {view === "vaccines" && <VaccinesPage />}
-            {view === "invoices" && <InvoicesPage />}
-            {view === "reports" && <ReportsPage />}
-            {view === "settings" && <SettingsPage />}
-            {view === "users" && <UsersPage />}
-            {view === "audit-log" && <AuditLogPage />}
-          </div>
-        </main>
+          <main className="mx-auto max-w-6xl px-4 py-6 lg:px-6">
+            <div key={view} className="animate-fade-in-up">
+              {view === "dashboard" && <DashboardPage />}
+              {view === "agenda" && <ConsultationsPage />}
+              {view === "patients" && <PatientsPage />}
+              {view === "clinical-history" && <ClinicalHistoryPage />}
+              {view === "samples" && <SamplesPage />}
+              {view === "surgeries" && <SurgeriesPage />}
+              {view === "vaccines" && <VaccinesPage />}
+              {view === "invoices" && <InvoicesPage />}
+              {view === "reports" && <ReportsPage />}
+              {view === "settings" && <SettingsPage />}
+              {view === "users" && <UsersPage />}
+              {view === "audit-log" && <AuditLogPage />}
+            </div>
+          </main>
+        </div>
       </div>
-    </div>
+    </ErrorBoundary>
   );
 }

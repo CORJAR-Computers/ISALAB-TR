@@ -1,6 +1,6 @@
 use tauri::State;
 
-use crate::auth::require_session;
+use crate::auth::{require_session, require_vet_or_admin};
 use crate::error::AppError;
 use crate::models::surgery::{CreateSurgeryInput, Surgery};
 use crate::repositories::surgeries as surgeries_repo;
@@ -13,7 +13,7 @@ pub fn create_surgery(
     state: State<'_, AppState>,
     input: CreateSurgeryInput,
 ) -> Result<Surgery, AppError> {
-    let user = require_session(&state)?;
+    let user = require_vet_or_admin(&state)?;
     let mut pooled = state.pool.acquire()?;
     surgeries_repo::create(pooled.conn(), &input, Some(user.id))
 }
@@ -39,7 +39,7 @@ pub fn set_surgery_status(
     id: i32,
     status: String,
 ) -> Result<Surgery, AppError> {
-    let user = require_session(&state)?;
+    let user = require_vet_or_admin(&state)?;
     let mut pooled = state.pool.acquire()?;
     let surgery = surgeries_repo::set_status(pooled.conn(), id, &status)?;
 

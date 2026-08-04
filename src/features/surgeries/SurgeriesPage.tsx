@@ -37,6 +37,7 @@ import { getErrorMessage } from "@/lib/api";
 import { SURGERY_STATUS } from "@/lib/status";
 import { cn, formatDateTime } from "@/lib/utils";
 import { NewSurgeryDialog } from "./NewSurgeryDialog";
+import { usePermissions } from "@/hooks/use-permissions";
 
 const STATUS_TABS: Array<{ value: string | null; label: string }> = [
   { value: null, label: "Todas" },
@@ -53,6 +54,7 @@ export function SurgeriesPage() {
   const { data: surgeries, isLoading, isError } = useSurgeries(status, search);
   const { data: all } = useSurgeryCounts();
   const setStatusMutation = useSetSurgeryStatus();
+  const { isVetOrAdmin } = usePermissions();
 
   // Contadores reales por estado (independientes de filtros/búsqueda).
   const counts = useMemo(() => {
@@ -91,10 +93,12 @@ export function SurgeriesPage() {
             intervención.
           </p>
         </div>
-        <Button onClick={() => setDialogOpen(true)}>
-          <Plus className="size-4" />
-          Programar cirugía
-        </Button>
+        {isVetOrAdmin && (
+          <Button onClick={() => setDialogOpen(true)}>
+            <Plus className="size-4" />
+            Programar cirugía
+          </Button>
+        )}
       </div>
 
       <div className="flex flex-col gap-3 lg:flex-row lg:items-center">
@@ -222,52 +226,56 @@ export function SurgeriesPage() {
                       <Badge variant={st.variant}>{st.label}</Badge>
                     </TableCell>
                     <TableCell className="text-right">
-                      {s.status === "PROGRAMADA" && (
-                        <Button
-                          variant="outline"
-                          size="sm"
-                          disabled={busy}
-                          onClick={() =>
-                            changeStatus(s.id, "EN_CURSO", "En curso")
-                          }
-                        >
-                          {busy ? (
-                            <Loader2 className="size-3.5 animate-spin" />
-                          ) : (
-                            <PlayCircle className="size-3.5" />
+                      {isVetOrAdmin && (
+                        <>
+                          {s.status === "PROGRAMADA" && (
+                            <Button
+                              variant="outline"
+                              size="sm"
+                              disabled={busy}
+                              onClick={() =>
+                                changeStatus(s.id, "EN_CURSO", "En curso")
+                              }
+                            >
+                              {busy ? (
+                                <Loader2 className="size-3.5 animate-spin" />
+                              ) : (
+                                <PlayCircle className="size-3.5" />
+                              )}
+                              Iniciar
+                            </Button>
                           )}
-                          Iniciar
-                        </Button>
-                      )}
-                      {s.status === "EN_CURSO" && (
-                        <div className="flex justify-end gap-1">
-                          <Button
-                            variant="outline"
-                            size="sm"
-                            className="text-success"
-                            disabled={busy}
-                            onClick={() =>
-                              changeStatus(s.id, "COMPLETADA", "Completada")
-                            }
-                          >
-                            <CheckCircle2 className="size-3.5" />
-                            Completar
-                          </Button>
-                        </div>
-                      )}
-                      {(s.status === "PROGRAMADA" || s.status === "EN_CURSO") && (
-                        <Button
-                          variant="ghost"
-                          size="sm"
-                          className="text-destructive"
-                          disabled={busy}
-                          onClick={() =>
-                            changeStatus(s.id, "CANCELADA", "Cancelada")
-                          }
-                        >
-                          <Ban className="size-3.5" />
-                          Cancelar
-                        </Button>
+                          {s.status === "EN_CURSO" && (
+                            <div className="flex justify-end gap-1">
+                              <Button
+                                variant="outline"
+                                size="sm"
+                                className="text-success"
+                                disabled={busy}
+                                onClick={() =>
+                                  changeStatus(s.id, "COMPLETADA", "Completada")
+                                }
+                              >
+                                <CheckCircle2 className="size-3.5" />
+                                Completar
+                              </Button>
+                            </div>
+                          )}
+                          {(s.status === "PROGRAMADA" || s.status === "EN_CURSO") && (
+                            <Button
+                              variant="ghost"
+                              size="sm"
+                              className="text-destructive"
+                              disabled={busy}
+                              onClick={() =>
+                                changeStatus(s.id, "CANCELADA", "Cancelada")
+                              }
+                            >
+                              <Ban className="size-3.5" />
+                              Cancelar
+                            </Button>
+                          )}
+                        </>
                       )}
                     </TableCell>
                   </TableRow>

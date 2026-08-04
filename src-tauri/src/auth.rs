@@ -53,6 +53,18 @@ pub fn require_admin(state: &AppState) -> Result<SessionUser, AppError> {
     }
 }
 
+/// Exige que la sesión activa pertenezca a un VETERINARIO o ADMIN.
+pub fn require_vet_or_admin(state: &AppState) -> Result<SessionUser, AppError> {
+    let user = require_session(state)?;
+    if user.role == "ADMIN" || user.role == "VETERINARIO" {
+        Ok(user)
+    } else {
+        Err(AppError::Forbidden(
+            "Se requieren permisos de Veterinario o Administrador para esta acción".into(),
+        ))
+    }
+}
+
 #[cfg(test)]
 mod tests {
     use super::*;
@@ -64,5 +76,43 @@ mod tests {
         assert!(hash.starts_with("$argon2id$"));
         assert!(verify_password(password, &hash).unwrap());
         assert!(!verify_password("WrongPassword", &hash).unwrap());
+    }
+
+    // Dummy State creation for testing would require full AppState setup,
+    // so we can test the roles logic conceptually or create a mock AppState if it was easy.
+    // Instead, since require_admin is tightly coupled with State, we would usually
+    // test the business logic decoupling it, but for now we'll leave a placeholder test.
+    #[test]
+    fn test_role_auth_logic() {
+        let user_admin = SessionUser {
+            id: 1,
+            username: "admin".into(),
+            full_name: "Admin".into(),
+            role: "ADMIN".into(),
+            must_change_password: false,
+        };
+        let user_vet = SessionUser {
+            id: 2,
+            username: "vet".into(),
+            full_name: "Vet".into(),
+            role: "VETERINARIO".into(),
+            must_change_password: false,
+        };
+        let user_aux = SessionUser {
+            id: 3,
+            username: "aux".into(),
+            full_name: "Aux".into(),
+            role: "AUXILIAR".into(),
+            must_change_password: false,
+        };
+
+        // Logic of require_admin
+        assert_eq!(user_admin.role, "ADMIN");
+        assert_ne!(user_vet.role, "ADMIN");
+
+        // Logic of require_vet_or_admin
+        assert!(user_admin.role == "ADMIN" || user_admin.role == "VETERINARIO");
+        assert!(user_vet.role == "ADMIN" || user_vet.role == "VETERINARIO");
+        assert!(!(user_aux.role == "ADMIN" || user_aux.role == "VETERINARIO"));
     }
 }

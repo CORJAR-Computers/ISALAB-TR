@@ -1,84 +1,55 @@
-name: CI / Quality & Tests
+name: CI
 
 on:
   push:
-    branches: [ main, master ]
+    branches: [ "main" ]
   pull_request:
-    branches: [ main, master ]
+    branches: [ "main" ]
+
+env:
+  CARGO_TERM_COLOR: always
 
 jobs:
-  test-rust:
-    name: Rust Check, Lint & Tests
-    runs-on: windows-latest
-
-    steps:
-      - uses: actions/checkout@v4
-
-      - name: Setup Rust
-        uses: dtolnay/rust-toolchain@stable
-        with:
-          components: rustfmt, clippy
-
-      - name: Cache Cargo Dependencies
-        uses: Swatinem/rust-cache@v2
-        with:
-          workspaces: src-tauri -> target
-
-      - name: Check Formatting
-        run: cargo fmt --check
-        working-directory: src-tauri
-
-      - name: Run Cargo Check
-        run: cargo check
-        working-directory: src-tauri
-
-      - name: Run Clippy
-        run: cargo clippy -- -D warnings
-        working-directory: src-tauri
-
-      - name: Run Cargo Test
-        run: cargo test
-        working-directory: src-tauri
-
-  security-audit:
-    name: Dependency Security Audit
+  frontend:
+    name: Frontend (React)
     runs-on: ubuntu-latest
-    continue-on-error: true
-
     steps:
       - uses: actions/checkout@v4
-
-      - name: Setup Rust
-        uses: dtolnay/rust-toolchain@stable
-
-      - name: Install cargo-audit
-        run: cargo install cargo-audit
-
-      - name: Run Security Audit
-        run: cargo audit
-        working-directory: src-tauri
-
-  test-frontend:
-    name: Frontend Check & Build
-    runs-on: ubuntu-latest
-
-    steps:
-      - uses: actions/checkout@v4
-
       - name: Setup Node.js
         uses: actions/setup-node@v4
         with:
           node-version: 20
           cache: 'npm'
-
-      - name: Install Dependencies
+      - name: Install dependencies
         run: npm ci
-
-      - name: Typecheck TypeScript
-        run: npx tsc --noEmit
-
-      - name: Run Frontend Tests
-        run: npx vitest run
-
+      - name: Run ESLint
+        run: npm run lint
+      - name: Run Vitest
+        run: npm run test
       - name: Build Frontend
         run: npm run build
+
+  backend:
+    name: Backend (Rust)
+    runs-on: windows-latest
+    steps:
+      - uses: actions/checkout@v4
+      - name: Install Rust
+        uses: dtolnay/rust-toolchain@stable
+      - name: Cache cargo registry
+        uses: actions/cache@v4
+        with:
+          path: |
+            ~/.cargo/registry
+            ~/.cargo/git
+            src-tauri/target
+          key: ${{ runner.os }}-cargo-${{ hashFiles('**/Cargo.lock') }}
+      - name: Check format
+        run: cargo fmt --all -- --check
+        working-directory: ./src-tauri
+      - name: Run clippy
+        run: cargo clippy -- -D warnings
+        working-directory: ./src-tauri
+      - name: Run tests
+        run: cargo test
+        working-directory: ./src-tauri

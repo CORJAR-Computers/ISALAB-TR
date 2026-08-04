@@ -1,6 +1,6 @@
 use tauri::State;
 
-use crate::auth::require_session;
+use crate::auth::{require_session, require_vet_or_admin};
 use crate::error::AppError;
 use crate::models::clinical_history::ClinicalHistory;
 use crate::models::consultation::{
@@ -26,7 +26,7 @@ pub fn create_consultation(
     state: State<'_, AppState>,
     input: CreateConsultationInput,
 ) -> Result<Consultation, AppError> {
-    require_session(&state)?;
+    require_vet_or_admin(&state)?;
     let mut pooled = state.pool.acquire()?;
     history_repo::create_consultation(pooled.conn(), &input)
 }
@@ -52,7 +52,7 @@ pub fn set_consultation_status(
     id: i32,
     status: String,
 ) -> Result<ConsultationListItem, AppError> {
-    let user = require_session(&state)?;
+    let user = require_vet_or_admin(&state)?;
     let mut pooled = state.pool.acquire()?;
     let result = history_repo::set_consultation_status(pooled.conn(), id, &status)?;
 
