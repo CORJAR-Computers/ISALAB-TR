@@ -107,6 +107,8 @@ export const commands = {
 	generateCarnetVacunacion: (patientId: number) => typedError<ReportFile, AppError>(__TAURI_INVOKE("generate_carnet_vacunacion", { patientId })),
 	/**  Lista los informes ya generados (carpeta app_data/reports), más reciente primero. */
 	listReports: () => typedError<ReportFile[], AppError>(__TAURI_INVOKE("list_reports")),
+	/**  Abre un archivo de reporte PDF en el visor por defecto del sistema operativo. */
+	openReportFile: (path: string) => typedError<null, AppError>(__TAURI_INVOKE("open_report_file", { path })),
 	/**  Listado de usuarios (sin hashes) — solo ADMIN. */
 	listUsers: () => typedError<UserListItem[], AppError>(__TAURI_INVOKE("list_users")),
 	/**

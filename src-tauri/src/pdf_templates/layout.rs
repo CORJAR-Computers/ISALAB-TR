@@ -85,10 +85,10 @@ pub fn draw_patient_block(pdf: &mut PdfBuilder, patient: &Patient) {
     draw_grid(pdf, &rows);
 }
 
-/// Dibuja la tabla de resultados analíticos con valores fuera de rango resaltados.
+/// Dibuja la tabla de resultados analíticos con alineación perfecta, columnas definidas y colores de estado.
 pub fn draw_results(pdf: &mut PdfBuilder, results: &[crate::models::sample::LabResult]) {
     pdf.y -= 4.0;
-    pdf.ensure_space(16.0);
+    pdf.ensure_space(20.0);
     pdf.text(true, "RESULTADOS ANALÍTICOS", 8.5, MARGIN, pdf.y, C_MUTED);
     pdf.y -= 6.0;
 
@@ -98,41 +98,66 @@ pub fn draw_results(pdf: &mut PdfBuilder, results: &[crate::models::sample::LabR
     }
 
     let cols: [(f32, &str); 5] = [
-        (62.0, "ANALITO"),
-        (24.0, "RESULTADO"),
-        (20.0, "UNIDAD"),
+        (60.0, "ANALITO"),
+        (28.0, "RESULTADO"),
+        (24.0, "UNIDAD"),
         (40.0, "RANGO REF."),
-        (34.0, "ESTADO"),
+        (33.9, "ESTADO"),
     ];
-    let row_h = 6.2;
+    let row_h = 7.0;
 
+    // Encabezado de la tabla
     pdf.rect(MARGIN, pdf.y, CONTENT_W, row_h, Some(C_HEADER_BG), Some(C_RULE));
-    let mut x = MARGIN + 2.0;
+    let mut x_col = MARGIN;
     for (w, label) in cols {
-        pdf.text(true, label, 7.5, x, pdf.y - 1.6, C_TEXT);
-        x += w;
+        pdf.text(true, label, 7.5, x_col + 3.0, pdf.y - 4.8, C_TEXT);
+        x_col += w;
+        if x_col < MARGIN + CONTENT_W - 1.0 {
+            pdf.rule(x_col, pdf.y, x_col, pdf.y - row_h, C_RULE);
+        }
     }
     pdf.y -= row_h;
 
-    for r in results {
+    // Filas de datos
+    for (idx, r) in results.iter().enumerate() {
         pdf.ensure_space(row_h + 1.0);
+        let bg_color = if idx % 2 == 1 {
+            Some((248, 250, 252))
+        } else {
+            None
+        };
         let color = status_color(&r.status);
-        pdf.rect(MARGIN, pdf.y, CONTENT_W, row_h, None, Some(C_RULE));
-        let mut x = MARGIN + 2.0;
+        pdf.rect(MARGIN, pdf.y, CONTENT_W, row_h, bg_color, Some(C_RULE));
 
-        pdf.text(false, &r.analyte_name, 8.5, x, pdf.y - 1.6, C_TEXT);
+        let mut x = MARGIN;
+
+        // 1. Analito
+        pdf.text(false, &r.analyte_name, 8.5, x + 3.0, pdf.y - 4.8, C_TEXT);
         x += cols[0].0;
-        pdf.text(true, &format_value(r.value), 8.5, x, pdf.y - 1.6, color);
+        pdf.rule(x, pdf.y, x, pdf.y - row_h, C_RULE);
+
+        // 2. Resultado (Destacado en negrita y color según rango)
+        pdf.text(true, &format_value(r.value), 8.5, x + 3.0, pdf.y - 4.8, color);
         x += cols[1].0;
-        pdf.text(false, r.unit.as_deref().unwrap_or("—"), 7.5, x, pdf.y - 1.6, C_MUTED);
+        pdf.rule(x, pdf.y, x, pdf.y - row_h, C_RULE);
+
+        // 3. Unidad
+        pdf.text(false, r.unit.as_deref().unwrap_or("—"), 7.5, x + 3.0, pdf.y - 4.8, C_MUTED);
         x += cols[2].0;
+        pdf.rule(x, pdf.y, x, pdf.y - row_h, C_RULE);
+
+        // 4. Rango de Referencia
         let range = match (r.ref_min, r.ref_max) {
             (Some(min), Some(max)) => format!("{min} – {max}"),
             _ => "—".to_string(),
         };
-        pdf.text(false, &range, 7.5, x, pdf.y - 1.6, C_TEXT);
+        pdf.text(false, &range, 7.5, x + 3.0, pdf.y - 4.8, C_TEXT);
         x += cols[3].0;
-        pdf.text(true, status_label(&r.status), 7.5, x, pdf.y - 1.6, color);
+        pdf.rule(x, pdf.y, x, pdf.y - row_h, C_RULE);
+
+        // 5. Estado
+        pdf.text(true, status_label(&r.status), 7.5, x + 3.0, pdf.y - 4.8, color);
+
         pdf.y -= row_h;
     }
     pdf.y -= 4.0;

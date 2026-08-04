@@ -70,6 +70,32 @@ pub fn load_right_logo(clinic: &ClinicHeader) -> Option<RawImage> {
     None
 }
 
+/// Dibuja una marca de agua central sutil con el logo institucional de ISALAB.
+pub fn draw_watermark(pdf: &mut PdfBuilder) {
+    if pdf.left_logo.is_none() {
+        pdf.left_logo = load_left_logo();
+    }
+    if let Some(logo) = &pdf.left_logo {
+        let (w_px, h_px) = (logo.width as f32, logo.height as f32);
+        let wm_w_mm = 85.0f32;
+        let wm_h_mm = if w_px > 0.0 { (wm_w_mm * h_px / w_px).min(85.0) } else { wm_w_mm };
+        let x_center = (PAGE_W - wm_w_mm) / 2.0;
+        let y_center = (PAGE_H - wm_h_mm) / 2.0;
+
+        pdf.ops.push(Op::UseXobject {
+            id: XObjectId(LEFT_LOGO_XOBJECT.to_string()),
+            transform: XObjectTransform {
+                translate_x: Some(Pt(x_center * MM_TO_PT)),
+                translate_y: Some(Pt(y_center * MM_TO_PT)),
+                scale_x: Some(wm_w_mm * MM_TO_PT),
+                scale_y: Some(wm_h_mm * MM_TO_PT),
+                no_auto_scale: true,
+                ..Default::default()
+            },
+        });
+    }
+}
+
 /// Encabezado institucional: Logo ISALAB a la izquierda, datos de ISALAB en el centro,
 /// logo de la empresa a la derecha, y título del informe.
 pub fn draw_header(
@@ -79,6 +105,8 @@ pub fn draw_header(
     subtitle: &str,
     extra: Option<&str>,
 ) {
+    draw_watermark(pdf);
+
     let start_y = PAGE_H - 14.0;
     pdf.y = start_y;
 
