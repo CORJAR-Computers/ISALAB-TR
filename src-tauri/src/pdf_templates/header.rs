@@ -3,11 +3,11 @@ use serde::{Deserialize, Serialize};
 use specta::Type;
 
 use crate::pdf_templates::builder::{
-    PdfBuilder, C_MUTED, C_RULE, C_TEXT, MARGIN, MM_TO_PT, PAGE_H, PAGE_W,
+    PdfBuilder, C_MUTED, C_TEXT, MARGIN, MM_TO_PT, PAGE_H, PAGE_W,
 };
 
 /// Ancho estándar del logo en el encabezado (mm); la altura se deriva del ratio.
-pub const LOGO_W_MM: f32 = 50.0;
+pub const LOGO_W_MM: f32 = 42.0;
 
 /// Nombres de los XObjects de los logos en los recursos del PDF.
 pub const LEFT_LOGO_XOBJECT: &str = "ISALAB-LEFT-LOGO";
@@ -244,17 +244,19 @@ pub fn draw_header(
     }
 
     let max_h = left_h_mm.max(right_h_mm).max(start_y - text_y + 2.0);
-    pdf.y = start_y - max_h - 4.0;
+    pdf.y = start_y - max_h - 2.0;
 
-    pdf.rule(MARGIN, pdf.y, PAGE_W - MARGIN, pdf.y, C_RULE);
-    pdf.y -= 7.0;
-    pdf.text_centered(true, title, 11.5, pdf.y, C_TEXT);
+    // Título principal en azul cian (#0082C8) centrado
+    let title_color = (0, 130, 200);
+    pdf.text_centered(true, title, 13.5, pdf.y, title_color);
     pdf.y -= 5.0;
-    pdf.text_centered(false, subtitle, 8.5, pdf.y, C_TEXT);
-    if let Some(line) = extra {
+    if !subtitle.is_empty() {
+        pdf.text_centered(false, subtitle, 8.5, pdf.y, C_TEXT);
         pdf.y -= 4.5;
-        pdf.text_centered(false, line, 8.0, pdf.y, C_MUTED);
     }
-    pdf.y -= 5.5;
-    pdf.rule(MARGIN, pdf.y, PAGE_W - MARGIN, pdf.y, C_RULE);
+    if let Some(line) = extra {
+        pdf.text_centered(false, line, 8.0, pdf.y, C_MUTED);
+        pdf.y -= 4.5;
+    }
+    pdf.y -= 2.0;
 }

@@ -5,12 +5,12 @@ use specta::Type;
 use crate::models::patient::Patient;
 use crate::models::sample::LabResult;
 use crate::pdf_templates::builder::{
-    draw_multiline, save_pdf, sanitize, C_MUTED, C_TEXT, MARGIN, PdfBuilder,
+    draw_multiline, save_pdf, sanitize, C_MUTED, MARGIN, PdfBuilder,
 };
 use crate::pdf_templates::header::{draw_header, ClinicHeader};
 use crate::pdf_templates::layout::{
-    draw_footer, draw_grid, draw_lab_note, draw_patient_block, draw_results, draw_signature,
-    section_title, ReportSignature,
+    draw_contact_footer, draw_footer, draw_grid, draw_patient_metadata_grid, draw_results_full,
+    draw_signature, section_title, ReportSignature,
 };
 
 /// Datos completos de un informe de resultados analíticos.
@@ -49,26 +49,24 @@ pub fn generate_report(data: &ClinicalReportData, out_path: &Path) -> Result<(),
     }
 
     let mut pdf = PdfBuilder::new();
-    let subtitle = format!(
-        "Muestra {} · {}",
-        data.sample_code,
-        sanitize(&data.sample_type)
-    );
-    let recv = format!("Fecha de recepción: {}", data.received_at);
     draw_header(
         &mut pdf,
         &data.clinic,
-        "INFORME DE RESULTADOS DE LABORATORIO",
-        &subtitle,
-        Some(&recv),
+        "RESULTADOS DE LABORATORIO",
+        "",
+        None,
     );
-    draw_patient_block(&mut pdf, &data.patient);
-    draw_results(&mut pdf, &data.results);
-    draw_signature(&mut pdf, &data.signature);
-    draw_lab_note(&mut pdf);
-    draw_footer(&mut pdf, &format!("Muestra {}", data.sample_code));
+    draw_patient_metadata_grid(
+        &mut pdf,
+        &data.patient,
+        &data.clinic,
+        &data.signature,
+        &data.received_at,
+    );
+    draw_results_full(&mut pdf, &data.sample_type, &data.results, None);
+    draw_contact_footer(&mut pdf, data.clinic.phone.as_deref());
 
-    save_pdf(pdf, out_path, "ISALAB · Informe de resultados de laboratorio")
+    save_pdf(pdf, out_path, "ISALAB · Resultados de laboratorio")
 }
 
 pub fn generate_formula(data: &FormulaMedicaData, out_path: &Path) -> Result<(), String> {
