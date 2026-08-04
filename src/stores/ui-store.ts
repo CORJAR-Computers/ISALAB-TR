@@ -22,6 +22,8 @@ type UiState = {
   activePatientId: number | null;
   /** Solicitud global para abrir el diálogo de nuevo paciente (p. ej. desde el dashboard). */
   newPatientRequest: number;
+  /** Control del diálogo Acerca de (CORJAR Computers Solutions). */
+  aboutOpen: boolean;
   setTheme: (theme: Theme) => void;
   toggleTheme: () => void;
   setSidebarOpen: (open: boolean) => void;
@@ -29,6 +31,7 @@ type UiState = {
   setActivePatient: (id: number | null) => void;
   requestNewPatient: () => void;
   consumeNewPatientRequest: () => void;
+  setAboutOpen: (open: boolean) => void;
 };
 
 const storedTheme = (): Theme => {
@@ -46,6 +49,7 @@ export const useUiStore = create<UiState>((set) => ({
   view: "dashboard",
   activePatientId: null,
   newPatientRequest: 0,
+  aboutOpen: false,
 
   setTheme: (theme) => {
     document.documentElement.classList.toggle("dark", theme === "dark");
@@ -74,4 +78,5 @@ export const useUiStore = create<UiState>((set) => ({
   setActivePatient: (id) => set({ activePatientId: id }),
   requestNewPatient: () => set((s) => ({ newPatientRequest: s.newPatientRequest + 1 })),
   consumeNewPatientRequest: () => set({ newPatientRequest: 0 }),
+  setAboutOpen: (open) => set({ aboutOpen: open }),
 }));

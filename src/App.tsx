@@ -3,6 +3,7 @@ import { AlertTriangle, Loader2, RefreshCw } from "lucide-react";
 import { emit } from "@tauri-apps/api/event";
 import { Sidebar } from "@/components/layout/Sidebar";
 import { TopBar } from "@/components/layout/TopBar";
+import { AboutDialog } from "@/components/layout/AboutDialog";
 import { Button } from "@/components/ui/button";
 import { Badge } from "@/components/ui/badge";
 import { ChangePasswordDialog } from "@/features/auth/ChangePasswordDialog";
@@ -83,6 +84,7 @@ export default function App() {
   return (
     <div className="min-h-svh">
       <Sidebar />
+      <AboutDialog />
       <ChangePasswordDialog
         open={mustChangePassword || changePasswordOpen}
         onOpenChange={mustChangePassword ? () => {} : closeChangePassword}

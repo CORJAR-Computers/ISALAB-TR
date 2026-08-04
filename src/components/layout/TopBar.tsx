@@ -1,4 +1,4 @@
-import { KeyRound, LogOut, Menu, Moon, Settings, Sun } from "lucide-react";
+import { Info, KeyRound, LogOut, Menu, Moon, Settings, Sun } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { Badge } from "@/components/ui/badge";
 import { useUiStore } from "@/stores/ui-store";
@@ -59,6 +59,7 @@ export function TopBar() {
   const theme = useUiStore((s) => s.theme);
   const toggleTheme = useUiStore((s) => s.toggleTheme);
   const setSidebarOpen = useUiStore((s) => s.setSidebarOpen);
+  const setAboutOpen = useUiStore((s) => s.setAboutOpen);
   const navigate = useUiStore((s) => s.navigate);
   const session = useSessionStore((s) => s.session);
   const openChangePassword = useSessionStore((s) => s.openChangePassword);
@@ -137,6 +138,15 @@ export function TopBar() {
           className="transition-transform hover:rotate-12"
         >
           {theme === "light" ? <Moon className="size-4.5" /> : <Sun className="size-4.5" />}
+        </Button>
+        <Button
+          variant="ghost"
+          size="icon"
+          onClick={() => setAboutOpen(true)}
+          aria-label="Acerca de ISALAB"
+          title="Acerca de ISALAB (CORJAR Computers Solutions)"
+        >
+          <Info className="size-4.5" />
         </Button>
         <Button
           variant="ghost"

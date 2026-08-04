@@ -4,6 +4,7 @@ import {
   CalendarClock,
   FlaskConical,
   HeartPulse,
+  Info,
   FileText,
   LayoutDashboard,
   Receipt,
@@ -34,6 +35,7 @@ const NAV_ITEMS: Array<{ view: View; label: string; icon: typeof Users }> = [
 export function Sidebar() {
   const sidebarOpen = useUiStore((s) => s.sidebarOpen);
   const setSidebarOpen = useUiStore((s) => s.setSidebarOpen);
+  const setAboutOpen = useUiStore((s) => s.setAboutOpen);
   const view = useUiStore((s) => s.view);
   const navigate = useUiStore((s) => s.navigate);
 
@@ -118,18 +120,26 @@ export function Sidebar() {
 
         {/* Pie */}
         <div className="border-t p-4">
-          <div className="flex items-center gap-2 rounded-xl bg-sidebar-accent/60 px-3 py-2.5">
-            <span className="relative flex size-2">
+          <button
+            type="button"
+            onClick={() => setAboutOpen(true)}
+            title="Ver información de ISALAB y CORJAR Computers Solutions"
+            className="group flex w-full items-center gap-2 rounded-xl bg-sidebar-accent/60 px-3 py-2.5 transition-all hover:bg-sidebar-accent hover:shadow-sm"
+          >
+            <span className="relative flex size-2 shrink-0">
               <span className="absolute inline-flex h-full w-full animate-ping rounded-full bg-success opacity-60" />
               <span className="relative inline-flex size-2 rounded-full bg-success" />
             </span>
-            <div className="min-w-0">
-              <p className="truncate text-xs font-semibold">Entorno</p>
+            <div className="min-w-0 flex-1 text-left">
+              <p className="truncate text-xs font-semibold group-hover:text-primary">
+                Acerca de ISALAB
+              </p>
               <p className="text-muted-foreground truncate text-[11px]">
-                Firebird 5 Embedded · Tauri v2 · v0.1.0
+                CORJAR Computers · v2.0
               </p>
             </div>
-          </div>
+            <Info className="size-4 shrink-0 text-muted-foreground group-hover:text-primary transition-colors" />
+          </button>
         </div>
       </aside>
     </>
