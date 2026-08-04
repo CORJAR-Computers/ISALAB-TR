@@ -11,8 +11,9 @@ export type View =
   | "vaccines"
   | "invoices"
   | "reports"
-  | "settings"
-  | "users";
+  | "users"
+  | "audit-log"
+  | "settings";
 
 type UiState = {
   theme: Theme;

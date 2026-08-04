@@ -2,7 +2,7 @@ use rsfbclient::prelude::*;
 use rsfbclient::SimpleConnection;
 
 use crate::error::AppError;
-use crate::models::auth::SessionUser;
+use crate::models::auth::{AuditLogEntry, SessionUser};
 
 /// Fila de USERS (incluye el hash cuando la consulta lo pide).
 pub struct UserRecord {
@@ -71,4 +71,35 @@ pub fn log_audit(
     )
     .map_err(AppError::from)?;
     Ok(())
+}
+
+/// Lista entradas del registro de auditoría con paginación.
+/// Orden descendente (más reciente primero). `limit` máximo 500, `offset` desde 0.
+pub fn list_audit_log(
+    conn: &mut SimpleConnection,
+    limit: i32,
+    offset: i32,
+) -> Result<Vec<AuditLogEntry>, AppError> {
+    let rows: Vec<(i32, Option<i32>, String, String, Option<String>, String)> = conn
+        .query(
+            "SELECT FIRST ? SKIP ?
+                l.ID, l.USER_ID, l.USERNAME, l.ACTION, l.DETAILS,
+                LEFT(CAST(l.CREATED_AT AS VARCHAR(60)), 19)
+             FROM USER_AUDIT_LOG l
+             ORDER BY l.ID DESC",
+            (&limit, &offset),
+        )
+        .map_err(AppError::from)?;
+
+    Ok(rows
+        .into_iter()
+        .map(|r| AuditLogEntry {
+            id: r.0,
+            user_id: r.1,
+            username: r.2,
+            action: r.3,
+            details: r.4,
+            created_at: r.5,
+        })
+        .collect())
 }

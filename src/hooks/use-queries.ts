@@ -468,3 +468,14 @@ export function useGenerateCarnetVacunacion() {
     onSuccess: () => qc.invalidateQueries({ queryKey: ["reports"] }),
   });
 }
+
+// ====================== AUDITORÍA ===========================================
+
+export function useAuditLog(page: number, pageSize = 50) {
+  const offset = page * pageSize;
+  return useQuery({
+    queryKey: ["audit-log", page, pageSize],
+    queryFn: () => api.listAuditLog(pageSize, offset),
+    placeholderData: (prev) => prev,
+  });
+}

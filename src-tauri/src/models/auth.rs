@@ -52,3 +52,15 @@ pub struct ChangePasswordInput {
     pub current_password: String,
     pub new_password: String,
 }
+
+/// Fila del registro de auditoría (USER_AUDIT_LOG).
+#[derive(Debug, Clone, Serialize, Deserialize, Type)]
+#[serde(rename_all = "camelCase")]
+pub struct AuditLogEntry {
+    pub id: i32,
+    pub user_id: Option<i32>,
+    pub username: String,
+    pub action: String,
+    pub details: Option<String>,
+    pub created_at: String,
+}

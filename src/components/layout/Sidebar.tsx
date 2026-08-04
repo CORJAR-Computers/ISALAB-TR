@@ -9,6 +9,7 @@ import {
   LayoutDashboard,
   Receipt,
   Scissors,
+  ScrollText,
   Settings,
   Shield,
   Syringe,
@@ -29,6 +30,7 @@ const NAV_ITEMS: Array<{ view: View; label: string; icon: typeof Users }> = [
   { view: "invoices", label: "Facturación", icon: Receipt },
   { view: "reports", label: "Reportes PDF", icon: FileText },
   { view: "users", label: "Usuarios", icon: Shield },
+  { view: "audit-log", label: "Auditoría", icon: ScrollText },
   { view: "settings", label: "Configuración", icon: Settings },
 ];
 

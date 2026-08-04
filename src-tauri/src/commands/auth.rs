@@ -2,18 +2,37 @@ use tauri::State;
 
 use crate::auth;
 use crate::error::AppError;
-use crate::models::auth::{LoginInput, SessionUser};
+use crate::models::auth::{AuditLogEntry, LoginInput, SessionUser};
 use crate::repositories::auth as auth_repo;
 use crate::state::AppState;
 
 /// Inicia sesión verificando la contraseña (Argon2id) contra la tabla USERS.
 /// La sesión es única: una app de escritorio con un operador a la vez.
+///
+/// Protección contra fuerza bruta: tras 5 intentos fallidos consecutivos,
+/// el login se bloquea por 5 minutos para ese usuario.
 #[tauri::command]
 #[specta::specta]
 pub fn login(
     state: State<'_, AppState>,
     input: LoginInput,
 ) -> Result<SessionUser, AppError> {
+    // --- Rate limiting: verificar si el usuario está bloqueado ---
+    {
+        let attempts = state
+            .login_attempts
+            .lock()
+            .map_err(|_| AppError::Internal("Contador bloqueado".into()))?;
+        if let Some(remaining) = attempts.get(&input.username).and_then(|a| a.check_locked()) {
+            let mins = remaining / 60;
+            let secs = remaining % 60;
+            return Err(AppError::Forbidden(format!(
+                "Demasiados intentos fallidos. Intenta de nuevo en {} min {} s.",
+                mins, secs
+            )));
+        }
+    }
+
     let mut pooled = state.pool.acquire()?;
     let user = match auth_repo::find_by_username(pooled.conn(), &input.username) {
         Ok(Some(u)) => u,
@@ -27,6 +46,14 @@ pub fn login(
                     "LOGIN_FAILED",
                     Some("Usuario no encontrado"),
                 ).ok();
+            }
+            // Registrar intento fallido (usar el username como clave).
+            {
+                let mut attempts = state
+                    .login_attempts
+                    .lock()
+                    .map_err(|_| AppError::Internal("Contador bloqueado".into()))?;
+                attempts.entry(input.username.clone()).or_default().record_failure();
             }
             return Err(AppError::Validation("Usuario o contraseña incorrectos".into()));
         }
@@ -42,6 +69,13 @@ pub fn login(
                 "LOGIN_FAILED",
                 Some("Usuario inactivo"),
             ).ok();
+        }
+        {
+            let mut attempts = state
+                .login_attempts
+                .lock()
+                .map_err(|_| AppError::Internal("Contador bloqueado".into()))?;
+            attempts.entry(user.username.clone()).or_default().record_failure();
         }
         return Err(AppError::Validation("Usuario inactivo. Contacta al administrador.".into()));
     }
@@ -61,6 +95,13 @@ pub fn login(
                 Some("Contraseña incorrecta"),
             ).ok();
         }
+        {
+            let mut attempts = state
+                .login_attempts
+                .lock()
+                .map_err(|_| AppError::Internal("Contador bloqueado".into()))?;
+            attempts.entry(user.username.clone()).or_default().record_failure();
+        }
         return Err(AppError::Validation("Usuario o contraseña incorrectos".into()));
     }
 
@@ -75,6 +116,17 @@ pub fn login(
             "LOGIN",
             Some("Inicio de sesión exitoso"),
         ).ok();
+    }
+
+    // Reiniciar contador de intentos fallidos para este usuario.
+    {
+        let mut attempts = state
+            .login_attempts
+            .lock()
+            .map_err(|_| AppError::Internal("Contador bloqueado".into()))?;
+        if let Some(a) = attempts.get_mut(&input.username) {
+            a.reset();
+        }
     }
 
     let mut guard = state
@@ -116,4 +168,20 @@ pub fn get_session(state: State<'_, AppState>) -> Result<Option<SessionUser>, Ap
         .lock()
         .map_err(|_| AppError::Internal("Sesión bloqueada".into()))?;
     Ok(guard.clone())
+}
+
+/// Lista el registro de auditoría con paginación (solo ADMIN).
+/// Orden descendente (más reciente primero).
+#[tauri::command]
+#[specta::specta]
+pub fn list_audit_log(
+    state: State<'_, AppState>,
+    limit: Option<i32>,
+    offset: Option<i32>,
+) -> Result<Vec<AuditLogEntry>, AppError> {
+    crate::auth::require_admin(&state)?;
+    let mut pooled = state.pool.acquire()?;
+    let l = limit.unwrap_or(100).min(500);
+    let o = offset.unwrap_or(0);
+    auth_repo::list_audit_log(pooled.conn(), l, o)
 }

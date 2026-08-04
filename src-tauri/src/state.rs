@@ -1,12 +1,57 @@
+use std::collections::HashMap;
 use std::path::PathBuf;
 use std::sync::Mutex;
 use std::thread::JoinHandle;
+use std::time::Instant;
 
 use rsfbclient::FbError;
 use tauri::{AppHandle, Manager};
 
 use crate::db::{bootstrap, DbPool};
 use crate::models::auth::SessionUser;
+
+/// Máximo de intentos fallidos antes de bloquear temporalmente el login.
+pub const LOGIN_MAX_ATTEMPTS: u32 = 5;
+/// Duración del bloqueo en segundos tras alcanzar el máximo de intentos.
+pub const LOGIN_LOCKOUT_SECS: u64 = 300; // 5 minutos
+
+/// Registro de intentos fallidos por nombre de usuario.
+#[derive(Default)]
+pub struct LoginAttempts {
+    /// Número de intentos fallidos consecutivos.
+    count: u32,
+    /// Momento del último intento fallido (para calcular cooldown).
+    last_attempt: Option<Instant>,
+}
+
+impl LoginAttempts {
+    /// Devuelve `Some(segundos_restantes)` si la cuenta está bloqueada,
+    /// o `None` si puede intentar.
+    pub fn check_locked(&self) -> Option<u64> {
+        if self.count < LOGIN_MAX_ATTEMPTS {
+            return None;
+        }
+        let last = self.last_attempt?;
+        let elapsed = last.elapsed().as_secs();
+        if elapsed >= LOGIN_LOCKOUT_SECS {
+            None // El bloqueo ya expiró
+        } else {
+            Some(LOGIN_LOCKOUT_SECS - elapsed)
+        }
+    }
+
+    /// Registra un intento fallido más.
+    pub fn record_failure(&mut self) {
+        self.count += 1;
+        self.last_attempt = Some(Instant::now());
+    }
+
+    /// Reinicia el contador (login exitoso).
+    pub fn reset(&mut self) {
+        self.count = 0;
+        self.last_attempt = None;
+    }
+}
 
 /// Estado global gestionado por Tauri (accesible en cada comando).
 pub struct AppState {
@@ -18,6 +63,8 @@ pub struct AppState {
     /// Sesión activa (una única sesión local, como corresponde a una app de
     /// escritorio de un solo usuario a la vez).
     pub session: Mutex<Option<SessionUser>>,
+    /// Intentos fallidos de login por usuario (protección contra fuerza bruta).
+    pub login_attempts: Mutex<HashMap<String, LoginAttempts>>,
     #[allow(dead_code)]
     pub listeners: Vec<JoinHandle<Result<(), FbError>>>,
 }
@@ -58,6 +105,7 @@ impl AppState {
                     schema_version,
                     init_error: None,
                     session: Mutex::new(None),
+                    login_attempts: Mutex::new(HashMap::new()),
                     listeners,
                 }
             }
@@ -68,6 +116,7 @@ impl AppState {
                 schema_version: 0,
                 init_error: Some(e.to_string()),
                 session: Mutex::new(None),
+                login_attempts: Mutex::new(HashMap::new()),
                 listeners: Vec::new(),
             },
         }

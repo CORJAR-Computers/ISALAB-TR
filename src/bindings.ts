@@ -172,6 +172,8 @@ export const commands = {
 	 *  cirugías, refuerzos de vacunación y últimas muestras.
 	 */
 	getDashboardStats: () => typedError<DashboardStats, AppError>(__TAURI_INVOKE("get_dashboard_stats")),
+	/**  Lista el registro de auditoría con paginación (solo ADMIN). */
+	listAuditLog: (limit: number | null, offset: number | null) => typedError<AuditLogEntry[], AppError>(__TAURI_INVOKE("list_audit_log", { limit, offset })),
 };
 
 /* Types */
@@ -603,6 +605,15 @@ export type UserListItem = {
 	createdAt: string,
 };
 
+export type AuditLogEntry = {
+	id: number,
+	userId: number | null,
+	username: string,
+	action: string,
+	details: string | null,
+	createdAt: string,
+};
+
 /**  Vacuna administrada a un paciente (con campos unidos para el listado global). */
 export type Vaccine = {
 	id: number,
@@ -648,4 +659,3 @@ async function typedError<T, E>(result: Promise<T>): Promise<{ status: "ok"; dat
         return { status: "error", error: e as any };
     }
 }
-

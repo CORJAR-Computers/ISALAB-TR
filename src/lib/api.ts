@@ -2,6 +2,7 @@ import { invoke } from "@tauri-apps/api/core";
 import type {
   Analyte,
   AppError,
+  AuditLogEntry,
   Breed,
   ChangePasswordInput,
   ClinicalHistory,
@@ -105,6 +106,10 @@ export const api = {
     invoke<UserListItem>("create_user", { input }),
   changePassword: (input: ChangePasswordInput) =>
     invoke<SessionUser>("change_password", { input }),
+
+  // ---- Auditoría ----
+  listAuditLog: (limit: number | null, offset: number | null) =>
+    invoke<AuditLogEntry[]>("list_audit_log", { limit, offset }),
 
   // ---- Reportes PDF ----
   generateReport: (sampleId: number) =>

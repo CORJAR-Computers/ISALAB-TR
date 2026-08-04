@@ -13,7 +13,7 @@ use specta_typescript::Typescript;
 use tauri::Manager;
 use tauri_specta::{collect_commands, Builder};
 
-use crate::commands::auth::{get_session, login, logout};
+use crate::commands::auth::{get_session, list_audit_log, login, logout};
 use crate::commands::catalog::{
     list_analytes, list_breeds, list_sample_types, list_species, list_vaccine_types,
 };
@@ -91,10 +91,12 @@ fn specta_builder() -> Builder<tauri::Wry> {
             get_invoice,
             set_invoice_status,
             get_dashboard_stats,
+            list_audit_log,
         ])
-        // Tipos expuestos para la UI (eventos Firebird → Tauri).
+        // Tipos expuestos para la UI (eventos Firebird → Tauri, auditoría).
         .typ::<crate::models::sample::SampleChangedEvent>()
         .typ::<crate::models::sample::LabResultChangedEvent>()
+        .typ::<crate::models::auth::AuditLogEntry>()
 }
 
 #[cfg_attr(mobile, tauri::mobile_entry_point)]

@@ -23,6 +23,7 @@ import { InvoicesPage } from "@/features/invoices/InvoicesPage";
 import { ReportsPage } from "@/features/reports/ReportsPage";
 import { SettingsPage } from "@/features/settings/SettingsPage";
 import { UsersPage } from "@/features/users/UsersPage";
+import { AuditLogPage } from "@/features/audit/AuditLogPage";
 import { LoginPage } from "@/features/auth/LoginPage";
 
 export default function App() {
@@ -161,6 +162,7 @@ export default function App() {
             {view === "reports" && <ReportsPage />}
             {view === "settings" && <SettingsPage />}
             {view === "users" && <UsersPage />}
+            {view === "audit-log" && <AuditLogPage />}
           </div>
         </main>
       </div>
