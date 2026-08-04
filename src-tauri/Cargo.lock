@@ -2267,6 +2267,7 @@ dependencies = [
  "tauri-plugin-opener",
  "tauri-specta",
  "thiserror 2.0.19",
+ "walkdir",
  "zip",
 ]
 

@@ -2,6 +2,7 @@ use serde::{Deserialize, Serialize};
 use specta::Type;
 use tauri::State;
 
+use crate::error::AppError;
 use crate::state::AppState;
 
 #[derive(Debug, Clone, Serialize, Deserialize, Type)]
@@ -39,7 +40,7 @@ pub fn db_health(state: State<'_, AppState>) -> DbHealth {
 #[specta::specta]
 pub fn create_local_backup(
     app: tauri::AppHandle,
-    state: State<'_, AppState>,
+    _state: State<'_, AppState>,
     dest_path: String,
 ) -> Result<String, AppError> {
     use std::fs::File;

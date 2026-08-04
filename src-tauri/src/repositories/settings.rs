@@ -5,7 +5,7 @@ use crate::error::AppError;
 use crate::models::settings::ClinicSettings;
 
 /// Mapa de clave → valor de la tabla CLINIC_SETTINGS.
-const SETTING_KEYS: [(&str, &str); 11] = [
+const SETTING_KEYS: [(&str, &str); 12] = [
     ("clinic.name", "clinic_name"),
     ("clinic.nit", "clinic_nit"),
     ("clinic.address", "address"),

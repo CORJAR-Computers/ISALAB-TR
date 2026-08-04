@@ -3,7 +3,7 @@ use tauri::State;
 
 use crate::auth::require_session;
 use crate::error::AppError;
-use crate::repositories::patients as patients_repo;
+use crate::repositories::patient as patients_repo;
 use crate::repositories::samples as samples_repo;
 use crate::repositories::settings as settings_repo;
 use crate::state::AppState;
@@ -39,8 +39,8 @@ pub fn interpret_lab_results(
         Paciente:\n- Especie/Raza: {} / {}\n- Edad: {} (nacimiento)\n- Sexo: {}\n\n\
         Muestra: {}\nResultados:\n",
         patient.species_name,
-        patient.breed_name.as_deref().unwrap_or("Mestizo"),
-        patient.birth_date,
+        patient.breed_name.unwrap_or_default(),
+        patient.birth_date.unwrap_or_else(|| "Desconocida".to_string()),
         patient.sex,
         sample.sample_type_name
     );
