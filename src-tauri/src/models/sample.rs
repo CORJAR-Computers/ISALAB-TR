@@ -19,6 +19,16 @@ pub struct LabResult {
 
 #[derive(Debug, Clone, Serialize, Deserialize, Type)]
 #[serde(rename_all = "camelCase")]
+pub struct TrendPoint {
+    pub date: String,
+    pub value: f64,
+    pub ref_min: Option<f64>,
+    pub ref_max: Option<f64>,
+    pub status: String,
+}
+
+#[derive(Debug, Clone, Serialize, Deserialize, Type)]
+#[serde(rename_all = "camelCase")]
 pub struct Sample {
     pub id: i32,
     /// Código único de trazabilidad (M-YYYY-NNNN)

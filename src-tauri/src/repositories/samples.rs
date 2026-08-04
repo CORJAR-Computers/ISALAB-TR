@@ -228,4 +228,29 @@ pub fn map_lab_result(
     }
 }
 
-
+pub fn get_patient_lab_trends(
+    conn: &mut SimpleConnection,
+    patient_id: i32,
+    analyte_id: i32,
+) -> Result<Vec<crate::models::sample::TrendPoint>, AppError> {
+    let sql = "
+        SELECT LEFT(CAST(s.RECEIVED_AT AS VARCHAR(60)), 10),
+               r.RESULT_VALUE, rr.MIN_VALUE, rr.MAX_VALUE, r.STATUS
+        FROM LAB_RESULTS r
+        JOIN SAMPLES s ON s.ID = r.SAMPLE_ID
+        LEFT JOIN REFERENCE_RANGES rr ON rr.ID = r.REFERENCE_RANGE_ID
+        WHERE s.PATIENT_ID = ? AND r.ANALYTE_ID = ? AND s.STATUS IN ('EN_PROCESO', 'FINALIZADA')
+        ORDER BY s.RECEIVED_AT ASC
+    ";
+    let rows: Vec<(String, f64, Option<f64>, Option<f64>, String)> = conn
+        .query(sql, (&patient_id, &analyte_id))
+        .map_err(AppError::from)?;
+        
+    Ok(rows.into_iter().map(|r| crate::models::sample::TrendPoint {
+        date: r.0,
+        value: r.1,
+        ref_min: r.2,
+        ref_max: r.3,
+        status: r.4,
+    }).collect())
+}

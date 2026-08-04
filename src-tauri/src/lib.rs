@@ -21,11 +21,13 @@ use crate::commands::clinical_history::{
     create_consultation, get_clinical_history, list_consultations, set_consultation_status,
 };
 use crate::commands::dashboard::get_dashboard_stats;
-use crate::commands::db::db_health;
+use crate::commands::db::{db_health, create_local_backup};
 use crate::commands::invoices::{
     create_invoice, get_invoice, list_invoices, set_invoice_status,
 };
-use crate::commands::patients::{create_patient, get_patient, list_owners, list_patients};
+use crate::commands::patients::{
+    create_patient, get_patient, get_patient_lab_trends, list_owners, list_patients,
+};
 use crate::commands::reports::{
     generate_carnet_vacunacion, generate_certificado_cirugia, generate_clinical_report,
     generate_consentimiento, generate_formula_medica, generate_recibo_invoice, list_reports,
@@ -47,6 +49,7 @@ fn specta_builder() -> Builder<tauri::Wry> {
     Builder::<tauri::Wry>::new()
         .commands(collect_commands![
             db_health,
+            create_local_backup,
             list_species,
             list_breeds,
             list_sample_types,
@@ -94,6 +97,7 @@ fn specta_builder() -> Builder<tauri::Wry> {
             get_dashboard_stats,
             list_audit_log,
             interpret_lab_results,
+            get_patient_lab_trends,
         ])
         // Tipos expuestos para la UI (eventos Firebird → Tauri, auditoría).
         .typ::<crate::models::sample::SampleChangedEvent>()

@@ -4,8 +4,9 @@ import { zodResolver } from "@hookform/resolvers/zod";
 import { z } from "zod";
 import { toast } from "sonner";
 import { convertFileSrc } from "@tauri-apps/api/core";
-import { open } from "@tauri-apps/plugin-dialog";
-import { Building2, CreditCard, ImageUp, Loader2, PenLine, Save, X, Bot } from "lucide-react";
+import { open, save as saveDialog } from "@tauri-apps/plugin-dialog";
+import { Building2, CreditCard, ImageUp, Loader2, PenLine, Save, X, Bot, DatabaseBackup } from "lucide-react";
+import { invoke } from "@tauri-apps/api/core";
 import { Button } from "@/components/ui/button";
 import {
   Card,
@@ -65,6 +66,7 @@ export function SettingsPage() {
   const { data: settings, isLoading } = useClinicSettings();
   const save = useSaveClinicSettings();
   const importLogo = useImportClinicLogo();
+  const [backingUp, setBackingUp] = useState(false);
 
   const form = useForm<Values>({
     resolver: zodResolver(schema),
@@ -158,6 +160,29 @@ export function SettingsPage() {
       });
     } catch (e) {
       toast.error("No se pudo guardar", { description: getErrorMessage(e) });
+    }
+  };
+
+  const createBackup = async () => {
+    try {
+      const selected = await saveDialog({
+        title: "Crear copia de seguridad",
+        filters: [{ name: "Archivos ZIP", extensions: ["zip"] }],
+        defaultPath: `ISALAB_Backup_${new Date().toISOString().split("T")[0]}.zip`,
+      });
+      if (!selected) return;
+
+      setBackingUp(true);
+      const destPath = await invoke<string>("create_local_backup", { destPath: selected });
+      toast.success("Copia de seguridad creada con éxito", {
+        description: `Guardado en: ${destPath}`,
+      });
+    } catch (e) {
+      toast.error("Error al crear copia de seguridad", {
+        description: getErrorMessage(e),
+      });
+    } finally {
+      setBackingUp(false);
     }
   };
 
@@ -465,6 +490,31 @@ export function SettingsPage() {
                   </FormItem>
                 )}
               />
+            </CardContent>
+          </Card>
+
+          {/* Mantenimiento y Respaldo */}
+          <Card>
+            <CardHeader>
+              <CardTitle className="flex items-center gap-2 text-base">
+                <DatabaseBackup className="size-4 text-primary" />
+                Mantenimiento y Respaldo
+              </CardTitle>
+              <CardDescription>
+                Crea una copia de seguridad en un archivo .zip con toda la base de datos y recursos (firmas, logos).
+              </CardDescription>
+            </CardHeader>
+            <CardContent>
+              <Button 
+                type="button" 
+                variant="outline" 
+                onClick={createBackup} 
+                disabled={backingUp}
+                className="gap-2"
+              >
+                {backingUp ? <Loader2 className="animate-spin size-4" /> : <DatabaseBackup className="size-4" />}
+                Descargar Copia de Seguridad
+              </Button>
             </CardContent>
           </Card>
 

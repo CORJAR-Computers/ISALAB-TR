@@ -12,6 +12,7 @@ import { PatientCard } from "./PatientCard";
 import { ClinicalTimeline } from "./ClinicalTimeline";
 import { NewConsultationDialog } from "./NewConsultationDialog";
 import { NewSampleDialog } from "./NewSampleDialog";
+import { PatientTrendsChart } from "./PatientTrendsChart";
 import { usePermissions } from "@/hooks/use-permissions";
 
 export function ClinicalHistoryPage() {
@@ -143,6 +144,8 @@ export function ClinicalHistoryPage() {
         patient={history.patient}
         owner={history.owner}
       />
+
+      <PatientTrendsChart patientId={activePatientId} />
 
       <ClinicalTimeline history={history} />
 
