@@ -7,7 +7,7 @@ use crate::pdf_templates::builder::{
 };
 
 /// Ancho estándar del logo en el encabezado (mm); la altura se deriva del ratio.
-pub const LOGO_W_MM: f32 = 40.0;
+pub const LOGO_W_MM: f32 = 50.0;
 
 /// Nombres de los XObjects de los logos en los recursos del PDF.
 pub const LEFT_LOGO_XOBJECT: &str = "ISALAB-LEFT-LOGO";
