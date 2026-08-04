@@ -5,7 +5,7 @@ use specta::Type;
 use crate::models::patient::Patient;
 use crate::models::sample::LabResult;
 use crate::pdf_templates::builder::{
-    draw_multiline, save_pdf, sanitize, C_MUTED, MARGIN, PdfBuilder,
+    draw_multiline, save_pdf, C_MUTED, C_TEXT, MARGIN, PdfBuilder,
 };
 use crate::pdf_templates::header::{draw_header, ClinicHeader};
 use crate::pdf_templates::layout::{
