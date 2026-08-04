@@ -40,6 +40,7 @@ use crate::commands::settings::{
 use crate::commands::surgeries::{create_surgery, list_surgeries, set_surgery_status};
 use crate::commands::users::{change_password, create_user, list_users};
 use crate::commands::vaccines::{create_vaccine, list_vaccines};
+use crate::commands::ai::interpret_lab_results;
 use crate::state::AppState;
 
 fn specta_builder() -> Builder<tauri::Wry> {
@@ -92,6 +93,7 @@ fn specta_builder() -> Builder<tauri::Wry> {
             set_invoice_status,
             get_dashboard_stats,
             list_audit_log,
+            interpret_lab_results,
         ])
         // Tipos expuestos para la UI (eventos Firebird → Tauri, auditoría).
         .typ::<crate::models::sample::SampleChangedEvent>()

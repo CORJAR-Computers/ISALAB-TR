@@ -18,6 +18,7 @@ pub struct ClinicSettings {
     pub signature_mode: String,
     pub vet_name: String,
     pub vet_license: Option<String>,
+    pub groq_api_key: Option<String>,
 }
 
 impl Default for ClinicSettings {
@@ -34,6 +35,7 @@ impl Default for ClinicSettings {
             signature_mode: "GRAPHIC".into(),
             vet_name: String::new(),
             vet_license: None,
+            groq_api_key: None,
         }
     }
 }

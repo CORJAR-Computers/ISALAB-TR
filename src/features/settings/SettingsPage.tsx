@@ -5,7 +5,7 @@ import { z } from "zod";
 import { toast } from "sonner";
 import { convertFileSrc } from "@tauri-apps/api/core";
 import { open } from "@tauri-apps/plugin-dialog";
-import { Building2, CreditCard, ImageUp, Loader2, PenLine, Save, X } from "lucide-react";
+import { Building2, CreditCard, ImageUp, Loader2, PenLine, Save, X, Bot } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import {
   Card,
@@ -53,6 +53,7 @@ const schema = z.object({
   signatureMode: z.enum(["GRAPHIC", "DIGITAL"]),
   vetName: z.string().optional(),
   vetLicense: z.string().optional(),
+  groqApiKey: z.string().optional(),
 });
 
 type Values = z.infer<typeof schema>;
@@ -79,6 +80,7 @@ export function SettingsPage() {
       signatureMode: "GRAPHIC",
       vetName: "",
       vetLicense: "",
+      groqApiKey: "",
     },
   });
 
@@ -98,6 +100,7 @@ export function SettingsPage() {
           settings.signatureMode === "DIGITAL" ? "DIGITAL" : "GRAPHIC",
         vetName: settings.vetName ?? "",
         vetLicense: settings.vetLicense ?? "",
+        groqApiKey: settings.groqApiKey ?? "",
       });
     }
   }, [settings, form]);
@@ -145,6 +148,7 @@ export function SettingsPage() {
       signatureMode: values.signatureMode,
       vetName: values.vetName?.trim() ?? "",
       vetLicense: toNullable(values.vetLicense),
+      groqApiKey: toNullable(values.groqApiKey),
     };
     try {
       await save.mutateAsync(input);
@@ -426,6 +430,37 @@ export function SettingsPage() {
                     <FormControl>
                       <Input placeholder="Nº de registro" {...field} />
                     </FormControl>
+                    <FormMessage />
+                  </FormItem>
+                )}
+              />
+            </CardContent>
+          </Card>
+
+          {/* Inteligencia Artificial */}
+          <Card>
+            <CardHeader>
+              <CardTitle className="flex items-center gap-2 text-base">
+                <Bot className="size-4 text-primary" />
+                Inteligencia Artificial
+              </CardTitle>
+              <CardDescription>
+                Configura la integración con Groq para la interpretación de resultados de laboratorio.
+              </CardDescription>
+            </CardHeader>
+            <CardContent className="grid gap-4 sm:grid-cols-2">
+              <FormField
+                control={form.control}
+                name="groqApiKey"
+                render={({ field }) => (
+                  <FormItem className="sm:col-span-2">
+                    <FormLabel>Groq API Key</FormLabel>
+                    <FormControl>
+                      <Input type="password" placeholder="gsk_..." {...field} />
+                    </FormControl>
+                    <FormDescription>
+                      Consigue una clave gratuita en <a href="https://console.groq.com" target="_blank" className="text-primary underline">console.groq.com</a>.
+                    </FormDescription>
                     <FormMessage />
                   </FormItem>
                 )}

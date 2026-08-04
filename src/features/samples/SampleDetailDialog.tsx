@@ -11,7 +11,9 @@ import {
   PlayCircle,
   Plus,
   MessageCircle,
+  Bot,
 } from "lucide-react";
+import { invoke } from "@tauri-apps/api/core";
 import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
@@ -83,11 +85,15 @@ export function SampleDetailDialog({
   const [analyteId, setAnalyteId] = useState<number | null>(null);
   const [value, setValue] = useState("");
   const [confirmAnular, setConfirmAnular] = useState(false);
+  
+  const [aiInterpretation, setAiInterpretation] = useState<string | null>(null);
+  const [interpreting, setInterpreting] = useState(false);
 
   const resetForm = () => {
     setAnalyteId(null);
     setValue("");
     setConfirmAnular(false);
+    setAiInterpretation(null);
   };
 
   const pending = registerResult.isPending || setStatus.isPending;
@@ -198,6 +204,21 @@ export function SampleDetailDialog({
     }
     const message = `Hola ${patient.ownerName},\n\nTe escribimos de ISALAB para informarte que los resultados de laboratorio de tu mascota *${patient.name}* ya están listos.\n\nPor favor, revisa el archivo adjunto.\n\n¡Gracias por confiar en nosotros!`;
     sendWhatsAppMessage(patient.ownerPhone, message);
+  };
+
+  const handleInterpretAI = async () => {
+    if (!sample) return;
+    setInterpreting(true);
+    try {
+      const response = await invoke<string>("interpret_lab_results", { sampleId: sample.id });
+      setAiInterpretation(response);
+    } catch (err) {
+      toast.error("Error al interpretar con IA", {
+        description: getErrorMessage(err),
+      });
+    } finally {
+      setInterpreting(false);
+    }
   };
 
   const sampleStatus = sample?.status ?? "";
@@ -450,6 +471,19 @@ export function SampleDetailDialog({
                 </span>
               </div>
             )}
+
+            {/* Resultado IA */}
+            {aiInterpretation && (
+              <div className="bg-primary/5 border border-primary/20 rounded-lg p-4 text-sm space-y-2">
+                <div className="flex items-center gap-2 font-semibold text-primary">
+                  <Bot className="size-4" />
+                  Interpretación IA (Llama 3)
+                </div>
+                <div className="whitespace-pre-wrap text-muted-foreground">
+                  {aiInterpretation}
+                </div>
+              </div>
+            )}
           </div>
         )}
 
@@ -498,6 +532,15 @@ export function SampleDetailDialog({
                 >
                   <MessageCircle className="size-4" />
                   Enviar por WhatsApp
+                </Button>
+                <Button
+                  variant="outline"
+                  className="gap-2 bg-purple-50 text-purple-700 hover:bg-purple-100 hover:text-purple-800 border-purple-200 dark:bg-purple-900/20 dark:text-purple-400 dark:border-purple-900/50 dark:hover:bg-purple-900/40"
+                  onClick={handleInterpretAI}
+                  disabled={interpreting}
+                >
+                  {interpreting ? <Loader2 className="size-4 animate-spin" /> : <Bot className="size-4" />}
+                  Interpretación IA
                 </Button>
               </>
             )}

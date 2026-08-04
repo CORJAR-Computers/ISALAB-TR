@@ -208,12 +208,13 @@ export type ClinicSettings = {
 	city: string | null,
 	logoPath: string | null,
 	/**  IVA por defecto (%). */
-	taxRate: number | null,
+	taxRate: number,
 	currency: string,
 	/**  GRAPHIC (imagen) o DIGITAL (PKCS#12). */
 	signatureMode: string,
 	vetName: string,
 	vetLicense: string | null,
+	groqApiKey: string | null,
 };
 
 /**  Agregado del historial clínico completo de un paciente. */

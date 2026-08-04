@@ -17,6 +17,7 @@ const SETTING_KEYS: [(&str, &str); 11] = [
     ("report.signature_mode", "signature_mode"),
     ("report.vet_name", "vet_name"),
     ("report.vet_license", "vet_license"),
+    ("ai.groq_api_key", "groq_api_key"),
 ];
 
 fn value(conn: &mut SimpleConnection, key: &str) -> Result<Option<String>, AppError> {
@@ -46,6 +47,7 @@ pub fn get(conn: &mut SimpleConnection) -> Result<ClinicSettings, AppError> {
             "signature_mode" => s.signature_mode = if v.is_empty() { s.signature_mode } else { v },
             "vet_name" => s.vet_name = v,
             "vet_license" => s.vet_license = Some(v),
+            "groq_api_key" => s.groq_api_key = Some(v).filter(|x| !x.is_empty()),
             _ => {}
         }
     }
@@ -73,6 +75,7 @@ pub fn save(
             "signature_mode" => Some(input.signature_mode.clone()),
             "vet_name" => Some(input.vet_name.clone()),
             "vet_license" => input.vet_license.clone(),
+            "groq_api_key" => input.groq_api_key.clone(),
             _ => None,
         };
 
