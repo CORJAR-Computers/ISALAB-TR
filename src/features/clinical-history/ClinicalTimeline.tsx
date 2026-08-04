@@ -133,6 +133,7 @@ function EntryShell({
   title,
   date,
   badge,
+  actions,
   children,
 }: {
   icon: LucideIcon;

@@ -111,7 +111,7 @@ export function PatientTrendsChart({ patientId }: { patientId: number }) {
                 />
                 <Tooltip
                   contentStyle={{ borderRadius: "8px", border: "1px solid #e5e7eb" }}
-                  formatter={(value: number) => [`${value} ${selectedAnalyte?.unit ?? ""}`, "Resultado"]}
+                  formatter={(value) => [`${value} ${selectedAnalyte?.unit ?? ""}`, "Resultado"]}
                   labelFormatter={(label) => `Fecha: ${label}`}
                 />
                 

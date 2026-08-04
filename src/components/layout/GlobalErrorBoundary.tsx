@@ -1,5 +1,5 @@
 import { AlertOctagon, RefreshCw } from "lucide-react";
-import { FallbackProps } from "react-error-boundary";
+import type { FallbackProps } from "react-error-boundary";
 import { Button } from "@/components/ui/button";
 
 export function GlobalErrorFallback({ error, resetErrorBoundary }: FallbackProps) {
@@ -17,7 +17,7 @@ export function GlobalErrorFallback({ error, resetErrorBoundary }: FallbackProps
       
       <div className="bg-muted/50 mb-8 w-full max-w-xl overflow-auto rounded-lg border p-4 text-left font-mono text-xs">
         <span className="font-semibold text-destructive">Error: </span> 
-        {error.message}
+        {(error as Error).message}
       </div>
 
       <div className="flex flex-col sm:flex-row gap-3">
