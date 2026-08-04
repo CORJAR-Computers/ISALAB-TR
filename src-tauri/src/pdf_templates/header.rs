@@ -1,4 +1,4 @@
-use printpdf::{Op, Pt, RawImage, XObjectId, XObjectTransform, PdfWarnMsg};
+use printpdf::{Op, PdfWarnMsg, Pt, RawImage, XObjectId, XObjectTransform};
 use serde::{Deserialize, Serialize};
 use specta::Type;
 
@@ -7,7 +7,7 @@ use crate::pdf_templates::builder::{
 };
 
 /// Ancho estándar del logo en el encabezado (mm); la altura se deriva del ratio.
-pub const LOGO_W_MM: f32 = 30.0;
+pub const LOGO_W_MM: f32 = 40.0;
 
 /// Nombres de los XObjects de los logos en los recursos del PDF.
 pub const LEFT_LOGO_XOBJECT: &str = "ISALAB-LEFT-LOGO";
@@ -36,7 +36,12 @@ pub fn load_left_logo() -> Option<RawImage> {
         RawImage::decode_from_bytes(bytes, &mut warnings).ok()
     };
 
-    for candidate in &["dist/isalab.png", "isalab.png", "isalab_icon.png", "dist/icon.png"] {
+    for candidate in &[
+        "dist/isalab.png",
+        "isalab.png",
+        "isalab_icon.png",
+        "dist/icon.png",
+    ] {
         if let Ok(bytes) = std::fs::read(candidate) {
             if let Some(img) = decode(&bytes) {
                 return Some(img);
@@ -49,7 +54,7 @@ pub fn load_left_logo() -> Option<RawImage> {
 /// Carga el logo de ISALAB y le aplica un suavizado ultrasuave (~7% de intensidad) para la marca de agua.
 pub fn load_watermark_logo() -> Option<RawImage> {
     let mut img = load_left_logo()?;
-    let factor = 0.07f32; // 7% de opacidad para que sea ultrasuave y no interfiera con el texto
+    let factor = 0.09f32; // 9% de opacidad para que sea ultrasuave y no interfiera con el texto
 
     if let printpdf::RawImageData::U8(ref mut data) = img.pixels {
         let total_pixels = img.width * img.height;
@@ -118,8 +123,12 @@ pub fn draw_watermark(pdf: &mut PdfBuilder) {
     }
     if let Some(logo) = &pdf.watermark_logo {
         let (w_px, h_px) = (logo.width as f32, logo.height as f32);
-        let wm_w_mm = 85.0f32;
-        let wm_h_mm = if w_px > 0.0 { (wm_w_mm * h_px / w_px).min(85.0) } else { wm_w_mm };
+        let wm_w_mm = 100.0f32;
+        let wm_h_mm = if w_px > 0.0 {
+            (wm_w_mm * h_px / w_px).min(95.0)
+        } else {
+            wm_w_mm
+        };
         let x_center = (PAGE_W - wm_w_mm) / 2.0;
         let y_center = (PAGE_H - wm_h_mm) / 2.0;
 
@@ -164,7 +173,11 @@ pub fn draw_header(
     // 1. Logo izquierdo (ISALAB)
     if let Some(logo) = &pdf.left_logo {
         let (w_px, h_px) = (logo.width as f32, logo.height as f32);
-        left_h_mm = if w_px > 0.0 { (LOGO_W_MM * h_px / w_px).min(22.0) } else { LOGO_W_MM };
+        left_h_mm = if w_px > 0.0 {
+            (LOGO_W_MM * h_px / w_px).min(22.0)
+        } else {
+            LOGO_W_MM
+        };
         let x_left = MARGIN;
         let y_bottom = start_y - left_h_mm;
         pdf.ops.push(Op::UseXobject {
@@ -183,7 +196,11 @@ pub fn draw_header(
     // 2. Logo derecho (Empresa cliente / cv_ruffos_house.png)
     if let Some(logo) = &pdf.right_logo {
         let (w_px, h_px) = (logo.width as f32, logo.height as f32);
-        right_h_mm = if w_px > 0.0 { (LOGO_W_MM * h_px / w_px).min(22.0) } else { LOGO_W_MM };
+        right_h_mm = if w_px > 0.0 {
+            (LOGO_W_MM * h_px / w_px).min(22.0)
+        } else {
+            LOGO_W_MM
+        };
         let x_right = PAGE_W - MARGIN - LOGO_W_MM;
         let y_bottom = start_y - right_h_mm;
         pdf.ops.push(Op::UseXobject {
