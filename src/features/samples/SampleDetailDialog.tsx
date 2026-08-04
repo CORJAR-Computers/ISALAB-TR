@@ -49,7 +49,7 @@ import {
 } from "@/hooks/use-queries";
 import { RESULT_STATUS, SAMPLE_STATUS } from "@/lib/status";
 import { cn, formatDateTime } from "@/lib/utils";
-import { getErrorMessage } from "@/lib/api";
+import { api, getErrorMessage } from "@/lib/api";
 import { useUiStore } from "@/stores/ui-store";
 
 const STATUS_ICON: Record<string, typeof FlaskConical> = {

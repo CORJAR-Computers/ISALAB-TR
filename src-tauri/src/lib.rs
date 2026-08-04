@@ -1,3 +1,5 @@
+#![allow(linker_messages)]
+
 pub mod auth;
 pub mod commands;
 pub mod db;
