@@ -8,6 +8,7 @@ import {
   Plus,
   Scissors,
   Search,
+  MessageCircle,
 } from "lucide-react";
 import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
@@ -36,6 +37,7 @@ import {
 import { getErrorMessage } from "@/lib/api";
 import { SURGERY_STATUS } from "@/lib/status";
 import { cn, formatDateTime } from "@/lib/utils";
+import { sendWhatsAppMessage } from "@/lib/whatsapp";
 import { NewSurgeryDialog } from "./NewSurgeryDialog";
 import { usePermissions } from "@/hooks/use-permissions";
 
@@ -276,6 +278,42 @@ export function SurgeriesPage() {
                             </Button>
                           )}
                         </>
+                      )}
+                      
+                      {s.status === "PROGRAMADA" && (
+                        <Button
+                          variant="ghost"
+                          size="sm"
+                          className="h-7 gap-1.5 text-green-600 hover:bg-green-50 hover:text-green-700 dark:text-green-400 dark:hover:bg-green-900/30"
+                          onClick={() => {
+                            if (!s.ownerPhone) {
+                              toast.error("Falta información", { description: "El propietario no tiene teléfono." });
+                              return;
+                            }
+                            sendWhatsAppMessage(s.ownerPhone, `Hola ${s.ownerName},\n\nTe compartimos desde ISALAB el consentimiento informado para la cirugía programada de *${s.patientName}*.\n\nPor favor, revísalo y fírmalo.`);
+                          }}
+                        >
+                          <MessageCircle className="size-3.5" />
+                          Consent.
+                        </Button>
+                      )}
+
+                      {s.status === "COMPLETADA" && (
+                        <Button
+                          variant="ghost"
+                          size="sm"
+                          className="h-7 gap-1.5 text-green-600 hover:bg-green-50 hover:text-green-700 dark:text-green-400 dark:hover:bg-green-900/30"
+                          onClick={() => {
+                            if (!s.ownerPhone) {
+                              toast.error("Falta información", { description: "El propietario no tiene teléfono." });
+                              return;
+                            }
+                            sendWhatsAppMessage(s.ownerPhone, `Hola ${s.ownerName},\n\nTe compartimos desde ISALAB el certificado/reporte quirúrgico de *${s.patientName}*.\n\nPor favor, revisa el archivo adjunto.\n\n¡Pronta recuperación!`);
+                          }}
+                        >
+                          <MessageCircle className="size-3.5" />
+                          Reporte
+                        </Button>
                       )}
                     </TableCell>
                   </TableRow>

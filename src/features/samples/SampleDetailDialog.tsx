@@ -10,6 +10,7 @@ import {
   Loader2,
   PlayCircle,
   Plus,
+  MessageCircle,
 } from "lucide-react";
 import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
@@ -51,6 +52,7 @@ import { RESULT_STATUS, SAMPLE_STATUS } from "@/lib/status";
 import { cn, formatDateTime } from "@/lib/utils";
 import { api, getErrorMessage } from "@/lib/api";
 import { useUiStore } from "@/stores/ui-store";
+import { sendWhatsAppMessage } from "@/lib/whatsapp";
 
 const STATUS_ICON: Record<string, typeof FlaskConical> = {
   RECIBIDA: FlaskConical,
@@ -185,6 +187,17 @@ export function SampleDetailDialog({
     setActivePatient(sample.patientId);
     onOpenChange(false);
     navigate("clinical-history");
+  };
+
+  const handleWhatsApp = () => {
+    if (!patient?.ownerPhone || !patient?.ownerName || !patient?.name) {
+      toast.error("Falta información", {
+        description: "El paciente no tiene un número de teléfono del propietario registrado.",
+      });
+      return;
+    }
+    const message = `Hola ${patient.ownerName},\n\nTe escribimos de ISALAB para informarte que los resultados de laboratorio de tu mascota *${patient.name}* ya están listos.\n\nPor favor, revisa el archivo adjunto.\n\n¡Gracias por confiar en nosotros!`;
+    sendWhatsAppMessage(patient.ownerPhone, message);
   };
 
   const sampleStatus = sample?.status ?? "";
@@ -469,14 +482,24 @@ export function SampleDetailDialog({
               </Button>
             )}
             {canReport && sample && sample.results.length > 0 && (
-              <Button onClick={generatePdf} disabled={generate.isPending}>
-                {generate.isPending ? (
-                  <Loader2 className="animate-spin" />
-                ) : (
-                  <FileText className="size-4" />
-                )}
-                Generar PDF
-              </Button>
+              <>
+                <Button onClick={generatePdf} disabled={generate.isPending}>
+                  {generate.isPending ? (
+                    <Loader2 className="animate-spin" />
+                  ) : (
+                    <FileText className="size-4" />
+                  )}
+                  Generar PDF
+                </Button>
+                <Button
+                  variant="outline"
+                  className="gap-2 bg-green-50 text-green-700 hover:bg-green-100 hover:text-green-800 border-green-200 dark:bg-green-900/20 dark:text-green-400 dark:border-green-900/50 dark:hover:bg-green-900/40"
+                  onClick={handleWhatsApp}
+                >
+                  <MessageCircle className="size-4" />
+                  Enviar por WhatsApp
+                </Button>
+              </>
             )}
           </div>
           <Button variant="ghost" onClick={() => onOpenChange(false)}>

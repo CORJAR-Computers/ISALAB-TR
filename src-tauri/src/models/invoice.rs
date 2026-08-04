@@ -23,6 +23,7 @@ pub struct Invoice {
     pub patient_name: Option<String>,
     pub owner_id: i32,
     pub owner_name: String,
+    pub owner_phone: Option<String>,
     pub consultation_id: Option<i32>,
     /// YYYY-MM-DD HH:MM:SS
     pub issue_date: String,

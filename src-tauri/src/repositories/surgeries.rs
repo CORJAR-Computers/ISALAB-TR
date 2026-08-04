@@ -7,7 +7,7 @@ use crate::repositories::next_id;
 
 /// Columnas de una cirugía con paciente y veterinario unidos.
 const SURGERY_SELECT: &str = "
-    SELECT s.ID, s.PATIENT_ID, p.NAME, sp.NAME, o.FULL_NAME,
+    SELECT s.ID, s.PATIENT_ID, p.NAME, sp.NAME, o.FULL_NAME, o.PHONE,
            s.VETERINARIAN_ID, u.FULL_NAME,
            s.SURGERY_TYPE,
            LEFT(CAST(s.SCHEDULED_AT AS VARCHAR(60)), 19),
@@ -25,6 +25,7 @@ type SurgeryRow = (
     String,          // patient_name
     String,          // species_name
     String,          // owner_name
+    Option<String>,  // owner_phone
     Option<i32>,     // veterinarian_id
     Option<String>,  // veterinarian_name
     String,          // surgery_type
@@ -42,14 +43,15 @@ fn map_surgery(r: SurgeryRow) -> Surgery {
         patient_name: r.2,
         species_name: r.3,
         owner_name: r.4,
-        veterinarian_id: r.5,
-        veterinarian_name: r.6,
-        surgery_type: r.7,
-        scheduled_at: r.8,
-        anesthesia_type: r.9,
-        preoperative_notes: r.10,
-        postoperative_notes: r.11,
-        status: r.12,
+        owner_phone: r.5,
+        veterinarian_id: r.6,
+        veterinarian_name: r.7,
+        surgery_type: r.8,
+        scheduled_at: r.9,
+        anesthesia_type: r.10,
+        preoperative_notes: r.11,
+        postoperative_notes: r.12,
+        status: r.13,
     }
 }
 

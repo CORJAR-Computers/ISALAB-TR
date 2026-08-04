@@ -10,6 +10,7 @@ pub struct Surgery {
     pub patient_name: String,
     pub species_name: String,
     pub owner_name: String,
+    pub owner_phone: Option<String>,
     pub veterinarian_id: Option<i32>,
     pub veterinarian_name: Option<String>,
     pub surgery_type: String,

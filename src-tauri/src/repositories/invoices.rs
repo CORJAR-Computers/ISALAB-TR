@@ -10,7 +10,7 @@ use crate::repositories::next_id;
 /// Columnas de una factura con propietario/paciente unidos.
 const INVOICE_SELECT: &str = "
     SELECT i.ID, i.INVOICE_NUMBER, i.PATIENT_ID, p.NAME,
-           i.OWNER_ID, o.FULL_NAME, i.CONSULTATION_ID,
+           i.OWNER_ID, o.FULL_NAME, o.PHONE, i.CONSULTATION_ID,
            LEFT(CAST(i.ISSUE_DATE AS VARCHAR(60)), 19),
            CAST(i.SUBTOTAL AS DOUBLE PRECISION),
            CAST(i.TAX_RATE AS DOUBLE PRECISION),
@@ -28,6 +28,7 @@ type InvoiceRow = (
     Option<String>,  // patient_name
     i32,             // owner_id
     String,          // owner_name
+    Option<String>,  // owner_phone
     Option<i32>,     // consultation_id
     String,          // issue_date
     f64,             // subtotal
@@ -47,15 +48,16 @@ fn map_invoice(r: InvoiceRow, items: Vec<InvoiceItem>) -> Invoice {
         patient_name: r.3,
         owner_id: r.4,
         owner_name: r.5,
-        consultation_id: r.6,
-        issue_date: r.7,
-        subtotal: r.8,
-        tax_rate: r.9,
-        tax_amount: r.10,
-        total: r.11,
-        status: r.12,
-        payment_method: r.13,
-        notes: r.14,
+        owner_phone: r.6,
+        consultation_id: r.7,
+        issue_date: r.8,
+        subtotal: r.9,
+        tax_rate: r.10,
+        tax_amount: r.11,
+        total: r.12,
+        status: r.13,
+        payment_method: r.14,
+        notes: r.15,
         items,
     }
 }

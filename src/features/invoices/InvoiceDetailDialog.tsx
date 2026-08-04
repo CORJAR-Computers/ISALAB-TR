@@ -1,5 +1,5 @@
 import { toast } from "sonner";
-import { Ban, CheckCircle2, Loader2, Receipt } from "lucide-react";
+import { Ban, CheckCircle2, Loader2, Receipt, MessageCircle } from "lucide-react";
 import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
 import {
@@ -24,6 +24,7 @@ import { useInvoice, useSetInvoiceStatus } from "@/hooks/use-queries";
 import { getErrorMessage } from "@/lib/api";
 import { INVOICE_STATUS, PAYMENT_METHOD_LABEL } from "@/lib/status";
 import { formatCOP, formatDateTime } from "@/lib/utils";
+import { sendWhatsAppMessage } from "@/lib/whatsapp";
 
 export function InvoiceDetailDialog({
   invoiceId,
@@ -45,6 +46,17 @@ export function InvoiceDetailDialog({
         description: getErrorMessage(e),
       });
     }
+  };
+
+  const handleWhatsApp = () => {
+    if (!invoice?.ownerPhone || !invoice?.ownerName) {
+      toast.error("Falta información", {
+        description: "La factura no tiene un número de teléfono del propietario registrado.",
+      });
+      return;
+    }
+    const message = `Hola ${invoice.ownerName},\n\nTe compartimos desde ISALAB la factura correspondiente a tu última visita${invoice.patientName ? ` con ${invoice.patientName}` : ""}.\n\nPor favor, revisa el archivo adjunto.\n\n¡Gracias por confiar en nosotros!`;
+    sendWhatsAppMessage(invoice.ownerPhone, message);
   };
 
   return (
@@ -190,6 +202,16 @@ export function InvoiceDetailDialog({
                     <CheckCircle2 className="size-4" />
                   )}
                   Marcar como pagada
+                </Button>
+              )}
+              {invoice.status !== "ANULADA" && (
+                <Button
+                  variant="outline"
+                  className="gap-2 bg-green-50 text-green-700 hover:bg-green-100 hover:text-green-800 border-green-200 dark:bg-green-900/20 dark:text-green-400 dark:border-green-900/50 dark:hover:bg-green-900/40"
+                  onClick={handleWhatsApp}
+                >
+                  <MessageCircle className="size-4" />
+                  Enviar por WhatsApp
                 </Button>
               )}
               {invoice.status === "ANULADA" && (

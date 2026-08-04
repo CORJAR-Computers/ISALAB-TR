@@ -392,6 +392,7 @@ export type Invoice = {
 	patientName: string | null,
 	ownerId: number,
 	ownerName: string,
+	ownerPhone: string | null,
 	consultationId: number | null,
 	/**  YYYY-MM-DD HH:MM:SS */
 	issueDate: string,
@@ -581,6 +582,7 @@ export type Surgery = {
 	patientName: string,
 	speciesName: string,
 	ownerName: string,
+	ownerPhone: string | null,
 	veterinarianId: number | null,
 	veterinarianName: string | null,
 	surgeryType: string,

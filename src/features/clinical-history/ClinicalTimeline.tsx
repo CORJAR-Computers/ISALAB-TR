@@ -4,6 +4,7 @@ import {
   FlaskConical,
   Stethoscope,
   Syringe,
+  MessageCircle,
   type LucideIcon,
 } from "lucide-react";
 import { Badge } from "@/components/ui/badge";
@@ -16,9 +17,12 @@ import {
   TableHeader,
   TableRow,
 } from "@/components/ui/table";
+import { Button } from "@/components/ui/button";
+import { toast } from "sonner";
 import { cn, formatDate, formatDateTime } from "@/lib/utils";
+import { sendWhatsAppMessage } from "@/lib/whatsapp";
 import { CONSULTATION_STATUS, RESULT_STATUS, SAMPLE_STATUS } from "@/lib/status";
-import type { ClinicalHistory, Consultation, Sample, Vaccine } from "@/bindings";
+import type { ClinicalHistory, Consultation, Sample, Vaccine, Patient, Owner } from "@/bindings";
 
 type TimelineItem =
   | { kind: "consultation"; key: string; date: string; data: Consultation }
@@ -87,9 +91,11 @@ export function ClinicalTimeline({ history }: { history: ClinicalHistory }) {
                 </span>
 
                 {item.kind === "consultation" && (
-                  <ConsultationEntry item={item} />
+                  <ConsultationEntry item={item} patient={history.patient} owner={history.owner} />
                 )}
-                {item.kind === "vaccine" && <VaccineEntry item={item} />}
+                {item.kind === "vaccine" && (
+                  <VaccineEntry item={item} patient={history.patient} owner={history.owner} />
+                )}
                 {item.kind === "sample" && (
                   <SampleEntry
                     item={item}
@@ -133,6 +139,7 @@ function EntryShell({
   title: string;
   date: string;
   badge?: ReactNode;
+  actions?: ReactNode;
   children?: ReactNode;
 }) {
   const Icon = icon;
@@ -147,6 +154,11 @@ function EntryShell({
           {formatDateTime(date)}
         </span>
         {badge}
+        {actions && (
+          <div className="ml-auto flex items-center gap-2">
+            {actions}
+          </div>
+        )}
       </div>
       {children && (
         <div className="text-muted-foreground mt-1.5 space-y-1 text-sm">
@@ -157,18 +169,49 @@ function EntryShell({
   );
 }
 
-function ConsultationEntry({ item }: { item: Extract<TimelineItem, { kind: "consultation" }> }) {
+function ConsultationEntry({
+  item,
+  patient,
+  owner,
+}: {
+  item: Extract<TimelineItem, { kind: "consultation" }>;
+  patient: Patient;
+  owner: Owner | null;
+}) {
   const c = item.data;
   const status = CONSULTATION_STATUS[c.status] ?? {
     label: c.status,
     variant: "secondary" as const,
   };
+
+  const handleWhatsApp = () => {
+    if (!owner?.phone || !owner?.fullName) {
+      toast.error("Falta información", {
+        description: "El propietario no tiene un número de teléfono registrado.",
+      });
+      return;
+    }
+    const message = `Hola ${owner.fullName},\n\nTe compartimos desde ISALAB la fórmula médica / resumen de la consulta de tu mascota *${patient.name}*.\n\nPor favor, revisa el archivo adjunto.\n\n¡Gracias por confiar en nosotros!`;
+    sendWhatsAppMessage(owner.phone, message);
+  };
+
   return (
     <EntryShell
       icon={Stethoscope}
       title={c.reason || "Consulta"}
       date={c.consultationDate}
       badge={<Badge variant={status.variant}>{status.label}</Badge>}
+      actions={
+        <Button
+          variant="ghost"
+          size="sm"
+          className="h-7 gap-1.5 text-green-600 hover:bg-green-50 hover:text-green-700 dark:text-green-400 dark:hover:bg-green-900/30"
+          onClick={handleWhatsApp}
+        >
+          <MessageCircle className="size-3.5" />
+          WhatsApp
+        </Button>
+      }
     >
       {c.anamnesis && (
         <p>
@@ -199,8 +242,28 @@ function ConsultationEntry({ item }: { item: Extract<TimelineItem, { kind: "cons
   );
 }
 
-function VaccineEntry({ item }: { item: Extract<TimelineItem, { kind: "vaccine" }> }) {
+function VaccineEntry({
+  item,
+  patient,
+  owner,
+}: {
+  item: Extract<TimelineItem, { kind: "vaccine" }>;
+  patient: Patient;
+  owner: Owner | null;
+}) {
   const v = item.data;
+
+  const handleWhatsApp = () => {
+    if (!owner?.phone || !owner?.fullName) {
+      toast.error("Falta información", {
+        description: "El propietario no tiene un número de teléfono registrado.",
+      });
+      return;
+    }
+    const message = `Hola ${owner.fullName},\n\nTe compartimos desde ISALAB el certificado de vacunación de tu mascota *${patient.name}* (${v.vaccineName}).\n\nPor favor, revisa el archivo adjunto.\n\n¡Gracias por confiar en nosotros!`;
+    sendWhatsAppMessage(owner.phone, message);
+  };
+
   return (
     <EntryShell
       icon={Syringe}
@@ -212,6 +275,17 @@ function VaccineEntry({ item }: { item: Extract<TimelineItem, { kind: "vaccine" 
             Refuerzo: {formatDate(v.nextDoseAt)}
           </Badge>
         ) : undefined
+      }
+      actions={
+        <Button
+          variant="ghost"
+          size="sm"
+          className="h-7 gap-1.5 text-green-600 hover:bg-green-50 hover:text-green-700 dark:text-green-400 dark:hover:bg-green-900/30"
+          onClick={handleWhatsApp}
+        >
+          <MessageCircle className="size-3.5" />
+          WhatsApp
+        </Button>
       }
     >
       {v.lot && (
