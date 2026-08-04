@@ -27,6 +27,7 @@ use crate::commands::patients::{create_patient, get_patient, list_owners, list_p
 use crate::commands::reports::{
     generate_carnet_vacunacion, generate_certificado_cirugia, generate_clinical_report,
     generate_consentimiento, generate_formula_medica, generate_recibo_invoice, list_reports,
+    open_report_file,
 };
 use crate::commands::samples::{
     create_sample, get_sample, list_samples, register_lab_result, set_sample_status,
@@ -72,6 +73,7 @@ fn specta_builder() -> Builder<tauri::Wry> {
             generate_certificado_cirugia,
             generate_carnet_vacunacion,
             list_reports,
+            open_report_file,
             list_users,
             create_user,
             change_password,

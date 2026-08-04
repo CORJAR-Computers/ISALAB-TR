@@ -1,6 +1,7 @@
 use chrono::{DateTime, Local};
 use rsfbclient::prelude::*;
 use tauri::{AppHandle, Manager, State};
+use tauri_plugin_opener::OpenerExt;
 
 use crate::auth::require_session;
 use crate::error::AppError;
@@ -393,4 +394,23 @@ pub fn list_reports(
         b.generated_at.cmp(&a.generated_at).then_with(|| b.file_name.cmp(&a.file_name))
     });
     Ok(reports)
+}
+
+/// Abre un archivo de reporte PDF en el visor por defecto del sistema operativo.
+#[tauri::command]
+#[specta::specta]
+pub fn open_report_file(
+    state: State<'_, AppState>,
+    app: AppHandle,
+    path: String,
+) -> Result<(), AppError> {
+    require_session(&state)?;
+    let p = std::path::PathBuf::from(&path);
+    if !p.exists() {
+        return Err(AppError::Validation("El archivo PDF no existe".into()));
+    }
+    app.opener()
+        .open_path(p.to_string_lossy().to_string(), None::<&str>)
+        .map_err(|e| AppError::Internal(format!("No se pudo abrir el PDF: {e}")))?;
+    Ok(())
 }

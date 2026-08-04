@@ -168,7 +168,11 @@ export function SampleDetailDialog({
       toast.success(`Informe ${report.fileName} generado`, {
         description: "Se abrirá con el visor de PDF del sistema.",
       });
-      await openPath(report.path);
+      try {
+        await api.openReportFile(report.path);
+      } catch {
+        await openPath(report.path);
+      }
     } catch (err) {
       toast.error("No se pudo generar el PDF", {
         description: getErrorMessage(err),

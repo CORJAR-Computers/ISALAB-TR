@@ -120,6 +120,7 @@ export const api = {
   generateCarnetVacunacion: (patientId: number) =>
     invoke<ReportFile>("generate_carnet_vacunacion", { patientId }),
   listReports: () => invoke<ReportFile[]>("list_reports"),
+  openReportFile: (path: string) => invoke<void>("open_report_file", { path }),
 
   // ---- Agenda de consultas ----
   listConsultations: (status: string | null, search: string | null) =>

@@ -21,7 +21,7 @@ import {
 } from "@/components/ui/table";
 import { Skeleton } from "@/components/ui/skeleton";
 import { useReports } from "@/hooks/use-queries";
-import { getErrorMessage } from "@/lib/api";
+import { api, getErrorMessage } from "@/lib/api";
 import { formatDateTime } from "@/lib/utils";
 import { GenerateReportDialog } from "./GenerateReportDialog";
 
@@ -31,7 +31,11 @@ export function ReportsPage() {
 
   const open = async (path: string) => {
     try {
-      await openPath(path);
+      try {
+        await api.openReportFile(path);
+      } catch {
+        await openPath(path);
+      }
     } catch (e) {
       toast.error("No se pudo abrir el PDF", {
         description: getErrorMessage(e),
