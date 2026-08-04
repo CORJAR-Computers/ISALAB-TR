@@ -81,7 +81,7 @@ export function ClinicalTimeline({ history }: { history: ClinicalHistory }) {
                 {/* Nodo */}
                 <span
                   className={cn(
-                    "absolute top-1 -left-[31px] flex size-5 items-center justify-center rounded-full border-2 bg-background",
+                    "absolute top-1 -left-7.75 flex size-5 items-center justify-center rounded-full border-2 bg-background",
                     item.kind === "consultation" && "border-primary",
                     item.kind === "vaccine" && "border-success",
                     item.kind === "sample" && "border-warning",
