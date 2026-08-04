@@ -52,13 +52,13 @@ export function Sidebar() {
       <aside
         className={cn(
           "bg-sidebar text-sidebar-foreground fixed inset-y-0 left-0 z-50 flex w-64 flex-col border-r shadow-lg transition-transform duration-300 lg:translate-x-0",
-          "bg-gradient-to-b from-sidebar to-sidebar/95",
+          "bg-linear-to-b from-sidebar to-sidebar/95",
           sidebarOpen ? "translate-x-0" : "-translate-x-full",
         )}
       >
         {/* Logo */}
         <div className="flex h-20 shrink-0 items-center gap-3 border-b px-4">
-          <div className="flex h-12 flex-1 items-center justify-center rounded-xl border border-primary/10 bg-primary/[0.06] px-3 transition-colors hover:bg-primary/10">
+          <div className="flex h-12 flex-1 items-center justify-center rounded-xl border border-primary/10 bg-primary/6 px-3 transition-colors hover:bg-primary/10">
             <img
               src={logoSidebar}
               alt="ISALAB · Laboratorio Veterinario"
@@ -91,7 +91,7 @@ export function Sidebar() {
                 className={cn(
                   "group relative flex w-full items-center gap-3 rounded-xl px-3 py-2.5 text-sm font-medium transition-all duration-200",
                   active
-                    ? "bg-gradient-to-r from-primary to-primary/90 text-primary-foreground shadow-md"
+                    ? "bg-linear-to-r from-primary to-primary/90 text-primary-foreground shadow-md"
                     : "text-muted-foreground hover:bg-sidebar-accent hover:text-sidebar-accent-foreground hover:translate-x-0.5",
                 )}
               >

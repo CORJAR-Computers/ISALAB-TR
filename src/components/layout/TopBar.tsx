@@ -109,7 +109,7 @@ export function TopBar() {
               <KeyRound className="size-4.5" />
             </Button>
             <div className="bg-secondary/80 text-foreground flex h-9 items-center gap-2 rounded-full py-1 pr-3 pl-1 shadow-sm ring-1 ring-border backdrop-blur-sm transition-shadow hover:shadow-md">
-              <span className="bg-gradient-to-br from-primary to-emerald-600 text-primary-foreground flex size-7 items-center justify-center rounded-full text-[11px] font-bold uppercase shadow-sm">
+              <span className="bg-linear-to-br from-primary to-emerald-600 text-primary-foreground flex size-7 items-center justify-center rounded-full text-[11px] font-bold uppercase shadow-sm">
                 {(session.fullName || session.username).slice(0, 1)}
               </span>
               <span className="hidden text-xs font-medium sm:block">

@@ -16,7 +16,6 @@ import {
   FileCheck2,
   Globe,
   HeartPulse,
-  Info,
   ShieldCheck,
   Sparkles,
 } from "lucide-react";
@@ -28,8 +27,15 @@ export function AboutDialog() {
   return (
     <Dialog open={aboutOpen} onOpenChange={setAboutOpen}>
       <DialogContent className="max-w-xl p-0 overflow-hidden rounded-2xl border shadow-2xl">
+        <DialogHeader className="sr-only">
+          <DialogTitle>Acerca de ISALAB - CORJAR Computers Solutions</DialogTitle>
+          <DialogDescription>
+            Información del sistema y detalles de desarrollo de CORJAR Computers Solutions.
+          </DialogDescription>
+        </DialogHeader>
+
         {/* Encabezado con degradado y logo */}
-        <div className="relative bg-gradient-to-br from-slate-900 via-primary/95 to-slate-900 p-6 text-white overflow-hidden">
+        <div className="relative bg-linear-to-br from-slate-900 via-primary/95 to-slate-900 p-6 text-white overflow-hidden">
           <div className="absolute -right-12 -top-12 size-40 rounded-full bg-emerald-500/10 blur-2xl pointer-events-none" />
           <div className="absolute -left-12 -bottom-12 size-40 rounded-full bg-blue-500/10 blur-2xl pointer-events-none" />
 
@@ -62,7 +68,7 @@ export function AboutDialog() {
 
         <div className="p-6 space-y-5 text-sm">
           {/* Tarjeta de la Empresa */}
-          <div className="rounded-xl border bg-gradient-to-r from-primary/5 via-emerald-500/5 to-transparent p-4 flex items-center justify-between gap-4">
+          <div className="rounded-xl border bg-linear-to-r from-primary/5 via-emerald-500/5 to-transparent p-4 flex items-center justify-between gap-4">
             <div className="space-y-0.5">
               <span className="text-[11px] font-semibold text-muted-foreground uppercase tracking-wider flex items-center gap-1.5">
                 <Sparkles className="size-3.5 text-primary" /> Desarrollado por
