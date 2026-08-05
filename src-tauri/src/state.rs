@@ -7,6 +7,7 @@ use std::time::Instant;
 use rsfbclient::FbError;
 use tauri::{AppHandle, Manager};
 
+use crate::ai_cache::AiCache;
 use crate::db::{bootstrap, DbPool};
 use crate::models::auth::SessionUser;
 
@@ -65,6 +66,8 @@ pub struct AppState {
     pub session: Mutex<Option<SessionUser>>,
     /// Intentos fallidos de login por usuario (protección contra fuerza bruta).
     pub login_attempts: Mutex<HashMap<String, LoginAttempts>>,
+    /// Cache de interpretaciones de IA para evitar llamadas repetidas a Groq.
+    pub ai_cache: AiCache,
     #[allow(dead_code)]
     pub listeners: Vec<JoinHandle<Result<(), FbError>>>,
 }
@@ -106,6 +109,7 @@ impl AppState {
                     init_error: None,
                     session: Mutex::new(None),
                     login_attempts: Mutex::new(HashMap::new()),
+                    ai_cache: AiCache::new(),
                     listeners,
                 }
             }
@@ -117,6 +121,7 @@ impl AppState {
                 init_error: Some(e.to_string()),
                 session: Mutex::new(None),
                 login_attempts: Mutex::new(HashMap::new()),
+                ai_cache: AiCache::new(),
                 listeners: Vec::new(),
             },
         }

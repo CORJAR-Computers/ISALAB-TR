@@ -1,4 +1,7 @@
-import { useState, type FormEvent } from "react";
+import { useState } from "react";
+import { useForm } from "react-hook-form";
+import { zodResolver } from "@hookform/resolvers/zod";
+import { z } from "zod";
 import { openPath } from "@tauri-apps/plugin-opener";
 import { toast } from "sonner";
 import {
@@ -13,11 +16,17 @@ import {
   MessageCircle,
   Bot,
 } from "lucide-react";
-import { invoke } from "@tauri-apps/api/core";
 import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
-import { Label } from "@/components/ui/label";
+import {
+  Form,
+  FormControl,
+  FormField,
+  FormItem,
+  FormLabel,
+  FormMessage,
+} from "@/components/ui/form";
 import {
   Dialog,
   DialogContent,
@@ -56,6 +65,15 @@ import { api, getErrorMessage } from "@/lib/api";
 import { useUiStore } from "@/stores/ui-store";
 import { sendWhatsAppMessage } from "@/lib/whatsapp";
 
+const resultSchema = z.object({
+  analyteId: z.coerce.number().min(1, "Selecciona el analito"),
+  value: z.coerce
+    .number({ invalid_type_message: "Ingresa un número válido" })
+    .min(0, "El valor no puede ser negativo"),
+});
+
+type ResultValues = z.infer<typeof resultSchema>;
+
 const STATUS_ICON: Record<string, typeof FlaskConical> = {
   RECIBIDA: FlaskConical,
   EN_PROCESO: PlayCircle,
@@ -82,37 +100,38 @@ export function SampleDetailDialog({
   const setActivePatient = useUiStore((s) => s.setActivePatient);
   const navigate = useUiStore((s) => s.navigate);
 
-  const [analyteId, setAnalyteId] = useState<number | null>(null);
-  const [value, setValue] = useState("");
   const [confirmAnular, setConfirmAnular] = useState(false);
-  
   const [aiInterpretation, setAiInterpretation] = useState<string | null>(null);
   const [interpreting, setInterpreting] = useState(false);
 
+  const resultForm = useForm<ResultValues>({
+    resolver: zodResolver(resultSchema),
+    defaultValues: {
+      analyteId: 0,
+      value: 0,
+    },
+  });
+
   const resetForm = () => {
-    setAnalyteId(null);
-    setValue("");
+    resultForm.reset({ analyteId: 0, value: 0 });
     setConfirmAnular(false);
     setAiInterpretation(null);
   };
 
   const pending = registerResult.isPending || setStatus.isPending;
 
-  const submitResult = async (e: FormEvent) => {
-    e.preventDefault();
-    if (analyteId == null || !value || !sample) return;
-    const num = Number(value.replace(",", "."));
-    if (Number.isNaN(num)) return;
+  const onSubmitResult = async (values: ResultValues) => {
+    if (!sample) return;
     try {
       const result = await registerResult.mutateAsync({
         sampleId: sample.id,
-        analyteId,
-        value: num,
+        analyteId: values.analyteId,
+        value: values.value,
       });
       toast.success(`Resultado de ${result.analyteName} cargado`, {
         description: `Valor ${result.value} · estado ${RESULT_STATUS[result.status]?.label ?? result.status}.`,
       });
-      resetForm();
+      resultForm.reset({ analyteId: 0, value: 0 });
     } catch (err) {
       toast.error("No se pudo registrar el resultado", {
         description: getErrorMessage(err),
@@ -210,8 +229,14 @@ export function SampleDetailDialog({
     if (!sample) return;
     setInterpreting(true);
     try {
-      const response = await invoke<string>("interpret_lab_results", { sampleId: sample.id });
-      setAiInterpretation(response);
+      const response = await api.interpretLabResults(sample.id);
+      if (response.status === "ok") {
+        setAiInterpretation(response.data);
+      } else {
+        toast.error("Error al interpretar con IA", {
+          description: getErrorMessage(response.error),
+        });
+      }
     } catch (err) {
       toast.error("Error al interpretar con IA", {
         description: getErrorMessage(err),
@@ -384,81 +409,99 @@ export function SampleDetailDialog({
 
             {/* Carga de resultados */}
             {canAddResult && (
-              <form onSubmit={submitResult} className="space-y-3">
-                <div className="grid gap-3 sm:grid-cols-[1fr_120px_auto]">
-                  <div className="space-y-1.5">
-                    <Label htmlFor="analyte">Analito</Label>
-                    <Select
-                      value={analyteId?.toString() ?? ""}
-                      onValueChange={(v) => setAnalyteId(Number(v))}
-                    >
-                      <SelectTrigger id="analyte" className="w-full">
-                        <SelectValue
-                          placeholder={
-                            availableAnalytes.length === 0
-                              ? "Todos los analitos ya tienen valor (puedes actualizarlo)"
-                              : "Selecciona analito…"
-                          }
-                        />
-                      </SelectTrigger>
-                      <SelectContent>
-                        {availableAnalytes.map((a) => (
-                          <SelectItem key={a.id} value={a.id.toString()}>
-                            {a.name}
-                            {a.unit ? ` (${a.unit})` : ""}
-                          </SelectItem>
-                        ))}
-                        {analyzed.length > 0 && (
-                          <>
-                            <SelectItem value="__sep__" disabled>
-                              ── Actualizar ──
-                            </SelectItem>
-                            {analyzed.map((a) => (
-                              <SelectItem key={a.id} value={a.id.toString()}>
-                                {a.name}
-                                {a.unit ? ` (${a.unit})` : ""}
-                              </SelectItem>
-                            ))}
-                          </>
-                        )}
-                      </SelectContent>
-                    </Select>
-                  </div>
-                  <div className="space-y-1.5">
-                    <Label htmlFor="result-value">Valor</Label>
-                    <Input
-                      id="result-value"
-                      type="number"
-                      step="any"
-                      inputMode="decimal"
-                      placeholder="0.0"
-                      value={value}
-                      onChange={(e) => setValue(e.target.value)}
-                      className="font-mono"
-                    />
-                  </div>
-                  <div className="flex items-end">
-                    <Button
-                      type="submit"
-                      disabled={analyteId == null || value === "" || pending}
-                    >
-                      {registerResult.isPending ? (
-                        <Loader2 className="animate-spin" />
-                      ) : (
-                        <Plus className="size-4" />
+              <Form {...resultForm}>
+                <form onSubmit={resultForm.handleSubmit(onSubmitResult)} className="space-y-3">
+                  <div className="grid gap-3 sm:grid-cols-[1fr_120px_auto]">
+                    <FormField
+                      control={resultForm.control}
+                      name="analyteId"
+                      render={({ field }) => (
+                        <FormItem>
+                          <FormLabel>Analito</FormLabel>
+                          <Select
+                            value={field.value?.toString() ?? ""}
+                            onValueChange={(v) => field.onChange(Number(v))}
+                          >
+                            <FormControl>
+                              <SelectTrigger className="w-full">
+                                <SelectValue
+                                  placeholder={
+                                    availableAnalytes.length === 0
+                                      ? "Todos los analitos ya tienen valor (puedes actualizarlo)"
+                                      : "Selecciona analito…"
+                                  }
+                                />
+                              </SelectTrigger>
+                            </FormControl>
+                            <SelectContent>
+                              {availableAnalytes.map((a) => (
+                                <SelectItem key={a.id} value={a.id.toString()}>
+                                  {a.name}
+                                  {a.unit ? ` (${a.unit})` : ""}
+                                </SelectItem>
+                              ))}
+                              {analyzed.length > 0 && (
+                                <>
+                                  <SelectItem value="__sep__" disabled>
+                                    ── Actualizar ──
+                                  </SelectItem>
+                                  {analyzed.map((a) => (
+                                    <SelectItem key={a.id} value={a.id.toString()}>
+                                      {a.name}
+                                      {a.unit ? ` (${a.unit})` : ""}
+                                    </SelectItem>
+                                  ))}
+                                </>
+                              )}
+                            </SelectContent>
+                          </Select>
+                          <FormMessage />
+                        </FormItem>
                       )}
-                      Cargar
-                    </Button>
+                    />
+                    <FormField
+                      control={resultForm.control}
+                      name="value"
+                      render={({ field }) => (
+                        <FormItem>
+                          <FormLabel>Valor</FormLabel>
+                          <FormControl>
+                            <Input
+                              type="number"
+                              step="any"
+                              inputMode="decimal"
+                              placeholder="0.0"
+                              className="font-mono"
+                              {...field}
+                            />
+                          </FormControl>
+                          <FormMessage />
+                        </FormItem>
+                      )}
+                    />
+                    <div className="flex items-end">
+                      <Button
+                        type="submit"
+                        disabled={pending}
+                      >
+                        {registerResult.isPending ? (
+                          <Loader2 className="animate-spin" />
+                        ) : (
+                          <Plus className="size-4" />
+                        )}
+                        Cargar
+                      </Button>
+                    </div>
                   </div>
-                </div>
-                <p className="text-muted-foreground text-xs">
-                  El estado clínico (normal/alto/bajo) se calcula contra los
-                  rangos de referencia de la especie, sexo y edad del paciente.
-                  Al cargar resultados la muestra pasa a{" "}
-                  <span className="font-medium">EN PROCESO</span>; al terminar,
-                  finalízala para habilitar el informe PDF.
-                </p>
-              </form>
+                  <p className="text-muted-foreground text-xs">
+                    El estado clínico (normal/alto/bajo) se calcula contra los
+                    rangos de referencia de la especie, sexo y edad del paciente.
+                    Al cargar resultados la muestra pasa a{" "}
+                    <span className="font-medium">EN PROCESO</span>; al terminar,
+                    finalízala para habilitar el informe PDF.
+                  </p>
+                </form>
+              </Form>
             )}
 
             {sampleStatus === "FINALIZADA" && sample.results.length > 0 && (

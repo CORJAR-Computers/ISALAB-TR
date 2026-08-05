@@ -1,4 +1,7 @@
 import { useEffect, useMemo, useState } from "react";
+import { useForm, useFieldArray } from "react-hook-form";
+import { zodResolver } from "@hookform/resolvers/zod";
+import { z } from "zod";
 import { toast } from "sonner";
 import { Loader2, Plus, Receipt, Search, Trash2 } from "lucide-react";
 import { Button } from "@/components/ui/button";
@@ -10,6 +13,14 @@ import {
   DialogHeader,
   DialogTitle,
 } from "@/components/ui/dialog";
+import {
+  Form,
+  FormControl,
+  FormField,
+  FormItem,
+  FormLabel,
+  FormMessage,
+} from "@/components/ui/form";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
 import { Textarea } from "@/components/ui/textarea";
@@ -32,20 +43,24 @@ import { getErrorMessage } from "@/lib/api";
 import { PAYMENT_METHOD_LABEL } from "@/lib/status";
 import { cn, formatCOP } from "@/lib/utils";
 
-type ItemRow = {
-  key: number;
-  description: string;
-  quantity: string;
-  unitPrice: string;
-};
-
-let rowKey = 0;
-const newRow = (): ItemRow => ({
-  key: ++rowKey,
-  description: "",
-  quantity: "1",
-  unitPrice: "",
+const invoiceItemSchema = z.object({
+  description: z.string().min(1, "Descripción requerida"),
+  quantity: z.coerce.number().int().min(1, "Cantidad mínima: 1"),
+  unitPrice: z.coerce.number().min(0, "Precio no puede ser negativo"),
 });
+
+const invoiceSchema = z.object({
+  ownerId: z.coerce.number().min(1, "Selecciona el propietario"),
+  patientId: z.coerce.number().nullable(),
+  taxRate: z.coerce.number().min(0).max(100).nullable(),
+  paymentMethod: z.string().nullable(),
+  notes: z.string().nullable(),
+  items: z
+    .array(invoiceItemSchema)
+    .min(1, "Agrega al menos un concepto"),
+});
+
+type InvoiceValues = z.infer<typeof invoiceSchema>;
 
 export function NewInvoiceDialog({
   open,
@@ -58,82 +73,79 @@ export function NewInvoiceDialog({
   const { data: settings } = useClinicSettings();
 
   const [ownerSearch, setOwnerSearch] = useState("");
-  const [ownerId, setOwnerId] = useState<number | null>(null);
   const [patientSearch, setPatientSearch] = useState("");
-  const [patientId, setPatientId] = useState<number | null>(null);
-  const [paymentMethod, setPaymentMethod] = useState("EFECTIVO");
-  const [taxRate, setTaxRate] = useState<string>("");
-  const [notes, setNotes] = useState("");
-  const [items, setItems] = useState<ItemRow[]>(() => [newRow()]);
 
   const { data: owners = [], isLoading: loadingOwners } = useOwners(ownerSearch);
   const { data: patients = [], isLoading: loadingPatients } =
     usePatients(patientSearch);
 
+  const form = useForm<InvoiceValues>({
+    resolver: zodResolver(invoiceSchema),
+    defaultValues: {
+      ownerId: 0,
+      patientId: null,
+      taxRate: null,
+      paymentMethod: "EFECTIVO",
+      notes: null,
+      items: [{ description: "", quantity: 1, unitPrice: 0 }],
+    },
+  });
+
+  const { fields, append, remove } = useFieldArray({
+    control: form.control,
+    name: "items",
+  });
+
   // IVA por defecto desde la configuración de la clínica.
   useEffect(() => {
-    if (open && settings && !taxRate) setTaxRate(String(settings.taxRate));
-  }, [open, settings, taxRate]);
+    if (open && settings && !form.getValues("taxRate")) {
+      form.setValue("taxRate", settings.taxRate);
+    }
+  }, [open, settings, form]);
 
   // Reinicia el formulario al abrir.
   useEffect(() => {
     if (open) {
-      setOwnerId(null);
-      setPatientId(null);
-      setPaymentMethod("EFECTIVO");
-      setNotes("");
+      form.reset({
+        ownerId: 0,
+        patientId: null,
+        taxRate: settings?.taxRate ?? 19,
+        paymentMethod: "EFECTIVO",
+        notes: null,
+        items: [{ description: "", quantity: 1, unitPrice: 0 }],
+      });
       setOwnerSearch("");
       setPatientSearch("");
-      setItems([newRow()]);
     }
-  }, [open]);
+  }, [open, settings, form]);
 
-  const updateItem = (key: number, patch: Partial<ItemRow>) =>
-    setItems((prev) =>
-      prev.map((it) => (it.key === key ? { ...it, ...patch } : it)),
-    );
-  const removeItem = (key: number) =>
-    setItems((prev) =>
-      prev.length > 1 ? prev.filter((it) => it.key !== key) : prev,
-    );
+  const watchedItems = form.watch("items");
+  const watchedTaxRate = form.watch("taxRate");
 
   const totals = useMemo(() => {
-    const subtotal = items.reduce((acc, it) => {
+    const subtotal = watchedItems.reduce((acc, it) => {
       const qty = Number(it.quantity) || 0;
       const price = Number(it.unitPrice) || 0;
       return acc + qty * price;
     }, 0);
-    const rate = Number(taxRate) || 0;
+    const rate = Number(watchedTaxRate) || 0;
     const tax = subtotal * (rate / 100);
     return { subtotal, tax, total: subtotal + tax };
-  }, [items, taxRate]);
+  }, [watchedItems, watchedTaxRate]);
 
-  const submit = async () => {
-    const clean = items.filter((it) => it.description.trim());
-    if (!ownerId) {
-      toast.error("Selecciona el propietario que facturarás");
-      return;
-    }
-    if (clean.length === 0) {
-      toast.error("Agrega al menos un concepto con descripción");
-      return;
-    }
-    if (clean.some((it) => !(Number(it.quantity) > 0) || !(Number(it.unitPrice) >= 0))) {
-      toast.error("Revisa cantidades y precios de los conceptos");
-      return;
-    }
+  const onSubmit = async (values: InvoiceValues) => {
     try {
       const invoice = await createInvoice.mutateAsync({
-        ownerId,
-        patientId,
+        ownerId: values.ownerId,
+        patientId: values.patientId || null,
         consultationId: null,
-        taxRate: Number(taxRate) || null,
-        paymentMethod: paymentMethod || null,
-        notes: notes.trim() || null,
-        items: clean.map((it) => ({
+        taxRate: values.taxRate,
+        paymentMethod: values.paymentMethod || null,
+        notes: values.notes?.trim() || null,
+        items: values.items.map((it) => ({
           description: it.description.trim(),
-          quantity: Number(it.quantity),
-          unitPrice: Number(it.unitPrice),
+          quantity: it.quantity,
+          unitPrice: it.unitPrice,
         })),
       });
       toast.success(`Factura ${invoice.invoiceNumber} emitida`, {
@@ -154,221 +166,284 @@ export function NewInvoiceDialog({
         <DialogHeader>
           <DialogTitle>Nueva factura</DialogTitle>
           <DialogDescription>
-            Emite la factura con IVA {Number(taxRate) || 0}% (configurable). El
+            Emite la factura con IVA {Number(watchedTaxRate) || 0}% (configurable). El
             número se asigna automáticamente (FAC-000001…).
           </DialogDescription>
         </DialogHeader>
 
-        <div className="space-y-4">
-          {/* Cliente y paciente */}
-          <div className="grid gap-3 sm:grid-cols-2">
-            <div className="space-y-1.5">
-              <Label>Propietario (a facturar) *</Label>
-              <div className="relative">
-                <Search className="text-muted-foreground absolute top-1/2 left-3 size-4 -translate-y-1/2" />
-                <Input
-                  value={ownerSearch}
-                  onChange={(e) => {
-                    setOwnerSearch(e.target.value);
-                    setOwnerId(null);
-                  }}
-                  placeholder="Buscar propietario…"
-                  className="pl-9"
-                />
-              </div>
-              {loadingOwners ? (
-                <Skeleton className="h-10 w-full" />
-              ) : (
-                <Select
-                  value={ownerId?.toString() ?? ""}
-                  onValueChange={(v) => setOwnerId(Number(v))}
-                >
-                  <SelectTrigger className="w-full">
-                    <SelectValue placeholder="Selecciona…" />
-                  </SelectTrigger>
-                  <SelectContent>
-                    {owners.map((o) => (
-                      <SelectItem key={o.id} value={o.id.toString()}>
-                        {o.fullName} · {o.documentNumber}
-                      </SelectItem>
-                    ))}
-                  </SelectContent>
-                </Select>
-              )}
-            </div>
+        <Form {...form}>
+          <form onSubmit={form.handleSubmit(onSubmit)} className="space-y-4">
+            {/* Cliente y paciente */}
+            <div className="grid gap-3 sm:grid-cols-2">
+              <FormField
+                control={form.control}
+                name="ownerId"
+                render={({ field }) => (
+                  <FormItem>
+                    <FormLabel>Propietario (a facturar) *</FormLabel>
+                    <div className="relative">
+                      <Search className="text-muted-foreground absolute top-1/2 left-3 size-4 -translate-y-1/2" />
+                      <Input
+                        value={ownerSearch}
+                        onChange={(e) => {
+                          setOwnerSearch(e.target.value);
+                          field.onChange(0);
+                        }}
+                        placeholder="Buscar propietario…"
+                        className="pl-9"
+                      />
+                    </div>
+                    {loadingOwners ? (
+                      <Skeleton className="h-10 w-full" />
+                    ) : (
+                      <Select
+                        value={field.value?.toString() ?? ""}
+                        onValueChange={(v) => field.onChange(Number(v))}
+                      >
+                        <FormControl>
+                          <SelectTrigger className="w-full">
+                            <SelectValue placeholder="Selecciona…" />
+                          </SelectTrigger>
+                        </FormControl>
+                        <SelectContent>
+                          {owners.map((o) => (
+                            <SelectItem key={o.id} value={o.id.toString()}>
+                              {o.fullName} · {o.documentNumber}
+                            </SelectItem>
+                          ))}
+                        </SelectContent>
+                      </Select>
+                    )}
+                    <FormMessage />
+                  </FormItem>
+                )}
+              />
 
-            <div className="space-y-1.5">
-              <Label>Paciente (opcional)</Label>
-              <div className="relative">
-                <Search className="text-muted-foreground absolute top-1/2 left-3 size-4 -translate-y-1/2" />
-                <Input
-                  value={patientSearch}
-                  onChange={(e) => {
-                    setPatientSearch(e.target.value);
-                    setPatientId(null);
-                  }}
-                  placeholder="Buscar paciente…"
-                  className="pl-9"
-                />
-              </div>
-              {loadingPatients ? (
-                <Skeleton className="h-10 w-full" />
-              ) : (
-                <Select
-                  value={patientId?.toString() ?? ""}
-                  onValueChange={(v) => setPatientId(Number(v))}
-                >
-                  <SelectTrigger className="w-full">
-                    <SelectValue placeholder="Sin paciente" />
-                  </SelectTrigger>
-                  <SelectContent>
-                    {patients.map((p) => (
-                      <SelectItem key={p.id} value={p.id.toString()}>
-                        {p.name} · {p.ownerName}
-                      </SelectItem>
-                    ))}
-                  </SelectContent>
-                </Select>
-              )}
-            </div>
-          </div>
-
-          {/* Conceptos */}
-          <div className="space-y-2">
-            <Label>Conceptos *</Label>
-            <div className="space-y-2">
-              {items.map((it) => (
-                <div key={it.key} className="flex items-center gap-2">
-                  <Input
-                    value={it.description}
-                    onChange={(e) =>
-                      updateItem(it.key, { description: e.target.value })
-                    }
-                    placeholder="Descripción (consulta, vacuna, cirugía…)"
-                    className="flex-1"
-                  />
-                  <Input
-                    type="number"
-                    min={1}
-                    value={it.quantity}
-                    onChange={(e) =>
-                      updateItem(it.key, { quantity: e.target.value })
-                    }
-                    placeholder="Cant."
-                    className="w-20"
-                    aria-label="Cantidad"
-                  />
-                  <Input
-                    type="number"
-                    min={0}
-                    step="0.01"
-                    value={it.unitPrice}
-                    onChange={(e) =>
-                      updateItem(it.key, { unitPrice: e.target.value })
-                    }
-                    placeholder="$ 0"
-                    className="w-28"
-                    aria-label="Precio unitario"
-                  />
-                  <Button
-                    variant="ghost"
-                    size="icon"
-                    className="shrink-0"
-                    onClick={() => removeItem(it.key)}
-                    disabled={items.length === 1}
-                    aria-label="Eliminar concepto"
-                  >
-                    <Trash2 className="size-4 text-destructive" />
-                  </Button>
-                </div>
-              ))}
-            </div>
-            <Button
-              variant="outline"
-              size="sm"
-              onClick={() => setItems((prev) => [...prev, newRow()])}
-            >
-              <Plus className="size-3.5" />
-              Agregar concepto
-            </Button>
-          </div>
-
-          {/* Pago y notas */}
-          <div className="grid gap-3 sm:grid-cols-2">
-            <div className="space-y-1.5">
-              <Label>Método de pago</Label>
-              <Select value={paymentMethod} onValueChange={setPaymentMethod}>
-                <SelectTrigger className="w-full">
-                  <SelectValue />
-                </SelectTrigger>
-                <SelectContent>
-                  {Object.entries(PAYMENT_METHOD_LABEL).map(([value, label]) => (
-                    <SelectItem key={value} value={value}>
-                      {label}
-                    </SelectItem>
-                  ))}
-                </SelectContent>
-              </Select>
-            </div>
-            <div className="space-y-1.5">
-              <Label>IVA (%)</Label>
-              <Input
-                type="number"
-                min={0}
-                max={100}
-                step="0.01"
-                value={taxRate}
-                onChange={(e) => setTaxRate(e.target.value)}
-                placeholder="19"
+              <FormField
+                control={form.control}
+                name="patientId"
+                render={({ field }) => (
+                  <FormItem>
+                    <FormLabel>Paciente (opcional)</FormLabel>
+                    <div className="relative">
+                      <Search className="text-muted-foreground absolute top-1/2 left-3 size-4 -translate-y-1/2" />
+                      <Input
+                        value={patientSearch}
+                        onChange={(e) => {
+                          setPatientSearch(e.target.value);
+                          field.onChange(null);
+                        }}
+                        placeholder="Buscar paciente…"
+                        className="pl-9"
+                      />
+                    </div>
+                    {loadingPatients ? (
+                      <Skeleton className="h-10 w-full" />
+                    ) : (
+                      <Select
+                        value={field.value?.toString() ?? ""}
+                        onValueChange={(v) => field.onChange(Number(v))}
+                      >
+                        <FormControl>
+                          <SelectTrigger className="w-full">
+                            <SelectValue placeholder="Sin paciente" />
+                          </SelectTrigger>
+                        </FormControl>
+                        <SelectContent>
+                          {patients.map((p) => (
+                            <SelectItem key={p.id} value={p.id.toString()}>
+                              {p.name} · {p.ownerName}
+                            </SelectItem>
+                          ))}
+                        </SelectContent>
+                      </Select>
+                    )}
+                    <FormMessage />
+                  </FormItem>
+                )}
               />
             </div>
-          </div>
 
-          <div className="space-y-1.5">
-            <Label>Notas</Label>
-            <Textarea
-              value={notes}
-              onChange={(e) => setNotes(e.target.value)}
-              placeholder="Condiciones de pago, observaciones…"
-              className="min-h-14"
+            {/* Conceptos */}
+            <div className="space-y-2">
+              <Label>Conceptos *</Label>
+              <div className="space-y-2">
+                {fields.map((field, index) => (
+                  <div key={field.id} className="flex items-center gap-2">
+                    <FormField
+                      control={form.control}
+                      name={`items.${index}.description`}
+                      render={({ field: f }) => (
+                        <Input
+                          {...f}
+                          placeholder="Descripción (consulta, vacuna, cirugía…)"
+                          className="flex-1"
+                        />
+                      )}
+                    />
+                    <FormField
+                      control={form.control}
+                      name={`items.${index}.quantity`}
+                      render={({ field: f }) => (
+                        <Input
+                          {...f}
+                          type="number"
+                          min={1}
+                          placeholder="Cant."
+                          className="w-20"
+                          aria-label="Cantidad"
+                        />
+                      )}
+                    />
+                    <FormField
+                      control={form.control}
+                      name={`items.${index}.unitPrice`}
+                      render={({ field: f }) => (
+                        <Input
+                          {...f}
+                          type="number"
+                          min={0}
+                          step="0.01"
+                          placeholder="$ 0"
+                          className="w-28"
+                          aria-label="Precio unitario"
+                        />
+                      )}
+                    />
+                    <Button
+                      type="button"
+                      variant="ghost"
+                      size="icon"
+                      className="shrink-0"
+                      onClick={() => remove(index)}
+                      disabled={fields.length === 1}
+                      aria-label="Eliminar concepto"
+                    >
+                      <Trash2 className="size-4 text-destructive" />
+                    </Button>
+                  </div>
+                ))}
+              </div>
+              <Button
+                type="button"
+                variant="outline"
+                size="sm"
+                onClick={() => append({ description: "", quantity: 1, unitPrice: 0 })}
+              >
+                <Plus className="size-3.5" />
+                Agregar concepto
+              </Button>
+              {form.formState.errors.items?.message && (
+                <p className="text-sm text-destructive">
+                  {form.formState.errors.items.message}
+                </p>
+              )}
+            </div>
+
+            {/* Pago y notas */}
+            <div className="grid gap-3 sm:grid-cols-2">
+              <FormField
+                control={form.control}
+                name="paymentMethod"
+                render={({ field }) => (
+                  <FormItem>
+                    <FormLabel>Método de pago</FormLabel>
+                    <Select value={field.value ?? ""} onValueChange={field.onChange}>
+                      <FormControl>
+                        <SelectTrigger className="w-full">
+                          <SelectValue />
+                        </SelectTrigger>
+                      </FormControl>
+                      <SelectContent>
+                        {Object.entries(PAYMENT_METHOD_LABEL).map(([value, label]) => (
+                          <SelectItem key={value} value={value}>
+                            {label}
+                          </SelectItem>
+                        ))}
+                      </SelectContent>
+                    </Select>
+                    <FormMessage />
+                  </FormItem>
+                )}
+              />
+              <FormField
+                control={form.control}
+                name="taxRate"
+                render={({ field }) => (
+                  <FormItem>
+                    <FormLabel>IVA (%)</FormLabel>
+                    <FormControl>
+                      <Input
+                        type="number"
+                        min={0}
+                        max={100}
+                        step="0.01"
+                        value={field.value ?? ""}
+                        onChange={(e) => field.onChange(e.target.value ? Number(e.target.value) : null)}
+                        placeholder="19"
+                      />
+                    </FormControl>
+                    <FormMessage />
+                  </FormItem>
+                )}
+              />
+            </div>
+
+            <FormField
+              control={form.control}
+              name="notes"
+              render={({ field }) => (
+                <FormItem>
+                  <FormLabel>Notas</FormLabel>
+                  <FormControl>
+                    <Textarea
+                      value={field.value ?? ""}
+                      onChange={(e) => field.onChange(e.target.value || null)}
+                      placeholder="Condiciones de pago, observaciones…"
+                      className="min-h-14"
+                    />
+                  </FormControl>
+                  <FormMessage />
+                </FormItem>
+              )}
             />
-          </div>
 
-          {/* Totales en vivo */}
-          <div className="rounded-lg border bg-muted/40 p-3">
-            <div className="flex justify-between text-sm">
-              <span className="text-muted-foreground">Subtotal</span>
-              <span className="font-medium tabular-nums">
-                {formatCOP(totals.subtotal)}
-              </span>
+            {/* Totales en vivo */}
+            <div className="rounded-lg border bg-muted/40 p-3">
+              <div className="flex justify-between text-sm">
+                <span className="text-muted-foreground">Subtotal</span>
+                <span className="font-medium tabular-nums">
+                  {formatCOP(totals.subtotal)}
+                </span>
+              </div>
+              <div className="flex justify-between text-sm">
+                <span className="text-muted-foreground">
+                  IVA ({Number(watchedTaxRate) || 0}%)
+                </span>
+                <span className="font-medium tabular-nums">
+                  {formatCOP(totals.tax)}
+                </span>
+              </div>
+              <Separator className="my-2" />
+              <div className="flex justify-between text-base font-semibold">
+                <span>Total</span>
+                <span className={cn("tabular-nums text-primary")}>
+                  {formatCOP(totals.total)}
+                </span>
+              </div>
             </div>
-            <div className="flex justify-between text-sm">
-              <span className="text-muted-foreground">
-                IVA ({Number(taxRate) || 0}%)
-              </span>
-              <span className="font-medium tabular-nums">
-                {formatCOP(totals.tax)}
-              </span>
-            </div>
-            <Separator className="my-2" />
-            <div className="flex justify-between text-base font-semibold">
-              <span>Total</span>
-              <span className={cn("tabular-nums text-primary")}>
-                {formatCOP(totals.total)}
-              </span>
-            </div>
-          </div>
-        </div>
 
-        <DialogFooter>
-          <Button variant="outline" onClick={() => onOpenChange(false)}>
-            Cancelar
-          </Button>
-          <Button onClick={submit} disabled={createInvoice.isPending}>
-            {createInvoice.isPending && <Loader2 className="animate-spin" />}
-            Emitir factura
-          </Button>
-        </DialogFooter>
+            <DialogFooter>
+              <Button type="button" variant="outline" onClick={() => onOpenChange(false)}>
+                Cancelar
+              </Button>
+              <Button type="submit" disabled={createInvoice.isPending}>
+                {createInvoice.isPending && <Loader2 className="animate-spin" />}
+                Emitir factura
+              </Button>
+            </DialogFooter>
+          </form>
+        </Form>
       </DialogContent>
     </Dialog>
   );

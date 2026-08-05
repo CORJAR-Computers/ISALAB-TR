@@ -60,7 +60,9 @@ pub fn create_local_backup(
 
     for entry in it {
         let path = entry.path();
-        let name = path.strip_prefix(&app_data_dir).unwrap();
+        let name = path.strip_prefix(&app_data_dir).map_err(|e| {
+            AppError::Internal(format!("Error procesando ruta {}: {}", path.display(), e))
+        })?;
         let name_str = name.to_string_lossy().replace("\\", "/");
 
         if path.is_file() {

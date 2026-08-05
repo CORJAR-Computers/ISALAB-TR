@@ -1,4 +1,7 @@
-import { useState, type FormEvent } from "react";
+import { useState } from "react";
+import { useForm } from "react-hook-form";
+import { zodResolver } from "@hookform/resolvers/zod";
+import { z } from "zod";
 import { toast } from "sonner";
 import {
   Eye,
@@ -12,11 +15,25 @@ import {
   User,
 } from "lucide-react";
 import { Button } from "@/components/ui/button";
+import {
+  Form,
+  FormControl,
+  FormField,
+  FormItem,
+  FormLabel,
+  FormMessage,
+} from "@/components/ui/form";
 import { Input } from "@/components/ui/input";
-import { Label } from "@/components/ui/label";
 import { useLogin } from "@/hooks/use-queries";
 import { getErrorMessage } from "@/lib/api";
 import logoSidebar from "@/assets/logo_sidebar.png";
+
+const loginSchema = z.object({
+  username: z.string().min(1, "El usuario es requerido"),
+  password: z.string().min(1, "La contraseña es requerida"),
+});
+
+type LoginValues = z.infer<typeof loginSchema>;
 
 const FEATURES = [
   { icon: Stethoscope, text: "Historiales clínicos por paciente" },
@@ -26,17 +43,21 @@ const FEATURES = [
 
 export function LoginPage() {
   const login = useLogin();
-  const [username, setUsername] = useState("");
-  const [password, setPassword] = useState("");
   const [showPassword, setShowPassword] = useState(false);
 
-  const submit = async (e: FormEvent) => {
-    e.preventDefault();
-    if (!username.trim() || !password) return;
+  const form = useForm<LoginValues>({
+    resolver: zodResolver(loginSchema),
+    defaultValues: {
+      username: "",
+      password: "",
+    },
+  });
+
+  const onSubmit = async (values: LoginValues) => {
     try {
       const user = await login.mutateAsync({
-        username: username.trim(),
-        password,
+        username: values.username.trim(),
+        password: values.password,
       });
       toast.success(`Bienvenido, ${user.fullName || user.username}`);
     } catch (err) {
@@ -142,76 +163,92 @@ export function LoginPage() {
             </p>
           </div>
 
-          <form
-            onSubmit={submit}
-            className="bg-card border-card mt-6 rounded-2xl border p-6 shadow-lg transition-shadow hover:shadow-xl"
-          >
-            <div className="space-y-4">
-              <div className="space-y-1.5">
-                <Label htmlFor="username">Usuario</Label>
-                <div className="relative">
-                  <User className="text-muted-foreground absolute top-1/2 left-3 size-4 -translate-y-1/2" />
-                  <Input
-                    id="username"
-                    value={username}
-                    onChange={(e) => setUsername(e.target.value)}
-                    placeholder="admin"
-                    autoComplete="username"
-                    className="pl-9"
-                    autoFocus
-                  />
-                </div>
+          <Form {...form}>
+            <form
+              onSubmit={form.handleSubmit(onSubmit)}
+              className="bg-card border-card mt-6 rounded-2xl border p-6 shadow-lg transition-shadow hover:shadow-xl"
+            >
+              <div className="space-y-4">
+                <FormField
+                  control={form.control}
+                  name="username"
+                  render={({ field }) => (
+                    <FormItem>
+                      <FormLabel>Usuario</FormLabel>
+                      <div className="relative">
+                        <User className="text-muted-foreground absolute top-1/2 left-3 size-4 -translate-y-1/2" />
+                        <FormControl>
+                          <Input
+                            placeholder="admin"
+                            autoComplete="username"
+                            className="pl-9"
+                            autoFocus
+                            {...field}
+                          />
+                        </FormControl>
+                      </div>
+                      <FormMessage />
+                    </FormItem>
+                  )}
+                />
+
+                <FormField
+                  control={form.control}
+                  name="password"
+                  render={({ field }) => (
+                    <FormItem>
+                      <FormLabel>Contraseña</FormLabel>
+                      <div className="relative">
+                        <KeyRound className="text-muted-foreground absolute top-1/2 left-3 size-4 -translate-y-1/2" />
+                        <FormControl>
+                          <Input
+                            type={showPassword ? "text" : "password"}
+                            placeholder="••••••••"
+                            autoComplete="current-password"
+                            className="pl-9 pr-9"
+                            {...field}
+                          />
+                        </FormControl>
+                        <button
+                          type="button"
+                          onClick={() => setShowPassword((v) => !v)}
+                          className="text-muted-foreground hover:text-foreground absolute top-1/2 right-2.5 -translate-y-1/2"
+                          aria-label={
+                            showPassword ? "Ocultar contraseña" : "Mostrar contraseña"
+                          }
+                        >
+                          {showPassword ? (
+                            <EyeOff className="size-4" />
+                          ) : (
+                            <Eye className="size-4" />
+                          )}
+                        </button>
+                      </div>
+                      <FormMessage />
+                    </FormItem>
+                  )}
+                />
+
+                <Button
+                  type="submit"
+                  className="w-full"
+                  disabled={login.isPending}
+                >
+                  {login.isPending ? (
+                    <Loader2 className="animate-spin" />
+                  ) : (
+                    <KeyRound className="size-4" />
+                  )}
+                  Entrar
+                </Button>
               </div>
 
-              <div className="space-y-1.5">
-                <Label htmlFor="password">Contraseña</Label>
-                <div className="relative">
-                  <KeyRound className="text-muted-foreground absolute top-1/2 left-3 size-4 -translate-y-1/2" />
-                  <Input
-                    id="password"
-                    type={showPassword ? "text" : "password"}
-                    value={password}
-                    onChange={(e) => setPassword(e.target.value)}
-                    placeholder="••••••••"
-                    autoComplete="current-password"
-                    className="pl-9 pr-9"
-                  />
-                  <button
-                    type="button"
-                    onClick={() => setShowPassword((v) => !v)}
-                    className="text-muted-foreground hover:text-foreground absolute top-1/2 right-2.5 -translate-y-1/2"
-                    aria-label={
-                      showPassword ? "Ocultar contraseña" : "Mostrar contraseña"
-                    }
-                  >
-                    {showPassword ? (
-                      <EyeOff className="size-4" />
-                    ) : (
-                      <Eye className="size-4" />
-                    )}
-                  </button>
-                </div>
-              </div>
-
-              <Button
-                type="submit"
-                className="w-full"
-                disabled={login.isPending || !username.trim() || !password}
-              >
-                {login.isPending ? (
-                  <Loader2 className="animate-spin" />
-                ) : (
-                  <KeyRound className="size-4" />
-                )}
-                Entrar
-              </Button>
-            </div>
-
-            <p className="text-muted-foreground mt-5 text-center text-xs">
-              Primer acceso: <code className="font-mono">admin</code> /{" "}
-              <code className="font-mono">admin123</code>
-            </p>
-          </form>
+              <p className="text-muted-foreground mt-5 text-center text-xs">
+                Primer acceso: <code className="font-mono">admin</code> /{" "}
+                <code className="font-mono">admin123</code>
+              </p>
+            </form>
+          </Form>
 
           <p className="text-muted-foreground mt-6 flex items-center justify-center gap-1.5 text-center text-xs">
             <ShieldCheck className="size-3.5" />

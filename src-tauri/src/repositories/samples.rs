@@ -5,6 +5,26 @@ use crate::error::AppError;
 use crate::models::sample::{LabResult, Sample};
 use crate::models::sample_list_item::SampleListItem;
 
+pub(crate) type SampleListItemRow = (
+    i32, String, i32, String, String, String, i32, String, String, String,
+    Option<String>, Option<String>, i32, i32,
+);
+
+pub(crate) type LabResultRow = (
+    i32,
+    i32,
+    i32,
+    String,
+    Option<String>,
+    f64,
+    String,
+    Option<f64>,
+    Option<f64>,
+    Option<String>,
+);
+
+pub(crate) type TrendPointRow = (String, f64, Option<f64>, Option<f64>, String);
+
 /// Columnas de una muestra con el tipo unido.
 const SAMPLE_SELECT: &str = "
     SELECT s.ID, s.CODE, s.PATIENT_ID, s.SAMPLE_TYPE_ID, st.NAME,
@@ -13,7 +33,7 @@ const SAMPLE_SELECT: &str = "
     FROM SAMPLES s
     JOIN SAMPLE_TYPES st ON st.ID = s.SAMPLE_TYPE_ID";
 
-type SampleRow = (
+pub(crate) type SampleRow = (
     i32,          // id
     String,       // code
     i32,          // patient_id
@@ -25,7 +45,7 @@ type SampleRow = (
     Option<String>, // notes
 );
 
-fn map_sample(r: SampleRow) -> Sample {
+pub(crate) fn map_sample(r: SampleRow) -> Sample {
     Sample {
         id: r.0,
         code: r.1,
@@ -67,8 +87,8 @@ pub fn list(
         .map(|s| format!("%{}%", s.trim()))
         .filter(|s| !s.trim_matches('%').is_empty());
 
-    let sql = format!(
-        "SELECT s.ID, s.CODE, s.PATIENT_ID, p.NAME, o.FULL_NAME, sp.NAME,
+    let sql = "
+        SELECT s.ID, s.CODE, s.PATIENT_ID, p.NAME, o.FULL_NAME, sp.NAME,
                 s.SAMPLE_TYPE_ID, st.NAME,
                 LEFT(CAST(s.RECEIVED_AT AS VARCHAR(60)), 19),
                 s.STATUS, s.COLLECTED_BY, s.NOTES,
@@ -85,14 +105,10 @@ pub fn list(
                 OR UPPER(s.CODE) LIKE UPPER(?)
                 OR UPPER(p.NAME) LIKE UPPER(?)
                 OR UPPER(o.FULL_NAME) LIKE UPPER(?))
-         ORDER BY s.RECEIVED_AT DESC, s.ID DESC"
-    );
+         ORDER BY s.RECEIVED_AT DESC, s.ID DESC";
 
-    let rows: Vec<(
-        i32, String, i32, String, String, String, i32, String, String, String,
-        Option<String>, Option<String>, i32, i32,
-    )> = conn
-        .query(&sql, (&status, &status, &like, &like, &like, &like))
+    let rows: Vec<SampleListItemRow> = conn
+        .query(sql, (&status, &status, &like, &like, &like, &like))
         .map_err(AppError::from)?;
 
     Ok(rows
@@ -171,18 +187,7 @@ pub fn list_results(
     conn: &mut SimpleConnection,
     sample_id: i32,
 ) -> Result<Vec<LabResult>, AppError> {
-    let rows: Vec<(
-        i32,
-        i32,
-        i32,
-        String,
-        Option<String>,
-        f64,
-        String,
-        Option<f64>,
-        Option<f64>,
-        Option<String>,
-    )> = conn
+    let rows: Vec<LabResultRow> = conn
         .query(
             "SELECT r.ID, r.SAMPLE_ID, r.ANALYTE_ID, a.NAME, a.UNIT,
                     r.RESULT_VALUE, r.STATUS,
@@ -200,20 +205,7 @@ pub fn list_results(
     Ok(rows.into_iter().map(map_lab_result).collect())
 }
 
-pub fn map_lab_result(
-    r: (
-        i32,
-        i32,
-        i32,
-        String,
-        Option<String>,
-        f64,
-        String,
-        Option<f64>,
-        Option<f64>,
-        Option<String>,
-    ),
-) -> LabResult {
+pub fn map_lab_result(r: LabResultRow) -> LabResult {
     LabResult {
         id: r.0,
         sample_id: r.1,
@@ -242,7 +234,7 @@ pub fn get_patient_lab_trends(
         WHERE s.PATIENT_ID = ? AND r.ANALYTE_ID = ? AND s.STATUS IN ('EN_PROCESO', 'FINALIZADA')
         ORDER BY s.RECEIVED_AT ASC
     ";
-    let rows: Vec<(String, f64, Option<f64>, Option<f64>, String)> = conn
+    let rows: Vec<TrendPointRow> = conn
         .query(sql, (&patient_id, &analyte_id))
         .map_err(AppError::from)?;
         
@@ -253,4 +245,240 @@ pub fn get_patient_lab_trends(
         ref_max: r.3,
         status: r.4,
     }).collect())
+}
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+
+    #[test]
+    fn test_map_sample_fields() {
+        let row: SampleRow = (
+            1,                          // id
+            "M-2026-0001".into(),       // code
+            10,                         // patient_id
+            1,                          // sample_type_id
+            "Sangre total (EDTA)".into(), // sample_type_name
+            "2026-08-01 10:30:00".into(), // received_at
+            "RECIBIDA".into(),          // status
+            Some("Dr. Ramos".into()),   // collected_by
+            Some("Muestra de control".into()), // notes
+        );
+        let sample = map_sample(row);
+
+        assert_eq!(sample.id, 1);
+        assert_eq!(sample.code, "M-2026-0001");
+        assert_eq!(sample.patient_id, 10);
+        assert_eq!(sample.sample_type_id, 1);
+        assert_eq!(sample.sample_type_name, "Sangre total (EDTA)");
+        assert_eq!(sample.received_at, "2026-08-01 10:30:00");
+        assert_eq!(sample.status, "RECIBIDA");
+        assert_eq!(sample.collected_by.as_deref(), Some("Dr. Ramos"));
+        assert_eq!(sample.notes.as_deref(), Some("Muestra de control"));
+        assert!(sample.results.is_empty()); // map_sample siempre devuelve results vacío
+    }
+
+    #[test]
+    fn test_map_sample_optional_fields_none() {
+        let row: SampleRow = (
+            2, "M-2026-0002".into(), 20, 2, "Suero".into(),
+            "2026-08-02 14:00:00".into(), "EN_PROCESO".into(), None, None,
+        );
+        let sample = map_sample(row);
+
+        assert_eq!(sample.id, 2);
+        assert_eq!(sample.collected_by, None);
+        assert_eq!(sample.notes, None);
+    }
+
+    #[test]
+    fn test_map_lab_result_with_reference_range() {
+        let row: LabResultRow = (
+            100,    // id
+            1,      // sample_id
+            1,      // analyte_id
+            "Hematocrito".into(), // analyte_name
+            Some("%".into()),     // unit
+            42.5,   // value
+            "NORMAL".into(),      // status
+            Some(37.0),           // ref_min
+            Some(55.0),           // ref_max
+            Some("2026-08-01 11:00:00".into()), // analyzed_at
+        );
+        let result = map_lab_result(row);
+
+        assert_eq!(result.id, 100);
+        assert_eq!(result.sample_id, 1);
+        assert_eq!(result.analyte_id, 1);
+        assert_eq!(result.analyte_name, "Hematocrito");
+        assert_eq!(result.unit.as_deref(), Some("%"));
+        assert!((result.value - 42.5).abs() < f64::EPSILON);
+        assert_eq!(result.status, "NORMAL");
+        assert_eq!(result.ref_min, Some(37.0));
+        assert_eq!(result.ref_max, Some(55.0));
+        assert_eq!(result.analyzed_at.as_deref(), Some("2026-08-01 11:00:00"));
+    }
+
+    #[test]
+    fn test_map_lab_result_without_reference_range() {
+        let row: LabResultRow = (
+            101, 1, 10, "Glucosa".into(), Some("mg/dL".into()),
+            95.0, "NORMAL".into(), None, None, None,
+        );
+        let result = map_lab_result(row);
+
+        assert_eq!(result.ref_min, None);
+        assert_eq!(result.ref_max, None);
+        assert_eq!(result.analyzed_at, None);
+    }
+
+    #[test]
+    fn test_map_lab_result_abnormal_status() {
+        let row: LabResultRow = (
+            102, 1, 6, "ALT".into(), Some("U/L".into()),
+            150.0, "ALTO".into(), Some(10.0), Some(100.0), None,
+        );
+        let result = map_lab_result(row);
+        assert_eq!(result.status, "ALTO");
+        assert!((result.value - 150.0).abs() < f64::EPSILON);
+    }
+
+    #[test]
+    fn test_sample_list_item_row_mapping() {
+        let row: SampleListItemRow = (
+            1, "M-2026-0001".into(), 10, "Luna".into(),
+            "Juan Pérez".into(), "Canino".into(), 1, "Sangre".into(),
+            "2026-08-01 10:30:00".into(), "RECIBIDA".into(),
+            Some("Dr. Ramos".into()), None, 3, 1,
+        );
+
+        assert_eq!(row.0, 1);
+        assert_eq!(row.1, "M-2026-0001");
+        assert_eq!(row.12, 3); // result_count
+        assert_eq!(row.13, 1); // abnormal_count
+    }
+}
+
+#[cfg(test)]
+mod integration_tests {
+    use super::*;
+    use crate::test_helpers;
+
+    fn setup() -> (SimpleConnection, std::path::PathBuf) {
+        let (mut conn, db_path) = test_helpers::setup_test_db();
+        test_helpers::insert_test_sample_type(&mut conn);
+        (conn, db_path)
+    }
+
+    #[test]
+    fn test_get_sample_existing() {
+        let (mut conn, db_path) = setup();
+        let patient_id = test_helpers::insert_test_patient(&mut conn);
+
+        // Insertar muestra
+        conn.execute(
+            "INSERT INTO SAMPLES (ID, CODE, PATIENT_ID, SAMPLE_TYPE_ID, RECEIVED_AT, STATUS)
+             VALUES (1, 'M-2026-0001', ?, 1, '2026-08-01 10:00:00', 'RECIBIDA')",
+            (&patient_id,),
+        ).unwrap();
+
+        let sample = get(&mut conn, 1).unwrap();
+        assert!(sample.is_some());
+        let s = sample.unwrap();
+        assert_eq!(s.id, 1);
+        assert_eq!(s.code, "M-2026-0001");
+        assert_eq!(s.status, "RECIBIDA");
+        assert_eq!(s.sample_type_name, "Sangre total (EDTA)");
+
+        test_helpers::cleanup_test_db(&db_path);
+    }
+
+    #[test]
+    fn test_get_sample_not_found() {
+        let (mut conn, db_path) = setup();
+        let _ = test_helpers::insert_test_patient(&mut conn);
+
+        let sample = get(&mut conn, 999).unwrap();
+        assert!(sample.is_none());
+
+        test_helpers::cleanup_test_db(&db_path);
+    }
+
+    #[test]
+    fn test_list_samples_no_filter() {
+        let (mut conn, db_path) = setup();
+        let patient_id = test_helpers::insert_test_patient(&mut conn);
+
+        conn.execute(
+            "INSERT INTO SAMPLES (ID, CODE, PATIENT_ID, SAMPLE_TYPE_ID, RECEIVED_AT, STATUS)
+             VALUES (1, 'M-2026-0001', ?, 1, '2026-08-01 10:00:00', 'RECIBIDA')",
+            (&patient_id,),
+        ).unwrap();
+
+        let samples = list(&mut conn, None, None).unwrap();
+        assert_eq!(samples.len(), 1);
+        assert_eq!(samples[0].code, "M-2026-0001");
+        assert_eq!(samples[0].patient_name, "Luna");
+
+        test_helpers::cleanup_test_db(&db_path);
+    }
+
+    #[test]
+    fn test_list_samples_with_status_filter() {
+        let (mut conn, db_path) = setup();
+        let patient_id = test_helpers::insert_test_patient(&mut conn);
+
+        conn.execute(
+            "INSERT INTO SAMPLES (ID, CODE, PATIENT_ID, SAMPLE_TYPE_ID, RECEIVED_AT, STATUS)
+             VALUES (1, 'M-2026-0001', ?, 1, '2026-08-01 10:00:00', 'RECIBIDA')",
+            (&patient_id,),
+        ).unwrap();
+        conn.execute(
+            "INSERT INTO SAMPLES (ID, CODE, PATIENT_ID, SAMPLE_TYPE_ID, RECEIVED_AT, STATUS)
+             VALUES (2, 'M-2026-0002', ?, 1, '2026-08-02 10:00:00', 'FINALIZADA')",
+            (&patient_id,),
+        ).unwrap();
+
+        let samples = list(&mut conn, Some("RECIBIDA"), None).unwrap();
+        assert_eq!(samples.len(), 1);
+        assert_eq!(samples[0].code, "M-2026-0001");
+
+        test_helpers::cleanup_test_db(&db_path);
+    }
+
+    #[test]
+    fn test_set_sample_status_transition() {
+        let (mut conn, db_path) = setup();
+        let patient_id = test_helpers::insert_test_patient(&mut conn);
+
+        conn.execute(
+            "INSERT INTO SAMPLES (ID, CODE, PATIENT_ID, SAMPLE_TYPE_ID, RECEIVED_AT, STATUS)
+             VALUES (1, 'M-2026-0001', ?, 1, '2026-08-01 10:00:00', 'RECIBIDA')",
+            (&patient_id,),
+        ).unwrap();
+
+        // RECIBIDA -> EN_PROCESO
+        let updated = set_status(&mut conn, 1, "EN_PROCESO").unwrap();
+        assert_eq!(updated.status, "EN_PROCESO");
+
+        test_helpers::cleanup_test_db(&db_path);
+    }
+
+    #[test]
+    fn test_set_sample_status_invalid_transition() {
+        let (mut conn, db_path) = setup();
+        let patient_id = test_helpers::insert_test_patient(&mut conn);
+
+        conn.execute(
+            "INSERT INTO SAMPLES (ID, CODE, PATIENT_ID, SAMPLE_TYPE_ID, RECEIVED_AT, STATUS)
+             VALUES (1, 'M-2026-0001', ?, 1, '2026-08-01 10:00:00', 'RECIBIDA')",
+            (&patient_id,),
+        ).unwrap();
+
+        // RECIBIDA -> FINALIZADA sin resultados (debe fallar)
+        let result = set_status(&mut conn, 1, "FINALIZADA");
+        assert!(result.is_err());
+
+        test_helpers::cleanup_test_db(&db_path);
+    }
 }

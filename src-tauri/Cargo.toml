@@ -1,6 +1,6 @@
 [package]
 name = "isalab"
-version = "0.1.0"
+version = "0.3.0"
 description = "Sistema de gestión para laboratorios veterinarios (Firebird 5 Embedded)"
 authors = ["ISALAB"]
 edition = "2021"
@@ -42,6 +42,8 @@ rsfbclient = { version = "0.27", default-features = false, features = ["dynamic_
 tauri-plugin-dialog = "2"
 zip = "4.2.0"
 walkdir = "2.5.0"
+
+# ---- Firma digital PKCS#12 (metadata y bloque visible) ----
 
 [profile.release]
 codegen-units = 1

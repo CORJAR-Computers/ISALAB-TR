@@ -18,6 +18,9 @@ pub struct ReportSignature {
     pub vet_license: Option<String>,
     pub signature_image_path: Option<String>,
     pub pkcs12_path: Option<String>,
+    /// Contraseña del certificado PKCS#12 (solo para uso interno, nunca se serializa).
+    #[serde(skip_serializing_if = "Option::is_none")]
+    pub pkcs12_password: Option<String>,
 }
 
 /// Dibuja un título de sección (label muted, con separador posterior).
@@ -76,7 +79,7 @@ pub fn draw_patient_metadata_grid(
         .unwrap_or(received_at)
         .to_string();
 
-    let left_rows = vec![
+    let left_rows = [
         ("NOMBRE", patient.name.to_uppercase()),
         ("ESPECIE", patient.species_name.to_uppercase()),
         (
@@ -91,7 +94,7 @@ pub fn draw_patient_metadata_grid(
         ("EDAD", edad),
     ];
 
-    let right_rows = vec![
+    let right_rows = [
         ("MEDICO VETERINARIO", vet),
         ("EMPRESA", clinic.name.to_uppercase()),
         ("PROPIETARIO", patient.owner_name.to_uppercase()),

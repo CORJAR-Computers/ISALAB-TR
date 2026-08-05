@@ -108,8 +108,22 @@ export const api = {
     invoke<SessionUser>("change_password", { input }),
 
   // ---- Auditoría ----
-  listAuditLog: (limit: number | null, offset: number | null) =>
-    invoke<AuditLogEntry[]>("list_audit_log", { limit, offset }),
+  listAuditLog: (
+    limit: number | null,
+    offset: number | null,
+    username?: string,
+    action?: string,
+    dateFrom?: string,
+    dateTo?: string,
+  ) =>
+    invoke<AuditLogEntry[]>("list_audit_log", {
+      limit,
+      offset,
+      username: username || null,
+      action: action || null,
+      dateFrom: dateFrom || null,
+      dateTo: dateTo || null,
+    }),
 
   // ---- Reportes PDF ----
   generateReport: (sampleId: number) =>

@@ -2,8 +2,8 @@ import { useEffect, useRef } from "react";
 import { toast } from "sonner";
 import { useSessionStore } from "@/stores/session-store";
 
-// 45 minutos de inactividad
-const TIMEOUT_MS = 45 * 60 * 1000;
+// 15 minutos de inactividad (cumplimiento clínico)
+const TIMEOUT_MS = 15 * 60 * 1000;
 
 export function useSessionTimeout() {
   const session = useSessionStore((s) => s.session);
@@ -31,7 +31,7 @@ export function useSessionTimeout() {
       await logout();
       
       toast.error("Sesión expirada por inactividad", {
-        description: "Por tu seguridad, la sesión se ha cerrado tras 45 minutos de inactividad.",
+        description: "Por tu seguridad, la sesión se ha cerrado tras 15 minutos de inactividad.",
         duration: 8000,
       });
     };

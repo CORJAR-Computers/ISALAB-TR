@@ -1,5 +1,6 @@
 #![allow(linker_messages)]
 
+pub mod ai_cache;
 pub mod auth;
 pub mod commands;
 pub mod db;
@@ -8,6 +9,9 @@ pub mod models;
 pub mod pdf_templates;
 pub mod repositories;
 pub mod state;
+
+#[cfg(test)]
+pub mod test_helpers;
 
 use specta_typescript::Typescript;
 use tauri::Manager;

@@ -1,6 +1,6 @@
 use tauri::State;
 
-use crate::auth::require_session;
+use crate::auth::{require_session, require_vet_or_admin};
 use crate::error::AppError;
 use crate::models::sample::{CreateSampleInput, LabResult, RegisterResultInput, Sample};
 use crate::models::sample_list_item::SampleListItem;
@@ -15,22 +15,28 @@ pub fn create_sample(
     state: State<'_, AppState>,
     input: CreateSampleInput,
 ) -> Result<Sample, AppError> {
-    require_session(&state)?;
+    require_vet_or_admin(&state)?;
     let mut pooled = state.pool.acquire()?;
     history_repo::create_sample(pooled.conn(), &input)
 }
 
 /// Carga un resultado de laboratorio; valida el rango de referencia por
 /// especie/edad/sexo vía stored procedure y finaliza la muestra.
+/// Invalida el cache de IA para esta muestra.
 #[tauri::command]
 #[specta::specta]
 pub fn register_lab_result(
     state: State<'_, AppState>,
     input: RegisterResultInput,
 ) -> Result<LabResult, AppError> {
-    require_session(&state)?;
+    require_vet_or_admin(&state)?;
     let mut pooled = state.pool.acquire()?;
-    history_repo::register_lab_result(pooled.conn(), &input)
+    let result = history_repo::register_lab_result(pooled.conn(), &input)?;
+    
+    // Invalidar cache de IA cuando se actualizan resultados
+    state.ai_cache.invalidate(input.sample_id);
+    
+    Ok(result)
 }
 
 /// Mesa de trabajo del laboratorio: listado global de muestras con filtros
@@ -67,7 +73,7 @@ pub fn set_sample_status(
     id: i32,
     status: String,
 ) -> Result<Sample, AppError> {
-    let user = require_session(&state)?;
+    let user = require_vet_or_admin(&state)?;
     let mut pooled = state.pool.acquire()?;
     let sample = samples_repo::set_status(pooled.conn(), id, &status)?;
 

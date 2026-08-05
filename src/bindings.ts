@@ -6,6 +6,7 @@ import { invoke as __TAURI_INVOKE } from "@tauri-apps/api/core";
 export const commands = {
 	/**  Estado de la conexión Firebird Embedded (banner de setup en la UI). */
 	dbHealth: () => __TAURI_INVOKE<DbHealth>("db_health"),
+	createLocalBackup: (destPath: string) => typedError<string, AppError>(__TAURI_INVOKE("create_local_backup", { destPath })),
 	listSpecies: () => typedError<Species[], AppError>(__TAURI_INVOKE("list_species")),
 	listBreeds: (speciesId: number) => typedError<Breed[], AppError>(__TAURI_INVOKE("list_breeds", { speciesId })),
 	listSampleTypes: () => typedError<SampleType[], AppError>(__TAURI_INVOKE("list_sample_types")),
@@ -45,6 +46,7 @@ export const commands = {
 	/**
 	 *  Carga un resultado de laboratorio; valida el rango de referencia por
 	 *  especie/edad/sexo vía stored procedure y finaliza la muestra.
+	 *  Invalida el cache de IA para esta muestra.
 	 */
 	registerLabResult: (input: RegisterResultInput) => typedError<LabResult, AppError>(__TAURI_INVOKE("register_lab_result", { input })),
 	/**
@@ -80,6 +82,9 @@ export const commands = {
 	/**
 	 *  Inicia sesión verificando la contraseña (Argon2id) contra la tabla USERS.
 	 *  La sesión es única: una app de escritorio con un operador a la vez.
+	 * 
+	 *  Protección contra fuerza bruta: tras 5 intentos fallidos consecutivos,
+	 *  el login se bloquea por 5 minutos para ese usuario.
 	 */
 	login: (input: LoginInput) => typedError<SessionUser, AppError>(__TAURI_INVOKE("login", { input })),
 	logout: () => typedError<null, AppError>(__TAURI_INVOKE("logout")),
@@ -152,6 +157,7 @@ export const commands = {
 	patientName: string | null,
 	ownerId: number,
 	ownerName: string,
+	ownerPhone: string | null,
 	consultationId: number | null,
 	/**  YYYY-MM-DD HH:MM:SS */
 	issueDate: string,
@@ -172,8 +178,13 @@ export const commands = {
 	 *  cirugías, refuerzos de vacunación y últimas muestras.
 	 */
 	getDashboardStats: () => typedError<DashboardStats, AppError>(__TAURI_INVOKE("get_dashboard_stats")),
-	/**  Lista el registro de auditoría con paginación (solo ADMIN). */
+	/**
+	 *  Lista el registro de auditoría con paginación (solo ADMIN).
+	 *  Orden descendente (más reciente primero).
+	 */
 	listAuditLog: (limit: number | null, offset: number | null) => typedError<AuditLogEntry[], AppError>(__TAURI_INVOKE("list_audit_log", { limit, offset })),
+	interpretLabResults: (sampleId: number) => typedError<string, AppError>(__TAURI_INVOKE("interpret_lab_results", { sampleId })),
+	getPatientLabTrends: (patientId: number, analyteId: number) => typedError<TrendPoint[], AppError>(__TAURI_INVOKE("get_patient_lab_trends", { patientId, analyteId })),
 };
 
 /* Types */
@@ -187,6 +198,16 @@ export type Analyte = {
 
 /**  Error tipado de la app. Se serializa como `{ type, data }` para el frontend. */
 export type AppError = { type: "Db"; data: string } | { type: "NotFound"; data: string } | { type: "Validation"; data: string } | { type: "Forbidden"; data: string } | { type: "Internal"; data: string };
+
+/**  Fila del registro de auditoría (USER_AUDIT_LOG). */
+export type AuditLogEntry = {
+	id: number,
+	userId: number | null,
+	username: string,
+	action: string,
+	details: string | null,
+	createdAt: string,
+};
 
 export type Breed = {
 	id: number,
@@ -208,7 +229,7 @@ export type ClinicSettings = {
 	city: string | null,
 	logoPath: string | null,
 	/**  IVA por defecto (%). */
-	taxRate: number,
+	taxRate: number | null,
 	currency: string,
 	/**  GRAPHIC (imagen) o DIGITAL (PKCS#12). */
 	signatureMode: string,
@@ -596,6 +617,14 @@ export type Surgery = {
 	status: string,
 };
 
+export type TrendPoint = {
+	date: string,
+	value: number | null,
+	refMin: number | null,
+	refMax: number | null,
+	status: string,
+};
+
 /**  Fila del listado de usuarios (nunca expone el hash). */
 export type UserListItem = {
 	id: number,
@@ -605,15 +634,6 @@ export type UserListItem = {
 	role: string,
 	active: boolean,
 	mustChangePassword: boolean,
-	createdAt: string,
-};
-
-export type AuditLogEntry = {
-	id: number,
-	userId: number | null,
-	username: string,
-	action: string,
-	details: string | null,
 	createdAt: string,
 };
 
@@ -662,3 +682,4 @@ async function typedError<T, E>(result: Promise<T>): Promise<{ status: "ok"; dat
         return { status: "error", error: e as any };
     }
 }
+

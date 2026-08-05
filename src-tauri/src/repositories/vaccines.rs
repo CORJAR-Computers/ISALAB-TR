@@ -5,6 +5,11 @@ use crate::error::AppError;
 use crate::models::vaccine::{CreateVaccineInput, Vaccine, VaccineListItem};
 use crate::repositories::next_id;
 
+pub(crate) type VaccineListItemRow = (
+    i32, i32, String, String, String, String, String, Option<String>,
+    Option<String>, Option<String>, Option<String>,
+);
+
 /// Columnas de una vacuna con el tipo y el veterinario unidos (ficha completa).
 const VACCINE_SELECT: &str = "
     SELECT v.ID, v.PATIENT_ID, v.VACCINE_TYPE_ID, v.VACCINE_NAME, v.DOSE,
@@ -14,7 +19,7 @@ const VACCINE_SELECT: &str = "
     FROM VACCINES v
     LEFT JOIN USERS u ON u.ID = v.VETERINARIAN_ID";
 
-type VaccineRow = (
+pub(crate) type VaccineRow = (
     i32,            // id
     i32,            // patient_id
     Option<i32>,    // vaccine_type_id
@@ -28,7 +33,7 @@ type VaccineRow = (
     Option<String>, // notes
 );
 
-fn map_vaccine(r: VaccineRow) -> Vaccine {
+pub(crate) fn map_vaccine(r: VaccineRow) -> Vaccine {
     Vaccine {
         id: r.0,
         patient_id: r.1,
@@ -123,11 +128,8 @@ pub fn list(
                OR UPPER(v.VACCINE_NAME) LIKE UPPER(?))
         ORDER BY v.ADMINISTERED_AT DESC";
 
-    let rows: Vec<(
-        i32, i32, String, String, String, String, String, Option<String>,
-        Option<String>, Option<String>, Option<String>,
-    )> = conn
-        .query(&sql, (&like, &like, &like, &like))
+    let rows: Vec<VaccineListItemRow> = conn
+        .query(sql, (&like, &like, &like, &like))
         .map_err(AppError::from)?;
 
     Ok(rows
@@ -168,10 +170,7 @@ pub fn list_upcoming(
          ORDER BY v.NEXT_DOSE_AT ASC"
     );
 
-    let rows: Vec<(
-        i32, i32, String, String, String, String, String, Option<String>,
-        Option<String>, Option<String>, Option<String>,
-    )> = conn.query(&sql, ()).map_err(AppError::from)?;
+    let rows: Vec<VaccineListItemRow> = conn.query(&sql, ()).map_err(AppError::from)?;
 
     Ok(rows
         .into_iter()
@@ -189,4 +188,154 @@ pub fn list_upcoming(
             veterinarian_name: r.10,
         })
         .collect())
+}
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+
+    #[test]
+    fn test_map_vaccine_all_fields() {
+        let row: VaccineRow = (
+            1,                          // id
+            10,                         // patient_id
+            Some(1),                    // vaccine_type_id (Rabia)
+            "Rabia".into(),            // vaccine_name
+            Some("1 ml".into()),       // dose
+            "2026-08-01 10:00:00".into(), // administered_at
+            Some("2027-08-01".into()), // next_dose_at
+            Some("LOT-12345".into()),  // lot
+            Some("Zoetis".into()),     // manufacturer
+            Some("Dr. Ramos".into()),  // veterinarian_name
+            Some("Sin reacciones".into()), // notes
+        );
+        let vaccine = map_vaccine(row);
+
+        assert_eq!(vaccine.id, 1);
+        assert_eq!(vaccine.patient_id, 10);
+        assert_eq!(vaccine.vaccine_type_id, Some(1));
+        assert_eq!(vaccine.vaccine_name, "Rabia");
+        assert_eq!(vaccine.dose.as_deref(), Some("1 ml"));
+        assert_eq!(vaccine.administered_at, "2026-08-01 10:00:00");
+        assert_eq!(vaccine.next_dose_at.as_deref(), Some("2027-08-01"));
+        assert_eq!(vaccine.lot.as_deref(), Some("LOT-12345"));
+        assert_eq!(vaccine.manufacturer.as_deref(), Some("Zoetis"));
+        assert_eq!(vaccine.veterinarian_name.as_deref(), Some("Dr. Ramos"));
+        assert_eq!(vaccine.notes.as_deref(), Some("Sin reacciones"));
+    }
+
+    #[test]
+    fn test_map_vaccine_optional_fields_none() {
+        let row: VaccineRow = (
+            2, 20, None, "Desparasitación".into(), None,
+            "2026-08-15 14:00:00".into(), None, None, None, None, None,
+        );
+        let vaccine = map_vaccine(row);
+
+        assert_eq!(vaccine.id, 2);
+        assert_eq!(vaccine.vaccine_type_id, None);
+        assert_eq!(vaccine.dose, None);
+        assert_eq!(vaccine.next_dose_at, None);
+        assert_eq!(vaccine.lot, None);
+        assert_eq!(vaccine.manufacturer, None);
+        assert_eq!(vaccine.veterinarian_name, None);
+        assert_eq!(vaccine.notes, None);
+    }
+
+    #[test]
+    fn test_vaccine_list_item_row_mapping() {
+        let row: VaccineListItemRow = (
+            1, 10, "Luna".into(), "Canino".into(), "Juan Pérez".into(),
+            "Rabia".into(), "2026-08-01 10:00:00".into(),
+            Some("2027-08-01".into()), Some("LOT-123".into()),
+            Some("Zoetis".into()), Some("Dr. Ramos".into()),
+        );
+
+        assert_eq!(row.0, 1);
+        assert_eq!(row.1, 10);
+        assert_eq!(row.2, "Luna");
+        assert_eq!(row.5, "Rabia");
+        assert_eq!(row.7.as_deref(), Some("2027-08-01"));
+    }
+}
+
+#[cfg(test)]
+mod integration_tests {
+    use super::*;
+    use crate::test_helpers;
+
+    fn setup() -> (SimpleConnection, std::path::PathBuf) {
+        test_helpers::setup_test_db()
+    }
+
+    #[test]
+    fn test_create_vaccine() {
+        let (mut conn, db_path) = setup();
+        let patient_id = test_helpers::insert_test_patient(&mut conn);
+
+        let input = CreateVaccineInput {
+            patient_id,
+            vaccine_type_id: None,
+            vaccine_name: "Rabia".into(),
+            dose: Some("1 ml".into()),
+            administered_at: "2026-08-01 10:00:00".into(),
+            next_dose_at: Some("2027-08-01".into()),
+            lot: Some("LOT-12345".into()),
+            manufacturer: Some("Zoetis".into()),
+            notes: Some("Sin reacciones".into()),
+        };
+
+        let vaccine = create(&mut conn, &input, Some(1)).unwrap();
+        assert_eq!(vaccine.vaccine_name, "Rabia");
+        assert_eq!(vaccine.patient_id, patient_id);
+        assert_eq!(vaccine.dose.as_deref(), Some("1 ml"));
+        assert!(vaccine.id > 0);
+
+        test_helpers::cleanup_test_db(&db_path);
+    }
+
+    #[test]
+    fn test_by_patient() {
+        let (mut conn, db_path) = setup();
+        let patient_id = test_helpers::insert_test_patient(&mut conn);
+
+        // Insertar dos vacunas
+        conn.execute(
+            "INSERT INTO VACCINES (ID, PATIENT_ID, VACCINE_NAME, DOSE, ADMINISTERED_AT)
+             VALUES (1, ?, 'Rabia', '1 ml', '2026-08-01 10:00:00')",
+            (&patient_id,),
+        ).unwrap();
+        conn.execute(
+            "INSERT INTO VACCINES (ID, PATIENT_ID, VACCINE_NAME, DOSE, ADMINISTERED_AT)
+             VALUES (2, ?, 'Polivalente', '2 ml', '2026-07-01 10:00:00')",
+            (&patient_id,),
+        ).unwrap();
+
+        let vaccines = by_patient(&mut conn, patient_id).unwrap();
+        assert_eq!(vaccines.len(), 2);
+        // Ordenadas por fecha descendente
+        assert_eq!(vaccines[0].vaccine_name, "Rabia");
+        assert_eq!(vaccines[1].vaccine_name, "Polivalente");
+
+        test_helpers::cleanup_test_db(&db_path);
+    }
+
+    #[test]
+    fn test_list_vaccines() {
+        let (mut conn, db_path) = setup();
+        let patient_id = test_helpers::insert_test_patient(&mut conn);
+
+        conn.execute(
+            "INSERT INTO VACCINES (ID, PATIENT_ID, VACCINE_NAME, ADMINISTERED_AT)
+             VALUES (1, ?, 'Rabia', '2026-08-01 10:00:00')",
+            (&patient_id,),
+        ).unwrap();
+
+        let vaccines = list(&mut conn, None).unwrap();
+        assert_eq!(vaccines.len(), 1);
+        assert_eq!(vaccines[0].vaccine_name, "Rabia");
+        assert_eq!(vaccines[0].patient_name, "Luna");
+
+        test_helpers::cleanup_test_db(&db_path);
+    }
 }

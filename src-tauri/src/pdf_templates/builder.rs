@@ -102,6 +102,12 @@ pub struct PdfBuilder {
     pub watermark_logo: Option<RawImage>,
 }
 
+impl Default for PdfBuilder {
+    fn default() -> Self {
+        Self::new()
+    }
+}
+
 impl PdfBuilder {
     pub fn new() -> Self {
         Self {

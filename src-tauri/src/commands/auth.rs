@@ -170,7 +170,7 @@ pub fn get_session(state: State<'_, AppState>) -> Result<Option<SessionUser>, Ap
     Ok(guard.clone())
 }
 
-/// Lista el registro de auditoría con paginación (solo ADMIN).
+/// Lista el registro de auditoría con paginación y filtros (solo ADMIN).
 /// Orden descendente (más reciente primero).
 #[tauri::command]
 #[specta::specta]
@@ -178,10 +178,20 @@ pub fn list_audit_log(
     state: State<'_, AppState>,
     limit: Option<i32>,
     offset: Option<i32>,
+    username: Option<String>,
+    action: Option<String>,
+    date_from: Option<String>,
+    date_to: Option<String>,
 ) -> Result<Vec<AuditLogEntry>, AppError> {
     crate::auth::require_admin(&state)?;
     let mut pooled = state.pool.acquire()?;
     let l = limit.unwrap_or(100).min(500);
     let o = offset.unwrap_or(0);
-    auth_repo::list_audit_log(pooled.conn(), l, o)
+    let filters = auth_repo::AuditFilters {
+        username,
+        action,
+        date_from,
+        date_to,
+    };
+    auth_repo::list_audit_log(pooled.conn(), l, o, Some(&filters))
 }

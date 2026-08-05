@@ -19,6 +19,10 @@ pub struct ClinicSettings {
     pub vet_name: String,
     pub vet_license: Option<String>,
     pub groq_api_key: Option<String>,
+    /// Ruta al archivo PKCS#12 (.p12/.pfx) para firma digital.
+    pub pkcs12_path: Option<String>,
+    /// Contraseña del certificado PKCS#12 (solo en memoria, nunca se persiste).
+    pub pkcs12_password: Option<String>,
 }
 
 impl Default for ClinicSettings {
@@ -36,6 +40,8 @@ impl Default for ClinicSettings {
             vet_name: String::new(),
             vet_license: None,
             groq_api_key: None,
+            pkcs12_path: None,
+            pkcs12_password: None,
         }
     }
 }

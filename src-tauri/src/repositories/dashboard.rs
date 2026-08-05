@@ -6,6 +6,10 @@ use crate::models::consultation::ConsultationListItem;
 use crate::models::dashboard::DashboardStats;
 use crate::repositories::{samples as samples_repo, surgeries as surgeries_repo, vaccines as vaccines_repo};
 
+type ConsultationListItemRow = (
+    i32, i32, String, String, String, String, String, String, Option<String>,
+);
+
 fn count(conn: &mut SimpleConnection, sql: &str) -> Result<i32, AppError> {
     conn.query_first(sql, ())
         .map_err(AppError::from)?
@@ -118,9 +122,7 @@ pub fn list_upcoming_consultations(
          ORDER BY c.CONSULTATION_DATE ASC"
     );
 
-    let rows: Vec<(
-        i32, i32, String, String, String, String, String, String, Option<String>,
-    )> = conn.query(&sql, ()).map_err(AppError::from)?;
+    let rows: Vec<ConsultationListItemRow> = conn.query(&sql, ()).map_err(AppError::from)?;
 
     Ok(rows
         .into_iter()
@@ -136,4 +138,230 @@ pub fn list_upcoming_consultations(
             veterinarian_name: r.8,
         })
         .collect())
+}
+
+#[cfg(test)]
+mod tests {
+    use std::path::PathBuf;
+    use super::*;
+    use crate::test_helpers::*;
+
+    fn setup() -> (SimpleConnection, PathBuf) {
+        setup_test_db()
+    }
+
+    #[test]
+    fn test_get_stats_empty_database() {
+        let (mut conn, db_path) = setup();
+        let stats = get_stats(&mut conn).unwrap();
+
+        // All counts should be 0 or defaults
+        assert_eq!(stats.patients_total, 0);
+        assert_eq!(stats.patients_active, 0);
+        assert_eq!(stats.samples_total, 0);
+        assert_eq!(stats.samples_in_progress, 0);
+        assert_eq!(stats.samples_finished, 0);
+        assert_eq!(stats.samples_cancelled, 0);
+        assert_eq!(stats.abnormal_results, 0);
+        assert_eq!(stats.consultations_pending, 0);
+        assert_eq!(stats.surgeries_programmed, 0);
+        assert_eq!(stats.vaccines_due, 0);
+        assert_eq!(stats.invoices_unpaid, 0);
+        assert_eq!(stats.revenue_total, 0.0);
+        assert!(stats.upcoming_consultations.is_empty());
+        assert!(stats.upcoming_surgeries.is_empty());
+        assert!(stats.upcoming_vaccines.is_empty());
+        assert!(stats.recent_samples.is_empty());
+
+        cleanup_test_db(&db_path);
+    }
+
+    #[test]
+    fn test_get_stats_with_patients() {
+        let (mut conn, db_path) = setup();
+        insert_test_patient(&mut conn);
+
+        let stats = get_stats(&mut conn).unwrap();
+        assert_eq!(stats.patients_total, 1);
+        assert_eq!(stats.patients_active, 1);
+
+        cleanup_test_db(&db_path);
+    }
+
+    #[test]
+    fn test_get_stats_with_consultations() {
+        let (mut conn, db_path) = setup();
+        let patient_id = insert_test_patient(&mut conn);
+
+        // Create a pending consultation
+        conn.execute(
+            "INSERT INTO CONSULTATIONS (ID, PATIENT_ID, CONSULTATION_DATE, REASON, STATUS)
+             VALUES (1, ?, CURRENT_TIMESTAMP, 'Consulta de prueba', 'PENDIENTE')",
+            (&patient_id,),
+        ).unwrap();
+
+        let stats = get_stats(&mut conn).unwrap();
+        assert_eq!(stats.consultations_pending, 1);
+
+        cleanup_test_db(&db_path);
+    }
+
+    #[test]
+    fn test_get_stats_with_samples() {
+        let (mut conn, db_path) = setup();
+        let patient_id = insert_test_patient(&mut conn);
+        insert_test_sample_type(&mut conn);
+
+        // Create samples in different statuses
+        conn.execute(
+            "INSERT INTO SAMPLES (ID, PATIENT_ID, SAMPLE_TYPE_ID, RECEIVED_AT, STATUS)
+             VALUES (1, ?, 1, CURRENT_TIMESTAMP, 'RECIBIDA')",
+            (&patient_id,),
+        ).unwrap();
+        conn.execute(
+            "INSERT INTO SAMPLES (ID, PATIENT_ID, SAMPLE_TYPE_ID, RECEIVED_AT, STATUS)
+             VALUES (2, ?, 1, CURRENT_TIMESTAMP, 'EN_PROCESO')",
+            (&patient_id,),
+        ).unwrap();
+        conn.execute(
+            "INSERT INTO SAMPLES (ID, PATIENT_ID, SAMPLE_TYPE_ID, RECEIVED_AT, STATUS)
+             VALUES (3, ?, 1, CURRENT_TIMESTAMP, 'FINALIZADA')",
+            (&patient_id,),
+        ).unwrap();
+
+        let stats = get_stats(&mut conn).unwrap();
+        assert_eq!(stats.samples_total, 3);
+        assert_eq!(stats.samples_in_progress, 1);
+        assert_eq!(stats.samples_finished, 1);
+
+        cleanup_test_db(&db_path);
+    }
+
+    #[test]
+    fn test_get_stats_with_surgeries() {
+        let (mut conn, db_path) = setup();
+        let patient_id = insert_test_patient(&mut conn);
+
+        conn.execute(
+            "INSERT INTO SURGERIES (ID, PATIENT_ID, SURGERY_TYPE, SCHEDULED_AT, STATUS)
+             VALUES (1, ?, 'Castración', CURRENT_TIMESTAMP, 'PROGRAMADA')",
+            (&patient_id,),
+        ).unwrap();
+
+        let stats = get_stats(&mut conn).unwrap();
+        assert_eq!(stats.surgeries_programmed, 1);
+
+        cleanup_test_db(&db_path);
+    }
+
+    #[test]
+    fn test_get_stats_with_invoices() {
+        let (mut conn, db_path) = setup();
+        insert_test_patient(&mut conn);
+
+        // Create unpaid invoice
+        conn.execute(
+            "INSERT INTO INVOICES (ID, OWNER_ID, INVOICE_NUMBER, ISSUE_DATE, TOTAL, STATUS)
+             VALUES (1, 1, 'FAC-0001', CURRENT_TIMESTAMP, 100000, 'EMITIDA')",
+            (),
+        ).unwrap();
+
+        // Create paid invoice
+        conn.execute(
+            "INSERT INTO INVOICES (ID, OWNER_ID, INVOICE_NUMBER, ISSUE_DATE, TOTAL, STATUS)
+             VALUES (2, 1, 'FAC-0002', CURRENT_TIMESTAMP, 200000, 'PAGADA')",
+            (),
+        ).unwrap();
+
+        let stats = get_stats(&mut conn).unwrap();
+        assert_eq!(stats.invoices_unpaid, 1);
+        assert!((stats.revenue_total - 200000.0).abs() < 0.01);
+
+        cleanup_test_db(&db_path);
+    }
+
+    #[test]
+    fn test_list_upcoming_consultations_empty() {
+        let (mut conn, db_path) = setup();
+        let consultations = list_upcoming_consultations(&mut conn, 5).unwrap();
+        assert!(consultations.is_empty());
+        cleanup_test_db(&db_path);
+    }
+
+    #[test]
+    fn test_list_upcoming_consultations_with_data() {
+        let (mut conn, db_path) = setup();
+        let patient_id = insert_test_patient(&mut conn);
+
+        // Create a future pending consultation
+        conn.execute(
+            "INSERT INTO CONSULTATIONS (ID, PATIENT_ID, CONSULTATION_DATE, REASON, STATUS)
+             VALUES (1, ?, DATEADD(1 DAY TO CURRENT_TIMESTAMP), 'Consulta futura', 'PENDIENTE')",
+            (&patient_id,),
+        ).unwrap();
+
+        let consultations = list_upcoming_consultations(&mut conn, 5).unwrap();
+        assert_eq!(consultations.len(), 1);
+        assert_eq!(consultations[0].reason, "Consulta futura");
+        assert_eq!(consultations[0].status, "PENDIENTE");
+
+        cleanup_test_db(&db_path);
+    }
+
+    #[test]
+    fn test_list_upcoming_consultations_excludes_past() {
+        let (mut conn, db_path) = setup();
+        let patient_id = insert_test_patient(&mut conn);
+
+        // Create a past consultation
+        conn.execute(
+            "INSERT INTO CONSULTATIONS (ID, PATIENT_ID, CONSULTATION_DATE, REASON, STATUS)
+             VALUES (1, ?, DATEADD(-1 DAY TO CURRENT_TIMESTAMP), 'Consulta pasada', 'PENDIENTE')",
+            (&patient_id,),
+        ).unwrap();
+
+        let consultations = list_upcoming_consultations(&mut conn, 5).unwrap();
+        assert!(consultations.is_empty());
+
+        cleanup_test_db(&db_path);
+    }
+
+    #[test]
+    fn test_list_upcoming_consultations_excludes_completed() {
+        let (mut conn, db_path) = setup();
+        let patient_id = insert_test_patient(&mut conn);
+
+        // Create a completed consultation
+        conn.execute(
+            "INSERT INTO CONSULTATIONS (ID, PATIENT_ID, CONSULTATION_DATE, REASON, STATUS)
+             VALUES (1, ?, DATEADD(1 DAY TO CURRENT_TIMESTAMP), 'Consulta completada', 'COMPLETADA')",
+            (&patient_id,),
+        ).unwrap();
+
+        let consultations = list_upcoming_consultations(&mut conn, 5).unwrap();
+        assert!(consultations.is_empty());
+
+        cleanup_test_db(&db_path);
+    }
+
+    #[test]
+    fn test_list_upcoming_consultations_limit() {
+        let (mut conn, db_path) = setup();
+        let patient_id = insert_test_patient(&mut conn);
+
+        // Create 3 future consultations
+        for i in 1..=3 {
+            conn.execute(
+                "INSERT INTO CONSULTATIONS (ID, PATIENT_ID, CONSULTATION_DATE, REASON, STATUS)
+                 VALUES (?, ?, DATEADD(? DAY TO CURRENT_TIMESTAMP), ?, 'PENDIENTE')",
+                (&i, &patient_id, &(i as i32), &format!("Consulta {}", i)),
+            ).unwrap();
+        }
+
+        // Request only 2
+        let consultations = list_upcoming_consultations(&mut conn, 2).unwrap();
+        assert_eq!(consultations.len(), 2);
+
+        cleanup_test_db(&db_path);
+    }
 }
