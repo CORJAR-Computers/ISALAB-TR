@@ -13,6 +13,8 @@ pub mod state;
 #[cfg(test)]
 pub mod test_helpers;
 
+// Solo se usa para regenerar src/bindings.ts en builds de desarrollo.
+#[cfg(debug_assertions)]
 use specta_typescript::Typescript;
 use tauri::Manager;
 use tauri_specta::{collect_commands, Builder};
