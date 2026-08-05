@@ -1,13 +1,15 @@
 # ─────────────────────────────────────────────────────────────────────────────
-# Dependabot — GitHub Actions
+# Dependabot — GitHub Actions + npm
 #
-# Mantiene las actions de los workflows actualizadas en un único PR semanal
-# (grupo `all-actions`), en lugar de esperar a acumular saltos de major como
-# ocurrió con el paso de checkout@v4 / setup-node@v4 a v7 (ver CHANGELOG 0.3.1).
+# 1) GitHub Actions: un único PR semanal (grupo `all-actions`) en lugar de
+#    acumular saltos de major como el paso de checkout@v4 / setup-node@v4 a v7
+#    (ver CHANGELOG 0.3.1).
+# 2) npm (frontend): PRs semanales separados por tipo de dependencia
+#    (runtime vs dev) usando `dependency-type`, que Dependabot distingue
+#    gracias al `package-lock.json` trackeado.
 #
-# Cada PR de Dependabot dispara el CI (jobs frontend + backend + tauri-build),
-# así que una actualización de actions queda validada por los 208 tests de Rust
-# y el build antes de poder mergearse.
+# Cada PR dispara el CI (frontend + 208 tests Rust + tauri-build), así que
+# cualquier actualización queda validada antes de poder mergearse.
 # ─────────────────────────────────────────────────────────────────────────────
 
 version: 2
@@ -27,3 +29,21 @@ updates:
       all-actions:
         patterns:
           - "*"
+
+  - package-ecosystem: "npm"
+    directory: "/"
+    schedule:
+      interval: "weekly"
+      day: "monday"
+      time: "09:30"
+      timezone: "America/Bogota"
+    open-pull-requests-limit: 10
+    labels:
+      - "dependencies"
+    groups:
+      # Dependencias de producción (lo que empaqueta el frontend).
+      runtime:
+        dependency-type: "production"
+      # Dependencias de desarrollo (build, test, lint, tipos).
+      dev:
+        dependency-type: "development"
