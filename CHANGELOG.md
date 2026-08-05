@@ -4,6 +4,26 @@ All notable changes to ISALAB will be documented in this file.
 
 The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.1.0/).
 
+## [Unreleased]
+
+### Security & Hardening
+
+- **Secretos cifrados en la BD local (DPAPI de Windows)**: la clave de IA
+  (Groq) ya no se almacena en texto plano. Nuevo módulo `crypto.rs` la cifra
+  con `CryptProtectData` (ámbito del usuario de Windows) y la persiste como
+  `enc:v1:<base64>` en `CLINIC_SETTINGS`. Los valores legacy en texto plano se
+  re-cifran automáticamente en el primer acceso; si la BD se mueve a otro
+  usuario o máquina, la clave no se expone (se pide de nuevo en Ajustes). En
+  builds de desarrollo no-Windows el módulo es un passthrough documentado (el
+  producto de producción es Windows).
+
+### Added
+
+- Tests de cifrado en `crypto.rs` (roundtrip, legacy, corrupto) y de
+  repositorio (`test_groq_api_key_is_encrypted_at_rest`,
+  `test_legacy_plaintext_key_is_migrated_on_read`). Total de tests Rust:
+  202 → **208**.
+
 ## [0.3.0] - 2026-08-05
 
 ### 🎯 Release Summary

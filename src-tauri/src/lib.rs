@@ -3,6 +3,7 @@
 pub mod ai_cache;
 pub mod auth;
 pub mod commands;
+pub mod crypto;
 pub mod db;
 pub mod error;
 pub mod models;

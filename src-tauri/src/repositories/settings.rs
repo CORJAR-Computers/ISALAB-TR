@@ -81,7 +81,33 @@ pub fn get(conn: &mut SimpleConnection) -> Result<ClinicSettings, AppError> {
                 }
             }
             "vet_license" => s.vet_license = v.filter(|x| !x.is_empty()),
-            "groq_api_key" => s.groq_api_key = v.filter(|x| !x.is_empty()),
+            "groq_api_key" => {
+                if let Some(stored) = v {
+                    match crate::crypto::decrypt_from_db(&stored) {
+                        Ok(Some(plain)) => s.groq_api_key = Some(plain),
+                        Ok(None) => {
+                            // Valor legacy en texto plano (versión previa):
+                            // se re-cifra al vuelo para endurecer el
+                            // almacenamiento sin migración manual. Si el
+                            // re-cifrado falla aquí, se devuelve el valor y el
+                            // siguiente guardado lo cifrará definitivamente.
+                            if let Ok(enc) = crate::crypto::encrypt_to_db(&stored) {
+                                let _ = conn.execute(
+                                    "UPDATE CLINIC_SETTINGS SET VALUE_TEXT = ? WHERE KEY_NAME = ?",
+                                    (&enc, "ai.groq_api_key"),
+                                );
+                            }
+                            s.groq_api_key = Some(stored);
+                        }
+                        Err(_) => {
+                            // No se puede descifrar (p. ej. BD movida a otro
+                            // usuario de Windows): no exponer el valor. El
+                            // usuario reconfigura la clave en Ajustes.
+                            s.groq_api_key = None;
+                        }
+                    }
+                }
+            }
             "pkcs12_path" => s.pkcs12_path = v.filter(|x| !x.is_empty()),
             _ => {}
         }
@@ -95,6 +121,14 @@ pub fn save(
     input: &ClinicSettings,
 ) -> Result<ClinicSettings, AppError> {
     let tax = format!("{:.2}", input.tax_rate);
+
+    // La clave de IA se cifra con DPAPI ANTES de tocar la BD: si el cifrado
+    // falla, abortamos sin haber persistido ningún cambio (evita guardar un
+    // ajuste a medias). Los vacíos se tratan como "sin clave".
+    let groq_encrypted: Option<String> = match input.groq_api_key.as_deref() {
+        Some(k) if !k.trim().is_empty() => Some(crate::crypto::encrypt_to_db(k)?),
+        _ => None,
+    };
 
     // Reutiliza SETTING_KEYS: el listado de claves vive en un solo lugar.
     for (key, field) in SETTING_KEYS {
@@ -110,7 +144,7 @@ pub fn save(
             "signature_mode" => Some(input.signature_mode.clone()),
             "vet_name" => Some(input.vet_name.clone()),
             "vet_license" => input.vet_license.clone(),
-            "groq_api_key" => input.groq_api_key.clone(),
+            "groq_api_key" => groq_encrypted.clone(),
             "pkcs12_path" => input.pkcs12_path.clone(),
             _ => None,
         };
@@ -298,6 +332,71 @@ mod tests {
         let settings = get(&mut conn).unwrap();
         assert_eq!(settings.clinic_name, "Mi Clínica Veterinaria");
         assert_eq!(settings.tax_rate, 19.0);
+        cleanup_test_db(&db_path);
+    }
+
+    #[test]
+    fn test_groq_api_key_is_encrypted_at_rest() {
+        let (mut conn, db_path) = setup();
+
+        let input = ClinicSettings {
+            clinic_name: "Test".to_string(),
+            clinic_nit: "123".to_string(),
+            groq_api_key: Some("gsk_super_secret_key".to_string()),
+            ..Default::default()
+        };
+        save(&mut conn, &input).unwrap();
+
+        // En la BD el valor está cifrado: no contiene el texto plano.
+        let row: Option<(Option<String>,)> = conn
+            .query_first(
+                "SELECT VALUE_TEXT FROM CLINIC_SETTINGS WHERE KEY_NAME = 'ai.groq_api_key'",
+                (),
+            )
+            .unwrap();
+        let stored = row.unwrap().0.unwrap();
+        assert!(crate::crypto::is_encrypted(&stored));
+        assert!(!stored.contains("gsk_super_secret_key"));
+
+        // Y get() lo descifra de vuelta sin pérdida.
+        let fetched = get(&mut conn).unwrap();
+        assert_eq!(
+            fetched.groq_api_key.as_deref(),
+            Some("gsk_super_secret_key")
+        );
+
+        cleanup_test_db(&db_path);
+    }
+
+    #[test]
+    fn test_legacy_plaintext_key_is_migrated_on_read() {
+        let (mut conn, db_path) = setup();
+
+        // Simula una instalación previa: la clave guardada en texto plano.
+        conn.execute(
+            "UPDATE OR INSERT INTO CLINIC_SETTINGS (KEY_NAME, VALUE_TEXT)\n\
+             VALUES ('ai.groq_api_key', ?) MATCHING (KEY_NAME)",
+            (&Some("gsk_legacy_plaintext".to_string()),),
+        )
+        .unwrap();
+
+        // get() devuelve el valor y migra la fila a cifrado.
+        let fetched = get(&mut conn).unwrap();
+        assert_eq!(
+            fetched.groq_api_key.as_deref(),
+            Some("gsk_legacy_plaintext")
+        );
+
+        let row: Option<(Option<String>,)> = conn
+            .query_first(
+                "SELECT VALUE_TEXT FROM CLINIC_SETTINGS WHERE KEY_NAME = 'ai.groq_api_key'",
+                (),
+            )
+            .unwrap();
+        let stored = row.unwrap().0.unwrap();
+        assert!(crate::crypto::is_encrypted(&stored));
+        assert!(!stored.contains("gsk_legacy_plaintext"));
+
         cleanup_test_db(&db_path);
     }
 }

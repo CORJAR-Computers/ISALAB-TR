@@ -47,7 +47,10 @@ pdf_signer = "0.2"
 p12-keystore = "0.2.1"
 x509-cert = "0.2.5"
 
-# ---- Firma digital PKCS#12 (metadata y bloque visible) ----
+# ---- Cifrado de secretos en repositorio (DPAPI de Windows) ----
+base64 = "0.22"
+[target.'cfg(windows)'.dependencies]
+windows-sys = { version = "0.59", features = ["Win32_Foundation", "Win32_Security_Cryptography"] }
 
 [profile.release]
 codegen-units = 1

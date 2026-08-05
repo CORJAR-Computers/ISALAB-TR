@@ -148,9 +148,10 @@ npm run tauri:build     # ídem
 - Control de acceso basado en roles (RBAC: `ADMIN`, `VETERINARIO`, `AUXILIAR`) enforced en los comandos nativos de Rust.
 - **RBAC completo (v0.3.0)**: los **35 comandos** Tauri requieren sesión activa (`require_session`); las mutaciones críticas (usuarios, configuración, auditoría, logos, certificado PKCS#12, copias de seguridad) requieren rol `ADMIN` (`require_admin`).
 - **Rate limiting de login (v0.3.0)**: 5 intentos fallidos bloquean el usuario durante 5 minutos.
+- **Cifrado de secretos (DPAPI de Windows)**: la clave de IA (Groq) se almacena **cifrada con DPAPI** en `CLINIC_SETTINGS` (formato `enc:v1:<base64>`), ligada al usuario de Windows que la configuró. Una copia de la base de datos no expone la clave; los valores legacy en texto plano se re-cifran automáticamente al primer acceso.
 - **Auditoría**: tabla `USER_AUDIT_LOG` registra inicios/cierres de sesión, intentos fallidos de login, cambios de contraseña, creación de usuarios, cambios de configuración, importación de logos/certificados y transiciones de estado en muestras, facturas, consultas y cirugías. Desde la v0.3.0 el historial se consulta en la **UI de Auditoría** (solo `ADMIN`, tabla paginada con filtros).
 - **CSP**: Content Security Policy configurado (`script-src 'self'`, sin eval).
-- **Tests**: 202 tests de Rust (`cargo test`) + 102 de frontend con Vitest (`npm test`).
+- **Tests**: 208 tests de Rust (`cargo test`) + 102 de frontend con Vitest (`npm test`).
 
 ## Estructura
 
