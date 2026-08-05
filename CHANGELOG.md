@@ -4,19 +4,51 @@ All notable changes to ISALAB will be documented in this file.
 
 The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.1.0/).
 
-## [0.3.0] - 2026-08-04
+## [0.3.0] - 2026-08-05
 
-### 🎯 Session Summary
+### 🎯 Release Summary
 
-Major quality improvement session focusing on testing, code quality, and AI integration:
+Production-hardening release: full RBAC enforcement across every command,
+login rate limiting, an expanded audit trail with an admin UI, secondary
+clinic logos for PDF reports, a shared PDF layout module, and a CI pipeline
+that produces installers with the Firebird embedded engine bundled.
 
 | Metric | Before | After | Change |
 |--------|--------|-------|--------|
-| Rust tests | 30 | 163 | **+443%** |
+| Rust tests | 30 | 202 | **+573%** |
 | TypeScript tests | 102 | 102 | - |
 | Clippy warnings | 28 | 0 | **-100%** |
 | Repositories tested | 2 | 11 | **+450%** |
 | AI features | Basic | Enhanced + Cached | ✅ |
+| Commands with RBAC | — | 35/35 | ✅ |
+
+### Security & Hardening
+
+- **RBAC completo**: `require_session()` aplicado a los 35 comandos Tauri; `require_admin()` para acciones sensibles (usuarios, configuración, auditoría, logos, certificado PKCS#12, copias de seguridad)
+- **Guard consolidado**: se eliminó el `current_user()` duplicado; todo pasa por `auth::require_session()`
+- **Rate limiting de login**: 5 intentos fallidos → bloqueo de 5 minutos por usuario (`LoginAttempts` en `AppState`)
+
+### Audit Log
+
+- Nuevo modelo `AuditLogEntry` y repositorio con paginación `FIRST ? SKIP ?`
+- Comando `list_audit_log` protegido con `require_admin()`
+- UI **AuditLogPage**: tabla paginada (50/página), badges semánticos por acción y vista exclusiva de administradores
+- Eventos registrados: `LOGIN`, `LOGIN_FAILED` (usuario inexistente, inactivo o contraseña incorrecta), `USER_CREATED`, `PASSWORD_CHANGED`, `SETTINGS_CHANGED`, `LOGO_IMPORTED`, `SECONDARY_LOGO_*`, `CERTIFICATE_IMPORTED`, `SAMPLE_STATUS_CHANGE`, `INVOICE_STATUS_CHANGE`, `CONSULTATION_STATUS_CHANGE`, `SURGERY_STATUS_CHANGE`
+
+### Features
+
+- **Logos secundarios** (migraciones `0007_secondary_logos` + `0008_patient_preferred_logo`): importación, listado y borrado de logos adicionales para los reportes PDF; **logo preferido por paciente**; selector de logo en el diálogo de generación de reportes con opción de guardar la preferencia
+
+### PDF Refactor
+
+- Nuevo `pdf_templates/layout.rs` con helpers compartidos: `section_title`, `draw_grid`, `draw_patient_block`, `draw_results`, `draw_signature`, `draw_lab_note`, `draw_footer` y `ReportSignature`
+- Plantillas `clinical`, `surgical`, `financial` y `vaccines` reescritas sobre `layout.rs` (menos duplicación, firma consistente)
+
+### Production Build & CI
+
+- **Instalador con Firebird embebido**: los jobs `release` y `tauri-build` de GitHub Actions ahora descargan el runtime Firebird 5 y lo colocan en `src-tauri/binaries/firebird/` para que el glob de recursos lo empaquete (el motor está gitignored, así que sin este paso el instalador salía sin base de datos)
+- **Code-splitting del frontend**: bundle principal de 1266 kB → 207 kB en chunks cacheables (react, charts, markdown, icons, vendor); resuelto el ciclo `vendor ↔ react-vendor` causado por `@floating-ui/react`
+- **Lint y clippy limpios**: eliminados los últimos `any` del diálogo de reportes (tipado estricto), `ptr_arg` y `unnecessary_cast`; build release sin warnings (import de `specta` gated por `debug_assertions`)
 
 ### Fixed
 
@@ -89,7 +121,7 @@ Major quality improvement session focusing on testing, code quality, and AI inte
 ### Changed
 
 - **CI pipeline now passes**: `cargo clippy -- -D warnings` succeeds
-- **Test coverage**: Rust backend tests increased from 30 to 163 (+443%), TypeScript tests at 102
+- **Test coverage**: Rust backend tests increased from 30 to 202 (+573%), TypeScript tests at 102
 - **Version**: Updated to 0.3.0 in `package.json`, `Cargo.toml`, `tauri.conf.json`
 
 ### Test Infrastructure
