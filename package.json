@@ -10,7 +10,7 @@
     "preview": "vite preview",
     "tauri": "tauri",
     "tauri:dev": "node scripts/clean-target-orphans.mjs && tauri dev",
-    "tauri:build": "node scripts/clean-target-orphans.mjs && tauri build",
+    "tauri:build": "node scripts/clean-target-orphans.mjs && node scripts/prune-firebird.mjs && tauri build",
     "clean:target": "node scripts/clean-target-orphans.mjs",
     "setup:target": "node scripts/setup-local-target.mjs",
     "icons": "node scripts/gen-icons.mjs",

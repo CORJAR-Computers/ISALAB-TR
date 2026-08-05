@@ -24,6 +24,18 @@ The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.1.0/).
   `test_legacy_plaintext_key_is_migrated_on_read`). Total de tests Rust:
   202 → **208**.
 
+### Build & CI
+
+- **Instalador más pequeño**: nuevo `scripts/prune-firebird.mjs` reduce el
+  motor Firebird al subconjunto embedded (fbclient + ICU + plugins + intl +
+  tzdata + SECURITY5.FDB), eliminando las herramientas de servidor
+  (firebird.exe, gbak, gfix…), docs y el instalador de runtime (~68 MB →
+  ~49 MB). Se ejecuta en el pipeline de CI (release + tauri-build) y en
+  `npm run tauri:build`; el instalador NSIS baja de ~20 MB a ~16 MB.
+- **Actions de GitHub a Node 24**: checkout v7, setup-node v7, cache v6,
+  upload-artifact v7 y action-gh-release v3 (runtime `node24`, sin aviso de
+  deprecación) y `node-version: 24` en todos los jobs.
+
 ## [0.3.0] - 2026-08-05
 
 ### 🎯 Release Summary

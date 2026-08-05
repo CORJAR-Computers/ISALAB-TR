@@ -14,11 +14,11 @@ jobs:
     name: Frontend (React)
     runs-on: ubuntu-latest
     steps:
-      - uses: actions/checkout@v4
+      - uses: actions/checkout@v7
       - name: Setup Node.js
-        uses: actions/setup-node@v4
+        uses: actions/setup-node@v7
         with:
-          node-version: 20
+          node-version: 24
           cache: 'npm'
       - name: Install dependencies
         run: npm ci
@@ -36,11 +36,11 @@ jobs:
       FIREBIRD_VERSION: "5.0.3.1683-0"
       FIREBIRD_DIR: ${{ github.workspace }}\firebird5
     steps:
-      - uses: actions/checkout@v4
+      - uses: actions/checkout@v7
 
       - name: Cache Firebird 5 runtime
         id: cache-firebird
-        uses: actions/cache@v4
+        uses: actions/cache@v6
         with:
           path: ${{ github.workspace }}\firebird5
           key: firebird-5.0.3.1683-windows-x64
@@ -73,11 +73,16 @@ jobs:
           Write-Host "FIREBIRD_DIR=$env:FIREBIRD_DIR"
           Write-Host "fbclient.dll exists: $(Test-Path "$env:FIREBIRD_DIR\fbclient.dll")"
 
+      # Los tests corren contra el mismo subconjunto embedded que se empaqueta
+      # (sin tools de servidor ni docs): si el prune rompiera algo, falla aquí.
+      - name: Prune Firebird to embedded subset
+        run: node scripts/prune-firebird.mjs firebird5
+
       - name: Install Rust
         uses: dtolnay/rust-toolchain@stable
 
       - name: Cache cargo registry
-        uses: actions/cache@v4
+        uses: actions/cache@v6
         with:
           path: |
             ~/.cargo/registry
@@ -100,16 +105,16 @@ jobs:
     needs: [frontend, backend]
     runs-on: windows-latest
     steps:
-      - uses: actions/checkout@v4
+      - uses: actions/checkout@v7
       - name: Setup Node.js
-        uses: actions/setup-node@v4
+        uses: actions/setup-node@v7
         with:
-          node-version: 20
+          node-version: 24
           cache: 'npm'
       - name: Install Rust
         uses: dtolnay/rust-toolchain@stable
       - name: Cache cargo registry
-        uses: actions/cache@v4
+        uses: actions/cache@v6
         with:
           path: |
             ~/.cargo/registry
@@ -138,10 +143,12 @@ jobs:
           Remove-Item $zip -Force
           if (-not (Test-Path "$dest\fbclient.dll")) { throw "fbclient.dll no se copió al bundle" }
           Write-Host "fbclient.dll bundled: $(Test-Path "$dest\fbclient.dll")"
+      - name: Prune Firebird to embedded subset
+        run: node scripts/prune-firebird.mjs
       - name: Build Tauri app
         run: npx tauri build
       - name: Upload artifacts
-        uses: actions/upload-artifact@v4
+        uses: actions/upload-artifact@v7
         with:
           name: isalab-windows
           path: |
