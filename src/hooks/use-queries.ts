@@ -208,6 +208,30 @@ export function useImportClinicLogo() {
   });
 }
 
+export function useSecondaryLogos() {
+  return useQuery({
+    queryKey: ["secondary-logos"],
+    queryFn: api.listSecondaryLogos,
+  });
+}
+
+export function useImportSecondaryLogo() {
+  const qc = useQueryClient();
+  return useMutation({
+    mutationFn: ({ name, sourcePath }: { name: string; sourcePath: string }) =>
+      api.importSecondaryLogo(name, sourcePath),
+    onSuccess: () => qc.invalidateQueries({ queryKey: ["secondary-logos"] }),
+  });
+}
+
+export function useDeleteSecondaryLogo() {
+  const qc = useQueryClient();
+  return useMutation({
+    mutationFn: (id: number) => api.deleteSecondaryLogo(id),
+    onSuccess: () => qc.invalidateQueries({ queryKey: ["secondary-logos"] }),
+  });
+}
+
 // ====================== AUTENTICACIÓN =======================================
 
 export function useLogin() {
@@ -423,7 +447,8 @@ export function useReports() {
 export function useGenerateReport() {
   const qc = useQueryClient();
   return useMutation({
-    mutationFn: (sampleId: number) => api.generateReport(sampleId),
+    mutationFn: ({ sampleId, overrideLogoPath, saveLogoPreference }: { sampleId: number, overrideLogoPath?: string | null, saveLogoPreference?: boolean | null }) => 
+      api.generateReport(sampleId, overrideLogoPath, saveLogoPreference),
     onSuccess: () => qc.invalidateQueries({ queryKey: ["reports"] }),
   });
 }

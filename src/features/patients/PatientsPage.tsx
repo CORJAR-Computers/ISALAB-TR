@@ -57,7 +57,7 @@ export function PatientsPage() {
         <div>
           <h2 className="text-xl font-semibold tracking-tight">Pacientes</h2>
           <p className="text-muted-foreground text-sm">
-            Busca por nombre, propietario, microchip o documento.
+            Busca por código PAC-, nombre, propietario, microchip o documento.
           </p>
         </div>
         <Button onClick={() => setDialogOpen(true)}>
@@ -71,7 +71,7 @@ export function PatientsPage() {
         <Input
           value={debounced}
           onChange={(e) => setSearch(e.target.value)}
-          placeholder="Buscar paciente…"
+          placeholder="PAC-2026-0001 o buscar por nombre…"
           className="pl-9"
         />
       </div>
@@ -89,6 +89,7 @@ export function PatientsPage() {
           <Table>
             <TableHeader>
               <TableRow className="hover:bg-transparent">
+                <TableHead className="w-36">Código</TableHead>
                 <TableHead>Paciente</TableHead>
                 <TableHead>Especie / Raza</TableHead>
                 <TableHead>Sexo</TableHead>
@@ -101,7 +102,7 @@ export function PatientsPage() {
               {isLoading &&
                 Array.from({ length: 5 }).map((_, i) => (
                   <TableRow key={i}>
-                    <TableCell colSpan={6} className="h-12">
+                    <TableCell colSpan={7} className="h-12">
                       <Skeleton className="h-8 w-full" />
                     </TableCell>
                   </TableRow>
@@ -109,7 +110,7 @@ export function PatientsPage() {
 
               {!isLoading && isError && (
                 <TableRow>
-                  <TableCell colSpan={6} className="text-muted-foreground h-16 text-center">
+                  <TableCell colSpan={7} className="text-muted-foreground h-16 text-center">
                     No se pudo cargar la lista de pacientes.
                   </TableCell>
                 </TableRow>
@@ -117,7 +118,7 @@ export function PatientsPage() {
 
               {!isLoading && data && data.length === 0 && (
                 <TableRow>
-                  <TableCell colSpan={6} className="text-muted-foreground h-24 text-center">
+                  <TableCell colSpan={7} className="text-muted-foreground h-24 text-center">
                     {search
                       ? "Ningún paciente coincide con la búsqueda."
                       : "Aún no hay pacientes registrados. Crea el primero."}
@@ -131,6 +132,14 @@ export function PatientsPage() {
                   className="cursor-pointer"
                   onClick={() => openHistory(p.id)}
                 >
+                  <TableCell>
+                    <Badge
+                      variant="outline"
+                      className="font-mono text-xs tracking-wide"
+                    >
+                      {p.code}
+                    </Badge>
+                  </TableCell>
                   <TableCell>
                     <div className="flex flex-col">
                       <span className="font-medium">{p.name}</span>

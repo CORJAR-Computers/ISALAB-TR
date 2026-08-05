@@ -4,6 +4,7 @@ pub mod consultation;
 pub mod dashboard;
 pub mod invoice;
 pub mod owner;
+pub mod logo;
 pub mod patient;
 pub mod report;
 pub mod sample;

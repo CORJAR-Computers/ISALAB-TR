@@ -30,7 +30,7 @@ use crate::commands::invoices::{
     create_invoice, get_invoice, list_invoices, set_invoice_status,
 };
 use crate::commands::patients::{
-    create_patient, get_patient, get_patient_lab_trends, list_owners, list_patients,
+    create_patient, get_patient, get_patient_by_code, get_patient_lab_trends, list_owners, list_patients,
 };
 use crate::commands::reports::{
     generate_carnet_vacunacion, generate_certificado_cirugia, generate_clinical_report,
@@ -42,6 +42,7 @@ use crate::commands::samples::{
 };
 use crate::commands::settings::{
     get_clinic_settings, import_clinic_logo, import_pkcs12, save_clinic_settings,
+    list_secondary_logos, import_secondary_logo, delete_secondary_logo,
 };
 use crate::commands::surgeries::{create_surgery, list_surgeries, set_surgery_status};
 use crate::commands::users::{change_password, create_user, list_users};
@@ -62,6 +63,7 @@ fn specta_builder() -> Builder<tauri::Wry> {
             list_owners,
             list_patients,
             get_patient,
+            get_patient_by_code,
             create_patient,
             get_clinical_history,
             create_consultation,
@@ -74,6 +76,9 @@ fn specta_builder() -> Builder<tauri::Wry> {
             save_clinic_settings,
             import_clinic_logo,
             import_pkcs12,
+            list_secondary_logos,
+            import_secondary_logo,
+            delete_secondary_logo,
             test_groq_connection,
             login,
             logout,

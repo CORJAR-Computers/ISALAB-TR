@@ -11,6 +11,7 @@ import {
   Scissors,
   Search,
   Syringe,
+  ImageUp,
 } from "lucide-react";
 import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
@@ -22,6 +23,14 @@ import {
   TabsList,
   TabsTrigger,
 } from "@/components/ui/tabs";
+import { Label } from "@/components/ui/label";
+import {
+  Select,
+  SelectContent,
+  SelectItem,
+  SelectTrigger,
+  SelectValue,
+} from "@/components/ui/select";
 import {
   Dialog,
   DialogContent,
@@ -42,6 +51,7 @@ import {
   usePatients,
   useSamples,
   useSurgeries,
+  useSecondaryLogos,
 } from "@/hooks/use-queries";
 import { getErrorMessage } from "@/lib/api";
 import { formatDateTime } from "@/lib/utils";
@@ -211,6 +221,11 @@ export function GenerateReportDialog({
     carnet: null,
   });
 
+  const [overrideLogoPath, setOverrideLogoPath] = useState<string>("default");
+  const [saveLogoPref, setSaveLogoPref] = useState(false);
+
+  const { data: secondaryLogos } = useSecondaryLogos();
+
   const lab = useGenerateReport();
   const formula = useGenerateFormulaMedica();
   const consent = useGenerateConsentimiento();
@@ -218,7 +233,7 @@ export function GenerateReportDialog({
   const cirugia = useGenerateCertificadoCirugia();
   const carnet = useGenerateCarnetVacunacion();
 
-  const mutations: Record<ReportKind, UseMutationResult<ReportFile, Error, number>> = {
+  const mutations: Record<ReportKind, UseMutationResult<ReportFile, Error, any>> = {
     lab,
     formula,
     consent,
@@ -261,7 +276,17 @@ export function GenerateReportDialog({
     const id = selected[active];
     if (id == null) return;
     try {
-      const report = await mutation.mutateAsync(id);
+      let report;
+      if (active === "lab") {
+        const logoPath = overrideLogoPath === "default" ? null : overrideLogoPath;
+        report = await (mutation as typeof lab).mutateAsync({
+          sampleId: id,
+          overrideLogoPath: logoPath,
+          saveLogoPreference: saveLogoPref,
+        });
+      } else {
+        report = await (mutation as any).mutateAsync(id);
+      }
       onGenerated(report);
     } catch (e) {
       toast.error(`No se pudo generar ${current.label.toLowerCase()}`, {
@@ -384,6 +409,40 @@ export function GenerateReportDialog({
                               }))
                 }
               />
+              
+              {active === "lab" && (
+                <div className="mt-4 p-4 border rounded-lg bg-muted/10 space-y-4">
+                  <div className="flex items-center gap-2 mb-2">
+                    <ImageUp className="size-4 text-primary" />
+                    <Label className="font-semibold text-sm">Logo Secundario (Izquierda ISALAB, Derecha éste)</Label>
+                  </div>
+                  
+                  <Select value={overrideLogoPath} onValueChange={setOverrideLogoPath}>
+                    <SelectTrigger>
+                      <SelectValue placeholder="Seleccionar logo secundario..." />
+                    </SelectTrigger>
+                    <SelectContent>
+                      <SelectItem value="default">Ninguno (Dejar espacio o usar defecto)</SelectItem>
+                      {secondaryLogos?.map(logo => (
+                        <SelectItem key={logo.id} value={logo.logoPath}>{logo.name}</SelectItem>
+                      ))}
+                    </SelectContent>
+                  </Select>
+
+                  <div className="flex items-center space-x-2 pt-2">
+                    <input 
+                      type="checkbox"
+                      id="save-logo-pref" 
+                      className="size-4"
+                      checked={saveLogoPref}
+                      onChange={(e) => setSaveLogoPref(e.target.checked)}
+                    />
+                    <Label htmlFor="save-logo-pref" className="text-sm cursor-pointer">
+                      Guardar como preferencia para futuros reportes de este paciente
+                    </Label>
+                  </div>
+                </div>
+              )}
             </TabsContent>
           </div>
         </Tabs>

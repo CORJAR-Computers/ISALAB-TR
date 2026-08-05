@@ -1,26 +1,28 @@
 import { describe, it, expect } from "vitest";
 import { render, screen } from "@testing-library/react";
 import { ClinicalTimeline } from "./ClinicalTimeline";
-import type { ClinicalHistory } from "@/bindings";
+import type { ClinicalHistory, Patient } from "@/bindings";
 
-const mockPatient = {
+const mockPatient: Patient = {
   id: 1,
-  ownerId: 1,
+  code: "P-2023-0001",
+  ownerId: 2,
   speciesId: 1,
   breedId: null,
-  name: "Max",
+  name: "Firulais",
   sex: "M",
-  birthDate: "2020-01-15",
-  neutered: false,
-  color: "Negro",
+  birthDate: "2020-01-01T00:00:00Z",
+  neutered: true,
+  color: "Café",
   microchip: null,
   active: true,
   notes: null,
   speciesName: "Canino",
   breedName: null,
   ownerName: "Juan Pérez",
-  ownerPhone: "3001234567",
-  ageMonths: 78,
+  ownerPhone: "3000000000",
+  ageMonths: 36,
+  preferredLogoId: null,
 };
 
 const mockOwner = {

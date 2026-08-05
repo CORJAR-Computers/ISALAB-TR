@@ -19,6 +19,8 @@ dist-ssr/
 # Rust / Tauri
 src-tauri/target/
 src-tauri/gen/
+# Config local de cargo (target-dir absoluto y FIREBIRD_DIR son de esta máquina)
+src-tauri/.cargo/
 
 # Firebird runtime artifacts (never commit databases or the embedded engine)
 *.fdb

@@ -18,6 +18,8 @@ export const commands = {
 	listPatients: (search: string | null) => typedError<Patient[], AppError>(__TAURI_INVOKE("list_patients", { search })),
 	getPatient: (id: number) => typedError<{
 	id: number,
+	/**  Código único legible: PAC-YYYY-NNNN */
+	code: string,
 	ownerId: number,
 	speciesId: number,
 	breedId: number | null,
@@ -37,8 +39,11 @@ export const commands = {
 	ownerPhone: string | null,
 	/**  Calculada en SQL (DATEDIFF meses desde birth_date). */
 	ageMonths: number,
+    preferredLogoId: number | null,
 } | null, AppError>(__TAURI_INVOKE("get_patient", { id })),
 	createPatient: (input: CreatePatientInput) => typedError<Patient, AppError>(__TAURI_INVOKE("create_patient", { input })),
+	/**  Busca un paciente por su código único legible (PAC-YYYY-NNNN). */
+	getPatientByCode: (code: string) => typedError<Patient | null, AppError>(__TAURI_INVOKE("get_patient_by_code", { code })),
 	getClinicalHistory: (patientId: number) => typedError<ClinicalHistory, AppError>(__TAURI_INVOKE("get_clinical_history", { patientId })),
 	createConsultation: (input: CreateConsultationInput) => typedError<Consultation, AppError>(__TAURI_INVOKE("create_consultation", { input })),
 	/**  Recepción de muestra analítica (trazabilidad: código M-YYYY-NNNN, estado RECIBIDA). */
@@ -79,6 +84,9 @@ export const commands = {
 	 *  ruta. De este modo el logo persiste aunque se mueva/borre el original.
 	 */
 	importClinicLogo: (sourcePath: string) => typedError<string, AppError>(__TAURI_INVOKE("import_clinic_logo", { sourcePath })),
+	listSecondaryLogos: () => typedError<SecondaryLogo[], AppError>(__TAURI_INVOKE("list_secondary_logos")),
+	importSecondaryLogo: (name: string, sourcePath: string) => typedError<SecondaryLogo, AppError>(__TAURI_INVOKE("import_secondary_logo", { name, sourcePath })),
+	deleteSecondaryLogo: (id: number) => typedError<null, AppError>(__TAURI_INVOKE("delete_secondary_logo", { id })),
 	/**
 	 *  Valida y copia un certificado digital PKCS#12 (.p12/.pfx) a la carpeta
 	 *  de datos de la app y devuelve la ruta persistida. La contraseña solo se
@@ -105,7 +113,7 @@ export const commands = {
 	mustChangePassword: boolean,
 } | null, AppError>(__TAURI_INVOKE("get_session")),
 	/**  Genera el informe PDF de una muestra (con resultados) y devuelve la ruta. */
-	generateClinicalReport: (sampleId: number) => typedError<ReportFile, AppError>(__TAURI_INVOKE("generate_clinical_report", { sampleId })),
+	generateClinicalReport: (sampleId: number, overrideLogoPath: string | null, saveLogoPreference: boolean | null) => typedError<ReportFile, AppError>(__TAURI_INVOKE("generate_clinical_report", { sampleId, overrideLogoPath, saveLogoPreference })),
 	/**  Genera la fórmula médica (receta) de una consulta y devuelve la ruta. */
 	generateFormulaMedica: (consultationId: number) => typedError<ReportFile, AppError>(__TAURI_INVOKE("generate_formula_medica", { consultationId })),
 	/**  Genera el consentimiento informado de una cirugía programada. */
@@ -502,29 +510,8 @@ export type Owner = {
 	city: string | null,
 };
 
-/**  Ficha de paciente con campos unidos (especie, raza, propietario, edad). */
-export type Patient = {
-	id: number,
-	ownerId: number,
-	speciesId: number,
-	breedId: number | null,
-	name: string,
-	/**  M | F */
-	sex: string,
-	/**  YYYY-MM-DD */
-	birthDate: string | null,
-	neutered: boolean,
-	color: string | null,
-	microchip: string | null,
-	active: boolean,
-	notes: string | null,
-	speciesName: string,
-	breedName: string | null,
-	ownerName: string,
-	ownerPhone: string | null,
-	/**  Calculada en SQL (DATEDIFF meses desde birth_date). */
-	ageMonths: number,
-};
+/** Ficha de paciente con campos unidos (especie, raza, propietario, edad). */
+export type Patient = { id: number; code: string; ownerId: number; speciesId: number; breedId: number | null; name: string; sex: string; birthDate: string | null; neutered: boolean; color: string | null; microchip: string | null; active: boolean; notes: string | null; preferredLogoId: number | null; speciesName: string; breedName: string | null; ownerName: string; ownerPhone: string | null; ageMonths: number }
 
 export type RegisterResultInput = {
 	sampleId: number,
@@ -588,6 +575,7 @@ export type SampleListItem = {
 	/**  Nº de resultados fuera de rango (ALTO/BAJO) — alerta visual. */
 	abnormalCount: number,
 };
+export type SecondaryLogo = { id: number; name: string; logoPath: string; createdAt: string }
 
 export type SampleType = {
 	id: number,

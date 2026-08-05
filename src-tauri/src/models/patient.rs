@@ -8,6 +8,8 @@ use crate::models::owner::CreateOwnerInput;
 #[serde(rename_all = "camelCase")]
 pub struct Patient {
     pub id: i32,
+    /// Código único legible: PAC-YYYY-NNNN (generado por Firebird al insertar).
+    pub code: String,
     pub owner_id: i32,
     pub species_id: i32,
     pub breed_id: Option<i32>,
@@ -21,6 +23,7 @@ pub struct Patient {
     pub microchip: Option<String>,
     pub active: bool,
     pub notes: Option<String>,
+    pub preferred_logo_id: Option<i32>,
     // -- campos unidos (JOIN) --
     pub species_name: String,
     pub breed_name: Option<String>,
@@ -44,3 +47,4 @@ pub struct CreatePatientInput {
     pub microchip: Option<String>,
     pub notes: Option<String>,
 }
+

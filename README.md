@@ -45,6 +45,72 @@ En el primer arranque válido la app:
 > La base de datos nunca se commitea (`.gitignore`). Cada instalación la crea
 > localmente.
 
+## Compilación en Windows: target fuera del antivirus
+
+Windows Defender (y otros antivirus) escanean en tiempo real el directorio
+`target/` mientras `rustc` arma los `.rlib`. Si el archivo está bloqueado en
+ese instante, la compilación falla con `os error 32` ("el archivo está siendo
+utilizado por otro proceso") y quedan residuos `.temp-archive`. Para evitarlo
+en este proyecto el target se mueve a una ubicación estable **fuera del árbol**
+y se excluye del antivirus.
+
+### 1. Directorio de compilación (`CARGO_TARGET_DIR`)
+
+`npm run setup:target` detecta el mejor disco disponible, crea la carpeta y
+escribe `target-dir` en `src-tauri/.cargo/config.toml` (sin editarlo a mano):
+
+```bash
+npm run setup:target             # configura y crea la carpeta
+npm run setup:target -- --print  # solo muestra la ruta que elegiría
+npm run setup:target -- --unset  # revierte: cargo vuelve a src-tauri/target
+npm run setup:target -- --move   # mueve src-tauri/target (caché) a la nueva ruta
+```
+
+Resultado esperado (Windows): `[build] target-dir = "D:/rust-targets/isalab"`;
+en Unix, `~/.rust-targets/isalab`. Prioridad de resolución: variable de entorno
+`CARGO_TARGET_DIR` > `target-dir` del config > `src-tauri/target` por defecto.
+
+> [!NOTE]
+> `src-tauri/.cargo/` está en `.gitignore`: la ruta absoluta es específica de
+> cada máquina y **no debe commitearse** (rompería el CI, que cachea
+> `src-tauri/target`).
+
+### 2. Exclusión de Windows Defender
+
+Además de mover el target, hay que excluir la nueva ruta del antivirus. El
+script puede aplicarla automáticamente (aparecerá un aviso UAC para elevar
+permisos):
+
+```bash
+npm run setup:target -- --defender-exclusion
+```
+
+También puedes aplicarla a mano (PowerShell como administrador):
+
+```powershell
+# Directorio de compilación (target de cargo)
+Add-MpPreference -ExclusionPath 'D:\rust-targets'
+
+# fbclient.dll de Firebird 5 Embedded (runtime de la app)
+Add-MpPreference -ExclusionPath 'D:\Proyectos\ISALAB-TR\src-tauri\binaries\firebird'
+```
+
+La exclusión de `binaries/firebird` evita que el antivirus bloquee `fbclient.dll`
+al cargar Firebird 5 Embedded cuando se ejecuta la app.
+
+### 3. Limpieza automática de residuos (`.temp-archive`)
+
+`scripts/clean-target-orphans.mjs` elimina los directorios `*.temp-archive`
+huérfanos que deja una compilación fallida, resolviendo el target efectivo con
+`cargo metadata` (sigue la configuración de la sección 1). Se ejecuta
+automáticamente antes de cada compilación:
+
+```bash
+npm run clean:target    # manual, si hiciera falta
+npm run tauri:dev       # ya incluye la limpieza previa
+npm run tauri:build     # ídem
+```
+
 ## Autenticación y Seguridad
 
 > [!CAUTION]

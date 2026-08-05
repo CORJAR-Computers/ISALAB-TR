@@ -38,9 +38,13 @@ import {
   useClinicSettings,
   useImportClinicLogo,
   useSaveClinicSettings,
+  useSecondaryLogos,
+  useImportSecondaryLogo,
+  useDeleteSecondaryLogo,
 } from "@/hooks/use-queries";
 import { api, getErrorMessage } from "@/lib/api";
 import type { ClinicSettings } from "@/bindings";
+import { Trash2 } from "lucide-react";
 
 const schema = z.object({
   clinicName: z.string().min(1, "El nombre de la clínica es obligatorio"),
@@ -68,6 +72,10 @@ export function SettingsPage() {
   const { data: settings, isLoading } = useClinicSettings();
   const save = useSaveClinicSettings();
   const importLogo = useImportClinicLogo();
+  const { data: secondaryLogos } = useSecondaryLogos();
+  const importSecondaryLogo = useImportSecondaryLogo();
+  const deleteSecondaryLogo = useDeleteSecondaryLogo();
+
   const [backingUp, setBackingUp] = useState(false);
   const [testingGroq, setTestingGroq] = useState(false);
   const [importingPkcs12, setImportingPkcs12] = useState(false);
@@ -141,6 +149,40 @@ export function SettingsPage() {
 
   const clearLogo = () => {
     form.setValue("logoPath", "", { shouldDirty: true });
+  };
+
+  const pickSecondaryLogo = async () => {
+    try {
+      const selected = await open({
+        multiple: false,
+        directory: false,
+        title: "Seleccionar logo secundario",
+        filters: [{ name: "Imágenes", extensions: ["png", "jpg", "jpeg", "webp"] }],
+      });
+      if (!selected || Array.isArray(selected)) return;
+      
+      const name = window.prompt("Nombre para este logo (ej. Logo Falso, Proyecto X):");
+      if (!name || name.trim() === "") {
+        return;
+      }
+
+      await importSecondaryLogo.mutateAsync({ name, sourcePath: selected });
+      toast.success("Logo secundario añadido");
+    } catch (e) {
+      toast.error("No se pudo cargar el logo", {
+        description: getErrorMessage(e),
+      });
+    }
+  };
+
+  const removeSecondaryLogo = async (id: number) => {
+    if (!window.confirm("¿Seguro que deseas eliminar este logo secundario?")) return;
+    try {
+      await deleteSecondaryLogo.mutateAsync(id);
+      toast.success("Logo eliminado");
+    } catch (e) {
+      toast.error("No se pudo eliminar", { description: getErrorMessage(e) });
+    }
   };
 
   const logoPreview = form.watch("logoPath");
@@ -408,6 +450,64 @@ export function SettingsPage() {
                       PNG, JPG o WebP. Se copia a la app y aparece en el
                       encabezado de los reportes PDF.
                     </p>
+                  </div>
+                </div>
+              </div>
+            </CardContent>
+          </Card>
+
+          {/* Logos Secundarios */}
+          <Card>
+            <CardHeader>
+              <CardTitle className="flex items-center gap-2 text-base">
+                <ImageUp className="size-4 text-primary" />
+                Logos Secundarios
+              </CardTitle>
+              <CardDescription>
+                Puedes añadir otros logos que podrás elegir al momento de generar el reporte PDF.
+              </CardDescription>
+            </CardHeader>
+            <CardContent>
+              <div className="space-y-4">
+                <div className="grid grid-cols-2 md:grid-cols-4 gap-4">
+                  {secondaryLogos?.map((logo) => (
+                    <div key={logo.id} className="relative group border rounded-lg p-2 flex flex-col items-center gap-2 bg-muted/20">
+                      <div className="h-16 w-full flex items-center justify-center">
+                        <img
+                          src={convertFileSrc(logo.logoPath)}
+                          alt={logo.name}
+                          className="max-h-full max-w-full object-contain"
+                        />
+                      </div>
+                      <span className="text-xs font-medium text-center truncate w-full">{logo.name}</span>
+                      <Button
+                        type="button"
+                        variant="destructive"
+                        size="icon"
+                        className="absolute -top-2 -right-2 h-6 w-6 opacity-0 group-hover:opacity-100 transition-opacity"
+                        onClick={() => removeSecondaryLogo(logo.id)}
+                        disabled={deleteSecondaryLogo.isPending}
+                      >
+                        <Trash2 className="size-3" />
+                      </Button>
+                    </div>
+                  ))}
+                  
+                  <div className="border border-dashed rounded-lg p-2 flex items-center justify-center bg-muted/10 h-[104px] hover:bg-muted/30 transition-colors">
+                    <Button
+                      type="button"
+                      variant="ghost"
+                      onClick={pickSecondaryLogo}
+                      disabled={importSecondaryLogo.isPending}
+                      className="w-full h-full flex flex-col items-center gap-2 text-muted-foreground"
+                    >
+                      {importSecondaryLogo.isPending ? (
+                        <Loader2 className="animate-spin size-6" />
+                      ) : (
+                        <ImageUp className="size-6" />
+                      )}
+                      <span className="text-xs">Añadir Logo</span>
+                    </Button>
                   </div>
                 </div>
               </div>

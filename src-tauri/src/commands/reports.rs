@@ -116,6 +116,8 @@ pub fn generate_clinical_report(
     state: State<'_, AppState>,
     app: AppHandle,
     sample_id: i32,
+    override_logo_path: Option<String>,
+    save_logo_preference: Option<bool>,
 ) -> Result<ReportFile, AppError> {
     require_vet_or_admin(&state)?;
     let mut pooled = state.pool.acquire()?;
@@ -129,13 +131,41 @@ pub fn generate_clinical_report(
         ));
     }
 
-    let patient = patient_repo::get(conn, sample.patient_id)?.ok_or_else(|| {
+    let mut patient = patient_repo::get(conn, sample.patient_id)?.ok_or_else(|| {
         AppError::NotFound(format!("Paciente {} no encontrado", sample.patient_id))
     })?;
     let settings = settings_repo::get(conn)?;
 
+    // Handle logo override and preference
+    let mut clinic = clinic_header(&settings);
+    if let Some(ref path) = override_logo_path {
+        clinic.logo_path = Some(path.clone());
+    }
+
+    if save_logo_preference.unwrap_or(false) {
+        if let Some(ref path) = override_logo_path {
+            if let Ok(logos) = crate::repositories::logos::list(conn) {
+                if let Some(logo) = logos.iter().find(|l| l.logo_path == *path) {
+                    // Actualizar en base de datos la preferencia
+                    let _ = conn.execute(
+                        "UPDATE PATIENTS SET PREFERRED_LOGO_ID = ? WHERE ID = ?",
+                        (&logo.id, &patient.id),
+                    );
+                    patient.preferred_logo_id = Some(logo.id);
+                }
+            }
+        } else {
+            // Si elige el por defecto y pide guardar preferencia, limpiamos el campo
+            let _ = conn.execute(
+                "UPDATE PATIENTS SET PREFERRED_LOGO_ID = NULL WHERE ID = ?",
+                (&patient.id,),
+            );
+            patient.preferred_logo_id = None;
+        }
+    }
+
     let data = ClinicalReportData {
-        clinic: clinic_header(&settings),
+        clinic,
         patient,
         sample_code: sample.code.clone(),
         sample_type: sample.sample_type_name.clone(),

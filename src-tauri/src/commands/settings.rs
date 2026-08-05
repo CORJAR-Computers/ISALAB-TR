@@ -7,6 +7,7 @@ use crate::error::AppError;
 use crate::models::settings::ClinicSettings;
 use crate::pdf_templates::validate_pkcs12;
 use crate::repositories::auth as auth_repo;
+use crate::repositories::logos as logos_repo;
 use crate::repositories::settings as settings_repo;
 use crate::state::AppState;
 
@@ -145,6 +146,92 @@ pub fn import_clinic_logo(
     }
 
     Ok(dest.display().to_string())
+}
+
+#[tauri::command]
+#[specta::specta]
+pub fn list_secondary_logos(state: State<'_, AppState>) -> Result<Vec<crate::models::logo::SecondaryLogo>, AppError> {
+    require_session(&state)?;
+    let mut pooled = state.pool.acquire()?;
+    logos_repo::list(pooled.conn())
+}
+
+#[tauri::command]
+#[specta::specta]
+pub fn import_secondary_logo(
+    state: State<'_, AppState>,
+    app: AppHandle,
+    name: String,
+    source_path: String,
+) -> Result<crate::models::logo::SecondaryLogo, AppError> {
+    let admin = require_admin(&state)?;
+    let src = PathBuf::from(&source_path);
+    if !src.exists() {
+        return Err(AppError::Validation("El archivo de logo seleccionado ya no existe".into()));
+    }
+
+    let ext = src.extension().and_then(|e| e.to_str()).unwrap_or("").to_lowercase();
+    if !LOGO_EXTENSIONS.contains(&ext.as_str()) {
+        return Err(AppError::Validation(format!("Formato no soportado (.{ext}). Usa PNG, JPG o WebP.")));
+    }
+
+    let assets_dir = app.path().app_data_dir()
+        .map_err(|e| AppError::Internal(format!("Sin carpeta de datos: {e}")))?
+        .join("assets").join("logos");
+    std::fs::create_dir_all(&assets_dir)
+        .map_err(|e| AppError::Internal(format!("No se pudo crear assets/logos: {e}")))?;
+
+    // Generar un nombre único para evitar colisiones
+    let uuid = uuid::Uuid::new_v4().to_string();
+    let dest = assets_dir.join(format!("{}.{}", uuid, ext));
+    
+    std::fs::copy(&src, &dest).map_err(|e| AppError::Internal(format!("No se pudo copiar el logo: {e}")))?;
+
+    let mut pooled = state.pool.acquire()?;
+    let logo = logos_repo::insert(pooled.conn(), &name, &dest.display().to_string())?;
+
+    if let Ok(mut audit_conn) = state.pool.acquire() {
+        auth_repo::log_audit(
+            audit_conn.conn(),
+            Some(admin.id),
+            &admin.username,
+            "SECONDARY_LOGO_IMPORTED",
+            Some(&format!("Logo: {} - {}", name, dest.display())),
+        ).ok();
+    }
+
+    Ok(logo)
+}
+
+#[tauri::command]
+#[specta::specta]
+pub fn delete_secondary_logo(
+    state: State<'_, AppState>,
+    id: i32,
+) -> Result<(), AppError> {
+    let admin = require_admin(&state)?;
+    let mut pooled = state.pool.acquire()?;
+    
+    // Buscar para obtener la ruta y eliminar el archivo
+    if let Some(logo) = logos_repo::get(pooled.conn(), id)? {
+        let path = PathBuf::from(&logo.logo_path);
+        if path.exists() {
+            let _ = std::fs::remove_file(path);
+        }
+        logos_repo::delete(pooled.conn(), id)?;
+        
+        if let Ok(mut audit_conn) = state.pool.acquire() {
+            auth_repo::log_audit(
+                audit_conn.conn(),
+                Some(admin.id),
+                &admin.username,
+                "SECONDARY_LOGO_DELETED",
+                Some(&format!("Logo: {} ({})", logo.name, logo.id)),
+            ).ok();
+        }
+    }
+    
+    Ok(())
 }
 
 /// Valida y copia un certificado digital PKCS#12 (.p12/.pfx) a la carpeta de

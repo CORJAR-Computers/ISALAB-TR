@@ -29,6 +29,19 @@ pub fn get_patient(
     patient_repo::get(pooled.conn(), id)
 }
 
+/// Busca un paciente por su código único legible (PAC-YYYY-NNNN).
+/// Permite identificar mascotas de forma inequívoca cuando varias comparten nombre.
+#[tauri::command]
+#[specta::specta]
+pub fn get_patient_by_code(
+    state: State<'_, AppState>,
+    code: String,
+) -> Result<Option<Patient>, AppError> {
+    require_session(&state)?;
+    let mut pooled = state.pool.acquire()?;
+    patient_repo::get_by_code(pooled.conn(), &code)
+}
+
 #[tauri::command]
 #[specta::specta]
 pub fn create_patient(
@@ -63,3 +76,4 @@ pub fn get_patient_lab_trends(
     let mut pooled = state.pool.acquire()?;
     crate::repositories::samples::get_patient_lab_trends(pooled.conn(), patient_id, analyte_id)
 }
+

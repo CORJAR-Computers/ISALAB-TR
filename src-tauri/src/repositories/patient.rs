@@ -11,10 +11,11 @@ pub(crate) type OwnerRow = (
 );
 
 /// Columnas unidas de un paciente (especie, raza, propietario, edad).
+/// Incluye CODE (PAC-YYYY-NNNN) para búsqueda y trazabilidad.
 const PATIENT_SELECT: &str = "
-    SELECT p.ID, p.OWNER_ID, p.SPECIES_ID, p.BREED_ID, p.NAME, p.SEX,
+    SELECT p.ID, p.CODE, p.OWNER_ID, p.SPECIES_ID, p.BREED_ID, p.NAME, p.SEX,
            CAST(p.BIRTH_DATE AS VARCHAR(10)), p.NEUTERED, p.COLOR, p.MICROCHIP,
-           p.ACTIVE, p.NOTES,
+           p.ACTIVE, p.NOTES, p.PREFERRED_LOGO_ID,
            s.NAME,
            b.NAME,
            o.FULL_NAME,
@@ -26,44 +27,48 @@ const PATIENT_SELECT: &str = "
     JOIN OWNERS o ON o.ID = p.OWNER_ID";
 
 pub(crate) type PatientRow = (
-    i32,          // id
-    i32,          // owner_id
-    i32,          // species_id
-    Option<i32>,  // breed_id
-    String,       // name
-    String,       // sex
+    i32,            // id
+    String,         // code   ← PAC-YYYY-NNNN
+    i32,            // owner_id
+    i32,            // species_id
+    Option<i32>,    // breed_id
+    String,         // name
+    String,         // sex
     Option<String>, // birth_date
-    bool,         // neutered
+    bool,           // neutered
     Option<String>, // color
     Option<String>, // microchip
-    bool,         // active
+    bool,           // active
     Option<String>, // notes
-    String,       // species_name
+    Option<i32>,    // preferred_logo_id
+    String,         // species_name
     Option<String>, // breed_name
-    String,       // owner_name
+    String,         // owner_name
     Option<String>, // owner_phone
-    i32,          // age_months
+    i32,            // age_months
 );
 
 pub(crate) fn map_patient(r: PatientRow) -> Patient {
     Patient {
         id: r.0,
-        owner_id: r.1,
-        species_id: r.2,
-        breed_id: r.3,
-        name: r.4,
-        sex: r.5,
-        birth_date: r.6,
-        neutered: r.7,
-        color: r.8,
-        microchip: r.9,
-        active: r.10,
-        notes: r.11,
-        species_name: r.12,
-        breed_name: r.13,
-        owner_name: r.14,
-        owner_phone: r.15,
-        age_months: r.16,
+        code: r.1,
+        owner_id: r.2,
+        species_id: r.3,
+        breed_id: r.4,
+        name: r.5,
+        sex: r.6,
+        birth_date: r.7,
+        neutered: r.8,
+        color: r.9,
+        microchip: r.10,
+        active: r.11,
+        notes: r.12,
+        preferred_logo_id: r.13,
+        species_name: r.14,
+        breed_name: r.15,
+        owner_name: r.16,
+        owner_phone: r.17,
+        age_months: r.18,
     }
 }
 
@@ -80,25 +85,43 @@ pub fn list(
 ) -> Result<Vec<Patient>, AppError> {
     let rows: Vec<PatientRow> = match search {
         Some(term) if !term.trim().is_empty() => {
-            let like = format!("%{}%", term.trim());
+            let like = format!("%{}%", term.trim().to_uppercase());
+            let like_raw = format!("%{}%", term.trim());
             conn.query(
                 &format!(
                     "{PATIENT_SELECT}
-                     WHERE UPPER(p.NAME) LIKE UPPER(?)
-                        OR UPPER(o.FULL_NAME) LIKE UPPER(?)
+                     WHERE UPPER(p.NAME) LIKE ?
+                        OR UPPER(o.FULL_NAME) LIKE ?
+                        OR UPPER(p.CODE) LIKE ?
                         OR p.MICROCHIP LIKE ?
                         OR o.DOCUMENT_NUMBER LIKE ?
-                     ORDER BY p.NAME"
+                     ORDER BY p.CODE"
                 ),
-                (&like, &like, &like, &like),
+                (&like, &like, &like, &like_raw, &like_raw),
             )
             .map_err(AppError::from)?
         }
         _ => conn
-            .query(&format!("{PATIENT_SELECT} ORDER BY p.NAME"), ())
+            .query(&format!("{PATIENT_SELECT} ORDER BY p.CODE"), ())
             .map_err(AppError::from)?,
     };
     Ok(rows.into_iter().map(map_patient).collect())
+}
+
+/// Busca un paciente directamente por su código único (PAC-YYYY-NNNN).
+/// Devuelve `None` si no existe ningún paciente con ese código.
+pub fn get_by_code(
+    conn: &mut SimpleConnection,
+    code: &str,
+) -> Result<Option<Patient>, AppError> {
+    let normalized = code.trim().to_uppercase();
+    let row: Option<PatientRow> = conn
+        .query_first(
+            &format!("{PATIENT_SELECT} WHERE UPPER(p.CODE) = ?"),
+            (&normalized,),
+        )
+        .map_err(AppError::from)?;
+    Ok(row.map(map_patient))
 }
 
 pub fn create(
@@ -242,23 +265,25 @@ mod tests {
 
     fn sample_patient_row() -> PatientRow {
         (
-            1,                // id
-            10,               // owner_id
-            1,                // species_id (Canino)
-            Some(5),          // breed_id (Beagle)
-            "Luna".into(),    // name
-            "F".into(),       // sex
-            Some("2023-06-15".into()), // birth_date
-            true,             // neutered
-            Some("Marrón".into()), // color
-            Some("CHIP-12345".into()), // microchip
-            true,             // active
+            1,                           // id
+            "PAC-2026-0001".into(),      // code
+            10,                          // owner_id
+            1,                           // species_id (Canino)
+            Some(5),                     // breed_id (Beagle)
+            "Luna".into(),               // name
+            "F".into(),                  // sex
+            Some("2023-06-15".into()),   // birth_date
+            true,                        // neutered
+            Some("Marrón".into()),       // color
+            Some("CHIP-12345".into()),   // microchip
+            true,                        // active
             Some("Paciente de prueba".into()), // notes
-            "Canino".into(), // species_name
-            Some("Beagle".into()), // breed_name
-            "Juan Pérez".into(), // owner_name
+            None,                        // preferred_logo_id
+            "Canino".into(),             // species_name
+            Some("Beagle".into()),       // breed_name
+            "Juan Pérez".into(),         // owner_name
             Some("+57 300 1234567".into()), // owner_phone
-            24,               // age_months
+            24,                          // age_months
         )
     }
 
@@ -268,6 +293,7 @@ mod tests {
         let patient = map_patient(row);
 
         assert_eq!(patient.id, 1);
+        assert_eq!(patient.code, "PAC-2026-0001");
         assert_eq!(patient.owner_id, 10);
         assert_eq!(patient.species_id, 1);
         assert_eq!(patient.breed_id, Some(5));
@@ -289,13 +315,14 @@ mod tests {
     #[test]
     fn test_map_patient_optional_fields_none() {
         let row: PatientRow = (
-            2, 20, 2, None, "Michi".into(), "M".into(),
-            None, false, None, None, true, None,
+            2, "PAC-2026-0002".into(), 20, 2, None, "Michi".into(), "M".into(),
+            None, false, None, None, true, None, None,
             "Felino".into(), None, "María López".into(), None, 6,
         );
         let patient = map_patient(row);
 
         assert_eq!(patient.id, 2);
+        assert_eq!(patient.code, "PAC-2026-0002");
         assert_eq!(patient.breed_id, None);
         assert_eq!(patient.birth_date, None);
         assert!(!patient.neutered);

@@ -36,6 +36,7 @@ import type {
   Vaccine,
   VaccineListItem,
   VaccineType,
+  SecondaryLogo,
 } from "@/bindings";
 
 /** Extrae el mensaje legible de un AppError serializado por Tauri. */
@@ -96,6 +97,11 @@ export const api = {
     invoke<string>("import_clinic_logo", { sourcePath }),
   importPkcs12: (sourcePath: string, password: string) =>
     invoke<string>("import_pkcs12", { sourcePath, password }),
+  listSecondaryLogos: () => invoke<SecondaryLogo[]>("list_secondary_logos"),
+  importSecondaryLogo: (name: string, sourcePath: string) =>
+    invoke<SecondaryLogo>("import_secondary_logo", { name, sourcePath }),
+  deleteSecondaryLogo: (id: number) =>
+    invoke<null>("delete_secondary_logo", { id }),
 
   // ---- Autenticación ----
   login: (input: LoginInput) => invoke<SessionUser>("login", { input }),
@@ -128,8 +134,8 @@ export const api = {
     }),
 
   // ---- Reportes PDF ----
-  generateReport: (sampleId: number) =>
-    invoke<ReportFile>("generate_clinical_report", { sampleId }),
+  generateReport: (sampleId: number, overrideLogoPath?: string | null, saveLogoPreference?: boolean | null) =>
+    invoke<ReportFile>("generate_clinical_report", { sampleId, overrideLogoPath, saveLogoPreference }),
   generateFormulaMedica: (consultationId: number) =>
     invoke<ReportFile>("generate_formula_medica", { consultationId }),
   generateConsentimiento: (surgeryId: number) =>

@@ -32,10 +32,45 @@ jobs:
   backend:
     name: Backend (Rust)
     runs-on: windows-latest
+    env:
+      FIREBIRD_VERSION: "5.0.3.1683-0"
+      FIREBIRD_DIR: ${{ github.workspace }}\firebird5
     steps:
       - uses: actions/checkout@v4
+
+      - name: Cache Firebird 5 runtime
+        id: cache-firebird
+        uses: actions/cache@v4
+        with:
+          path: ${{ github.workspace }}\firebird5
+          key: firebird-5.0.3.1683-windows-x64
+
+      - name: Download Firebird 5 Embedded (if not cached)
+        if: steps.cache-firebird.outputs.cache-hit != 'true'
+        shell: pwsh
+        run: |
+          $url = "https://github.com/FirebirdSQL/firebird/releases/download/v5.0.3/Firebird-5.0.3.1683-0-windows-x64.zip"
+          $zip = "$env:TEMP\firebird5.zip"
+          Write-Host "Downloading Firebird 5 from $url ..."
+          Invoke-WebRequest -Uri $url -OutFile $zip -UseBasicParsing
+          Expand-Archive -Path $zip -DestinationPath "$env:GITHUB_WORKSPACE\firebird5_tmp" -Force
+          # El ZIP extrae a un subdirectorio con el nombre del release
+          $inner = Get-ChildItem "$env:GITHUB_WORKSPACE\firebird5_tmp" -Directory | Select-Object -First 1
+          Move-Item -Path $inner.FullName -Destination "$env:GITHUB_WORKSPACE\firebird5"
+          Remove-Item $zip -Force
+          Write-Host "fbclient.dll: $(Test-Path "$env:GITHUB_WORKSPACE\firebird5\fbclient.dll")"
+
+      - name: Add Firebird to PATH
+        shell: pwsh
+        run: |
+          echo "$env:FIREBIRD_DIR" >> $env:GITHUB_PATH
+          echo "FIREBIRD_DIR=$env:FIREBIRD_DIR" >> $env:GITHUB_ENV
+          Write-Host "FIREBIRD_DIR=$env:FIREBIRD_DIR"
+          Write-Host "fbclient.dll exists: $(Test-Path "$env:FIREBIRD_DIR\fbclient.dll")"
+
       - name: Install Rust
         uses: dtolnay/rust-toolchain@stable
+
       - name: Cache cargo registry
         uses: actions/cache@v4
         with:
@@ -44,6 +79,7 @@ jobs:
             ~/.cargo/git
             src-tauri/target
           key: ${{ runner.os }}-cargo-${{ hashFiles('**/Cargo.lock') }}
+
       - name: Check format
         run: cargo fmt --all -- --check
         working-directory: ./src-tauri

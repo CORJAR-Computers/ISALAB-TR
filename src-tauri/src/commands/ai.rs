@@ -63,6 +63,7 @@ pub(crate) fn build_interpretation_prompt(
 
     // Información del paciente
     prompt.push_str("## Paciente\n");
+    prompt.push_str(&format!("- **Código**: {}\n", patient.code));
     prompt.push_str(&format!("- **Nombre**: {}\n", patient.name));
     prompt.push_str(&format!("- **Especie/Raza**: {} / {}\n", 
         patient.species_name, 
@@ -266,20 +267,24 @@ pub(crate) fn groq_api_key_or_error(settings: &crate::models::settings::ClinicSe
 }
 
 /// Construye el mensaje de error legible ante una respuesta HTTP de error de
-/// la API de Groq. Mapea el 401 (clave inválida/revocada) a un mensaje claro.
+/// la API de Groq. Mapea el 401 (clave inválida/revocada) y el 429 (rate limit)
+/// a mensajes claros para el usuario.
 pub(crate) fn groq_error_message(status: u16, body: &str) -> String {
-    if status == 401 {
-        "Clave de API de Groq inválida o revocada (401). Verifica la clave en Configuración."
-            .to_string()
-    } else {
-        format!("Error de Groq API ({}): {}", status, body)
+    match status {
+        401 => "Clave de API de Groq inválida o revocada (401). Verifica la clave en Configuración."
+            .to_string(),
+        429 => "Límite de solicitudes de Groq alcanzado (429 Rate Limit). Espera unos segundos e intenta de nuevo."
+            .to_string(),
+        503 => "Servicio de Groq temporalmente no disponible (503). Intenta de nuevo en unos minutos."
+            .to_string(),
+        _ => format!("Error de Groq API ({}): {}", status, body),
     }
 }
 
 /// Cuerpo de la solicitud mínima de prueba de conexión (sin contexto clínico).
 pub(crate) fn groq_test_request_body() -> serde_json::Value {
     json!({
-        "model": "llama3-8b-8192",
+        "model": "llama-3.3-70b-versatile",
         "messages": [
             { "role": "user", "content": "Responde únicamente: OK" }
         ],
@@ -340,13 +345,16 @@ pub fn interpret_lab_results(
     // 6. Construct prompt with clinical context
     let prompt = build_interpretation_prompt(&patient, &sample, &sample.results, Some(&ctx));
 
-    // 7. Call Groq API via HTTP blocking request
-    let client = reqwest::blocking::Client::new();
+    // 7. Call Groq API via HTTP blocking request with timeout
+    let client = reqwest::blocking::Client::builder()
+        .timeout(std::time::Duration::from_secs(60))
+        .build()
+        .map_err(|e| AppError::Internal(format!("Error creando cliente HTTP: {}", e)))?;
     let res = client
         .post("https://api.groq.com/openai/v1/chat/completions")
         .header("Authorization", format!("Bearer {}", api_key))
         .json(&json!({
-            "model": "llama3-8b-8192",
+            "model": "llama-3.3-70b-versatile",
             "messages": [
                 {
                     "role": "system",
@@ -358,14 +366,15 @@ pub fn interpret_lab_results(
                 }
             ],
             "temperature": 0.3,
-            "max_tokens": 1800
+            "max_tokens": 2000
         }))
         .send()
         .map_err(|e| AppError::Internal(format!("Error conectando a Groq API: {}", e)))?;
 
     if !res.status().is_success() {
+        let status_code = res.status().as_u16();
         let error_text = res.text().unwrap_or_default();
-        return Err(AppError::Internal(format!("Error de Groq API: {}", error_text)));
+        return Err(AppError::Internal(groq_error_message(status_code, &error_text)));
     }
 
     let response_json: serde_json::Value = res
@@ -440,7 +449,10 @@ pub fn test_groq_connection(
     let api_key = groq_api_key_or_error(&settings)?;
 
     // Solicitud mínima (modelo barato, sin contexto clínico) para validar la clave.
-    let client = reqwest::blocking::Client::new();
+    let client = reqwest::blocking::Client::builder()
+        .timeout(std::time::Duration::from_secs(30))
+        .build()
+        .map_err(|e| AppError::Internal(format!("Error creando cliente HTTP: {}", e)))?;
     let res = client
         .post("https://api.groq.com/openai/v1/chat/completions")
         .header("Authorization", format!("Bearer {}", api_key))
@@ -472,17 +484,19 @@ mod tests {
     fn test_patient() -> Patient {
         Patient {
             id: 1,
+            code: "PAC-2026-0001".into(),
             owner_id: 1,
             species_id: 1,
-            breed_id: Some(1),
-            name: "Luna".to_string(),
-            sex: "F".to_string(),
-            birth_date: Some("2023-06-15".to_string()),
-            neutered: false,
-            color: Some("Marrón".to_string()),
+            breed_id: None,
+            name: "Max".into(),
+            sex: "M".into(),
+            birth_date: Some("2020-01-01".into()),
+            neutered: true,
+            color: None,
             microchip: None,
             active: true,
             notes: None,
+            preferred_logo_id: None,
             species_name: "Canino".to_string(),
             breed_name: Some("Beagle".to_string()),
             owner_name: "Juan Pérez".to_string(),
@@ -930,15 +944,41 @@ mod tests {
 
     #[test]
     fn test_groq_error_message_other_status() {
+        let msg = groq_error_message(500, "internal error");
+        assert!(msg.contains("500"));
+        assert!(msg.contains("internal error"));
+    }
+
+    #[test]
+    fn test_groq_error_message_429() {
         let msg = groq_error_message(429, "rate limited");
         assert!(msg.contains("429"));
-        assert!(msg.contains("rate limited"));
+        assert!(msg.contains("Rate Limit"));
+        // No debe exponer el cuerpo raw de la respuesta
+        assert!(!msg.contains("rate limited"));
+    }
+
+    #[test]
+    fn test_groq_error_message_503() {
+        let msg = groq_error_message(503, "service unavailable");
+        assert!(msg.contains("503"));
+        assert!(msg.contains("no disponible"));
+    }
+
+    #[test]
+    fn test_build_prompt_includes_patient_code() {
+        let patient = test_patient();
+        let sample = test_sample();
+        let results = vec![];
+        let prompt = build_interpretation_prompt(&patient, &sample, &results, None);
+        assert!(prompt.contains("**Código**"));
+        assert!(prompt.contains("PAC-2026-0001"));
     }
 
     #[test]
     fn test_groq_test_request_body() {
         let body = groq_test_request_body();
-        assert_eq!(body["model"], "llama3-8b-8192");
+        assert_eq!(body["model"], "llama-3.3-70b-versatile");
         assert_eq!(body["max_tokens"], 5);
         assert_eq!(body["temperature"], 0.0);
         assert_eq!(body["messages"][0]["content"], "Responde únicamente: OK");

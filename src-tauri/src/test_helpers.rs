@@ -9,11 +9,91 @@ use rsfbclient::SimpleConnection;
 use crate::db::{create_database, migrations, new_connection};
 use crate::error::AppError;
 
-/// Ruta al directorio de binarios de Firebird (relativa al workspace).
-fn fbclient_path() -> PathBuf {
-    // En tests, el CWD es src-tauri/
-    PathBuf::from("binaries/firebird/fbclient.dll")
+// ── Resolución de fbclient.dll ─────────────────────────────────────────────
+//
+// Orden de búsqueda (el primero que exista gana):
+//
+//   1. Variable de entorno FIREBIRD_DIR  (establecida por .cargo/config.toml
+//      o manualmente en CI).
+//   2. binaries/firebird/fbclient.dll   (ruta bundled del proyecto).
+//   3. ../Firebird-5.0.3.1683-0-windows-x64/ (Firebird incluido en el repo).
+//
+// Además, el directorio resuelto se añade al PATH del proceso para que
+// Firebird pueda encontrar plugins/, firebird.msg y las ICU DLLs.
+
+/// Resuelve la ruta al directorio de Firebird y al fbclient.dll.
+/// Inyecta el directorio al PATH del proceso para que Firebird Embedded
+/// encuentre sus dependencias (plugins/, firebird.msg, ICU dlls, etc.).
+fn resolve_firebird_dir() -> PathBuf {
+    // Candidatos en orden de prioridad.
+    let candidates: &[PathBuf] = &[
+        // 1. FIREBIRD_DIR env var (seteada por .cargo/config.toml o CI)
+        std::env::var("FIREBIRD_DIR")
+            .ok()
+            .map(PathBuf::from)
+            .unwrap_or_default(),
+        // 2. Bundled dentro de src-tauri/binaries/firebird/
+        PathBuf::from("binaries/firebird"),
+        // 3. Firebird incluido en la raíz del repo (un nivel arriba de src-tauri/)
+        PathBuf::from("../Firebird-5.0.3.1683-0-windows-x64"),
+    ];
+
+    for dir in candidates {
+        if dir.as_os_str().is_empty() {
+            continue;
+        }
+        let dll = dir.join("fbclient.dll");
+        if dll.exists() {
+            // Inyectar al PATH del proceso para que Firebird encuentre
+            // plugins/, firebird.msg e ICU en tiempo de ejecución.
+            inject_to_path(dir);
+            return dir.clone();
+        }
+    }
+
+    panic!(
+        "fbclient.dll no encontrado. Intenté:\n\
+         - $FIREBIRD_DIR\n\
+         - binaries/firebird/fbclient.dll\n\
+         - ../Firebird-5.0.3.1683-0-windows-x64/fbclient.dll\n\
+         \n\
+         Opciones:\n\
+         1. Ejecuta tests desde src-tauri/ (cd src-tauri && cargo test)\n\
+         2. Define FIREBIRD_DIR apuntando al directorio de Firebird 5\n\
+         3. Copia fbclient.dll y plugins/ a src-tauri/binaries/firebird/"
+    );
 }
+
+/// Añade `dir` al PATH del proceso actual (idempotente).
+fn inject_to_path(dir: &Path) {
+    let abs = match dir.canonicalize() {
+        Ok(p) => p,
+        Err(_) => dir.to_path_buf(),
+    };
+    let abs_str = abs.to_string_lossy().to_string();
+
+    let current_path = std::env::var("PATH").unwrap_or_default();
+
+    // No añadir si ya está en el PATH (evita duplicados en tests paralelos).
+    if !current_path
+        .split(';')
+        .any(|p| p.eq_ignore_ascii_case(&abs_str))
+    {
+        let new_path = format!("{};{}", abs_str, current_path);
+        // SAFETY: solo se llama desde tests (single-process).
+        #[allow(unused_unsafe)]
+        unsafe {
+            std::env::set_var("PATH", &new_path);
+        }
+    }
+}
+
+/// Ruta al fbclient.dll resuelto.
+fn fbclient_path() -> PathBuf {
+    resolve_firebird_dir().join("fbclient.dll")
+}
+
+
 
 /// Crea una base de datos temporal para tests con nombre único.
 /// Devuelve la conexión y la ruta de la DB.
@@ -71,6 +151,7 @@ pub fn setup_test_db() -> (SimpleConnection, PathBuf) {
     let reset_generators = [
         "SET GENERATOR GEN_OWNERS_ID TO 0",
         "SET GENERATOR GEN_PATIENTS_ID TO 0",
+        "SET GENERATOR GEN_PATIENT_CODE_SEQ TO 0",
         "SET GENERATOR GEN_CONSULTATIONS_ID TO 0",
         "SET GENERATOR GEN_SAMPLES_ID TO 0",
         "SET GENERATOR GEN_LAB_RESULTS_ID TO 0",
