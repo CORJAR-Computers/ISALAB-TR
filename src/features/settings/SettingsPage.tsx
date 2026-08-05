@@ -493,7 +493,7 @@ export function SettingsPage() {
                     </div>
                   ))}
                   
-                  <div className="border border-dashed rounded-lg p-2 flex items-center justify-center bg-muted/10 h-[104px] hover:bg-muted/30 transition-colors">
+                  <div className="border border-dashed rounded-lg p-2 flex items-center justify-center bg-muted/10 h-26 hover:bg-muted/30 transition-colors">
                     <Button
                       type="button"
                       variant="ghost"
