@@ -113,6 +113,22 @@ jobs:
           key: ${{ runner.os }}-cargo-${{ hashFiles('**/Cargo.lock') }}
       - name: Install frontend dependencies
         run: npm ci
+      - name: Download Firebird 5 Embedded (bundled runtime)
+        shell: pwsh
+        run: |
+          # El motor embedded está gitignored; se descarga aquí para que el
+          # instalador lo incluya vía "resources": ["binaries/firebird/**/*"].
+          $url = "https://github.com/FirebirdSQL/firebird/releases/download/v5.0.3/Firebird-5.0.3.1683-0-windows-x64.zip"
+          $zip = "$env:TEMP\firebird5.zip"
+          Invoke-WebRequest -Uri $url -OutFile $zip -UseBasicParsing
+          Expand-Archive -Path $zip -DestinationPath "$env:GITHUB_WORKSPACE\firebird5_tmp" -Force
+          $inner = Get-ChildItem "$env:GITHUB_WORKSPACE\firebird5_tmp" -Directory | Select-Object -First 1
+          $dest = "$env:GITHUB_WORKSPACE\src-tauri\binaries\firebird"
+          New-Item -ItemType Directory -Force -Path $dest | Out-Null
+          Copy-Item -Path "$($inner.FullName)\*" -Destination $dest -Recurse -Force
+          Remove-Item $zip -Force
+          if (-not (Test-Path "$dest\fbclient.dll")) { throw "fbclient.dll no se descargó" }
+          Write-Host "fbclient.dll bundled: $(Test-Path "$dest\fbclient.dll")"
       - name: Build Tauri app
         run: npx tauri build
       - name: Upload artifacts
