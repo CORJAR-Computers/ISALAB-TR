@@ -21,8 +21,9 @@ firmados y facturación.
 
 - Rust **stable** (≥ 1.77) con target `x86_64-pc-windows-msvc` + MSVC Build Tools
 - Node.js ≥ 20 y npm
-- **Firebird 5 Embedded**: copia `fbclient.dll` a
-  `src-tauri/binaries/firebird/` (ver [README de binarios](src-tauri/binaries/firebird/README.md))
+- **Firebird 5 Embedded** (solo desarrollo): copia `fbclient.dll` a
+  `src-tauri/binaries/firebird/` (ver [README de binarios](src-tauri/binaries/firebird/README.md)).
+  El **instalador de producción v0.3.0 ya incluye el motor embebido**.
 
 ## Primer arranque
 
@@ -44,6 +45,33 @@ En el primer arranque válido la app:
 
 > La base de datos nunca se commitea (`.gitignore`). Cada instalación la crea
 > localmente.
+
+## Instalación en producción (v0.3.0)
+
+Desde la **v0.3.0** la aplicación se distribuye como **instalador NSIS**
+(`ISALAB_0.3.0_x64-setup.exe`) con el **motor Firebird 5 Embedded incluido**:
+no requiere instalar Firebird ni configurar nada en la máquina destino.
+
+1. Descarga la última versión desde **Releases**:
+   <https://github.com/CORJAR-Computers/ISALAB-TR/releases>
+2. Ejecuta el instalador (instala por usuario, sin privilegios de
+   administrador) y abre la aplicación.
+3. En el primer arranque la app crea su base de datos `isalab.fdb` en la
+   carpeta de datos de la app y aplica migraciones + seed automáticamente.
+
+El pipeline de release (`release.yml`) compila el instalador en GitHub
+Actions, adjunta el artefacto al release y genera notas de cambios
+automáticas.
+
+### Compilación local del instalador
+
+```bash
+npm run tauri:build   # build release + instalador NSIS
+```
+
+El instalador queda en `target/release/bundle/nsis/` dentro del `target-dir`
+configurado (ver sección siguiente) e incluye el frontend compilado y
+`binaries/firebird/**` (fbclient.dll + ICU + plugins).
 
 ## Compilación en Windows: target fuera del antivirus
 
@@ -118,10 +146,11 @@ npm run tauri:build     # ídem
 
 - La sesión es local y única (una ventana, un operador a la vez).
 - Control de acceso basado en roles (RBAC: `ADMIN`, `VETERINARIO`, `AUXILIAR`) enforced en los comandos nativos de Rust.
-- Todos los comandos requieren sesión activa; las mutaciones críticas requieren rol `ADMIN`.
-- **Auditoría**: tabla `USER_AUDIT_LOG` registra inicios/cierres de sesión, intentos fallidos de login, cambios de contraseña, creación de usuarios, cambios de configuración y transiciones de estado en muestras, facturas, consultas y cirugías.
+- **RBAC completo (v0.3.0)**: los **35 comandos** Tauri requieren sesión activa (`require_session`); las mutaciones críticas (usuarios, configuración, auditoría, logos, certificado PKCS#12, copias de seguridad) requieren rol `ADMIN` (`require_admin`).
+- **Rate limiting de login (v0.3.0)**: 5 intentos fallidos bloquean el usuario durante 5 minutos.
+- **Auditoría**: tabla `USER_AUDIT_LOG` registra inicios/cierres de sesión, intentos fallidos de login, cambios de contraseña, creación de usuarios, cambios de configuración, importación de logos/certificados y transiciones de estado en muestras, facturas, consultas y cirugías. Desde la v0.3.0 el historial se consulta en la **UI de Auditoría** (solo `ADMIN`, tabla paginada con filtros).
 - **CSP**: Content Security Policy configurado (`script-src 'self'`, sin eval).
-- **Tests**: unit tests en Rust (`cargo test`) + Vitest en frontend (`npm test`).
+- **Tests**: 202 tests de Rust (`cargo test`) + 102 de frontend con Vitest (`npm test`).
 
 ## Estructura
 
@@ -162,10 +191,10 @@ src-tauri/               # Backend Rust
 
 - [x] **Hito 1**: scaffolding, schema Firebird 5, CRUD pacientes + historial
   clínico, tipos TS vía specta.
-- [x] **Hito 2**: reportes PDF con `printpdf` 0.12 (firma gráfica; PKCS#12
-  pendiente), laboratorio (mesa de trabajo, resultados por analito con
-  validación de rangos), configuración de la clínica y autenticación local
-  (Argon2id, roles ADMIN/VETERINARIO/AUXILIAR).
+- [x] **Hito 2**: reportes PDF con `printpdf` 0.12 (firma gráfica y **firma
+  digital PKCS#12** .p12/.pfx), laboratorio (mesa de trabajo, resultados por
+  analito con validación de rangos), configuración de la clínica y
+  autenticación local (Argon2id, roles ADMIN/VETERINARIO/AUXILIAR).
 - [x] **Hito 3**: agenda de consultas y cirugías (tabla `SURGERIES` con
   anestesia y estados), vacunación y desparasitación desde el historial y
   panel de control con métricas y próximas citas.
@@ -177,3 +206,8 @@ src-tauri/               # Backend Rust
   informado de cirugía, el recibo/comprobante de pago de factura, el
   certificado quirúrgico y el carnet de vacunación (selección por pestañas
   en Reportes PDF → Generar).
+- [x] **v0.3.0 — Endurecimiento y producción**: RBAC en los 35 comandos,
+  rate limiting de login, auditoría ampliada con UI de consulta (ADMIN),
+  logos secundarios y preferencia por paciente, refactor de plantillas PDF
+  (`layout.rs`), instalador NSIS con Firebird embebido y pipeline de release
+  en GitHub Actions.
