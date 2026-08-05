@@ -80,6 +80,12 @@ export const commands = {
 	 */
 	importClinicLogo: (sourcePath: string) => typedError<string, AppError>(__TAURI_INVOKE("import_clinic_logo", { sourcePath })),
 	/**
+	 *  Valida y copia un certificado digital PKCS#12 (.p12/.pfx) a la carpeta
+	 *  de datos de la app y devuelve la ruta persistida. La contraseña solo se
+	 *  usa para la validación y nunca se guarda en la base de datos.
+	 */
+	importPkcs12: (sourcePath: string, password: string) => typedError<string, AppError>(__TAURI_INVOKE("import_pkcs12", { sourcePath, password })),
+	/**
 	 *  Inicia sesión verificando la contraseña (Argon2id) contra la tabla USERS.
 	 *  La sesión es única: una app de escritorio con un operador a la vez.
 	 * 
@@ -179,11 +185,16 @@ export const commands = {
 	 */
 	getDashboardStats: () => typedError<DashboardStats, AppError>(__TAURI_INVOKE("get_dashboard_stats")),
 	/**
-	 *  Lista el registro de auditoría con paginación (solo ADMIN).
+	 *  Lista el registro de auditoría con paginación y filtros (solo ADMIN).
 	 *  Orden descendente (más reciente primero).
 	 */
-	listAuditLog: (limit: number | null, offset: number | null) => typedError<AuditLogEntry[], AppError>(__TAURI_INVOKE("list_audit_log", { limit, offset })),
+	listAuditLog: (limit: number | null, offset: number | null, username: string | null, action: string | null, dateFrom: string | null, dateTo: string | null) => typedError<AuditLogEntry[], AppError>(__TAURI_INVOKE("list_audit_log", { limit, offset, username, action, dateFrom, dateTo })),
 	interpretLabResults: (sampleId: number) => typedError<string, AppError>(__TAURI_INVOKE("interpret_lab_results", { sampleId })),
+	/**
+	 *  Prueba la conexión con la API de Groq usando la clave configurada y
+	 *  devuelve un mensaje breve si la clave es válida.
+	 */
+	testGroqConnection: () => typedError<string, AppError>(__TAURI_INVOKE("test_groq_connection")),
 	getPatientLabTrends: (patientId: number, analyteId: number) => typedError<TrendPoint[], AppError>(__TAURI_INVOKE("get_patient_lab_trends", { patientId, analyteId })),
 };
 
@@ -236,6 +247,10 @@ export type ClinicSettings = {
 	vetName: string,
 	vetLicense: string | null,
 	groqApiKey: string | null,
+	/**  Ruta al archivo PKCS#12 (.p12/.pfx) para firma digital. */
+	pkcs12Path: string | null,
+	/**  Contraseña del certificado PKCS#12 (solo en memoria, nunca se persiste). */
+	pkcs12Password: string | null,
 };
 
 /**  Agregado del historial clínico completo de un paciente. */

@@ -63,12 +63,15 @@ import { RESULT_STATUS, SAMPLE_STATUS } from "@/lib/status";
 import { cn, formatDateTime } from "@/lib/utils";
 import { api, getErrorMessage } from "@/lib/api";
 import { useUiStore } from "@/stores/ui-store";
+import { usePermissions } from "@/hooks/use-permissions";
 import { sendWhatsAppMessage } from "@/lib/whatsapp";
+import ReactMarkdown from "react-markdown";
+import remarkGfm from "remark-gfm";
 
 const resultSchema = z.object({
   analyteId: z.coerce.number().min(1, "Selecciona el analito"),
   value: z.coerce
-    .number({ invalid_type_message: "Ingresa un número válido" })
+    .number({ invalid_type_error: "Ingresa un número válido" })
     .min(0, "El valor no puede ser negativo"),
 });
 
@@ -100,6 +103,7 @@ export function SampleDetailDialog({
   const setActivePatient = useUiStore((s) => s.setActivePatient);
   const navigate = useUiStore((s) => s.navigate);
 
+  const { isVetOrAdmin } = usePermissions();
   const [confirmAnular, setConfirmAnular] = useState(false);
   const [aiInterpretation, setAiInterpretation] = useState<string | null>(null);
   const [interpreting, setInterpreting] = useState(false);
@@ -229,14 +233,8 @@ export function SampleDetailDialog({
     if (!sample) return;
     setInterpreting(true);
     try {
-      const response = await api.interpretLabResults(sample.id);
-      if (response.status === "ok") {
-        setAiInterpretation(response.data);
-      } else {
-        toast.error("Error al interpretar con IA", {
-          description: getErrorMessage(response.error),
-        });
-      }
+      const interpretation = await api.interpretLabResults(sample.id);
+      setAiInterpretation(interpretation);
     } catch (err) {
       toast.error("Error al interpretar con IA", {
         description: getErrorMessage(err),
@@ -522,8 +520,10 @@ export function SampleDetailDialog({
                   <Bot className="size-4" />
                   Interpretación IA (Llama 3)
                 </div>
-                <div className="whitespace-pre-wrap text-muted-foreground">
-                  {aiInterpretation}
+                <div className="prose prose-sm prose-neutral dark:prose-invert max-w-none">
+                  <ReactMarkdown remarkPlugins={[remarkGfm]}>
+                    {aiInterpretation}
+                  </ReactMarkdown>
                 </div>
               </div>
             )}
@@ -576,15 +576,17 @@ export function SampleDetailDialog({
                   <MessageCircle className="size-4" />
                   Enviar por WhatsApp
                 </Button>
-                <Button
-                  variant="outline"
-                  className="gap-2 bg-purple-50 text-purple-700 hover:bg-purple-100 hover:text-purple-800 border-purple-200 dark:bg-purple-900/20 dark:text-purple-400 dark:border-purple-900/50 dark:hover:bg-purple-900/40"
-                  onClick={handleInterpretAI}
-                  disabled={interpreting}
-                >
-                  {interpreting ? <Loader2 className="size-4 animate-spin" /> : <Bot className="size-4" />}
-                  Interpretación IA
-                </Button>
+                {isVetOrAdmin && (
+                  <Button
+                    variant="outline"
+                    className="gap-2 bg-purple-50 text-purple-700 hover:bg-purple-100 hover:text-purple-800 border-purple-200 dark:bg-purple-900/20 dark:text-purple-400 dark:border-purple-900/50 dark:hover:bg-purple-900/40"
+                    onClick={handleInterpretAI}
+                    disabled={interpreting}
+                  >
+                    {interpreting ? <Loader2 className="size-4 animate-spin" /> : <Bot className="size-4" />}
+                    Interpretación IA
+                  </Button>
+                )}
               </>
             )}
           </div>

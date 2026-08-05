@@ -59,13 +59,14 @@ pub fn generate_report(data: &ClinicalReportData, out_path: &Path) -> Result<(),
     draw_results_full(&mut pdf, &data.sample_type, &data.results, None);
     draw_contact_footer(&mut pdf, data.clinic.phone.as_deref());
 
-    // Si el modo es DIGITAL, agregar bloque de firma digital con metadatos del certificado
+    // Si el modo es DIGITAL, agregar bloque de firma digital con metadatos reales del certificado
     if data.signature.mode.eq_ignore_ascii_case("DIGITAL") {
         if let Some(ref pkcs12_path) = data.signature.pkcs12_path {
             let path = std::path::Path::new(pkcs12_path);
+            let password = data.signature.pkcs12_password.as_deref().unwrap_or("");
             if path.exists() {
-                // Extraer metadatos del certificado para el bloque de firma
-                if let Ok(info) = extract_pkcs12_info_for_pdf(path) {
+                // Metadatos reales del certificado (parseo PKCS#12)
+                if let Ok(info) = extract_pkcs12_info_for_pdf(path, password) {
                     draw_digital_signature_block(&mut pdf, &info);
                 } else {
                     // Firma visible genérica si no se puede leer el certificado
@@ -152,29 +153,21 @@ struct Pkcs12CertInfo {
     is_valid: bool,
 }
 
-/// Extrae información básica del certificado PKCS#12 para el bloque de firma.
-/// Nota: Sin la librería OpenSSL, solo verificamos la existencia del archivo
-/// y usamos metadatos genéricos. Para parsing completo, integrar openssl-rs.
-fn extract_pkcs12_info_for_pdf(path: &std::path::Path) -> Result<Pkcs12CertInfo, String> {
-    if !path.exists() {
-        return Err(format!("Archivo no encontrado: {}", path.display()));
-    }
+/// Extrae los metadatos reales del certificado PKCS#12 para el bloque de firma
+/// (parseo real con p12-keystore + x509-cert, ver `pdf_templates::signing`).
+fn extract_pkcs12_info_for_pdf(
+    path: &std::path::Path,
+    password: &str,
+) -> Result<Pkcs12CertInfo, String> {
+    let report = crate::pdf_templates::signing::validate_pkcs12(path, password)
+        .map_err(|e| e.to_string())?;
 
-    let metadata = std::fs::metadata(path)
-        .map_err(|e| format!("No se pudo leer metadata: {}", e))?;
-
-    if metadata.len() == 0 {
-        return Err("Archivo PKCS#12 vacío".to_string());
-    }
-
-    // Sin parsing PKCS#12, devolvemos información genérica
-    // En producción, integrar openssl-rs para parsing completo
     Ok(Pkcs12CertInfo {
-        holder_name: "Certificado digital ISALAB".to_string(),
-        issuer: "Autoridad de certificación".to_string(),
-        valid_from: chrono::Utc::now().format("%Y-%m-%d").to_string(),
-        valid_to: "2099-12-31".to_string(),
-        is_valid: true,
+        holder_name: report.info.holder_name,
+        issuer: report.info.issuer,
+        valid_from: report.info.valid_from,
+        valid_to: report.info.valid_to,
+        is_valid: report.info.is_valid,
     })
 }
 

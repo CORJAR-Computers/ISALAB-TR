@@ -2,7 +2,7 @@ use serde_json::json;
 use tauri::State;
 
 use crate::ai_cache::hash_results;
-use crate::auth::require_session;
+use crate::auth::{require_admin, require_vet_or_admin};
 use crate::error::AppError;
 use crate::models::consultation::Consultation;
 use crate::models::patient::Patient;
@@ -22,6 +22,26 @@ pub(crate) struct ClinicalContext {
     pub previous_results: Vec<LabResult>,
 }
 
+/// Nota clínica breve específica de la especie para orientar la interpretación.
+/// Los rangos mostrados ya son específicos de la especie/sexo/edad del paciente;
+/// esta nota añade particularidades fisiopatológicas conocidas por especie.
+fn species_specific_note(species_name: &str) -> &'static str {
+    let name = species_name.to_lowercase();
+    if name.contains("felino") || name.contains("gato") {
+        "Considera la hiperglucemia de estrés (puede elevar la glucosa sin ser patológica) y que los valores de eritrocitos/hematocrito suelen ser fisiológicamente menores que en caninos."
+    } else if name.contains("canino") || name.contains("perro") {
+        "Considera enfermedades frecuentes de la especie al interpretar (p. ej., ehrlichiosis, leptospirosis, enfermedad renal crónica en geriátricos, pancreatitis) y que la leucocitosis es un hallazgo inespecífico de inflamación."
+    } else if name.contains("equino") || name.contains("caballo") {
+        "Considera el estado de hidratación y la relación urea/creatinina al interpretar la azotemia, y que la bilirrubina y GGT se afectan por ayuno y ejercicio."
+    } else if name.contains("bovino") || name.contains("vaca") {
+        "Considera el estado de hidratación y que la hipocalcemia/hipomagnesemia son alteraciones frecuentes en el periparto; la relación urea/creatinina orienta causas prerrenales vs. renales."
+    } else if name.contains("ovino") || name.contains("caprino") || name.contains("oveja") || name.contains("cabra") {
+        "Considera que la anemia y la hipoproteinemia frecuentemente reflejan parasitismo gastrointestinal; valora la carga parasitaria y el estado nutricional al interpretar los resultados."
+    } else {
+        "No se dispone de particularidades específicas para esta especie; basa la interpretación en los rangos de referencia mostrados y en la literatura general."
+    }
+}
+
 /// Construye el prompt para la IA basado en el paciente, muestra, resultados
 /// y contexto clínico adicional (consultas recientes, vacunas, resultados previos).
 pub(crate) fn build_interpretation_prompt(
@@ -31,12 +51,14 @@ pub(crate) fn build_interpretation_prompt(
     ctx: Option<&ClinicalContext>,
 ) -> String {
     let mut prompt = String::from(
-        "Eres un veterinario experto en medicina interna y diagnóstico de laboratorio. \
+        "Eres un veterinario experto en medicina interna y diagnóstico de laboratorio clínico. \
         Analiza los siguientes resultados de laboratorio de un paciente y proporciona:\n\n\
-        1. **Interpretación clínica**: Análisis de cada resultado anormal y su significado clínico\n\
-        2. **Diagnósticos diferenciales**: Posibles causas de las alteraciones encontradas, ordenadas por probabilidad\n\
-        3. **Recomendaciones**: Estudios complementarios, tratamiento sugerido y seguimiento\n\
-        4. **Urgencia**: Nivel de urgencia (Baja/Media/Alta/Crítica) basado en los hallazgos\n\n\n"
+        1. **Interpretación clínica**: análisis de cada resultado anormal, su magnitud y su significado clínico\n\
+        2. **Diagnósticos diferenciales**: posibles causas de las alteraciones, ordenadas por probabilidad\n\
+        3. **Recomendaciones**: estudios complementarios, tratamiento sugerido y seguimiento\n\
+        4. **Nivel de urgencia**: clasifica en BAJA, MEDIA, ALTA o CRÍTICA con su justificación\n\n\
+        IMPORTANTE: los rangos de referencia mostrados ya son específicos de la especie, sexo y \
+        edad del paciente. Siempre indica la magnitud de cada desviación respecto a su rango.\n\n\n"
     );
 
     // Información del paciente
@@ -63,6 +85,10 @@ pub(crate) fn build_interpretation_prompt(
         }
     }
     prompt.push('\n');
+
+    // Consideración fisiopatológica por especie
+    prompt.push_str("## Consideración por especie\n");
+    prompt.push_str(&format!("- {}\n\n", species_specific_note(&patient.species_name)));
 
     // Información de la muestra
     prompt.push_str("## Muestra\n");
@@ -141,8 +167,8 @@ pub(crate) fn build_interpretation_prompt(
 
     // Resultados actuales
     prompt.push_str("## Resultados actuales\n\n");
-    prompt.push_str("| Analito | Resultado | Rango de referencia | Estado |\n");
-    prompt.push_str("|---------|-----------|---------------------|--------|\n");
+    prompt.push_str("| Analito | Resultado | Rango de referencia | Estado | Desviación |\n");
+    prompt.push_str("|---------|-----------|---------------------|--------|------------|\n");
     for r in results {
         let range = match (r.ref_min, r.ref_max) {
             (Some(min), Some(max)) => format!("{} - {}", min, max),
@@ -155,28 +181,65 @@ pub(crate) fn build_interpretation_prompt(
             _ => "⚪ SIN_RANGO",
         };
         prompt.push_str(&format!(
-            "| {} | {} {} | {} | {} |\n",
+            "| {} | {} {} | {} | {} | {} |\n",
             r.analyte_name,
             r.value,
             r.unit.as_deref().unwrap_or(""),
             range,
-            status_emoji
+            status_emoji,
+            deviation_label(r)
         ));
     }
     prompt.push('\n');
 
-    // Instrucciones finales
+    // Formato de respuesta y criterios de urgencia
     prompt.push_str(
-        "Responde en español usando formato Markdown. Si hay resultados fuera de rango, "
-    );
-    prompt.push_str(
-        "prioriza su interpretación. Si el paciente tiene un historial relevante, "
-    );
-    prompt.push_str(
-        "considéralo en tu análisis. Sé preciso y conciso."
+        "Responde en español usando formato Markdown. Estructura tu respuesta con estos encabezados:\n\
+         ## Interpretación clínica\n\
+         ## Diagnósticos diferenciales\n\
+         ## Recomendaciones\n\
+         ## Nivel de urgencia\n\n\
+         En la sección **Nivel de urgencia** usa EXACTAMENTE este formato de tres líneas:\n\
+         **Nivel**: BAJA | MEDIA | ALTA | CRÍTICA\n\
+         **Criterio**: <motivo clínico en una frase>\n\
+         **Acción sugerida**: <qué hacer y en qué plazo>\n\n\
+         Criterios orientativos para clasificar la urgencia:\n\
+         - BAJA: resultados dentro de rango o desviaciones mínimas sin relevancia clínica.\n\
+         - MEDIA: una o dos desviaciones leves/moderadas (hasta ~25 % fuera del rango).\n\
+         - ALTA: desviaciones marcadas (25-50 %) o varias alteraciones que sugieren enfermedad sistémica.\n\
+         - CRÍTICA: desviaciones severas (>50 %) en analitos de riesgo vital (glucosa, potasio, urea/creatinina, hematocrito, plaquetas) o signos de insuficiencia orgánica.\n\n\
+         Si hay resultados fuera de rango, prioriza su interpretación e indica la magnitud de la \
+         desviación. Considera el historial clínico del paciente si es relevante. Sé preciso y \
+         conciso; no inventes valores ni diagnósticos definitivos."
     );
 
     prompt
+}
+
+/// Etiqueta de la magnitud de la desviación para un resultado fuera de rango.
+fn deviation_label(r: &LabResult) -> String {
+    match r.status.as_str() {
+        "ALTO" => {
+            if let Some(max) = r.ref_max {
+                if max > 0.0 {
+                    let pct = ((r.value - max) / max) * 100.0;
+                    return format!("🔺 +{:.1}% sobre máx", pct.abs());
+                }
+            }
+            "🔺 Fuera de rango".to_string()
+        }
+        "BAJO" => {
+            if let Some(min) = r.ref_min {
+                if min > 0.0 {
+                    let pct = ((min - r.value) / min) * 100.0;
+                    return format!("🔻 -{:.1}% bajo mín", pct.abs());
+                }
+            }
+            "🔻 Fuera de rango".to_string()
+        }
+        "NORMAL" => "Dentro de rango".to_string(),
+        _ => "—".to_string(),
+    }
 }
 
 /// Extrae el contenido de texto de la respuesta de la API de Groq.
@@ -187,20 +250,56 @@ pub(crate) fn parse_groq_response(response: &serde_json::Value) -> Result<String
         .ok_or_else(|| AppError::Internal("No se recibió respuesta de la IA.".into()))
 }
 
+/// Devuelve la clave de API de Groq de la configuración o un error de
+/// validación claro si no está configurada.
+pub(crate) fn groq_api_key_or_error(settings: &crate::models::settings::ClinicSettings) -> Result<String, AppError> {
+    settings
+        .groq_api_key
+        .clone()
+        .filter(|k| !k.trim().is_empty())
+        .ok_or_else(|| {
+            AppError::Validation(
+                "La clave de API de Groq no está configurada. Ve a Configuración para agregarla."
+                    .into(),
+            )
+        })
+}
+
+/// Construye el mensaje de error legible ante una respuesta HTTP de error de
+/// la API de Groq. Mapea el 401 (clave inválida/revocada) a un mensaje claro.
+pub(crate) fn groq_error_message(status: u16, body: &str) -> String {
+    if status == 401 {
+        "Clave de API de Groq inválida o revocada (401). Verifica la clave en Configuración."
+            .to_string()
+    } else {
+        format!("Error de Groq API ({}): {}", status, body)
+    }
+}
+
+/// Cuerpo de la solicitud mínima de prueba de conexión (sin contexto clínico).
+pub(crate) fn groq_test_request_body() -> serde_json::Value {
+    json!({
+        "model": "llama3-8b-8192",
+        "messages": [
+            { "role": "user", "content": "Responde únicamente: OK" }
+        ],
+        "max_tokens": 5,
+        "temperature": 0.0
+    })
+}
+
 #[tauri::command]
 #[specta::specta]
 pub fn interpret_lab_results(
     state: State<'_, AppState>,
     sample_id: i32,
 ) -> Result<String, AppError> {
-    require_session(&state)?;
+    require_vet_or_admin(&state)?;
     let mut pooled = state.pool.acquire()?;
 
     // 1. Fetch settings to get Groq API key
     let settings = settings_repo::get(pooled.conn())?;
-    let api_key = settings.groq_api_key.ok_or_else(|| {
-        AppError::Validation("La clave de API de Groq no está configurada. Ve a Configuración para agregarla.".into())
-    })?;
+    let api_key = groq_api_key_or_error(&settings)?;
 
     // 2. Fetch sample and results
     let sample = samples_repo::get(pooled.conn(), sample_id)?.ok_or_else(|| {
@@ -251,7 +350,7 @@ pub fn interpret_lab_results(
             "messages": [
                 {
                     "role": "system",
-                    "content": "Eres un veterinario experto en medicina interna y diagnóstico de laboratorio clínico. Proporciona interpretaciones precisas, basadas en evidencia y considerando el contexto completo del paciente."
+                    "content": "Eres un veterinario colegiado experto en medicina interna y diagnóstico de laboratorio clínico de animales de compañía y de producción. Proporciona interpretaciones precisas, basadas en evidencia, considerando la especie, sexo y edad del paciente y el contexto clínico completo. Al clasificar la urgencia sé conservador: ante la duda, prioriza la seguridad del paciente. Tu análisis es de apoyo al criterio del médico veterinario tratante, no un diagnóstico definitivo."
                 },
                 {
                     "role": "user",
@@ -259,7 +358,7 @@ pub fn interpret_lab_results(
                 }
             ],
             "temperature": 0.3,
-            "max_tokens": 1500
+            "max_tokens": 1800
         }))
         .send()
         .map_err(|e| AppError::Internal(format!("Error conectando a Groq API: {}", e)))?;
@@ -324,6 +423,48 @@ fn get_previous_results(
         .collect())
 }
 
+/// Prueba la conexión con la API de Groq usando la clave configurada.
+/// Devuelve `Ok` con un mensaje breve si la clave es válida, o un `AppError`
+/// descriptivo si falta, es inválida o hay problemas de red.
+/// Solo ADMIN (vive en la página de Configuración).
+#[tauri::command]
+#[specta::specta]
+pub fn test_groq_connection(
+    state: State<'_, AppState>,
+) -> Result<String, AppError> {
+    require_admin(&state)?;
+
+    // Reutiliza la lectura de configuración: valida que exista clave.
+    let mut pooled = state.pool.acquire()?;
+    let settings = settings_repo::get(pooled.conn())?;
+    let api_key = groq_api_key_or_error(&settings)?;
+
+    // Solicitud mínima (modelo barato, sin contexto clínico) para validar la clave.
+    let client = reqwest::blocking::Client::new();
+    let res = client
+        .post("https://api.groq.com/openai/v1/chat/completions")
+        .header("Authorization", format!("Bearer {}", api_key))
+        .json(&groq_test_request_body())
+        .send()
+        .map_err(|e| AppError::Internal(format!("Error conectando a Groq API: {}", e)))?;
+
+    let status = res.status();
+    if !status.is_success() {
+        let error_text = res.text().unwrap_or_default();
+        return Err(AppError::Internal(groq_error_message(
+            status.as_u16(),
+            &error_text,
+        )));
+    }
+
+    let response_json: serde_json::Value = res
+        .json()
+        .map_err(|e| AppError::Internal(format!("Respuesta inválida de Groq API: {}", e)))?;
+
+    let content = parse_groq_response(&response_json)?;
+    Ok(format!("Conexión exitosa con Groq. Respuesta: {}", content))
+}
+
 #[cfg(test)]
 mod tests {
     use super::*;
@@ -366,13 +507,21 @@ mod tests {
     }
 
     fn test_lab_result(status: &str) -> LabResult {
+        // Valor coherente con el estado clínico respecto al rango 37-55:
+        // ALTO y BAJO deben quedar realmente fuera del rango para que la
+        // columna de desviación del prompt sea matemáticamente correcta.
+        let value = match status {
+            "ALTO" => 62.0,  // por encima de 55
+            "BAJO" => 30.0,  // por debajo de 37
+            _ => 45.0,        // dentro de 37-55
+        };
         LabResult {
             id: 1,
             sample_id: 1,
             analyte_id: 1,
             analyte_name: "Hematocrito".to_string(),
             unit: Some("%".to_string()),
-            value: 45.0,
+            value,
             status: status.to_string(),
             ref_min: Some(37.0),
             ref_max: Some(55.0),
@@ -575,6 +724,145 @@ mod tests {
     }
 
     #[test]
+    fn test_build_prompt_includes_species_note() {
+        let patient = test_patient();
+        let sample = test_sample();
+        let results = vec![];
+
+        let prompt = build_interpretation_prompt(&patient, &sample, &results, None);
+
+        assert!(prompt.contains("Consideración por especie"));
+        assert!(prompt.contains("ehrlichiosis")); // nota canina
+    }
+
+    #[test]
+    fn test_build_prompt_feline_species_note() {
+        let mut patient = test_patient();
+        patient.species_name = "Felino".to_string();
+        let sample = test_sample();
+        let results = vec![];
+
+        let prompt = build_interpretation_prompt(&patient, &sample, &results, None);
+
+        assert!(prompt.contains("hiperglucemia de estrés"));
+    }
+
+    #[test]
+    fn test_build_prompt_ovine_species_note() {
+        let mut patient = test_patient();
+        patient.species_name = "Ovino".to_string();
+        let sample = test_sample();
+        let results = vec![];
+
+        let prompt = build_interpretation_prompt(&patient, &sample, &results, None);
+
+        assert!(prompt.contains("parasitismo gastrointestinal"));
+    }
+
+    #[test]
+    fn test_build_prompt_unknown_species_note() {
+        let mut patient = test_patient();
+        patient.species_name = "Conejo".to_string();
+        let sample = test_sample();
+        let results = vec![];
+
+        let prompt = build_interpretation_prompt(&patient, &sample, &results, None);
+
+        assert!(prompt.contains("No se dispone de particularidades"));
+    }
+
+    #[test]
+    fn test_build_prompt_includes_deviation_column() {
+        let patient = test_patient();
+        let sample = test_sample();
+        let results = vec![test_lab_result("ALTO")]; // 45 vs máx 55 → no puede ser ALTO
+
+        let prompt = build_interpretation_prompt(&patient, &sample, &results, None);
+
+        assert!(prompt.contains("Desviación"));
+    }
+
+    #[test]
+    fn test_build_prompt_includes_structured_urgency() {
+        let patient = test_patient();
+        let sample = test_sample();
+        let results = vec![test_lab_result("ALTO")];
+
+        let prompt = build_interpretation_prompt(&patient, &sample, &results, None);
+
+        assert!(prompt.contains("## Nivel de urgencia"));
+        assert!(prompt.contains("**Nivel**"));
+        assert!(prompt.contains("BAJA | MEDIA | ALTA | CRÍTICA"));
+        assert!(prompt.contains("**Criterio**"));
+        assert!(prompt.contains("**Acción sugerida**"));
+        assert!(prompt.contains("CRÍTICA: desviaciones severas"));
+    }
+
+    #[test]
+    fn test_deviation_label_alto() {
+        let r = LabResult {
+            value: 80.0,
+            ref_min: Some(37.0),
+            ref_max: Some(55.0),
+            status: "ALTO".to_string(),
+            ..test_lab_result("ALTO")
+        };
+        assert!(deviation_label(&r).contains("🔺 +45.5%"));
+    }
+
+    #[test]
+    fn test_deviation_label_bajo() {
+        let r = LabResult {
+            value: 20.0,
+            ref_min: Some(37.0),
+            ref_max: Some(55.0),
+            status: "BAJO".to_string(),
+            ..test_lab_result("BAJO")
+        };
+        assert!(deviation_label(&r).contains("🔻 -45.9%"));
+    }
+
+    #[test]
+    fn test_deviation_label_normal() {
+        let r = test_lab_result("NORMAL");
+        assert_eq!(deviation_label(&r), "Dentro de rango");
+    }
+
+    #[test]
+    fn test_deviation_label_sin_rango() {
+        let r = LabResult {
+            ref_min: None,
+            ref_max: None,
+            status: "SIN_RANGO".to_string(),
+            ..test_lab_result("SIN_RANGO")
+        };
+        assert_eq!(deviation_label(&r), "—");
+    }
+
+    #[test]
+    fn test_deviation_label_alto_sin_max() {
+        let r = LabResult {
+            ref_min: Some(37.0),
+            ref_max: None,
+            status: "ALTO".to_string(),
+            ..test_lab_result("ALTO")
+        };
+        assert_eq!(deviation_label(&r), "🔺 Fuera de rango");
+    }
+
+    #[test]
+    fn test_deviation_label_bajo_con_min_cero() {
+        let r = LabResult {
+            value: -5.0,
+            ref_min: Some(0.0),
+            ref_max: Some(10.0),
+            status: "BAJO".to_string(),
+            ..test_lab_result("BAJO")
+        };
+        assert_eq!(deviation_label(&r), "🔻 Fuera de rango");
+    }
+
+    #[test]
     fn test_parse_groq_response_success() {
         let response = json!({
             "choices": [{
@@ -604,6 +892,56 @@ mod tests {
         });
         let result = parse_groq_response(&response);
         assert!(result.is_err());
+    }
+
+    #[test]
+    fn test_groq_api_key_or_error_ok() {
+        let settings = crate::models::settings::ClinicSettings {
+            groq_api_key: Some("gsk_abc123".into()),
+            ..Default::default()
+        };
+        assert_eq!(groq_api_key_or_error(&settings).unwrap(), "gsk_abc123");
+    }
+
+    #[test]
+    fn test_groq_api_key_or_error_none() {
+        let settings = crate::models::settings::ClinicSettings::default();
+        let err = groq_api_key_or_error(&settings).unwrap_err();
+        assert!(matches!(err, AppError::Validation(_)));
+        assert!(err.to_string().contains("no está configurada"));
+    }
+
+    #[test]
+    fn test_groq_api_key_or_error_empty() {
+        let settings = crate::models::settings::ClinicSettings {
+            groq_api_key: Some("   ".into()),
+            ..Default::default()
+        };
+        assert!(groq_api_key_or_error(&settings).is_err());
+    }
+
+    #[test]
+    fn test_groq_error_message_401() {
+        let msg = groq_error_message(401, "{\"error\":\"invalid\"}");
+        assert!(msg.contains("401"));
+        assert!(msg.contains("inválida o revocada"));
+        assert!(!msg.contains("invalid"));
+    }
+
+    #[test]
+    fn test_groq_error_message_other_status() {
+        let msg = groq_error_message(429, "rate limited");
+        assert!(msg.contains("429"));
+        assert!(msg.contains("rate limited"));
+    }
+
+    #[test]
+    fn test_groq_test_request_body() {
+        let body = groq_test_request_body();
+        assert_eq!(body["model"], "llama3-8b-8192");
+        assert_eq!(body["max_tokens"], 5);
+        assert_eq!(body["temperature"], 0.0);
+        assert_eq!(body["messages"][0]["content"], "Responde únicamente: OK");
     }
 
     #[test]

@@ -41,12 +41,12 @@ use crate::commands::samples::{
     create_sample, get_sample, list_samples, register_lab_result, set_sample_status,
 };
 use crate::commands::settings::{
-    get_clinic_settings, import_clinic_logo, save_clinic_settings,
+    get_clinic_settings, import_clinic_logo, import_pkcs12, save_clinic_settings,
 };
 use crate::commands::surgeries::{create_surgery, list_surgeries, set_surgery_status};
 use crate::commands::users::{change_password, create_user, list_users};
 use crate::commands::vaccines::{create_vaccine, list_vaccines};
-use crate::commands::ai::interpret_lab_results;
+use crate::commands::ai::{interpret_lab_results, test_groq_connection};
 use crate::state::AppState;
 
 fn specta_builder() -> Builder<tauri::Wry> {
@@ -73,6 +73,8 @@ fn specta_builder() -> Builder<tauri::Wry> {
             get_clinic_settings,
             save_clinic_settings,
             import_clinic_logo,
+            import_pkcs12,
+            test_groq_connection,
             login,
             logout,
             get_session,

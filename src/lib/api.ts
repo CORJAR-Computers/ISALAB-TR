@@ -94,6 +94,8 @@ export const api = {
     invoke<ClinicSettings>("save_clinic_settings", { input }),
   importClinicLogo: (sourcePath: string) =>
     invoke<string>("import_clinic_logo", { sourcePath }),
+  importPkcs12: (sourcePath: string, password: string) =>
+    invoke<string>("import_pkcs12", { sourcePath, password }),
 
   // ---- Autenticación ----
   login: (input: LoginInput) => invoke<SessionUser>("login", { input }),
@@ -172,4 +174,9 @@ export const api = {
 
   // ---- Dashboard ----
   getDashboardStats: () => invoke<DashboardStats>("get_dashboard_stats"),
+
+  // ---- IA (Groq) ----
+  interpretLabResults: (sampleId: number) =>
+    invoke<string>("interpret_lab_results", { sampleId }),
+  testGroqConnection: () => invoke<string>("test_groq_connection"),
 };

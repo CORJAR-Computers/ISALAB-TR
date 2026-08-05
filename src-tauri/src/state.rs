@@ -68,6 +68,10 @@ pub struct AppState {
     pub login_attempts: Mutex<HashMap<String, LoginAttempts>>,
     /// Cache de interpretaciones de IA para evitar llamadas repetidas a Groq.
     pub ai_cache: AiCache,
+    /// Contraseña del certificado PKCS#12 en memoria (para firmar PDFs).
+    /// NUNCA se persiste en la base de datos: se pide de nuevo al reimportar
+    /// o al reiniciar la app.
+    pub pkcs12_password: Mutex<Option<String>>,
     #[allow(dead_code)]
     pub listeners: Vec<JoinHandle<Result<(), FbError>>>,
 }
@@ -110,6 +114,7 @@ impl AppState {
                     session: Mutex::new(None),
                     login_attempts: Mutex::new(HashMap::new()),
                     ai_cache: AiCache::new(),
+                    pkcs12_password: Mutex::new(None),
                     listeners,
                 }
             }
@@ -122,6 +127,7 @@ impl AppState {
                 session: Mutex::new(None),
                 login_attempts: Mutex::new(HashMap::new()),
                 ai_cache: AiCache::new(),
+                pkcs12_password: Mutex::new(None),
                 listeners: Vec::new(),
             },
         }

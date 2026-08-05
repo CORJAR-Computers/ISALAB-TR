@@ -51,15 +51,62 @@ fn clinic_header(s: &ClinicSettings) -> ClinicHeader {
 }
 
 /// Bloque de firma del veterinario a partir de la configuración.
-fn report_signature(s: &ClinicSettings) -> ReportSignature {
+/// La contraseña PKCS#12 viene del estado en memoria (nunca de la BD).
+fn report_signature(s: &ClinicSettings, pkcs12_password: Option<String>) -> ReportSignature {
     ReportSignature {
         mode: s.signature_mode.clone(),
         vet_name: s.vet_name.clone(),
         vet_license: s.vet_license.clone(),
         signature_image_path: None,
         pkcs12_path: s.pkcs12_path.clone(),
-        pkcs12_password: s.pkcs12_password.clone(),
+        pkcs12_password,
     }
+}
+
+/// Lee la contraseña PKCS#12 desde el estado en memoria.
+fn pkcs12_password_from(state: &AppState) -> Option<String> {
+    state
+        .pkcs12_password
+        .lock()
+        .ok()
+        .and_then(|g| g.clone())
+}
+
+/// Firma criptográficamente un PDF ya generado si la clínica usa modo DIGITAL
+/// y tiene certificado + contraseña en memoria. Devuelve Ok sin hacer nada si
+/// no aplica, o un error claro si falta la contraseña.
+fn apply_digital_signature(
+    state: &AppState,
+    settings: &ClinicSettings,
+    out_path: &std::path::Path,
+    doc_name: &str,
+) -> Result<(), AppError> {
+    if !settings.signature_mode.eq_ignore_ascii_case("DIGITAL") {
+        return Ok(());
+    }
+    let Some(ref p12) = settings.pkcs12_path else {
+        return Ok(()); // sin certificado → se queda con firma gráfica/visible
+    };
+    if !std::path::Path::new(p12).exists() {
+        return Err(AppError::Validation(
+            "El certificado digital PKCS#12 ya no existe. Vuelve a importarlo en Configuración."
+                .into(),
+        ));
+    }
+    let password = pkcs12_password_from(state).ok_or_else(|| {
+        AppError::Validation(
+            "Para firmar digitalmente este reporte reingresa la contraseña del certificado PKCS#12 en Configuración.".into(),
+        )
+    })?;
+
+    crate::pdf_templates::sign_pdf_with_pkcs12(
+        out_path,
+        out_path,
+        std::path::Path::new(p12),
+        &password,
+        &settings.vet_name,
+        doc_name,
+    )
 }
 
 /// Genera el informe PDF de una muestra (con resultados) y devuelve la ruta.
@@ -94,7 +141,7 @@ pub fn generate_clinical_report(
         sample_type: sample.sample_type_name.clone(),
         received_at: sample.received_at.clone(),
         results: sample.results,
-        signature: report_signature(&settings),
+        signature: report_signature(&settings, pkcs12_password_from(&state)),
     };
 
     let dir = reports_dir(&app)?;
@@ -102,6 +149,7 @@ pub fn generate_clinical_report(
     let out_path = dir.join(&file_name);
     crate::pdf_templates::generate_report(&data, &out_path)
         .map_err(AppError::Internal)?;
+    apply_digital_signature(&state, &settings, &out_path, "Informe de resultados de laboratorio")?;
 
     let generated_at = now_db(conn)?;
     Ok(ReportFile {
@@ -141,13 +189,14 @@ pub fn generate_formula_medica(
         reason: consultation.reason,
         diagnosis: consultation.diagnosis,
         medication: consultation.treatment_plan,
-        signature: report_signature(&settings),
+        signature: report_signature(&settings, pkcs12_password_from(&state)),
     };
 
     let dir = reports_dir(&app)?;
     let file_name = format!("formula-{consultation_id}.pdf");
     let out_path = dir.join(&file_name);
     crate::pdf_templates::generate_formula(&data, &out_path).map_err(AppError::Internal)?;
+    apply_digital_signature(&state, &settings, &out_path, "Fórmula médica veterinaria")?;
 
     let generated_at = now_db(conn)?;
     Ok(ReportFile {
@@ -277,13 +326,14 @@ pub fn generate_certificado_cirugia(
         patient,
         owner,
         surgery,
-        signature: report_signature(&settings),
+        signature: report_signature(&settings, pkcs12_password_from(&state)),
     };
 
     let dir = reports_dir(&app)?;
     let file_name = format!("cirugia-{surgery_id}.pdf");
     let out_path = dir.join(&file_name);
     crate::pdf_templates::generate_cirugia(&data, &out_path).map_err(AppError::Internal)?;
+    apply_digital_signature(&state, &settings, &out_path, "Certificado quirúrgico")?;
 
     let generated_at = now_db(conn)?;
     Ok(ReportFile {

@@ -5,7 +5,7 @@ import { z } from "zod";
 import { toast } from "sonner";
 import { convertFileSrc } from "@tauri-apps/api/core";
 import { open, save as saveDialog } from "@tauri-apps/plugin-dialog";
-import { Building2, CreditCard, ImageUp, Loader2, PenLine, Save, X, Bot, DatabaseBackup } from "lucide-react";
+import { Building2, CreditCard, FileKey2, ImageUp, Loader2, PenLine, Save, X, Bot, DatabaseBackup, Wifi } from "lucide-react";
 import { invoke } from "@tauri-apps/api/core";
 import { Button } from "@/components/ui/button";
 import {
@@ -39,7 +39,7 @@ import {
   useImportClinicLogo,
   useSaveClinicSettings,
 } from "@/hooks/use-queries";
-import { getErrorMessage } from "@/lib/api";
+import { api, getErrorMessage } from "@/lib/api";
 import type { ClinicSettings } from "@/bindings";
 
 const schema = z.object({
@@ -55,6 +55,8 @@ const schema = z.object({
   vetName: z.string().optional(),
   vetLicense: z.string().optional(),
   groqApiKey: z.string().optional(),
+  pkcs12Path: z.string().optional(),
+  pkcs12Password: z.string().optional(),
 });
 
 type Values = z.infer<typeof schema>;
@@ -67,6 +69,8 @@ export function SettingsPage() {
   const save = useSaveClinicSettings();
   const importLogo = useImportClinicLogo();
   const [backingUp, setBackingUp] = useState(false);
+  const [testingGroq, setTestingGroq] = useState(false);
+  const [importingPkcs12, setImportingPkcs12] = useState(false);
 
   const form = useForm<Values>({
     resolver: zodResolver(schema),
@@ -83,6 +87,8 @@ export function SettingsPage() {
       vetName: "",
       vetLicense: "",
       groqApiKey: "",
+      pkcs12Path: "",
+      pkcs12Password: "",
     },
   });
 
@@ -103,6 +109,8 @@ export function SettingsPage() {
         vetName: settings.vetName ?? "",
         vetLicense: settings.vetLicense ?? "",
         groqApiKey: settings.groqApiKey ?? "",
+        pkcs12Path: settings.pkcs12Path ?? "",
+        pkcs12Password: "",
       });
     }
   }, [settings, form]);
@@ -151,15 +159,78 @@ export function SettingsPage() {
       vetName: values.vetName?.trim() ?? "",
       vetLicense: toNullable(values.vetLicense),
       groqApiKey: toNullable(values.groqApiKey),
+      pkcs12Path: toNullable(values.pkcs12Path),
+      // La contraseña solo viaja al backend para validarla y guardarla en
+      // memoria; nunca se persiste. Se limpia tras guardar.
+      pkcs12Password: toNullable(values.pkcs12Password),
     };
     try {
       await save.mutateAsync(input);
+      // Limpia la contraseña del formulario: ya se validó y quedó en memoria.
+      form.setValue("pkcs12Password", "", { shouldDirty: true });
       toast.success("Configuración guardada", {
         description:
           "Los reportes PDF y la facturación usarán estos datos.",
       });
     } catch (e) {
       toast.error("No se pudo guardar", { description: getErrorMessage(e) });
+    }
+  };
+
+  /** Selecciona un certificado PKCS#12, lo valida y lo copia a la app. */
+  const pickPkcs12 = async () => {
+    try {
+      const selected = await open({
+        multiple: false,
+        directory: false,
+        title: "Seleccionar certificado digital (PKCS#12)",
+        filters: [
+          { name: "Certificados PKCS#12", extensions: ["p12", "pfx"] },
+        ],
+      });
+      if (!selected || Array.isArray(selected)) return;
+
+      setImportingPkcs12(true);
+      const password = form.getValues("pkcs12Password") ?? "";
+      if (!password) {
+        toast.error("Falta la contraseña del certificado", {
+          description: "Ingresa la contraseña del .p12 antes de importarlo.",
+        });
+        setImportingPkcs12(false);
+        return;
+      }
+      const stored = await api.importPkcs12(selected, password);
+      form.setValue("pkcs12Path", stored, { shouldDirty: true });
+      toast.success("Certificado importado", {
+        description: "Guarda la configuración para aplicar la firma digital.",
+      });
+    } catch (e) {
+      toast.error("No se pudo importar el certificado", {
+        description: getErrorMessage(e),
+      });
+    } finally {
+      setImportingPkcs12(false);
+    }
+  };
+
+  const clearPkcs12 = () => {
+    form.setValue("pkcs12Path", "", { shouldDirty: true });
+  };
+
+  const testGroq = async () => {
+    setTestingGroq(true);
+    try {
+      const result = await api.testGroqConnection();
+      toast.success("Conexión con Groq exitosa", {
+        description: result,
+        duration: 6000,
+      });
+    } catch (e) {
+      toast.error("No se pudo conectar con Groq", {
+        description: getErrorMessage(e),
+      });
+    } finally {
+      setTestingGroq(false);
     }
   };
 
@@ -422,12 +493,14 @@ export function SettingsPage() {
                           Gráfica (texto del firmante)
                         </SelectItem>
                         <SelectItem value="DIGITAL">
-                          Digital PKCS#12 (próximamente)
+                          Digital PKCS#12
                         </SelectItem>
                       </SelectContent>
                     </Select>
                     <FormDescription>
-                      La firma digital aún no está implementada; usa Gráfica.
+                      La firma digital agrega el bloque de firma con metadatos
+                      del certificado (Ley 527 de 1999). Requiere un certificado
+                      PKCS#12 (.p12/.pfx).
                     </FormDescription>
                     <FormMessage />
                   </FormItem>
@@ -459,6 +532,79 @@ export function SettingsPage() {
                   </FormItem>
                 )}
               />
+              <FormField
+                control={form.control}
+                name="pkcs12Password"
+                render={({ field }) => (
+                  <FormItem className="sm:col-span-2">
+                    <FormLabel>Contraseña del certificado (no se guarda)</FormLabel>
+                    <FormControl>
+                      <Input
+                        type="password"
+                        placeholder="••••••••"
+                        autoComplete="off"
+                        {...field}
+                      />
+                    </FormControl>
+                    <FormDescription>
+                      Se usa para validar el certificado al importarlo y queda
+                      guardada en memoria de la sesión para firmar los reportes.
+                      Nunca se persiste en la base de datos: al reiniciar la app
+                      deberás reingresarla (Guardar configuración con la
+                      contraseña escrita) para volver a firmar.
+                    </FormDescription>
+                    <FormMessage />
+                  </FormItem>
+                )}
+              />
+              <FormField
+                control={form.control}
+                name="pkcs12Path"
+                render={({ field }) => (
+                  <FormItem className="sm:col-span-2">
+                    <FormLabel>Certificado digital (.p12/.pfx)</FormLabel>
+                    <div className="flex flex-wrap items-center gap-2">
+                      <Button
+                        type="button"
+                        variant="outline"
+                        size="sm"
+                        onClick={pickPkcs12}
+                        disabled={importingPkcs12}
+                      >
+                        {importingPkcs12 ? (
+                          <Loader2 className="animate-spin" />
+                        ) : (
+                          <FileKey2 className="size-4" />
+                        )}
+                        {field.value ? "Reemplazar certificado…" : "Importar certificado…"}
+                      </Button>
+                      {field.value && (
+                        <Button
+                          type="button"
+                          variant="ghost"
+                          size="sm"
+                          onClick={clearPkcs12}
+                        >
+                          <X className="size-4" />
+                          Quitar
+                        </Button>
+                      )}
+                    </div>
+                    {field.value && (
+                      <p className="text-muted-foreground font-mono text-xs break-all">
+                        {field.value}
+                      </p>
+                    )}
+                    <FormDescription>
+                      El archivo se copia a la carpeta de la app; la ruta se
+                      guarda en la configuración. Los reportes se firman
+                      criptográficamente (PAdES, Ley 527 de 1999) con este
+                      certificado.
+                    </FormDescription>
+                    <FormMessage />
+                  </FormItem>
+                )}
+              />
             </CardContent>
           </Card>
 
@@ -485,11 +631,31 @@ export function SettingsPage() {
                     </FormControl>
                     <FormDescription>
                       Consigue una clave gratuita en <a href="https://console.groq.com" target="_blank" className="text-primary underline">console.groq.com</a>.
+                      Debes guardar la configuración antes de probar la conexión.
                     </FormDescription>
                     <FormMessage />
                   </FormItem>
                 )}
               />
+              <div className="sm:col-span-2 flex flex-wrap items-center gap-2">
+                <Button
+                  type="button"
+                  variant="outline"
+                  size="sm"
+                  onClick={testGroq}
+                  disabled={testingGroq}
+                >
+                  {testingGroq ? (
+                    <Loader2 className="size-4 animate-spin" />
+                  ) : (
+                    <Wifi className="size-4" />
+                  )}
+                  Probar conexión
+                </Button>
+                <p className="text-muted-foreground text-xs">
+                  Envía una solicitud mínima a Groq para validar la clave guardada.
+                </p>
+              </div>
             </CardContent>
           </Card>
 
