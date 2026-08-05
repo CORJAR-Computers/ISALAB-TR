@@ -6,8 +6,20 @@ use crate::models::sample::{LabResult, Sample};
 use crate::models::sample_list_item::SampleListItem;
 
 pub(crate) type SampleListItemRow = (
-    i32, String, i32, String, String, String, i32, String, String, String,
-    Option<String>, Option<String>, i32, i32,
+    i32,
+    String,
+    i32,
+    String,
+    String,
+    String,
+    i32,
+    String,
+    String,
+    String,
+    Option<String>,
+    Option<String>,
+    i32,
+    i32,
 );
 
 pub(crate) type LabResultRow = (
@@ -34,13 +46,13 @@ const SAMPLE_SELECT: &str = "
     JOIN SAMPLE_TYPES st ON st.ID = s.SAMPLE_TYPE_ID";
 
 pub(crate) type SampleRow = (
-    i32,          // id
-    String,       // code
-    i32,          // patient_id
-    i32,          // sample_type_id
-    String,       // sample_type_name
-    String,       // received_at
-    String,       // status
+    i32,            // id
+    String,         // code
+    i32,            // patient_id
+    i32,            // sample_type_id
+    String,         // sample_type_name
+    String,         // received_at
+    String,         // status
     Option<String>, // collected_by
     Option<String>, // notes
 );
@@ -61,10 +73,7 @@ pub(crate) fn map_sample(r: SampleRow) -> Sample {
 }
 
 /// Devuelve una muestra completa (con resultados) o `None`.
-pub fn get(
-    conn: &mut SimpleConnection,
-    id: i32,
-) -> Result<Option<Sample>, AppError> {
+pub fn get(conn: &mut SimpleConnection, id: i32) -> Result<Option<Sample>, AppError> {
     let row: Option<SampleRow> = conn
         .query_first(&format!("{SAMPLE_SELECT} WHERE s.ID = ?"), (&id,))
         .map_err(AppError::from)?;
@@ -134,17 +143,12 @@ pub fn list(
 
 /// Cambia el estado de una muestra validando la transición.
 /// FINALIZADA requiere al menos un resultado cargado (cierre del analista).
-pub fn set_status(
-    conn: &mut SimpleConnection,
-    id: i32,
-    status: &str,
-) -> Result<Sample, AppError> {
+pub fn set_status(conn: &mut SimpleConnection, id: i32, status: &str) -> Result<Sample, AppError> {
     let current: Option<(String,)> = conn
         .query_first("SELECT STATUS FROM SAMPLES WHERE ID = ?", (&id,))
         .map_err(AppError::from)?;
-    let (current,) = current.ok_or_else(|| {
-        AppError::NotFound(format!("Muestra {id} no encontrada"))
-    })?;
+    let (current,) =
+        current.ok_or_else(|| AppError::NotFound(format!("Muestra {id} no encontrada")))?;
 
     let allowed = match status {
         "EN_PROCESO" => current == "RECIBIDA",
@@ -153,10 +157,7 @@ pub fn set_status(
                 false
             } else {
                 let has_results: Option<(i32,)> = conn
-                    .query_first(
-                        "SELECT 1 FROM LAB_RESULTS WHERE SAMPLE_ID = ?",
-                        (&id,),
-                    )
+                    .query_first("SELECT 1 FROM LAB_RESULTS WHERE SAMPLE_ID = ?", (&id,))
                     .map_err(AppError::from)?;
                 has_results.is_some()
             }
@@ -177,9 +178,8 @@ pub fn set_status(
     )
     .map_err(AppError::from)?;
 
-    get(conn, id)?.ok_or_else(|| {
-        AppError::Internal("Muestra actualizada pero no recuperada".into())
-    })
+    get(conn, id)?
+        .ok_or_else(|| AppError::Internal("Muestra actualizada pero no recuperada".into()))
 }
 
 /// Resultados de una muestra (para la ficha completa y el informe PDF).
@@ -237,14 +237,17 @@ pub fn get_patient_lab_trends(
     let rows: Vec<TrendPointRow> = conn
         .query(sql, (&patient_id, &analyte_id))
         .map_err(AppError::from)?;
-        
-    Ok(rows.into_iter().map(|r| crate::models::sample::TrendPoint {
-        date: r.0,
-        value: r.1,
-        ref_min: r.2,
-        ref_max: r.3,
-        status: r.4,
-    }).collect())
+
+    Ok(rows
+        .into_iter()
+        .map(|r| crate::models::sample::TrendPoint {
+            date: r.0,
+            value: r.1,
+            ref_min: r.2,
+            ref_max: r.3,
+            status: r.4,
+        })
+        .collect())
 }
 
 #[cfg(test)]
@@ -254,14 +257,14 @@ mod tests {
     #[test]
     fn test_map_sample_fields() {
         let row: SampleRow = (
-            1,                          // id
-            "M-2026-0001".into(),       // code
-            10,                         // patient_id
-            1,                          // sample_type_id
-            "Sangre total (EDTA)".into(), // sample_type_name
-            "2026-08-01 10:30:00".into(), // received_at
-            "RECIBIDA".into(),          // status
-            Some("Dr. Ramos".into()),   // collected_by
+            1,                                 // id
+            "M-2026-0001".into(),              // code
+            10,                                // patient_id
+            1,                                 // sample_type_id
+            "Sangre total (EDTA)".into(),      // sample_type_name
+            "2026-08-01 10:30:00".into(),      // received_at
+            "RECIBIDA".into(),                 // status
+            Some("Dr. Ramos".into()),          // collected_by
             Some("Muestra de control".into()), // notes
         );
         let sample = map_sample(row);
@@ -281,8 +284,15 @@ mod tests {
     #[test]
     fn test_map_sample_optional_fields_none() {
         let row: SampleRow = (
-            2, "M-2026-0002".into(), 20, 2, "Suero".into(),
-            "2026-08-02 14:00:00".into(), "EN_PROCESO".into(), None, None,
+            2,
+            "M-2026-0002".into(),
+            20,
+            2,
+            "Suero".into(),
+            "2026-08-02 14:00:00".into(),
+            "EN_PROCESO".into(),
+            None,
+            None,
         );
         let sample = map_sample(row);
 
@@ -294,15 +304,15 @@ mod tests {
     #[test]
     fn test_map_lab_result_with_reference_range() {
         let row: LabResultRow = (
-            100,    // id
-            1,      // sample_id
-            1,      // analyte_id
-            "Hematocrito".into(), // analyte_name
-            Some("%".into()),     // unit
-            42.5,   // value
-            "NORMAL".into(),      // status
-            Some(37.0),           // ref_min
-            Some(55.0),           // ref_max
+            100,                                // id
+            1,                                  // sample_id
+            1,                                  // analyte_id
+            "Hematocrito".into(),               // analyte_name
+            Some("%".into()),                   // unit
+            42.5,                               // value
+            "NORMAL".into(),                    // status
+            Some(37.0),                         // ref_min
+            Some(55.0),                         // ref_max
             Some("2026-08-01 11:00:00".into()), // analyzed_at
         );
         let result = map_lab_result(row);
@@ -322,8 +332,16 @@ mod tests {
     #[test]
     fn test_map_lab_result_without_reference_range() {
         let row: LabResultRow = (
-            101, 1, 10, "Glucosa".into(), Some("mg/dL".into()),
-            95.0, "NORMAL".into(), None, None, None,
+            101,
+            1,
+            10,
+            "Glucosa".into(),
+            Some("mg/dL".into()),
+            95.0,
+            "NORMAL".into(),
+            None,
+            None,
+            None,
         );
         let result = map_lab_result(row);
 
@@ -335,8 +353,16 @@ mod tests {
     #[test]
     fn test_map_lab_result_abnormal_status() {
         let row: LabResultRow = (
-            102, 1, 6, "ALT".into(), Some("U/L".into()),
-            150.0, "ALTO".into(), Some(10.0), Some(100.0), None,
+            102,
+            1,
+            6,
+            "ALT".into(),
+            Some("U/L".into()),
+            150.0,
+            "ALTO".into(),
+            Some(10.0),
+            Some(100.0),
+            None,
         );
         let result = map_lab_result(row);
         assert_eq!(result.status, "ALTO");
@@ -346,10 +372,20 @@ mod tests {
     #[test]
     fn test_sample_list_item_row_mapping() {
         let row: SampleListItemRow = (
-            1, "M-2026-0001".into(), 10, "Luna".into(),
-            "Juan Pérez".into(), "Canino".into(), 1, "Sangre".into(),
-            "2026-08-01 10:30:00".into(), "RECIBIDA".into(),
-            Some("Dr. Ramos".into()), None, 3, 1,
+            1,
+            "M-2026-0001".into(),
+            10,
+            "Luna".into(),
+            "Juan Pérez".into(),
+            "Canino".into(),
+            1,
+            "Sangre".into(),
+            "2026-08-01 10:30:00".into(),
+            "RECIBIDA".into(),
+            Some("Dr. Ramos".into()),
+            None,
+            3,
+            1,
         );
 
         assert_eq!(row.0, 1);
@@ -380,7 +416,8 @@ mod integration_tests {
             "INSERT INTO SAMPLES (ID, CODE, PATIENT_ID, SAMPLE_TYPE_ID, RECEIVED_AT, STATUS)
              VALUES (1, 'M-2026-0001', ?, 1, '2026-08-01 10:00:00', 'RECIBIDA')",
             (&patient_id,),
-        ).unwrap();
+        )
+        .unwrap();
 
         let sample = get(&mut conn, 1).unwrap();
         assert!(sample.is_some());
@@ -413,7 +450,8 @@ mod integration_tests {
             "INSERT INTO SAMPLES (ID, CODE, PATIENT_ID, SAMPLE_TYPE_ID, RECEIVED_AT, STATUS)
              VALUES (1, 'M-2026-0001', ?, 1, '2026-08-01 10:00:00', 'RECIBIDA')",
             (&patient_id,),
-        ).unwrap();
+        )
+        .unwrap();
 
         let samples = list(&mut conn, None, None).unwrap();
         assert_eq!(samples.len(), 1);
@@ -432,12 +470,14 @@ mod integration_tests {
             "INSERT INTO SAMPLES (ID, CODE, PATIENT_ID, SAMPLE_TYPE_ID, RECEIVED_AT, STATUS)
              VALUES (1, 'M-2026-0001', ?, 1, '2026-08-01 10:00:00', 'RECIBIDA')",
             (&patient_id,),
-        ).unwrap();
+        )
+        .unwrap();
         conn.execute(
             "INSERT INTO SAMPLES (ID, CODE, PATIENT_ID, SAMPLE_TYPE_ID, RECEIVED_AT, STATUS)
              VALUES (2, 'M-2026-0002', ?, 1, '2026-08-02 10:00:00', 'FINALIZADA')",
             (&patient_id,),
-        ).unwrap();
+        )
+        .unwrap();
 
         let samples = list(&mut conn, Some("RECIBIDA"), None).unwrap();
         assert_eq!(samples.len(), 1);
@@ -455,7 +495,8 @@ mod integration_tests {
             "INSERT INTO SAMPLES (ID, CODE, PATIENT_ID, SAMPLE_TYPE_ID, RECEIVED_AT, STATUS)
              VALUES (1, 'M-2026-0001', ?, 1, '2026-08-01 10:00:00', 'RECIBIDA')",
             (&patient_id,),
-        ).unwrap();
+        )
+        .unwrap();
 
         // RECIBIDA -> EN_PROCESO
         let updated = set_status(&mut conn, 1, "EN_PROCESO").unwrap();
@@ -473,7 +514,8 @@ mod integration_tests {
             "INSERT INTO SAMPLES (ID, CODE, PATIENT_ID, SAMPLE_TYPE_ID, RECEIVED_AT, STATUS)
              VALUES (1, 'M-2026-0001', ?, 1, '2026-08-01 10:00:00', 'RECIBIDA')",
             (&patient_id,),
-        ).unwrap();
+        )
+        .unwrap();
 
         // RECIBIDA -> FINALIZADA sin resultados (debe fallar)
         let result = set_status(&mut conn, 1, "FINALIZADA");

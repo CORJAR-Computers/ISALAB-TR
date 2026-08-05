@@ -2,14 +2,19 @@ use rsfbclient::prelude::*;
 use rsfbclient::SimpleConnection;
 
 use crate::error::AppError;
-use crate::models::invoice::{
-    CreateInvoiceInput, Invoice, InvoiceItem, InvoiceListItem,
-};
+use crate::models::invoice::{CreateInvoiceInput, Invoice, InvoiceItem, InvoiceListItem};
 use crate::repositories::next_id;
 
 pub(crate) type InvoiceListItemRow = (
-    i32, String, String, Option<String>, String, f64, String,
-    Option<String>, i32,
+    i32,
+    String,
+    String,
+    Option<String>,
+    String,
+    f64,
+    String,
+    Option<String>,
+    i32,
 );
 
 /// Columnas de una factura con propietario/paciente unidos.
@@ -27,22 +32,22 @@ const INVOICE_SELECT: &str = "
     LEFT JOIN PATIENTS p ON p.ID = i.PATIENT_ID";
 
 pub(crate) type InvoiceRow = (
-    i32,             // id
-    String,          // invoice_number
-    Option<i32>,     // patient_id
-    Option<String>,  // patient_name
-    i32,             // owner_id
-    String,          // owner_name
-    Option<String>,  // owner_phone
-    Option<i32>,     // consultation_id
-    String,          // issue_date
-    f64,             // subtotal
-    f64,             // tax_rate
-    f64,             // tax_amount
-    f64,             // total
-    String,          // status
-    Option<String>,  // payment_method
-    Option<String>,  // notes
+    i32,            // id
+    String,         // invoice_number
+    Option<i32>,    // patient_id
+    Option<String>, // patient_name
+    i32,            // owner_id
+    String,         // owner_name
+    Option<String>, // owner_phone
+    Option<i32>,    // consultation_id
+    String,         // issue_date
+    f64,            // subtotal
+    f64,            // tax_rate
+    f64,            // tax_amount
+    f64,            // total
+    String,         // status
+    Option<String>, // payment_method
+    Option<String>, // notes
 );
 
 pub(crate) fn map_invoice(r: InvoiceRow, items: Vec<InvoiceItem>) -> Invoice {
@@ -67,10 +72,7 @@ pub(crate) fn map_invoice(r: InvoiceRow, items: Vec<InvoiceItem>) -> Invoice {
     }
 }
 
-fn list_items(
-    conn: &mut SimpleConnection,
-    invoice_id: i32,
-) -> Result<Vec<InvoiceItem>, AppError> {
+fn list_items(conn: &mut SimpleConnection, invoice_id: i32) -> Result<Vec<InvoiceItem>, AppError> {
     let rows: Vec<(i32, String, i32, f64, f64)> = conn
         .query(
             "SELECT ID, DESCRIPTION, QUANTITY,
@@ -188,14 +190,19 @@ pub fn create(
             "INSERT INTO INVOICE_ITEMS
                 (ID, INVOICE_ID, DESCRIPTION, QUANTITY, UNIT_PRICE, LINE_TOTAL)
              VALUES (?, ?, ?, ?, ?, ?)",
-            (&item_id, &id, &it.description, &it.quantity, &it.unit_price, &line_total),
+            (
+                &item_id,
+                &id,
+                &it.description,
+                &it.quantity,
+                &it.unit_price,
+                &line_total,
+            ),
         )
         .map_err(AppError::from)?;
     }
 
-    get(conn, id)?.ok_or_else(|| {
-        AppError::Internal("Factura creada pero no recuperada".into())
-    })
+    get(conn, id)?.ok_or_else(|| AppError::Internal("Factura creada pero no recuperada".into()))
 }
 
 /// Listado de facturas con filtros opcionales por estado y búsqueda
@@ -246,17 +253,12 @@ pub fn list(
 }
 
 /// Cambia el estado de una factura: EMITIDA → PAGADA/ANULADA, PAGADA → ANULADA.
-pub fn set_status(
-    conn: &mut SimpleConnection,
-    id: i32,
-    status: &str,
-) -> Result<Invoice, AppError> {
+pub fn set_status(conn: &mut SimpleConnection, id: i32, status: &str) -> Result<Invoice, AppError> {
     let current: Option<(String,)> = conn
         .query_first("SELECT STATUS FROM INVOICES WHERE ID = ?", (&id,))
         .map_err(AppError::from)?;
-    let (current,) = current.ok_or_else(|| {
-        AppError::NotFound(format!("Factura {id} no encontrada"))
-    })?;
+    let (current,) =
+        current.ok_or_else(|| AppError::NotFound(format!("Factura {id} no encontrada")))?;
 
     let allowed = match status {
         "PAGADA" => current == "EMITIDA",
@@ -278,9 +280,8 @@ pub fn set_status(
     )
     .map_err(AppError::from)?;
 
-    get(conn, id)?.ok_or_else(|| {
-        AppError::Internal("Factura actualizada pero no recuperada".into())
-    })
+    get(conn, id)?
+        .ok_or_else(|| AppError::Internal("Factura actualizada pero no recuperada".into()))
 }
 
 #[cfg(test)]
@@ -290,32 +291,30 @@ mod tests {
     #[test]
     fn test_map_invoice_all_fields() {
         let row: InvoiceRow = (
-            1,                          // id
-            "FAC-000001".into(),       // invoice_number
-            Some(10),                   // patient_id
-            Some("Luna".into()),       // patient_name
-            100,                        // owner_id
-            "Juan Pérez".into(),       // owner_name
+            1,                              // id
+            "FAC-000001".into(),            // invoice_number
+            Some(10),                       // patient_id
+            Some("Luna".into()),            // patient_name
+            100,                            // owner_id
+            "Juan Pérez".into(),            // owner_name
             Some("+57 300 1234567".into()), // owner_phone
-            Some(5),                    // consultation_id
-            "2026-08-01 10:00:00".into(), // issue_date
-            150000.0,                   // subtotal
-            19.0,                       // tax_rate
-            28500.0,                    // tax_amount
-            178500.0,                   // total
-            "EMITIDA".into(),          // status
-            Some("EFECTIVO".into()),   // payment_method
-            Some("Pago completo".into()), // notes
+            Some(5),                        // consultation_id
+            "2026-08-01 10:00:00".into(),   // issue_date
+            150000.0,                       // subtotal
+            19.0,                           // tax_rate
+            28500.0,                        // tax_amount
+            178500.0,                       // total
+            "EMITIDA".into(),               // status
+            Some("EFECTIVO".into()),        // payment_method
+            Some("Pago completo".into()),   // notes
         );
-        let items = vec![
-            InvoiceItem {
-                id: 1,
-                description: "Consulta general".into(),
-                quantity: 1,
-                unit_price: 150000.0,
-                line_total: 150000.0,
-            },
-        ];
+        let items = vec![InvoiceItem {
+            id: 1,
+            description: "Consulta general".into(),
+            quantity: 1,
+            unit_price: 150000.0,
+            line_total: 150000.0,
+        }];
         let invoice = map_invoice(row, items);
 
         assert_eq!(invoice.id, 1);
@@ -341,11 +340,22 @@ mod tests {
     #[test]
     fn test_map_invoice_optional_fields_none() {
         let row: InvoiceRow = (
-            2, "FAC-000002".into(), None, None,
-            200, "María López".into(), None, None,
+            2,
+            "FAC-000002".into(),
+            None,
+            None,
+            200,
+            "María López".into(),
+            None,
+            None,
             "2026-08-02 14:00:00".into(),
-            0.0, 19.0, 0.0, 0.0,
-            "EMITIDA".into(), None, None,
+            0.0,
+            19.0,
+            0.0,
+            0.0,
+            "EMITIDA".into(),
+            None,
+            None,
         );
         let invoice = map_invoice(row, vec![]);
 
@@ -362,9 +372,15 @@ mod tests {
     #[test]
     fn test_invoice_list_item_row_mapping() {
         let row: InvoiceListItemRow = (
-            1, "FAC-000001".into(), "Juan Pérez".into(),
-            Some("Luna".into()), "2026-08-01 10:00:00".into(),
-            178500.0, "EMITIDA".into(), Some("EFECTIVO".into()), 3,
+            1,
+            "FAC-000001".into(),
+            "Juan Pérez".into(),
+            Some("Luna".into()),
+            "2026-08-01 10:00:00".into(),
+            178500.0,
+            "EMITIDA".into(),
+            Some("EFECTIVO".into()),
+            3,
         );
 
         assert_eq!(row.0, 1);
@@ -388,7 +404,8 @@ mod integration_tests {
             "INSERT INTO OWNERS (ID, DOCUMENT_TYPE, DOCUMENT_NUMBER, FULL_NAME)
              VALUES (1, 'CC', '1234567890', 'Juan Pérez')",
             (),
-        ).unwrap();
+        )
+        .unwrap();
         (conn, db_path)
     }
 

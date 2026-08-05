@@ -1,12 +1,12 @@
-use std::path::Path;
 use serde::{Deserialize, Serialize};
+use std::path::Path;
 
 use crate::models::owner::Owner;
 use crate::models::patient::Patient;
 use crate::models::vaccine::Vaccine;
 use crate::pdf_templates::builder::{
-    sanitize, save_pdf, truncate, CONTENT_W, C_HEADER_BG, C_MUTED, C_RULE, C_TEXT, MARGIN,
-    PAGE_H, PAGE_W, PdfBuilder,
+    sanitize, save_pdf, truncate, PdfBuilder, CONTENT_W, C_HEADER_BG, C_MUTED, C_RULE, C_TEXT,
+    MARGIN, PAGE_H, PAGE_W,
 };
 use crate::pdf_templates::header::{draw_header, ClinicHeader};
 use crate::pdf_templates::layout::{draw_footer, draw_grid, section_title};
@@ -45,18 +45,21 @@ pub fn generate_vacunacion(data: &VacunacionData, out_path: &Path) -> Result<(),
     );
 
     section_title(&mut pdf, "DATOS DEL CERTIFICADO");
-    draw_grid(&mut pdf, &[
-        ("No. certificado", data.certificate_number.clone()),
-        ("Fecha de emisión", data.issued_at.clone()),
-        (
-            "Médico veterinario",
-            if data.veterinarian.is_empty() {
-                "—".into()
-            } else {
-                data.veterinarian.clone()
-            },
-        ),
-    ]);
+    draw_grid(
+        &mut pdf,
+        &[
+            ("No. certificado", data.certificate_number.clone()),
+            ("Fecha de emisión", data.issued_at.clone()),
+            (
+                "Médico veterinario",
+                if data.veterinarian.is_empty() {
+                    "—".into()
+                } else {
+                    data.veterinarian.clone()
+                },
+            ),
+        ],
+    );
 
     let owner = data
         .owner
@@ -83,30 +86,40 @@ pub fn generate_vacunacion(data: &VacunacionData, out_path: &Path) -> Result<(),
         m => format!("{} años", m / 12),
     };
     section_title(&mut pdf, "PACIENTE");
-    draw_grid(&mut pdf, &[
-        ("Nombre", data.patient.name.clone()),
-        (
-            "Especie / Raza",
-            format!(
-                "{} · {}",
-                data.patient.species_name,
-                data.patient.breed_name.as_deref().unwrap_or("—")
+    draw_grid(
+        &mut pdf,
+        &[
+            ("Nombre", data.patient.name.clone()),
+            (
+                "Especie / Raza",
+                format!(
+                    "{} · {}",
+                    data.patient.species_name,
+                    data.patient.breed_name.as_deref().unwrap_or("—")
+                ),
             ),
-        ),
-        (
-            "Sexo",
-            if data.patient.sex == "M" {
-                "Macho".to_string()
-            } else {
-                "Hembra".to_string()
-            },
-        ),
-        ("Edad", edad),
-    ]);
+            (
+                "Sexo",
+                if data.patient.sex == "M" {
+                    "Macho".to_string()
+                } else {
+                    "Hembra".to_string()
+                },
+            ),
+            ("Edad", edad),
+        ],
+    );
 
     section_title(&mut pdf, "VACUNAS ADMINISTRADAS");
     if data.vaccines.is_empty() {
-        pdf.text(false, "Sin vacunas registradas.", 9.0, MARGIN, pdf.y, C_MUTED);
+        pdf.text(
+            false,
+            "Sin vacunas registradas.",
+            9.0,
+            MARGIN,
+            pdf.y,
+            C_MUTED,
+        );
         pdf.y -= 5.0;
     } else {
         let row_h = 6.2;
@@ -117,7 +130,14 @@ pub fn generate_vacunacion(data: &VacunacionData, out_path: &Path) -> Result<(),
             (34.0, "REFUERZO"),
             (28.0, "VETERINARIO"),
         ];
-        pdf.rect(MARGIN, pdf.y, CONTENT_W, row_h, Some(C_HEADER_BG), Some(C_RULE));
+        pdf.rect(
+            MARGIN,
+            pdf.y,
+            CONTENT_W,
+            row_h,
+            Some(C_HEADER_BG),
+            Some(C_RULE),
+        );
         let mut x = MARGIN + 2.0;
         for (w, label) in cols {
             pdf.text(true, label, 7.0, x, pdf.y - 1.6, C_TEXT);
@@ -129,13 +149,34 @@ pub fn generate_vacunacion(data: &VacunacionData, out_path: &Path) -> Result<(),
             pdf.ensure_space(row_h + 1.0);
             pdf.rect(MARGIN, pdf.y, CONTENT_W, row_h, None, Some(C_RULE));
             let mut x = MARGIN + 2.0;
-            pdf.text(false, &truncate(&v.vaccine_name, 20), 7.5, x, pdf.y - 1.6, C_TEXT);
+            pdf.text(
+                false,
+                &truncate(&v.vaccine_name, 20),
+                7.5,
+                x,
+                pdf.y - 1.6,
+                C_TEXT,
+            );
             x += cols[0].0;
             pdf.text(false, &v.administered_at, 7.0, x, pdf.y - 1.6, C_TEXT);
             x += cols[1].0;
-            pdf.text(false, v.lot.as_deref().unwrap_or("—"), 7.0, x, pdf.y - 1.6, C_TEXT);
+            pdf.text(
+                false,
+                v.lot.as_deref().unwrap_or("—"),
+                7.0,
+                x,
+                pdf.y - 1.6,
+                C_TEXT,
+            );
             x += cols[2].0;
-            pdf.text(false, v.next_dose_at.as_deref().unwrap_or("—"), 7.0, x, pdf.y - 1.6, C_TEXT);
+            pdf.text(
+                false,
+                v.next_dose_at.as_deref().unwrap_or("—"),
+                7.0,
+                x,
+                pdf.y - 1.6,
+                C_TEXT,
+            );
             x += cols[3].0;
             pdf.text(
                 false,
@@ -163,8 +204,22 @@ pub fn generate_vacunacion(data: &VacunacionData, out_path: &Path) -> Result<(),
             nv.vaccine_name,
             nv.next_dose_at.as_deref().unwrap_or("")
         );
-        pdf.rect(MARGIN, pdf.y, CONTENT_W, 10.0, Some(C_HEADER_BG), Some(C_RULE));
-        pdf.text(true, &sanitize(&label), 9.0, MARGIN + 4.0, pdf.y - 4.0, C_TEXT);
+        pdf.rect(
+            MARGIN,
+            pdf.y,
+            CONTENT_W,
+            10.0,
+            Some(C_HEADER_BG),
+            Some(C_RULE),
+        );
+        pdf.text(
+            true,
+            &sanitize(&label),
+            9.0,
+            MARGIN + 4.0,
+            pdf.y - 4.0,
+            C_TEXT,
+        );
         pdf.y -= 14.0;
     } else if !data.vaccines.is_empty() {
         pdf.text(
@@ -194,6 +249,9 @@ pub fn generate_vacunacion(data: &VacunacionData, out_path: &Path) -> Result<(),
     pdf.y -= 5.0;
     pdf.text(false, "Firma", 7.5, x, pdf.y, C_MUTED);
 
-    draw_footer(&mut pdf, &format!("Certificado {}", data.certificate_number));
+    draw_footer(
+        &mut pdf,
+        &format!("Certificado {}", data.certificate_number),
+    );
     save_pdf(pdf, out_path, "ISALAB · Certificado de vacunación")
 }

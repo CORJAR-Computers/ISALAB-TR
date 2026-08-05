@@ -34,10 +34,7 @@ pub fn list_species(state: State<'_, AppState>) -> Result<Vec<Species>, AppError
 
 #[tauri::command]
 #[specta::specta]
-pub fn list_breeds(
-    state: State<'_, AppState>,
-    species_id: i32,
-) -> Result<Vec<Breed>, AppError> {
+pub fn list_breeds(state: State<'_, AppState>, species_id: i32) -> Result<Vec<Breed>, AppError> {
     require_session(&state)?;
     let mut pooled = state.pool.acquire()?;
     let rows: Vec<BreedRow> = pooled
@@ -130,10 +127,10 @@ pub fn list_vaccine_types(state: State<'_, AppState>) -> Result<Vec<VaccineType>
 
 #[cfg(test)]
 mod tests {
-    use std::path::PathBuf;
     use super::*;
     use crate::test_helpers::*;
     use rsfbclient::SimpleConnection;
+    use std::path::PathBuf;
 
     fn setup() -> (SimpleConnection, PathBuf) {
         setup_test_db()
@@ -148,14 +145,14 @@ mod tests {
                 (),
             )
             .unwrap();
-        
+
         // Seed inserts 9 species
         assert!(rows.len() >= 9);
         // Check Canino exists
         assert!(rows.iter().any(|r| r.1 == "CAN" && r.2 == "Canino"));
         // Check Felino exists
         assert!(rows.iter().any(|r| r.1 == "FEL" && r.2 == "Felino"));
-        
+
         cleanup_test_db(&db_path);
     }
 
@@ -169,7 +166,7 @@ mod tests {
                 (),
             )
             .unwrap();
-        
+
         // Seed inserts multiple canino breeds
         assert!(rows.len() >= 10);
         // All should have species_id = 1
@@ -177,7 +174,7 @@ mod tests {
         // Check specific breeds exist
         assert!(rows.iter().any(|r| r.2 == "Labrador Retriever"));
         assert!(rows.iter().any(|r| r.2 == "Beagle"));
-        
+
         cleanup_test_db(&db_path);
     }
 
@@ -191,12 +188,12 @@ mod tests {
                 (),
             )
             .unwrap();
-        
+
         assert!(rows.len() >= 8);
         assert!(rows.iter().all(|r| r.1 == 2));
         assert!(rows.iter().any(|r| r.2 == "Siamés"));
         assert!(rows.iter().any(|r| r.2 == "Persa"));
-        
+
         cleanup_test_db(&db_path);
     }
 
@@ -210,7 +207,7 @@ mod tests {
                 (),
             )
             .unwrap();
-        
+
         assert!(rows.is_empty());
         cleanup_test_db(&db_path);
     }
@@ -224,13 +221,15 @@ mod tests {
                 (),
             )
             .unwrap();
-        
+
         // Seed inserts 10 sample types
         assert!(rows.len() >= 10);
-        assert!(rows.iter().any(|r| r.1 == "SANGRE" && r.2 == "Sangre total (EDTA)"));
+        assert!(rows
+            .iter()
+            .any(|r| r.1 == "SANGRE" && r.2 == "Sangre total (EDTA)"));
         assert!(rows.iter().any(|r| r.1 == "SUERO"));
         assert!(rows.iter().any(|r| r.1 == "ORINA"));
-        
+
         cleanup_test_db(&db_path);
     }
 
@@ -244,18 +243,22 @@ mod tests {
                 (),
             )
             .unwrap();
-        
+
         // Seed inserts 18 analytes
         assert!(rows.len() >= 18);
         // Check specific analytes
         assert!(rows.iter().any(|r| r.1 == "HCT" && r.2 == "Hematocrito"));
         assert!(rows.iter().any(|r| r.1 == "GLU" && r.2 == "Glucosa"));
         assert!(rows.iter().any(|r| r.1 == "CREA" && r.2 == "Creatinina"));
-        
+
         // Verify units exist
-        assert!(rows.iter().any(|r| r.1 == "HCT" && r.3.as_deref() == Some("%")));
-        assert!(rows.iter().any(|r| r.1 == "GLU" && r.3.as_deref() == Some("mg/dL")));
-        
+        assert!(rows
+            .iter()
+            .any(|r| r.1 == "HCT" && r.3.as_deref() == Some("%")));
+        assert!(rows
+            .iter()
+            .any(|r| r.1 == "GLU" && r.3.as_deref() == Some("mg/dL")));
+
         cleanup_test_db(&db_path);
     }
 
@@ -268,13 +271,13 @@ mod tests {
                 (),
             )
             .unwrap();
-        
+
         // Seed inserts 8 vaccine types
         assert!(rows.len() >= 8);
         assert!(rows.iter().any(|r| r.1 == "RABIA" && r.2 == "Rabia"));
         assert!(rows.iter().any(|r| r.1 == "POLI_CANINA"));
         assert!(rows.iter().any(|r| r.1 == "LEUCEMIA_FELINA"));
-        
+
         cleanup_test_db(&db_path);
     }
 
@@ -287,12 +290,17 @@ mod tests {
                 (),
             )
             .unwrap();
-        
+
         // Verify sorted alphabetically
         for window in rows.windows(2) {
-            assert!(window[0].2 <= window[1].2, "Species not sorted: {} > {}", window[0].2, window[1].2);
+            assert!(
+                window[0].2 <= window[1].2,
+                "Species not sorted: {} > {}",
+                window[0].2,
+                window[1].2
+            );
         }
-        
+
         cleanup_test_db(&db_path);
     }
 
@@ -306,12 +314,17 @@ mod tests {
                 (),
             )
             .unwrap();
-        
+
         // Verify sorted alphabetically
         for window in rows.windows(2) {
-            assert!(window[0].2 <= window[1].2, "Breeds not sorted: {} > {}", window[0].2, window[1].2);
+            assert!(
+                window[0].2 <= window[1].2,
+                "Breeds not sorted: {} > {}",
+                window[0].2,
+                window[1].2
+            );
         }
-        
+
         cleanup_test_db(&db_path);
     }
 
@@ -325,16 +338,20 @@ mod tests {
                 (),
             )
             .unwrap();
-        
+
         // All analytes should have code, name, and at least one of unit/method
         for row in &rows {
             assert!(!row.1.is_empty(), "Analyte {} has empty code", row.0);
             assert!(!row.2.is_empty(), "Analyte {} has empty name", row.0);
             // unit or method should exist
-            assert!(row.3.is_some() || row.4.is_some(), 
-                "Analyte {} ({}) has neither unit nor method", row.0, row.2);
+            assert!(
+                row.3.is_some() || row.4.is_some(),
+                "Analyte {} ({}) has neither unit nor method",
+                row.0,
+                row.2
+            );
         }
-        
+
         cleanup_test_db(&db_path);
     }
 }

@@ -2,9 +2,7 @@ use tauri::State;
 
 use crate::auth::{require_admin, require_session};
 use crate::error::AppError;
-use crate::models::auth::{
-    ChangePasswordInput, CreateUserInput, SessionUser, UserListItem,
-};
+use crate::models::auth::{ChangePasswordInput, CreateUserInput, SessionUser, UserListItem};
 use crate::repositories::auth as auth_repo;
 use crate::repositories::users;
 use crate::state::AppState;
@@ -37,8 +35,12 @@ pub fn create_user(
             Some(admin.id),
             &admin.username,
             "USER_CREATED",
-            Some(&format!("Usuario '{}' creado con rol {}", input.username, input.role)),
-        ).ok();
+            Some(&format!(
+                "Usuario '{}' creado con rol {}",
+                input.username, input.role
+            )),
+        )
+        .ok();
     }
 
     Ok(new_user)
@@ -70,7 +72,8 @@ pub fn change_password(
             &user.username,
             "PASSWORD_CHANGED",
             Some("Contraseña actualizada"),
-        ).ok();
+        )
+        .ok();
     }
 
     let mut guard = state

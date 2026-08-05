@@ -4,15 +4,7 @@ use rsfbclient::SimpleConnection;
 use crate::error::AppError;
 use crate::models::auth::{AuditLogEntry, SessionUser};
 
-type UserRow = (
-    i32,
-    String,
-    String,
-    String,
-    Option<String>,
-    bool,
-    bool,
-);
+type UserRow = (i32, String, String, String, Option<String>, bool, bool);
 
 type AuditLogRow = (i32, Option<i32>, String, String, Option<String>, String);
 
@@ -97,7 +89,7 @@ pub fn list_audit_log(
         "SELECT FIRST ? SKIP ?
             l.ID, l.USER_ID, l.USERNAME, l.ACTION, l.DETAILS,
             LEFT(CAST(l.CREATED_AT AS VARCHAR(60)), 19)
-         FROM USER_AUDIT_LOG l"
+         FROM USER_AUDIT_LOG l",
     );
     let mut conditions: Vec<String> = Vec::new();
 
@@ -153,9 +145,9 @@ pub fn list_audit_log(
 
 #[cfg(test)]
 mod tests {
-    use std::path::PathBuf;
     use super::*;
     use crate::test_helpers::*;
+    use std::path::PathBuf;
 
     fn setup() -> (SimpleConnection, PathBuf) {
         setup_test_db()
@@ -205,7 +197,8 @@ mod tests {
                 role: "VETERINARIO".to_string(),
                 initial_password: "password123".to_string(),
             },
-        ).unwrap();
+        )
+        .unwrap();
 
         let user = find_by_username(&mut conn, "vet_test").unwrap();
         assert!(user.is_some());
@@ -264,12 +257,27 @@ mod tests {
                 role: "VETERINARIO".to_string(),
                 initial_password: "password123".to_string(),
             },
-        ).unwrap();
+        )
+        .unwrap();
 
         // Log some audit entries
-        log_audit(&mut conn, Some(1), "admin", "LOGIN", Some("Inicio de sesión exitoso")).unwrap();
+        log_audit(
+            &mut conn,
+            Some(1),
+            "admin",
+            "LOGIN",
+            Some("Inicio de sesión exitoso"),
+        )
+        .unwrap();
         log_audit(&mut conn, Some(1), "admin", "LOGOUT", None).unwrap();
-        log_audit(&mut conn, Some(2), "vet1", "CREATE_PATIENT", Some("Paciente Luna creado")).unwrap();
+        log_audit(
+            &mut conn,
+            Some(2),
+            "vet1",
+            "CREATE_PATIENT",
+            Some("Paciente Luna creado"),
+        )
+        .unwrap();
 
         let entries = list_audit_log(&mut conn, 10, 0, None).unwrap();
         assert_eq!(entries.len(), 3);
@@ -279,7 +287,10 @@ mod tests {
         assert_eq!(entries[0].username, "vet1");
         assert_eq!(entries[1].action, "LOGOUT");
         assert_eq!(entries[2].action, "LOGIN");
-        assert_eq!(entries[2].details, Some("Inicio de sesión exitoso".to_string()));
+        assert_eq!(
+            entries[2].details,
+            Some("Inicio de sesión exitoso".to_string())
+        );
 
         cleanup_test_db(&db_path);
     }
@@ -324,7 +335,14 @@ mod tests {
     #[test]
     fn test_log_audit_with_null_user_id() {
         let (mut conn, db_path) = setup();
-        log_audit(&mut conn, None, "system", "SYSTEM_EVENT", Some("Evento del sistema")).unwrap();
+        log_audit(
+            &mut conn,
+            None,
+            "system",
+            "SYSTEM_EVENT",
+            Some("Evento del sistema"),
+        )
+        .unwrap();
 
         let entries = list_audit_log(&mut conn, 10, 0, None).unwrap();
         assert_eq!(entries.len(), 1);
@@ -346,7 +364,8 @@ mod tests {
                 role: "VETERINARIO".to_string(),
                 initial_password: "password123".to_string(),
             },
-        ).unwrap();
+        )
+        .unwrap();
         crate::repositories::users::create(
             &mut conn,
             &crate::models::auth::CreateUserInput {
@@ -355,9 +374,17 @@ mod tests {
                 role: "VETERINARIO".to_string(),
                 initial_password: "password123".to_string(),
             },
-        ).unwrap();
+        )
+        .unwrap();
 
-        log_audit(&mut conn, Some(2), "vet_alice", "LOGIN", Some("Alice login")).unwrap();
+        log_audit(
+            &mut conn,
+            Some(2),
+            "vet_alice",
+            "LOGIN",
+            Some("Alice login"),
+        )
+        .unwrap();
         log_audit(&mut conn, Some(3), "vet_bob", "LOGIN", Some("Bob login")).unwrap();
         log_audit(&mut conn, Some(2), "vet_alice", "LOGOUT", None).unwrap();
 
@@ -408,7 +435,8 @@ mod tests {
                 role: "AUXILIAR".to_string(),
                 initial_password: "password123".to_string(),
             },
-        ).unwrap();
+        )
+        .unwrap();
 
         log_audit(&mut conn, Some(1), "admin", "LOGIN", None).unwrap();
         log_audit(&mut conn, Some(2), "testuser", "LOGIN", None).unwrap();

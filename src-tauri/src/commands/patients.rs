@@ -20,10 +20,7 @@ pub fn list_patients(
 
 #[tauri::command]
 #[specta::specta]
-pub fn get_patient(
-    state: State<'_, AppState>,
-    id: i32,
-) -> Result<Option<Patient>, AppError> {
+pub fn get_patient(state: State<'_, AppState>, id: i32) -> Result<Option<Patient>, AppError> {
     require_session(&state)?;
     let mut pooled = state.pool.acquire()?;
     patient_repo::get(pooled.conn(), id)
@@ -76,4 +73,3 @@ pub fn get_patient_lab_trends(
     let mut pooled = state.pool.acquire()?;
     crate::repositories::samples::get_patient_lab_trends(pooled.conn(), patient_id, analyte_id)
 }
-

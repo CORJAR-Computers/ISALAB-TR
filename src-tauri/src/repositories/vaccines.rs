@@ -6,8 +6,17 @@ use crate::models::vaccine::{CreateVaccineInput, Vaccine, VaccineListItem};
 use crate::repositories::next_id;
 
 pub(crate) type VaccineListItemRow = (
-    i32, i32, String, String, String, String, String, Option<String>,
-    Option<String>, Option<String>, Option<String>,
+    i32,
+    i32,
+    String,
+    String,
+    String,
+    String,
+    String,
+    Option<String>,
+    Option<String>,
+    Option<String>,
+    Option<String>,
 );
 
 /// Columnas de una vacuna con el tipo y el veterinario unidos (ficha completa).
@@ -87,15 +96,10 @@ pub fn create(
 }
 
 /// Vacunas de un paciente (para el historial clínico).
-pub fn by_patient(
-    conn: &mut SimpleConnection,
-    patient_id: i32,
-) -> Result<Vec<Vaccine>, AppError> {
+pub fn by_patient(conn: &mut SimpleConnection, patient_id: i32) -> Result<Vec<Vaccine>, AppError> {
     let rows: Vec<VaccineRow> = conn
         .query(
-            &format!(
-                "{VACCINE_SELECT} WHERE v.PATIENT_ID = ? ORDER BY v.ADMINISTERED_AT DESC"
-            ),
+            &format!("{VACCINE_SELECT} WHERE v.PATIENT_ID = ? ORDER BY v.ADMINISTERED_AT DESC"),
             (&patient_id,),
         )
         .map_err(AppError::from)?;
@@ -197,16 +201,16 @@ mod tests {
     #[test]
     fn test_map_vaccine_all_fields() {
         let row: VaccineRow = (
-            1,                          // id
-            10,                         // patient_id
-            Some(1),                    // vaccine_type_id (Rabia)
-            "Rabia".into(),            // vaccine_name
-            Some("1 ml".into()),       // dose
-            "2026-08-01 10:00:00".into(), // administered_at
-            Some("2027-08-01".into()), // next_dose_at
-            Some("LOT-12345".into()),  // lot
-            Some("Zoetis".into()),     // manufacturer
-            Some("Dr. Ramos".into()),  // veterinarian_name
+            1,                             // id
+            10,                            // patient_id
+            Some(1),                       // vaccine_type_id (Rabia)
+            "Rabia".into(),                // vaccine_name
+            Some("1 ml".into()),           // dose
+            "2026-08-01 10:00:00".into(),  // administered_at
+            Some("2027-08-01".into()),     // next_dose_at
+            Some("LOT-12345".into()),      // lot
+            Some("Zoetis".into()),         // manufacturer
+            Some("Dr. Ramos".into()),      // veterinarian_name
             Some("Sin reacciones".into()), // notes
         );
         let vaccine = map_vaccine(row);
@@ -227,8 +231,17 @@ mod tests {
     #[test]
     fn test_map_vaccine_optional_fields_none() {
         let row: VaccineRow = (
-            2, 20, None, "Desparasitación".into(), None,
-            "2026-08-15 14:00:00".into(), None, None, None, None, None,
+            2,
+            20,
+            None,
+            "Desparasitación".into(),
+            None,
+            "2026-08-15 14:00:00".into(),
+            None,
+            None,
+            None,
+            None,
+            None,
         );
         let vaccine = map_vaccine(row);
 
@@ -245,10 +258,17 @@ mod tests {
     #[test]
     fn test_vaccine_list_item_row_mapping() {
         let row: VaccineListItemRow = (
-            1, 10, "Luna".into(), "Canino".into(), "Juan Pérez".into(),
-            "Rabia".into(), "2026-08-01 10:00:00".into(),
-            Some("2027-08-01".into()), Some("LOT-123".into()),
-            Some("Zoetis".into()), Some("Dr. Ramos".into()),
+            1,
+            10,
+            "Luna".into(),
+            "Canino".into(),
+            "Juan Pérez".into(),
+            "Rabia".into(),
+            "2026-08-01 10:00:00".into(),
+            Some("2027-08-01".into()),
+            Some("LOT-123".into()),
+            Some("Zoetis".into()),
+            Some("Dr. Ramos".into()),
         );
 
         assert_eq!(row.0, 1);
@@ -304,12 +324,14 @@ mod integration_tests {
             "INSERT INTO VACCINES (ID, PATIENT_ID, VACCINE_NAME, DOSE, ADMINISTERED_AT)
              VALUES (1, ?, 'Rabia', '1 ml', '2026-08-01 10:00:00')",
             (&patient_id,),
-        ).unwrap();
+        )
+        .unwrap();
         conn.execute(
             "INSERT INTO VACCINES (ID, PATIENT_ID, VACCINE_NAME, DOSE, ADMINISTERED_AT)
              VALUES (2, ?, 'Polivalente', '2 ml', '2026-07-01 10:00:00')",
             (&patient_id,),
-        ).unwrap();
+        )
+        .unwrap();
 
         let vaccines = by_patient(&mut conn, patient_id).unwrap();
         assert_eq!(vaccines.len(), 2);
@@ -329,7 +351,8 @@ mod integration_tests {
             "INSERT INTO VACCINES (ID, PATIENT_ID, VACCINE_NAME, ADMINISTERED_AT)
              VALUES (1, ?, 'Rabia', '2026-08-01 10:00:00')",
             (&patient_id,),
-        ).unwrap();
+        )
+        .unwrap();
 
         let vaccines = list(&mut conn, None).unwrap();
         assert_eq!(vaccines.len(), 1);

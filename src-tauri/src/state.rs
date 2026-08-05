@@ -98,13 +98,12 @@ impl AppState {
 
         match bootstrap(&db_path, &fbclient_path) {
             Ok((pool, schema_version)) => {
-                let listeners =
-                    crate::db::events::start_firebird_listeners(
-                        app.clone(),
-                        &db_path,
-                        &fbclient_path,
-                    )
-                    .unwrap_or_default();
+                let listeners = crate::db::events::start_firebird_listeners(
+                    app.clone(),
+                    &db_path,
+                    &fbclient_path,
+                )
+                .unwrap_or_default();
                 Self {
                     pool,
                     db_path,

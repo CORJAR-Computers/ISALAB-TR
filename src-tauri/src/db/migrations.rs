@@ -30,6 +30,14 @@ pub const MIGRATIONS: &[(&str, &str)] = &[
         "0006_patient_code",
         include_str!("../../migrations/0006_patient_code.sql"),
     ),
+    (
+        "0007_secondary_logos",
+        include_str!("../../migrations/0007_secondary_logos.sql"),
+    ),
+    (
+        "0008_patient_preferred_logo",
+        include_str!("../../migrations/0008_patient_preferred_logo.sql"),
+    ),
 ];
 
 /// Aplica las migraciones pendientes. Devuelve la versión de schema resultante.

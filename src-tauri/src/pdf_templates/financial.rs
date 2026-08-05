@@ -1,10 +1,10 @@
-use std::path::Path;
 use serde::{Deserialize, Serialize};
+use std::path::Path;
 
 use crate::models::invoice::Invoice;
 use crate::pdf_templates::builder::{
-    draw_multiline, format_cop, sanitize, save_pdf, text_right, truncate, CONTENT_W, C_HEADER_BG,
-    C_MUTED, C_RULE, C_TEXT, MARGIN, PAGE_W, PdfBuilder,
+    draw_multiline, format_cop, sanitize, save_pdf, text_right, truncate, PdfBuilder, CONTENT_W,
+    C_HEADER_BG, C_MUTED, C_RULE, C_TEXT, MARGIN, PAGE_W,
 };
 use crate::pdf_templates::header::{draw_header, ClinicHeader};
 use crate::pdf_templates::layout::{draw_footer, draw_grid, section_title};
@@ -48,21 +48,34 @@ pub fn generate_recibo(data: &ReciboData, out_path: &Path) -> Result<(), String>
     );
 
     section_title(&mut pdf, "DATOS DEL COMPROBANTE");
-    draw_grid(&mut pdf, &[
-        ("Fecha", inv.issue_date.clone()),
-        ("Cliente", inv.owner_name.clone()),
-        ("Paciente", inv.patient_name.clone().unwrap_or_else(|| "—".into())),
-        (
-            "Método de pago",
-            payment_method_label(inv.payment_method.as_deref()),
-        ),
-        ("Estado", invoice_status_label(&inv.status).to_string()),
-    ]);
+    draw_grid(
+        &mut pdf,
+        &[
+            ("Fecha", inv.issue_date.clone()),
+            ("Cliente", inv.owner_name.clone()),
+            (
+                "Paciente",
+                inv.patient_name.clone().unwrap_or_else(|| "—".into()),
+            ),
+            (
+                "Método de pago",
+                payment_method_label(inv.payment_method.as_deref()),
+            ),
+            ("Estado", invoice_status_label(&inv.status).to_string()),
+        ],
+    );
 
     section_title(&mut pdf, "CONCEPTOS FACTURADOS");
     let row_h = 6.2;
     let header_y = pdf.y - 1.6;
-    pdf.rect(MARGIN, pdf.y, CONTENT_W, row_h, Some(C_HEADER_BG), Some(C_RULE));
+    pdf.rect(
+        MARGIN,
+        pdf.y,
+        CONTENT_W,
+        row_h,
+        Some(C_HEADER_BG),
+        Some(C_RULE),
+    );
     pdf.text(true, "CONCEPTO", 7.5, MARGIN + 2.0, header_y, C_TEXT);
     text_right(
         &mut pdf,
@@ -122,7 +135,14 @@ pub fn generate_recibo(data: &ReciboData, out_path: &Path) -> Result<(), String>
         C_TEXT,
     );
     pdf.y -= 5.5;
-    pdf.text(false, &format!("IVA ({}%)", inv.tax_rate), 8.5, MARGIN + 95.0, pdf.y, C_MUTED);
+    pdf.text(
+        false,
+        &format!("IVA ({}%)", inv.tax_rate),
+        8.5,
+        MARGIN + 95.0,
+        pdf.y,
+        C_MUTED,
+    );
     let y = pdf.y;
     text_right(
         &mut pdf,

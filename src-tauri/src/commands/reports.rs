@@ -65,11 +65,7 @@ fn report_signature(s: &ClinicSettings, pkcs12_password: Option<String>) -> Repo
 
 /// Lee la contraseña PKCS#12 desde el estado en memoria.
 fn pkcs12_password_from(state: &AppState) -> Option<String> {
-    state
-        .pkcs12_password
-        .lock()
-        .ok()
-        .and_then(|g| g.clone())
+    state.pkcs12_password.lock().ok().and_then(|g| g.clone())
 }
 
 /// Firma criptográficamente un PDF ya generado si la clínica usa modo DIGITAL
@@ -177,9 +173,13 @@ pub fn generate_clinical_report(
     let dir = reports_dir(&app)?;
     let file_name = format!("{}-resultados.pdf", sample.code);
     let out_path = dir.join(&file_name);
-    crate::pdf_templates::generate_report(&data, &out_path)
-        .map_err(AppError::Internal)?;
-    apply_digital_signature(&state, &settings, &out_path, "Informe de resultados de laboratorio")?;
+    crate::pdf_templates::generate_report(&data, &out_path).map_err(AppError::Internal)?;
+    apply_digital_signature(
+        &state,
+        &settings,
+        &out_path,
+        "Informe de resultados de laboratorio",
+    )?;
 
     let generated_at = now_db(conn)?;
     Ok(ReportFile {
@@ -202,11 +202,13 @@ pub fn generate_formula_medica(
     let mut pooled = state.pool.acquire()?;
     let conn = pooled.conn();
 
-    let consultation = history_repo::get_consultation(conn, consultation_id)?.ok_or_else(|| {
-        AppError::NotFound(format!("Consulta {consultation_id} no encontrada"))
-    })?;
+    let consultation = history_repo::get_consultation(conn, consultation_id)?
+        .ok_or_else(|| AppError::NotFound(format!("Consulta {consultation_id} no encontrada")))?;
     let patient = patient_repo::get(conn, consultation.patient_id)?.ok_or_else(|| {
-        AppError::NotFound(format!("Paciente {} no encontrado", consultation.patient_id))
+        AppError::NotFound(format!(
+            "Paciente {} no encontrado",
+            consultation.patient_id
+        ))
     })?;
     let owner = patient_repo::get_owner(conn, patient.owner_id)?;
     let settings = settings_repo::get(conn)?;
@@ -249,9 +251,8 @@ pub fn generate_consentimiento(
     let mut pooled = state.pool.acquire()?;
     let conn = pooled.conn();
 
-    let surgery = surgeries_repo::get(conn, surgery_id)?.ok_or_else(|| {
-        AppError::NotFound(format!("Cirugía {surgery_id} no encontrada"))
-    })?;
+    let surgery = surgeries_repo::get(conn, surgery_id)?
+        .ok_or_else(|| AppError::NotFound(format!("Cirugía {surgery_id} no encontrada")))?;
     if surgery.status == "CANCELADA" {
         return Err(AppError::Validation(
             "No se puede generar el consentimiento de una cirugía cancelada".into(),
@@ -301,9 +302,8 @@ pub fn generate_recibo_invoice(
     let mut pooled = state.pool.acquire()?;
     let conn = pooled.conn();
 
-    let invoice = invoices_repo::get(conn, invoice_id)?.ok_or_else(|| {
-        AppError::NotFound(format!("Factura {invoice_id} no encontrada"))
-    })?;
+    let invoice = invoices_repo::get(conn, invoice_id)?
+        .ok_or_else(|| AppError::NotFound(format!("Factura {invoice_id} no encontrada")))?;
     if invoice.status == "ANULADA" {
         return Err(AppError::Validation(
             "No se puede generar el recibo de una factura anulada".into(),
@@ -342,9 +342,8 @@ pub fn generate_certificado_cirugia(
     let mut pooled = state.pool.acquire()?;
     let conn = pooled.conn();
 
-    let surgery = surgeries_repo::get(conn, surgery_id)?.ok_or_else(|| {
-        AppError::NotFound(format!("Cirugía {surgery_id} no encontrada"))
-    })?;
+    let surgery = surgeries_repo::get(conn, surgery_id)?
+        .ok_or_else(|| AppError::NotFound(format!("Cirugía {surgery_id} no encontrada")))?;
     let patient = patient_repo::get(conn, surgery.patient_id)?.ok_or_else(|| {
         AppError::NotFound(format!("Paciente {} no encontrado", surgery.patient_id))
     })?;
@@ -386,9 +385,8 @@ pub fn generate_carnet_vacunacion(
     let mut pooled = state.pool.acquire()?;
     let conn = pooled.conn();
 
-    let patient = patient_repo::get(conn, patient_id)?.ok_or_else(|| {
-        AppError::NotFound(format!("Paciente {patient_id} no encontrado"))
-    })?;
+    let patient = patient_repo::get(conn, patient_id)?
+        .ok_or_else(|| AppError::NotFound(format!("Paciente {patient_id} no encontrado")))?;
     let owner = patient_repo::get_owner(conn, patient.owner_id)?;
     let vaccines = vaccines_repo::by_patient(conn, patient_id)?;
     if vaccines.is_empty() {
@@ -446,11 +444,7 @@ pub fn list_reports(
         let reference = file_name
             .strip_suffix("-resultados.pdf")
             .map(|s| s.to_string())
-            .or_else(|| {
-                file_name
-                    .strip_suffix(".pdf")
-                    .map(|s| s.to_string())
-            })
+            .or_else(|| file_name.strip_suffix(".pdf").map(|s| s.to_string()))
             .unwrap_or_else(|| file_name.clone());
         let generated_at = entry
             .metadata()
@@ -472,7 +466,9 @@ pub fn list_reports(
 
     // Orden estable: fecha desc (formato YYYY-MM-DD HH:MM:SS ordenable).
     reports.sort_by(|a, b| {
-        b.generated_at.cmp(&a.generated_at).then_with(|| b.file_name.cmp(&a.file_name))
+        b.generated_at
+            .cmp(&a.generated_at)
+            .then_with(|| b.file_name.cmp(&a.file_name))
     });
     Ok(reports)
 }

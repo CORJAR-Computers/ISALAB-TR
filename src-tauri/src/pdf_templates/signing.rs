@@ -57,18 +57,13 @@ fn fmt_date(secs: u64) -> String {
 /// Valida un archivo PKCS#12 descifrándolo con la contraseña y extrayendo
 /// los metadatos reales del certificado (titular, emisor, vigencia, serie).
 pub fn validate_pkcs12(p12_path: &Path, password: &str) -> Result<ValidationReport, AppError> {
-    let data = std::fs::read(p12_path).map_err(|e| {
-        AppError::Validation(format!(
-            "No se pudo leer el archivo PKCS#12: {e}"
-        ))
-    })?;
+    let data = std::fs::read(p12_path)
+        .map_err(|e| AppError::Validation(format!("No se pudo leer el archivo PKCS#12: {e}")))?;
 
     // El parseo descifra el contenedor: si la contraseña es incorrecta,
     // `from_pkcs12` falla. Es la validación real del certificado.
     let ks = p12_keystore::KeyStore::from_pkcs12(&data, password).map_err(|e| {
-        AppError::Validation(format!(
-            "PKCS#12 inválido o contraseña incorrecta: {e}"
-        ))
+        AppError::Validation(format!("PKCS#12 inválido o contraseña incorrecta: {e}"))
     })?;
 
     let (_, chain) = ks.private_key_chain().ok_or_else(|| {
@@ -77,20 +72,13 @@ pub fn validate_pkcs12(p12_path: &Path, password: &str) -> Result<ValidationRepo
         )
     })?;
 
-    let leaf = chain
-        .chain()
-        .first()
-        .ok_or_else(|| {
-            AppError::Validation(
-                "El archivo PKCS#12 no contiene certificados".into(),
-            )
-        })?;
+    let leaf = chain.chain().first().ok_or_else(|| {
+        AppError::Validation("El archivo PKCS#12 no contiene certificados".into())
+    })?;
 
     // Extrae metadatos X.509 del certificado (leaf).
     let cert = Certificate::from_der(leaf.as_der()).map_err(|e| {
-        AppError::Validation(format!(
-            "No se pudo interpretar el certificado X.509: {e}"
-        ))
+        AppError::Validation(format!("No se pudo interpretar el certificado X.509: {e}"))
     })?;
 
     let tbs = &cert.tbs_certificate;
@@ -158,17 +146,15 @@ pub fn sign_pdf_with_pkcs12(
         pades_level: pdf_signer::PadesLevel::Bb,
     };
 
-    pdf_signer::sign_pdf_file(input, output, keystore, password, &opts).map_err(|e| {
-        AppError::Internal(format!("No se pudo firmar el PDF: {e}"))
-    })
+    pdf_signer::sign_pdf_file(input, output, keystore, password, &opts)
+        .map_err(|e| AppError::Internal(format!("No se pudo firmar el PDF: {e}")))
 }
 
 /// Verifica las firmas de un PDF ya firmado y devuelve una línea legible por
 /// firma (estado + firmante). Útil para validar un PDF recién generado.
 pub fn verify_signed_pdf(path: &Path) -> Result<Vec<String>, AppError> {
-    let report = pdf_signer::verify_pdf_file(path).map_err(|e| {
-        AppError::Internal(format!("No se pudo verificar la firma: {e}"))
-    })?;
+    let report = pdf_signer::verify_pdf_file(path)
+        .map_err(|e| AppError::Internal(format!("No se pudo verificar la firma: {e}")))?;
 
     Ok(report
         .signatures
@@ -197,7 +183,10 @@ pub fn signature_block_lines(info: &Pkcs12Info) -> Vec<String> {
     }
 
     lines.push(format!("Emisor: {}", info.issuer));
-    lines.push(format!("Vigencia: {} al {}", info.valid_from, info.valid_to));
+    lines.push(format!(
+        "Vigencia: {} al {}",
+        info.valid_from, info.valid_to
+    ));
 
     if let Some(ref serial) = info.serial_number {
         lines.push(format!("Serie: {serial}"));
@@ -223,10 +212,7 @@ mod tests {
     /// Crea un archivo PKCS#12 autofirmado de prueba (testkit de pdf_signer).
     fn temp_p12(password: &str) -> std::path::PathBuf {
         let bytes = pdf_signer::testkit::self_signed_p12(password);
-        let path = std::env::temp_dir().join(format!(
-            "isalab-test-{}.p12",
-            std::process::id()
-        ));
+        let path = std::env::temp_dir().join(format!("isalab-test-{}.p12", std::process::id()));
         std::fs::write(&path, bytes).unwrap();
         path
     }
@@ -275,8 +261,15 @@ mod tests {
         let p12 = temp_p12("sign-pass");
         std::fs::write(&input, &pdf).unwrap();
 
-        sign_pdf_with_pkcs12(&input, &output, &p12, "sign-pass", "Dra. Ana Pérez", "Informe de laboratorio")
-            .unwrap();
+        sign_pdf_with_pkcs12(
+            &input,
+            &output,
+            &p12,
+            "sign-pass",
+            "Dra. Ana Pérez",
+            "Informe de laboratorio",
+        )
+        .unwrap();
 
         let lines = verify_signed_pdf(&output).unwrap();
         assert!(!lines.is_empty());

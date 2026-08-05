@@ -34,10 +34,7 @@ pub fn list_invoices(
 /// Ficha completa de una factura (con items).
 #[tauri::command]
 #[specta::specta]
-pub fn get_invoice(
-    state: State<'_, AppState>,
-    id: i32,
-) -> Result<Option<Invoice>, AppError> {
+pub fn get_invoice(state: State<'_, AppState>, id: i32) -> Result<Option<Invoice>, AppError> {
     require_session(&state)?;
     let mut pooled = state.pool.acquire()?;
     invoices_repo::get(pooled.conn(), id)

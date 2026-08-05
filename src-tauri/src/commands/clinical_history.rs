@@ -3,9 +3,7 @@ use tauri::State;
 use crate::auth::{require_session, require_vet_or_admin};
 use crate::error::AppError;
 use crate::models::clinical_history::ClinicalHistory;
-use crate::models::consultation::{
-    Consultation, ConsultationListItem, CreateConsultationInput,
-};
+use crate::models::consultation::{Consultation, ConsultationListItem, CreateConsultationInput};
 use crate::repositories::clinical_history as history_repo;
 use crate::state::AppState;
 

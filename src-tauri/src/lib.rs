@@ -17,6 +17,7 @@ use specta_typescript::Typescript;
 use tauri::Manager;
 use tauri_specta::{collect_commands, Builder};
 
+use crate::commands::ai::{interpret_lab_results, test_groq_connection};
 use crate::commands::auth::{get_session, list_audit_log, login, logout};
 use crate::commands::catalog::{
     list_analytes, list_breeds, list_sample_types, list_species, list_vaccine_types,
@@ -25,12 +26,11 @@ use crate::commands::clinical_history::{
     create_consultation, get_clinical_history, list_consultations, set_consultation_status,
 };
 use crate::commands::dashboard::get_dashboard_stats;
-use crate::commands::db::{db_health, create_local_backup};
-use crate::commands::invoices::{
-    create_invoice, get_invoice, list_invoices, set_invoice_status,
-};
+use crate::commands::db::{create_local_backup, db_health};
+use crate::commands::invoices::{create_invoice, get_invoice, list_invoices, set_invoice_status};
 use crate::commands::patients::{
-    create_patient, get_patient, get_patient_by_code, get_patient_lab_trends, list_owners, list_patients,
+    create_patient, get_patient, get_patient_by_code, get_patient_lab_trends, list_owners,
+    list_patients,
 };
 use crate::commands::reports::{
     generate_carnet_vacunacion, generate_certificado_cirugia, generate_clinical_report,
@@ -41,13 +41,12 @@ use crate::commands::samples::{
     create_sample, get_sample, list_samples, register_lab_result, set_sample_status,
 };
 use crate::commands::settings::{
-    get_clinic_settings, import_clinic_logo, import_pkcs12, save_clinic_settings,
-    list_secondary_logos, import_secondary_logo, delete_secondary_logo,
+    delete_secondary_logo, get_clinic_settings, import_clinic_logo, import_pkcs12,
+    import_secondary_logo, list_secondary_logos, save_clinic_settings,
 };
 use crate::commands::surgeries::{create_surgery, list_surgeries, set_surgery_status};
 use crate::commands::users::{change_password, create_user, list_users};
 use crate::commands::vaccines::{create_vaccine, list_vaccines};
-use crate::commands::ai::{interpret_lab_results, test_groq_connection};
 use crate::state::AppState;
 
 fn specta_builder() -> Builder<tauri::Wry> {

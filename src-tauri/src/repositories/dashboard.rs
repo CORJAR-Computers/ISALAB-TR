@@ -4,10 +4,20 @@ use rsfbclient::SimpleConnection;
 use crate::error::AppError;
 use crate::models::consultation::ConsultationListItem;
 use crate::models::dashboard::DashboardStats;
-use crate::repositories::{samples as samples_repo, surgeries as surgeries_repo, vaccines as vaccines_repo};
+use crate::repositories::{
+    samples as samples_repo, surgeries as surgeries_repo, vaccines as vaccines_repo,
+};
 
 type ConsultationListItemRow = (
-    i32, i32, String, String, String, String, String, String, Option<String>,
+    i32,
+    i32,
+    String,
+    String,
+    String,
+    String,
+    String,
+    String,
+    Option<String>,
 );
 
 fn count(conn: &mut SimpleConnection, sql: &str) -> Result<i32, AppError> {
@@ -27,10 +37,7 @@ fn count_where(conn: &mut SimpleConnection, sql: &str, p: &str) -> Result<i32, A
 /// Métricas del panel de control y listas de la agenda.
 pub fn get_stats(conn: &mut SimpleConnection) -> Result<DashboardStats, AppError> {
     let patients_total = count(conn, "SELECT COUNT(*) FROM PATIENTS")?;
-    let patients_active = count(
-        conn,
-        "SELECT COUNT(*) FROM PATIENTS WHERE ACTIVE = TRUE",
-    )?;
+    let patients_active = count(conn, "SELECT COUNT(*) FROM PATIENTS WHERE ACTIVE = TRUE")?;
     let samples_total = count(conn, "SELECT COUNT(*) FROM SAMPLES")?;
     let samples_in_progress = count_where(
         conn,
@@ -142,9 +149,9 @@ pub fn list_upcoming_consultations(
 
 #[cfg(test)]
 mod tests {
-    use std::path::PathBuf;
     use super::*;
     use crate::test_helpers::*;
+    use std::path::PathBuf;
 
     fn setup() -> (SimpleConnection, PathBuf) {
         setup_test_db()
@@ -198,7 +205,8 @@ mod tests {
             "INSERT INTO CONSULTATIONS (ID, PATIENT_ID, CONSULTATION_DATE, REASON, STATUS)
              VALUES (1, ?, CURRENT_TIMESTAMP, 'Consulta de prueba', 'PENDIENTE')",
             (&patient_id,),
-        ).unwrap();
+        )
+        .unwrap();
 
         let stats = get_stats(&mut conn).unwrap();
         assert_eq!(stats.consultations_pending, 1);
@@ -217,17 +225,20 @@ mod tests {
             "INSERT INTO SAMPLES (ID, PATIENT_ID, SAMPLE_TYPE_ID, RECEIVED_AT, STATUS)
              VALUES (1, ?, 1, CURRENT_TIMESTAMP, 'RECIBIDA')",
             (&patient_id,),
-        ).unwrap();
+        )
+        .unwrap();
         conn.execute(
             "INSERT INTO SAMPLES (ID, PATIENT_ID, SAMPLE_TYPE_ID, RECEIVED_AT, STATUS)
              VALUES (2, ?, 1, CURRENT_TIMESTAMP, 'EN_PROCESO')",
             (&patient_id,),
-        ).unwrap();
+        )
+        .unwrap();
         conn.execute(
             "INSERT INTO SAMPLES (ID, PATIENT_ID, SAMPLE_TYPE_ID, RECEIVED_AT, STATUS)
              VALUES (3, ?, 1, CURRENT_TIMESTAMP, 'FINALIZADA')",
             (&patient_id,),
-        ).unwrap();
+        )
+        .unwrap();
 
         let stats = get_stats(&mut conn).unwrap();
         assert_eq!(stats.samples_total, 3);
@@ -246,7 +257,8 @@ mod tests {
             "INSERT INTO SURGERIES (ID, PATIENT_ID, SURGERY_TYPE, SCHEDULED_AT, STATUS)
              VALUES (1, ?, 'Castración', CURRENT_TIMESTAMP, 'PROGRAMADA')",
             (&patient_id,),
-        ).unwrap();
+        )
+        .unwrap();
 
         let stats = get_stats(&mut conn).unwrap();
         assert_eq!(stats.surgeries_programmed, 1);
@@ -264,14 +276,16 @@ mod tests {
             "INSERT INTO INVOICES (ID, OWNER_ID, INVOICE_NUMBER, ISSUE_DATE, TOTAL, STATUS)
              VALUES (1, 1, 'FAC-0001', CURRENT_TIMESTAMP, 100000, 'EMITIDA')",
             (),
-        ).unwrap();
+        )
+        .unwrap();
 
         // Create paid invoice
         conn.execute(
             "INSERT INTO INVOICES (ID, OWNER_ID, INVOICE_NUMBER, ISSUE_DATE, TOTAL, STATUS)
              VALUES (2, 1, 'FAC-0002', CURRENT_TIMESTAMP, 200000, 'PAGADA')",
             (),
-        ).unwrap();
+        )
+        .unwrap();
 
         let stats = get_stats(&mut conn).unwrap();
         assert_eq!(stats.invoices_unpaid, 1);
@@ -298,7 +312,8 @@ mod tests {
             "INSERT INTO CONSULTATIONS (ID, PATIENT_ID, CONSULTATION_DATE, REASON, STATUS)
              VALUES (1, ?, DATEADD(1 DAY TO CURRENT_TIMESTAMP), 'Consulta futura', 'PENDIENTE')",
             (&patient_id,),
-        ).unwrap();
+        )
+        .unwrap();
 
         let consultations = list_upcoming_consultations(&mut conn, 5).unwrap();
         assert_eq!(consultations.len(), 1);
@@ -318,7 +333,8 @@ mod tests {
             "INSERT INTO CONSULTATIONS (ID, PATIENT_ID, CONSULTATION_DATE, REASON, STATUS)
              VALUES (1, ?, DATEADD(-1 DAY TO CURRENT_TIMESTAMP), 'Consulta pasada', 'PENDIENTE')",
             (&patient_id,),
-        ).unwrap();
+        )
+        .unwrap();
 
         let consultations = list_upcoming_consultations(&mut conn, 5).unwrap();
         assert!(consultations.is_empty());
@@ -354,8 +370,9 @@ mod tests {
             conn.execute(
                 "INSERT INTO CONSULTATIONS (ID, PATIENT_ID, CONSULTATION_DATE, REASON, STATUS)
                  VALUES (?, ?, DATEADD(? DAY TO CURRENT_TIMESTAMP), ?, 'PENDIENTE')",
-                (&i, &patient_id, &(i as i32), &format!("Consulta {}", i)),
-            ).unwrap();
+                (&i, &patient_id, &i, &format!("Consulta {}", i)),
+            )
+            .unwrap();
         }
 
         // Request only 2

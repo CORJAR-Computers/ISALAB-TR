@@ -1,15 +1,13 @@
 use std::path::Path;
 
 use printpdf::{
-    BuiltinFont, Color, Line, LinePoint, Mm, Op, PaintMode, PdfDocument, PdfFontHandle,
-    PdfPage, PdfSaveOptions, Point, Polygon, PolygonRing, Pt, RawImage, Rgb,
-    TextItem, WindingOrder, XObject, XObjectId,
+    BuiltinFont, Color, Line, LinePoint, Mm, Op, PaintMode, PdfDocument, PdfFontHandle, PdfPage,
+    PdfSaveOptions, Point, Polygon, PolygonRing, Pt, RawImage, Rgb, TextItem, WindingOrder,
+    XObject, XObjectId,
 };
 
-use crate::pdf_templates::header::{
-    LEFT_LOGO_XOBJECT, RIGHT_LOGO_XOBJECT, WATERMARK_LOGO_XOBJECT,
-};
 pub use crate::pdf_templates::header::LOGO_W_MM;
+use crate::pdf_templates::header::{LEFT_LOGO_XOBJECT, RIGHT_LOGO_XOBJECT, WATERMARK_LOGO_XOBJECT};
 
 /// Ancho/alto Carta (US Letter: 8.5" x 11" = 215.9mm x 279.4mm) y márgenes (mm).
 /// printpdf usa el origen en la esquina inferior izquierda (y crece hacia arriba).
@@ -160,12 +158,20 @@ impl PdfBuilder {
         self.ops.push(Op::SetLineHeight {
             lh: Pt(size_pt * 1.2),
         });
-        self.ops
-            .push(Op::ShowText { items: vec![TextItem::Text(sanitize(text))] });
+        self.ops.push(Op::ShowText {
+            items: vec![TextItem::Text(sanitize(text))],
+        });
         self.ops.push(Op::EndTextSection);
     }
 
-    pub fn text_centered(&mut self, bold: bool, text: &str, size_pt: f32, y_mm: f32, color: (u8, u8, u8)) {
+    pub fn text_centered(
+        &mut self,
+        bold: bool,
+        text: &str,
+        size_pt: f32,
+        y_mm: f32,
+        color: (u8, u8, u8),
+    ) {
         let w = text_width_mm(text, size_pt);
         self.text(bold, text, size_pt, (PAGE_W - w) / 2.0, y_mm, color);
     }
@@ -270,12 +276,8 @@ pub fn save_pdf(mut pdf: PdfBuilder, out_path: &Path, doc_title: &str) -> Result
         .with_pages(pdf.finish())
         .save(&PdfSaveOptions::default(), &mut Vec::new());
 
-    std::fs::write(out_path, bytes).map_err(|e| {
-        format!(
-            "No se pudo crear el PDF en {}: {e}",
-            out_path.display()
-        )
-    })?;
+    std::fs::write(out_path, bytes)
+        .map_err(|e| format!("No se pudo crear el PDF en {}: {e}", out_path.display()))?;
     Ok(())
 }
 

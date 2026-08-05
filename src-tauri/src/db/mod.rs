@@ -32,9 +32,7 @@ impl DbPool {
             .lock()
             .map_err(|_| AppError::Db("Pool de conexiones bloqueado".into()))?;
         let conn = q.pop_front().ok_or_else(|| {
-            AppError::Db(
-                "Sin conexiones Firebird disponibles (motor no inicializado)".into(),
-            )
+            AppError::Db("Sin conexiones Firebird disponibles (motor no inicializado)".into())
         })?;
         Ok(PooledConn {
             pool: self.clone(),

@@ -32,10 +32,10 @@ pub fn register_lab_result(
     require_vet_or_admin(&state)?;
     let mut pooled = state.pool.acquire()?;
     let result = history_repo::register_lab_result(pooled.conn(), &input)?;
-    
+
     // Invalidar cache de IA cuando se actualizan resultados
     state.ai_cache.invalidate(input.sample_id);
-    
+
     Ok(result)
 }
 
@@ -56,10 +56,7 @@ pub fn list_samples(
 /// Ficha completa de una muestra (con resultados) para el detalle del lab.
 #[tauri::command]
 #[specta::specta]
-pub fn get_sample(
-    state: State<'_, AppState>,
-    id: i32,
-) -> Result<Option<Sample>, AppError> {
+pub fn get_sample(state: State<'_, AppState>, id: i32) -> Result<Option<Sample>, AppError> {
     require_session(&state)?;
     let mut pooled = state.pool.acquire()?;
     samples_repo::get(pooled.conn(), id)

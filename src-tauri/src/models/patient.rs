@@ -47,4 +47,3 @@ pub struct CreatePatientInput {
     pub microchip: Option<String>,
     pub notes: Option<String>,
 }
-

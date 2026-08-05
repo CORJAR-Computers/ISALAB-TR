@@ -137,12 +137,11 @@ pub fn change_password(
         )
         .map_err(AppError::from)?;
 
-    let (id, username, full_name, role, hash) = row
-        .ok_or_else(|| AppError::NotFound("Usuario no encontrado".into()))?;
+    let (id, username, full_name, role, hash) =
+        row.ok_or_else(|| AppError::NotFound("Usuario no encontrado".into()))?;
 
-    let hash = hash.ok_or_else(|| {
-        AppError::Validation("Usuario sin contraseña configurada".into())
-    })?;
+    let hash =
+        hash.ok_or_else(|| AppError::Validation("Usuario sin contraseña configurada".into()))?;
     if !auth::verify_password(current_password, &hash)? {
         return Err(AppError::Validation(
             "La contraseña actual no es correcta".into(),
@@ -170,9 +169,9 @@ pub fn change_password(
 
 #[cfg(test)]
 mod tests {
-    use std::path::PathBuf;
     use super::*;
     use crate::test_helpers::*;
+    use std::path::PathBuf;
 
     fn setup() -> (SimpleConnection, PathBuf) {
         setup_test_db()
@@ -381,10 +380,7 @@ mod tests {
 
         // Verify can login with new password (by checking hash)
         let row: Option<(Option<String>,)> = conn
-            .query_first(
-                "SELECT PASSWORD_HASH FROM USERS WHERE ID = ?",
-                (&user.id,),
-            )
+            .query_first("SELECT PASSWORD_HASH FROM USERS WHERE ID = ?", (&user.id,))
             .unwrap();
         let hash = row.unwrap().0.unwrap();
         assert!(auth::verify_password("newpass456", &hash).unwrap());

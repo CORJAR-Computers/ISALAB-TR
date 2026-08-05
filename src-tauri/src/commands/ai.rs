@@ -35,7 +35,11 @@ fn species_specific_note(species_name: &str) -> &'static str {
         "Considera el estado de hidratación y la relación urea/creatinina al interpretar la azotemia, y que la bilirrubina y GGT se afectan por ayuno y ejercicio."
     } else if name.contains("bovino") || name.contains("vaca") {
         "Considera el estado de hidratación y que la hipocalcemia/hipomagnesemia son alteraciones frecuentes en el periparto; la relación urea/creatinina orienta causas prerrenales vs. renales."
-    } else if name.contains("ovino") || name.contains("caprino") || name.contains("oveja") || name.contains("cabra") {
+    } else if name.contains("ovino")
+        || name.contains("caprino")
+        || name.contains("oveja")
+        || name.contains("cabra")
+    {
         "Considera que la anemia y la hipoproteinemia frecuentemente reflejan parasitismo gastrointestinal; valora la carga parasitaria y el estado nutricional al interpretar los resultados."
     } else {
         "No se dispone de particularidades específicas para esta especie; basa la interpretación en los rangos de referencia mostrados y en la literatura general."
@@ -65,17 +69,31 @@ pub(crate) fn build_interpretation_prompt(
     prompt.push_str("## Paciente\n");
     prompt.push_str(&format!("- **Código**: {}\n", patient.code));
     prompt.push_str(&format!("- **Nombre**: {}\n", patient.name));
-    prompt.push_str(&format!("- **Especie/Raza**: {} / {}\n", 
-        patient.species_name, 
+    prompt.push_str(&format!(
+        "- **Especie/Raza**: {} / {}\n",
+        patient.species_name,
         patient.breed_name.as_deref().unwrap_or("No especificada")
     ));
-    prompt.push_str(&format!("- **Edad**: {} meses ({})\n", 
+    prompt.push_str(&format!(
+        "- **Edad**: {} meses ({})\n",
         patient.age_months,
-        patient.birth_date.as_deref().unwrap_or("fecha de nacimiento desconocida")
+        patient
+            .birth_date
+            .as_deref()
+            .unwrap_or("fecha de nacimiento desconocida")
     ));
-    prompt.push_str(&format!("- **Sexo**: {}{}\n", 
-        if patient.sex == "M" { "Macho" } else { "Hembra" },
-        if patient.neutered { " (castrado/a)" } else { "" }
+    prompt.push_str(&format!(
+        "- **Sexo**: {}{}\n",
+        if patient.sex == "M" {
+            "Macho"
+        } else {
+            "Hembra"
+        },
+        if patient.neutered {
+            " (castrado/a)"
+        } else {
+            ""
+        }
     ));
     if let Some(color) = &patient.color {
         prompt.push_str(&format!("- **Color**: {}\n", color));
@@ -89,12 +107,18 @@ pub(crate) fn build_interpretation_prompt(
 
     // Consideración fisiopatológica por especie
     prompt.push_str("## Consideración por especie\n");
-    prompt.push_str(&format!("- {}\n\n", species_specific_note(&patient.species_name)));
+    prompt.push_str(&format!(
+        "- {}\n\n",
+        species_specific_note(&patient.species_name)
+    ));
 
     // Información de la muestra
     prompt.push_str("## Muestra\n");
     prompt.push_str(&format!("- **Tipo**: {}\n", sample.sample_type_name));
-    prompt.push_str(&format!("- **Fecha de recepción**: {}\n", sample.received_at));
+    prompt.push_str(&format!(
+        "- **Fecha de recepción**: {}\n",
+        sample.received_at
+    ));
     if let Some(collector) = &sample.collected_by {
         prompt.push_str(&format!("- **Recogida por**: {}\n", collector));
     }
@@ -113,9 +137,7 @@ pub(crate) fn build_interpretation_prompt(
             for c in ctx.recent_consultations.iter().take(3) {
                 prompt.push_str(&format!(
                     "- **{}** ({}): {}\n",
-                    c.consultation_date,
-                    c.status,
-                    c.reason
+                    c.consultation_date, c.status, c.reason
                 ));
                 if let Some(dx) = &c.diagnosis {
                     if !dx.is_empty() {
@@ -139,7 +161,9 @@ pub(crate) fn build_interpretation_prompt(
                     "- {} ({}) - {}\n",
                     v.vaccine_name,
                     v.administered_at,
-                    v.manufacturer.as_deref().unwrap_or("Fabricante desconocido")
+                    v.manufacturer
+                        .as_deref()
+                        .unwrap_or("Fabricante desconocido")
                 ));
             }
             prompt.push('\n');
@@ -253,7 +277,9 @@ pub(crate) fn parse_groq_response(response: &serde_json::Value) -> Result<String
 
 /// Devuelve la clave de API de Groq de la configuración o un error de
 /// validación claro si no está configurada.
-pub(crate) fn groq_api_key_or_error(settings: &crate::models::settings::ClinicSettings) -> Result<String, AppError> {
+pub(crate) fn groq_api_key_or_error(
+    settings: &crate::models::settings::ClinicSettings,
+) -> Result<String, AppError> {
     settings
         .groq_api_key
         .clone()
@@ -307,13 +333,16 @@ pub fn interpret_lab_results(
     let api_key = groq_api_key_or_error(&settings)?;
 
     // 2. Fetch sample and results
-    let sample = samples_repo::get(pooled.conn(), sample_id)?.ok_or_else(|| {
-        AppError::NotFound(format!("Muestra {sample_id} no encontrada"))
-    })?;
+    let sample = samples_repo::get(pooled.conn(), sample_id)?
+        .ok_or_else(|| AppError::NotFound(format!("Muestra {sample_id} no encontrada")))?;
 
     // 3. Check cache first
     let results_hash = hash_results(
-        &sample.results.iter().map(|r| (r.value, r.status.clone())).collect::<Vec<_>>()
+        &sample
+            .results
+            .iter()
+            .map(|r| (r.value, r.status.clone()))
+            .collect::<Vec<_>>(),
     );
     if let Some(cached) = state.ai_cache.get(sample_id, results_hash) {
         return Ok(cached);
@@ -328,13 +357,12 @@ pub fn interpret_lab_results(
     let recent_consultations = ch_repo::get_clinical_history(pooled.conn(), sample.patient_id)
         .map(|h| h.consultations)
         .unwrap_or_default();
-    
-    let vaccines = vaccines_repo::by_patient(pooled.conn(), sample.patient_id)
-        .unwrap_or_default();
-    
+
+    let vaccines = vaccines_repo::by_patient(pooled.conn(), sample.patient_id).unwrap_or_default();
+
     // Get previous sample results for trend comparison
-    let previous_results = get_previous_results(pooled.conn(), sample.patient_id, sample_id)
-        .unwrap_or_default();
+    let previous_results =
+        get_previous_results(pooled.conn(), sample.patient_id, sample_id).unwrap_or_default();
 
     let ctx = ClinicalContext {
         recent_consultations,
@@ -374,7 +402,10 @@ pub fn interpret_lab_results(
     if !res.status().is_success() {
         let status_code = res.status().as_u16();
         let error_text = res.text().unwrap_or_default();
-        return Err(AppError::Internal(groq_error_message(status_code, &error_text)));
+        return Err(AppError::Internal(groq_error_message(
+            status_code,
+            &error_text,
+        )));
     }
 
     let response_json: serde_json::Value = res
@@ -384,12 +415,25 @@ pub fn interpret_lab_results(
     let interpretation = parse_groq_response(&response_json)?;
 
     // 8. Cache the result
-    state.ai_cache.set(sample_id, interpretation.clone(), results_hash);
+    state
+        .ai_cache
+        .set(sample_id, interpretation.clone(), results_hash);
 
     Ok(interpretation)
 }
 
-type PrevResultRow = (i32, i32, i32, String, Option<String>, f64, String, Option<f64>, Option<f64>, Option<String>);
+type PrevResultRow = (
+    i32,
+    i32,
+    i32,
+    String,
+    Option<String>,
+    f64,
+    String,
+    Option<f64>,
+    Option<f64>,
+    Option<String>,
+);
 
 /// Obtiene los resultados de laboratorio previos del paciente (excluyendo la muestra actual).
 fn get_previous_results(
@@ -398,7 +442,7 @@ fn get_previous_results(
     current_sample_id: i32,
 ) -> Result<Vec<LabResult>, AppError> {
     use rsfbclient::prelude::*;
-    
+
     let rows: Vec<PrevResultRow> = conn
         .query(
             "SELECT r.ID, r.SAMPLE_ID, r.ANALYTE_ID, a.NAME, a.UNIT,
@@ -438,9 +482,7 @@ fn get_previous_results(
 /// Solo ADMIN (vive en la página de Configuración).
 #[tauri::command]
 #[specta::specta]
-pub fn test_groq_connection(
-    state: State<'_, AppState>,
-) -> Result<String, AppError> {
+pub fn test_groq_connection(state: State<'_, AppState>) -> Result<String, AppError> {
     require_admin(&state)?;
 
     // Reutiliza la lectura de configuración: valida que exista clave.
@@ -525,9 +567,9 @@ mod tests {
         // ALTO y BAJO deben quedar realmente fuera del rango para que la
         // columna de desviación del prompt sea matemáticamente correcta.
         let value = match status {
-            "ALTO" => 62.0,  // por encima de 55
-            "BAJO" => 30.0,  // por debajo de 37
-            _ => 45.0,        // dentro de 37-55
+            "ALTO" => 62.0, // por encima de 55
+            "BAJO" => 30.0, // por debajo de 37
+            _ => 45.0,      // dentro de 37-55
         };
         LabResult {
             id: 1,
@@ -554,7 +596,7 @@ mod tests {
         assert!(prompt.contains("veterinario experto"));
         assert!(prompt.contains("Canino / Beagle"));
         assert!(prompt.contains("24 meses"));
-        assert!(prompt.contains("Hembra"));
+        assert!(prompt.contains("Macho"));
         assert!(prompt.contains("Sangre total (EDTA)"));
         assert!(prompt.contains("Hematocrito"));
         assert!(prompt.contains("45"));
@@ -663,36 +705,32 @@ mod tests {
         let results = vec![test_lab_result("ALTO")];
 
         let ctx = ClinicalContext {
-            recent_consultations: vec![
-                Consultation {
-                    id: 1,
-                    patient_id: 1,
-                    veterinarian_id: Some(1),
-                    consultation_date: "2026-07-15 10:00:00".to_string(),
-                    reason: "Vacunación anual".to_string(),
-                    anamnesis: None,
-                    physical_exam: None,
-                    diagnosis: Some("Paciente sana".to_string()),
-                    treatment_plan: Some("Aplicar vacuna antirrábica".to_string()),
-                    status: "COMPLETADA".to_string(),
-                    veterinarian_name: Some("Dr. García".to_string()),
-                },
-            ],
-            vaccines: vec![
-                Vaccine {
-                    id: 1,
-                    patient_id: 1,
-                    vaccine_type_id: Some(1),
-                    vaccine_name: "Rabia".to_string(),
-                    dose: Some("1ra".to_string()),
-                    administered_at: "2026-07-15".to_string(),
-                    next_dose_at: Some("2027-07-15".to_string()),
-                    lot: Some("LOT123".to_string()),
-                    manufacturer: Some("Zoetis".to_string()),
-                    veterinarian_name: Some("Dr. García".to_string()),
-                    notes: None,
-                },
-            ],
+            recent_consultations: vec![Consultation {
+                id: 1,
+                patient_id: 1,
+                veterinarian_id: Some(1),
+                consultation_date: "2026-07-15 10:00:00".to_string(),
+                reason: "Vacunación anual".to_string(),
+                anamnesis: None,
+                physical_exam: None,
+                diagnosis: Some("Paciente sana".to_string()),
+                treatment_plan: Some("Aplicar vacuna antirrábica".to_string()),
+                status: "COMPLETADA".to_string(),
+                veterinarian_name: Some("Dr. García".to_string()),
+            }],
+            vaccines: vec![Vaccine {
+                id: 1,
+                patient_id: 1,
+                vaccine_type_id: Some(1),
+                vaccine_name: "Rabia".to_string(),
+                dose: Some("1ra".to_string()),
+                administered_at: "2026-07-15".to_string(),
+                next_dose_at: Some("2027-07-15".to_string()),
+                lot: Some("LOT123".to_string()),
+                manufacturer: Some("Zoetis".to_string()),
+                veterinarian_name: Some("Dr. García".to_string()),
+                notes: None,
+            }],
             previous_results: vec![],
         };
 
@@ -715,20 +753,18 @@ mod tests {
         let ctx = ClinicalContext {
             recent_consultations: vec![],
             vaccines: vec![],
-            previous_results: vec![
-                LabResult {
-                    id: 10,
-                    sample_id: 10,
-                    analyte_id: 1,
-                    analyte_name: "Hematocrito".to_string(),
-                    unit: Some("%".to_string()),
-                    value: 42.0,
-                    status: "NORMAL".to_string(),
-                    ref_min: Some(37.0),
-                    ref_max: Some(55.0),
-                    analyzed_at: Some("2026-06-01 10:00:00".to_string()),
-                },
-            ],
+            previous_results: vec![LabResult {
+                id: 10,
+                sample_id: 10,
+                analyte_id: 1,
+                analyte_name: "Hematocrito".to_string(),
+                unit: Some("%".to_string()),
+                value: 42.0,
+                status: "NORMAL".to_string(),
+                ref_min: Some(37.0),
+                ref_max: Some(55.0),
+                analyzed_at: Some("2026-06-01 10:00:00".to_string()),
+            }],
         };
 
         let prompt = build_interpretation_prompt(&patient, &sample, &results, Some(&ctx));

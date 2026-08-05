@@ -7,7 +7,14 @@ use crate::models::patient::{CreatePatientInput, Patient};
 use crate::repositories::next_id;
 
 pub(crate) type OwnerRow = (
-    i32, String, String, String, Option<String>, Option<String>, Option<String>, Option<String>,
+    i32,
+    String,
+    String,
+    String,
+    Option<String>,
+    Option<String>,
+    Option<String>,
+    Option<String>,
 );
 
 /// Columnas unidas de un paciente (especie, raza, propietario, edad).
@@ -79,10 +86,7 @@ pub fn get(conn: &mut SimpleConnection, id: i32) -> Result<Option<Patient>, AppE
     Ok(row.map(map_patient))
 }
 
-pub fn list(
-    conn: &mut SimpleConnection,
-    search: Option<&str>,
-) -> Result<Vec<Patient>, AppError> {
+pub fn list(conn: &mut SimpleConnection, search: Option<&str>) -> Result<Vec<Patient>, AppError> {
     let rows: Vec<PatientRow> = match search {
         Some(term) if !term.trim().is_empty() => {
             let like = format!("%{}%", term.trim().to_uppercase());
@@ -110,10 +114,7 @@ pub fn list(
 
 /// Busca un paciente directamente por su código único (PAC-YYYY-NNNN).
 /// Devuelve `None` si no existe ningún paciente con ese código.
-pub fn get_by_code(
-    conn: &mut SimpleConnection,
-    code: &str,
-) -> Result<Option<Patient>, AppError> {
+pub fn get_by_code(conn: &mut SimpleConnection, code: &str) -> Result<Option<Patient>, AppError> {
     let normalized = code.trim().to_uppercase();
     let row: Option<PatientRow> = conn
         .query_first(
@@ -152,9 +153,7 @@ pub fn create(
     )
     .map_err(AppError::from)?;
 
-    get(conn, id)?.ok_or_else(|| {
-        AppError::Internal("Paciente creado pero no recuperado".into())
-    })
+    get(conn, id)?.ok_or_else(|| AppError::Internal("Paciente creado pero no recuperado".into()))
 }
 
 /// Busca al propietario por documento o lo crea.
@@ -265,25 +264,25 @@ mod tests {
 
     fn sample_patient_row() -> PatientRow {
         (
-            1,                           // id
-            "PAC-2026-0001".into(),      // code
-            10,                          // owner_id
-            1,                           // species_id (Canino)
-            Some(5),                     // breed_id (Beagle)
-            "Luna".into(),               // name
-            "F".into(),                  // sex
-            Some("2023-06-15".into()),   // birth_date
-            true,                        // neutered
-            Some("Marrón".into()),       // color
-            Some("CHIP-12345".into()),   // microchip
-            true,                        // active
+            1,                                 // id
+            "PAC-2026-0001".into(),            // code
+            10,                                // owner_id
+            1,                                 // species_id (Canino)
+            Some(5),                           // breed_id (Beagle)
+            "Luna".into(),                     // name
+            "F".into(),                        // sex
+            Some("2023-06-15".into()),         // birth_date
+            true,                              // neutered
+            Some("Marrón".into()),             // color
+            Some("CHIP-12345".into()),         // microchip
+            true,                              // active
             Some("Paciente de prueba".into()), // notes
-            None,                        // preferred_logo_id
-            "Canino".into(),             // species_name
-            Some("Beagle".into()),       // breed_name
-            "Juan Pérez".into(),         // owner_name
-            Some("+57 300 1234567".into()), // owner_phone
-            24,                          // age_months
+            None,                              // preferred_logo_id
+            "Canino".into(),                   // species_name
+            Some("Beagle".into()),             // breed_name
+            "Juan Pérez".into(),               // owner_name
+            Some("+57 300 1234567".into()),    // owner_phone
+            24,                                // age_months
         )
     }
 
@@ -315,9 +314,25 @@ mod tests {
     #[test]
     fn test_map_patient_optional_fields_none() {
         let row: PatientRow = (
-            2, "PAC-2026-0002".into(), 20, 2, None, "Michi".into(), "M".into(),
-            None, false, None, None, true, None, None,
-            "Felino".into(), None, "María López".into(), None, 6,
+            2,
+            "PAC-2026-0002".into(),
+            20,
+            2,
+            None,
+            "Michi".into(),
+            "M".into(),
+            None,
+            false,
+            None,
+            None,
+            true,
+            None,
+            None,
+            "Felino".into(),
+            None,
+            "María López".into(),
+            None,
+            6,
         );
         let patient = map_patient(row);
 
@@ -336,9 +351,14 @@ mod tests {
     #[test]
     fn test_owner_row_mapping() {
         let row: OwnerRow = (
-            10, "CC".into(), "1234567890".into(), "Juan Pérez".into(),
-            Some("+57 300 1234567".into()), Some("juan@test.com".into()),
-            Some("Calle 123".into()), Some("Bogotá".into()),
+            10,
+            "CC".into(),
+            "1234567890".into(),
+            "Juan Pérez".into(),
+            Some("+57 300 1234567".into()),
+            Some("juan@test.com".into()),
+            Some("Calle 123".into()),
+            Some("Bogotá".into()),
         );
         let owner = Owner {
             id: row.0,
@@ -437,8 +457,16 @@ mod integration_tests {
     fn test_create_patient() {
         let (mut conn, db_path) = setup();
         // Preparar especie y raza
-        conn.execute("INSERT OR UPDATE INTO SPECIES (ID, CODE, NAME) VALUES (1, 'CAN', 'Canino')", ()).ok();
-        conn.execute("INSERT OR UPDATE INTO BREEDS (ID, SPECIES_ID, NAME) VALUES (1, 1, 'Beagle')", ()).ok();
+        conn.execute(
+            "INSERT OR UPDATE INTO SPECIES (ID, CODE, NAME) VALUES (1, 'CAN', 'Canino')",
+            (),
+        )
+        .ok();
+        conn.execute(
+            "INSERT OR UPDATE INTO BREEDS (ID, SPECIES_ID, NAME) VALUES (1, 1, 'Beagle')",
+            (),
+        )
+        .ok();
 
         let input = CreatePatientInput {
             owner: CreateOwnerInput {

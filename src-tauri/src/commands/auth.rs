@@ -13,10 +13,7 @@ use crate::state::AppState;
 /// el login se bloquea por 5 minutos para ese usuario.
 #[tauri::command]
 #[specta::specta]
-pub fn login(
-    state: State<'_, AppState>,
-    input: LoginInput,
-) -> Result<SessionUser, AppError> {
+pub fn login(state: State<'_, AppState>, input: LoginInput) -> Result<SessionUser, AppError> {
     // --- Rate limiting: verificar si el usuario está bloqueado ---
     {
         let attempts = state
@@ -45,7 +42,8 @@ pub fn login(
                     &input.username,
                     "LOGIN_FAILED",
                     Some("Usuario no encontrado"),
-                ).ok();
+                )
+                .ok();
             }
             // Registrar intento fallido (usar el username como clave).
             {
@@ -53,9 +51,14 @@ pub fn login(
                     .login_attempts
                     .lock()
                     .map_err(|_| AppError::Internal("Contador bloqueado".into()))?;
-                attempts.entry(input.username.clone()).or_default().record_failure();
+                attempts
+                    .entry(input.username.clone())
+                    .or_default()
+                    .record_failure();
             }
-            return Err(AppError::Validation("Usuario o contraseña incorrectos".into()));
+            return Err(AppError::Validation(
+                "Usuario o contraseña incorrectos".into(),
+            ));
         }
         Err(e) => return Err(e),
     };
@@ -68,21 +71,28 @@ pub fn login(
                 &user.username,
                 "LOGIN_FAILED",
                 Some("Usuario inactivo"),
-            ).ok();
+            )
+            .ok();
         }
         {
             let mut attempts = state
                 .login_attempts
                 .lock()
                 .map_err(|_| AppError::Internal("Contador bloqueado".into()))?;
-            attempts.entry(user.username.clone()).or_default().record_failure();
+            attempts
+                .entry(user.username.clone())
+                .or_default()
+                .record_failure();
         }
-        return Err(AppError::Validation("Usuario inactivo. Contacta al administrador.".into()));
+        return Err(AppError::Validation(
+            "Usuario inactivo. Contacta al administrador.".into(),
+        ));
     }
 
-    let hash = user.password_hash.as_deref().ok_or_else(|| {
-        AppError::Validation("Usuario sin contraseña configurada".into())
-    })?;
+    let hash = user
+        .password_hash
+        .as_deref()
+        .ok_or_else(|| AppError::Validation("Usuario sin contraseña configurada".into()))?;
 
     if !auth::verify_password(&input.password, hash)? {
         // Auditoría de login fallido (contraseña incorrecta).
@@ -93,16 +103,22 @@ pub fn login(
                 &user.username,
                 "LOGIN_FAILED",
                 Some("Contraseña incorrecta"),
-            ).ok();
+            )
+            .ok();
         }
         {
             let mut attempts = state
                 .login_attempts
                 .lock()
                 .map_err(|_| AppError::Internal("Contador bloqueado".into()))?;
-            attempts.entry(user.username.clone()).or_default().record_failure();
+            attempts
+                .entry(user.username.clone())
+                .or_default()
+                .record_failure();
         }
-        return Err(AppError::Validation("Usuario o contraseña incorrectos".into()));
+        return Err(AppError::Validation(
+            "Usuario o contraseña incorrectos".into(),
+        ));
     }
 
     let session = auth_repo::to_session(&user);
@@ -115,7 +131,8 @@ pub fn login(
             &session.username,
             "LOGIN",
             Some("Inicio de sesión exitoso"),
-        ).ok();
+        )
+        .ok();
     }
 
     // Reiniciar contador de intentos fallidos para este usuario.
@@ -152,7 +169,8 @@ pub fn logout(state: State<'_, AppState>) -> Result<(), AppError> {
                 &user.username,
                 "LOGOUT",
                 Some("Cierre de sesión"),
-            ).ok();
+            )
+            .ok();
         }
     }
     *guard = None;

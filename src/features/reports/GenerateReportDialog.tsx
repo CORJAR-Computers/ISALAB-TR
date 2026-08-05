@@ -1,6 +1,5 @@
-import { useState } from "react";
+import { useEffect, useState } from "react";
 import type { ReactNode } from "react";
-import type { UseMutationResult } from "@tanstack/react-query";
 import { toast } from "sonner";
 import {
   ClipboardList,
@@ -48,6 +47,7 @@ import {
   useGenerateReciboInvoice,
   useGenerateReport,
   useInvoices,
+  usePatient,
   usePatients,
   useSamples,
   useSurgeries,
@@ -226,6 +226,25 @@ export function GenerateReportDialog({
 
   const { data: secondaryLogos } = useSecondaryLogos();
 
+  const samples = useSamples("FINALIZADA", searches.lab, active === "lab");
+  const selectedLabSample = (samples.data ?? []).find(
+    (s) => s.id === selected.lab,
+  );
+  const { data: labPatient } = usePatient(
+    selectedLabSample?.patientId ?? null,
+  );
+
+  // Al elegir una muestra, precarga el logo preferido del paciente (si lo
+  // tiene guardado) para que "futuros reportes" usen ese logo por defecto.
+  useEffect(() => {
+    if (selected.lab == null || !labPatient) return;
+    const preferred = secondaryLogos?.find(
+      (l) => l.id === labPatient.preferredLogoId,
+    );
+    setOverrideLogoPath(preferred ? preferred.logoPath : "default");
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [selected.lab, labPatient?.preferredLogoId]);
+
   const lab = useGenerateReport();
   const formula = useGenerateFormulaMedica();
   const consent = useGenerateConsentimiento();
@@ -233,16 +252,6 @@ export function GenerateReportDialog({
   const cirugia = useGenerateCertificadoCirugia();
   const carnet = useGenerateCarnetVacunacion();
 
-  const mutations: Record<ReportKind, UseMutationResult<ReportFile, Error, any>> = {
-    lab,
-    formula,
-    consent,
-    recibo,
-    cirugia,
-    carnet,
-  };
-
-  const samples = useSamples("FINALIZADA", searches.lab, active === "lab");
   const consultations = useConsultations(
     null,
     searches.formula,
@@ -263,7 +272,13 @@ export function GenerateReportDialog({
 
   const current = TABS.find((t) => t.value === active)!;
   const CurrentIcon = current.icon;
-  const mutation = mutations[active];
+  const isPending =
+    (active === "lab" && lab.isPending) ||
+    (active === "formula" && formula.isPending) ||
+    (active === "consent" && consent.isPending) ||
+    (active === "recibo" && recibo.isPending) ||
+    (active === "cirugia" && cirugia.isPending) ||
+    (active === "carnet" && carnet.isPending);
   const isLoading =
     (active === "lab" && samples.isLoading) ||
     (active === "formula" && consultations.isLoading) ||
@@ -276,16 +291,30 @@ export function GenerateReportDialog({
     const id = selected[active];
     if (id == null) return;
     try {
-      let report;
+      let report: ReportFile;
       if (active === "lab") {
         const logoPath = overrideLogoPath === "default" ? null : overrideLogoPath;
-        report = await (mutation as typeof lab).mutateAsync({
+        report = await lab.mutateAsync({
           sampleId: id,
           overrideLogoPath: logoPath,
           saveLogoPreference: saveLogoPref,
         });
+      } else if (active === "formula") {
+        report = await formula.mutateAsync(id);
+      } else if (active === "consent") {
+        report = await consent.mutateAsync(id);
+      } else if (active === "recibo") {
+        report = await recibo.mutateAsync(id);
+      } else if (active === "cirugia") {
+        report = await cirugia.mutateAsync(id);
+      } else if (active === "carnet") {
+        // Último caso de ReportKind: si se añade un nuevo tipo de reporte
+        // sin tratarlo aquí, el throw de abajo fallará en runtime en vez de
+        // generar silenciosamente el carnet equivocado.
+        report = await carnet.mutateAsync(id);
       } else {
-        report = await (mutation as any).mutateAsync(id);
+        // Inalcanzable con el ReportKind actual; garantiza la asignación.
+        throw new Error(`Tipo de reporte no soportado: ${active}`);
       }
       onGenerated(report);
     } catch (e) {
@@ -453,9 +482,9 @@ export function GenerateReportDialog({
           </Button>
           <Button
             onClick={submit}
-            disabled={selected[active] == null || mutation.isPending}
+            disabled={selected[active] == null || isPending}
           >
-            {mutation.isPending ? (
+            {isPending ? (
               <Loader2 className="animate-spin" />
             ) : (
               <FileText className="size-4" />

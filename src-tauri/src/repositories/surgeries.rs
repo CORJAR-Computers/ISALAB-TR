@@ -20,20 +20,20 @@ const SURGERY_SELECT: &str = "
     LEFT JOIN USERS u ON u.ID = s.VETERINARIAN_ID";
 
 pub(crate) type SurgeryRow = (
-    i32,             // id
-    i32,             // patient_id
-    String,          // patient_name
-    String,          // species_name
-    String,          // owner_name
-    Option<String>,  // owner_phone
-    Option<i32>,     // veterinarian_id
-    Option<String>,  // veterinarian_name
-    String,          // surgery_type
-    String,          // scheduled_at
-    Option<String>,  // anesthesia_type
-    Option<String>,  // preoperative_notes
-    Option<String>,  // postoperative_notes
-    String,          // status
+    i32,            // id
+    i32,            // patient_id
+    String,         // patient_name
+    String,         // species_name
+    String,         // owner_name
+    Option<String>, // owner_phone
+    Option<i32>,    // veterinarian_id
+    Option<String>, // veterinarian_name
+    String,         // surgery_type
+    String,         // scheduled_at
+    Option<String>, // anesthesia_type
+    Option<String>, // preoperative_notes
+    Option<String>, // postoperative_notes
+    String,         // status
 );
 
 pub(crate) fn map_surgery(r: SurgeryRow) -> Surgery {
@@ -125,10 +125,7 @@ pub fn list(
 }
 
 /// Próximas cirugías de la agenda (dashboard): PROGRAMADA/EN_CURSO desde hoy.
-pub fn list_upcoming(
-    conn: &mut SimpleConnection,
-    limit: i32,
-) -> Result<Vec<Surgery>, AppError> {
+pub fn list_upcoming(conn: &mut SimpleConnection, limit: i32) -> Result<Vec<Surgery>, AppError> {
     let sql = format!(
         "{SURGERY_SELECT}
          WHERE s.STATUS IN ('PROGRAMADA', 'EN_CURSO')
@@ -142,17 +139,12 @@ pub fn list_upcoming(
 
 /// Cambia el estado de una cirugía validando la transición:
 /// PROGRAMADA → EN_CURSO/COMPLETADA/CANCELADA, EN_CURSO → COMPLETADA/CANCELADA.
-pub fn set_status(
-    conn: &mut SimpleConnection,
-    id: i32,
-    status: &str,
-) -> Result<Surgery, AppError> {
+pub fn set_status(conn: &mut SimpleConnection, id: i32, status: &str) -> Result<Surgery, AppError> {
     let current: Option<(String,)> = conn
         .query_first("SELECT STATUS FROM SURGERIES WHERE ID = ?", (&id,))
         .map_err(AppError::from)?;
-    let (current,) = current.ok_or_else(|| {
-        AppError::NotFound(format!("Cirugía {id} no encontrada"))
-    })?;
+    let (current,) =
+        current.ok_or_else(|| AppError::NotFound(format!("Cirugía {id} no encontrada")))?;
 
     let allowed = match status {
         "EN_CURSO" => current == "PROGRAMADA",
@@ -189,24 +181,25 @@ mod tests {
     #[test]
     fn test_map_surgery_all_fields() {
         let row: SurgeryRow = (
-            1,                          // id
-            10,                         // patient_id
-            "Luna".into(),              // patient_name
-            "Canino".into(),            // species_name
-            "Juan Pérez".into(),        // owner_name
-            Some("+57 300 1234567".into()), // owner_phone
-            Some(5),                     // veterinarian_id
-            Some("Dr. Ramos".into()),   // veterinarian_name
-            "Cesárea".into(),           // surgery_type
-            "2026-08-15 09:00:00".into(), // scheduled_at
-            Some("General".into()),     // anesthesia_type
+            1,                                 // id
+            10,                                // patient_id
+            "Luna".into(),                     // patient_name
+            "Canino".into(),                   // species_name
+            "Juan Pérez".into(),               // owner_name
+            Some("+57 300 1234567".into()),    // owner_phone
+            Some(5),                           // veterinarian_id
+            Some("Dr. Ramos".into()),          // veterinarian_name
+            "Cesárea".into(),                  // surgery_type
+            "2026-08-15 09:00:00".into(),      // scheduled_at
+            Some("General".into()),            // anesthesia_type
             Some("Paciente en ayunas".into()), // preoperative_notes
-            Some("Cirugía exitosa".into()), // postoperative_notes
-            "PROGRAMADA".into(),        // status
+            Some("Cirugía exitosa".into()),    // postoperative_notes
+            "PROGRAMADA".into(),               // status
         );
         let surgery = map_surgery(row);
 
-        assert_eq!(surgery.id, 1);assert_eq!(surgery.patient_id, 10);
+        assert_eq!(surgery.id, 1);
+        assert_eq!(surgery.patient_id, 10);
         assert_eq!(surgery.patient_name, "Luna");
         assert_eq!(surgery.species_name, "Canino");
         assert_eq!(surgery.owner_name, "Juan Pérez");
@@ -216,17 +209,34 @@ mod tests {
         assert_eq!(surgery.surgery_type, "Cesárea");
         assert_eq!(surgery.scheduled_at, "2026-08-15 09:00:00");
         assert_eq!(surgery.anesthesia_type.as_deref(), Some("General"));
-        assert_eq!(surgery.preoperative_notes.as_deref(), Some("Paciente en ayunas"));
-        assert_eq!(surgery.postoperative_notes.as_deref(), Some("Cirugía exitosa"));
+        assert_eq!(
+            surgery.preoperative_notes.as_deref(),
+            Some("Paciente en ayunas")
+        );
+        assert_eq!(
+            surgery.postoperative_notes.as_deref(),
+            Some("Cirugía exitosa")
+        );
         assert_eq!(surgery.status, "PROGRAMADA");
     }
 
     #[test]
     fn test_map_surgery_optional_fields_none() {
         let row: SurgeryRow = (
-            2, 20, "Michi".into(), "Felino".into(), "María López".into(),
-            None, None, None, "Esterilización".into(),
-            "2026-08-20 14:00:00".into(), None, None, None, "PROGRAMADA".into(),
+            2,
+            20,
+            "Michi".into(),
+            "Felino".into(),
+            "María López".into(),
+            None,
+            None,
+            None,
+            "Esterilización".into(),
+            "2026-08-20 14:00:00".into(),
+            None,
+            None,
+            None,
+            "PROGRAMADA".into(),
         );
         let surgery = map_surgery(row);
 
@@ -245,9 +255,20 @@ mod tests {
         let valid_statuses = ["PROGRAMADA", "EN_CURSO", "COMPLETADA", "CANCELADA"];
         for status in valid_statuses {
             let row: SurgeryRow = (
-                1, 10, "Test".into(), "Canino".into(), "Owner".into(),
-                None, None, None, "Test".into(),
-                "2026-08-15 09:00:00".into(), None, None, None, status.into(),
+                1,
+                10,
+                "Test".into(),
+                "Canino".into(),
+                "Owner".into(),
+                None,
+                None,
+                None,
+                "Test".into(),
+                "2026-08-15 09:00:00".into(),
+                None,
+                None,
+                None,
+                status.into(),
             );
             let surgery = map_surgery(row);
             assert_eq!(surgery.status, status);
@@ -296,7 +317,8 @@ mod integration_tests {
             "INSERT INTO SURGERIES (ID, PATIENT_ID, SURGERY_TYPE, SCHEDULED_AT, STATUS)
              VALUES (1, ?, 'Esterilización', '2026-08-20 14:00:00', 'PROGRAMADA')",
             (&patient_id,),
-        ).unwrap();
+        )
+        .unwrap();
 
         let surgery = get(&mut conn, 1).unwrap();
         assert!(surgery.is_some());
@@ -316,12 +338,14 @@ mod integration_tests {
             "INSERT INTO SURGERIES (ID, PATIENT_ID, SURGERY_TYPE, SCHEDULED_AT, STATUS)
              VALUES (1, ?, 'Cesárea', '2026-08-15 09:00:00', 'PROGRAMADA')",
             (&patient_id,),
-        ).unwrap();
+        )
+        .unwrap();
         conn.execute(
             "INSERT INTO SURGERIES (ID, PATIENT_ID, SURGERY_TYPE, SCHEDULED_AT, STATUS)
              VALUES (2, ?, 'Esterilización', '2026-08-20 14:00:00', 'COMPLETADA')",
             (&patient_id,),
-        ).unwrap();
+        )
+        .unwrap();
 
         // Filtrar por estado
         let surgeries = list(&mut conn, Some("PROGRAMADA"), None).unwrap();
@@ -344,7 +368,8 @@ mod integration_tests {
             "INSERT INTO SURGERIES (ID, PATIENT_ID, SURGERY_TYPE, SCHEDULED_AT, STATUS)
              VALUES (1, ?, 'Cesárea', '2026-08-15 09:00:00', 'PROGRAMADA')",
             (&patient_id,),
-        ).unwrap();
+        )
+        .unwrap();
 
         // PROGRAMADA -> EN_CURSO
         let updated = set_status(&mut conn, 1, "EN_CURSO").unwrap();
@@ -366,7 +391,8 @@ mod integration_tests {
             "INSERT INTO SURGERIES (ID, PATIENT_ID, SURGERY_TYPE, SCHEDULED_AT, STATUS)
              VALUES (1, ?, 'Cesárea', '2026-08-15 09:00:00', 'PROGRAMADA')",
             (&patient_id,),
-        ).unwrap();
+        )
+        .unwrap();
 
         // PROGRAMADA -> ESTADO_INVALIDO (no permitido)
         let result = set_status(&mut conn, 1, "ESTADO_INVALIDO");

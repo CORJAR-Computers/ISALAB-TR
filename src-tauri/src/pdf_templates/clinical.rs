@@ -1,11 +1,11 @@
-use std::path::Path;
 use serde::{Deserialize, Serialize};
 use specta::Type;
+use std::path::Path;
 
 use crate::models::patient::Patient;
 use crate::models::sample::LabResult;
 use crate::pdf_templates::builder::{
-    draw_multiline, save_pdf, C_MUTED, C_TEXT, MARGIN, PdfBuilder,
+    draw_multiline, save_pdf, PdfBuilder, C_MUTED, C_TEXT, MARGIN,
 };
 use crate::pdf_templates::header::{draw_header, ClinicHeader};
 use crate::pdf_templates::layout::{
@@ -99,19 +99,22 @@ pub fn generate_formula(data: &FormulaMedicaData, out_path: &Path) -> Result<(),
         .as_ref()
         .map(|o| o.full_name.clone())
         .unwrap_or_else(|| data.patient.owner_name.clone());
-    draw_grid(&mut pdf, &[
-        ("Fecha", data.date.clone()),
-        ("Paciente", data.patient.name.clone()),
-        (
-            "Especie / Raza",
-            format!(
-                "{} · {}",
-                data.patient.species_name,
-                data.patient.breed_name.as_deref().unwrap_or("—")
+    draw_grid(
+        &mut pdf,
+        &[
+            ("Fecha", data.date.clone()),
+            ("Paciente", data.patient.name.clone()),
+            (
+                "Especie / Raza",
+                format!(
+                    "{} · {}",
+                    data.patient.species_name,
+                    data.patient.breed_name.as_deref().unwrap_or("—")
+                ),
             ),
-        ),
-        ("Propietario", owner),
-    ]);
+            ("Propietario", owner),
+        ],
+    );
 
     section_title(&mut pdf, "MOTIVO DE CONSULTA");
     pdf.y = draw_multiline(&mut pdf, &data.reason, 9.0, MARGIN, C_TEXT, 5.0);
@@ -190,11 +193,25 @@ fn draw_digital_signature_block(pdf: &mut PdfBuilder, info: &Pkcs12CertInfo) {
     pdf.y -= 5.5;
 
     // Titular
-    pdf.text(false, &format!("Titular: {}", info.holder_name), 7.5, x, pdf.y, C_TEXT);
+    pdf.text(
+        false,
+        &format!("Titular: {}", info.holder_name),
+        7.5,
+        x,
+        pdf.y,
+        C_TEXT,
+    );
     pdf.y -= 4.5;
 
     // Emisor
-    pdf.text(false, &format!("Emisor: {}", info.issuer), 7.0, x, pdf.y, C_MUTED);
+    pdf.text(
+        false,
+        &format!("Emisor: {}", info.issuer),
+        7.0,
+        x,
+        pdf.y,
+        C_MUTED,
+    );
     pdf.y -= 4.5;
 
     // Vigencia
@@ -238,7 +255,10 @@ fn draw_digital_signature_block(pdf: &mut PdfBuilder, info: &Pkcs12CertInfo) {
 }
 
 /// Dibuja un bloque de firma digital genérico cuando no se puede leer el certificado.
-fn draw_generic_digital_signature(pdf: &mut PdfBuilder, signature: &crate::pdf_templates::layout::ReportSignature) {
+fn draw_generic_digital_signature(
+    pdf: &mut PdfBuilder,
+    signature: &crate::pdf_templates::layout::ReportSignature,
+) {
     use crate::pdf_templates::builder::{C_MUTED, C_TEXT, MARGIN, PAGE_W};
 
     pdf.y -= 14.0;
@@ -269,12 +289,5 @@ fn draw_generic_digital_signature(pdf: &mut PdfBuilder, signature: &crate::pdf_t
         C_MUTED,
     );
     pdf.y -= 4.5;
-    pdf.text(
-        false,
-        "Ley 527 de 1999 (Colombia)",
-        6.5,
-        x,
-        pdf.y,
-        C_MUTED,
-    );
+    pdf.text(false, "Ley 527 de 1999 (Colombia)", 6.5, x, pdf.y, C_MUTED);
 }

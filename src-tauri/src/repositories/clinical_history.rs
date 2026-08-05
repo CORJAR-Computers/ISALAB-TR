@@ -3,9 +3,7 @@ use rsfbclient::SimpleConnection;
 
 use crate::error::AppError;
 use crate::models::clinical_history::ClinicalHistory;
-use crate::models::consultation::{
-    Consultation, ConsultationListItem, CreateConsultationInput,
-};
+use crate::models::consultation::{Consultation, ConsultationListItem, CreateConsultationInput};
 use crate::models::sample::{CreateSampleInput, LabResult, RegisterResultInput, Sample};
 use crate::repositories::{
     next_id, patient as patient_repo, samples as samples_repo, vaccines as vaccines_repo,
@@ -66,9 +64,8 @@ pub fn get_clinical_history(
     conn: &mut SimpleConnection,
     patient_id: i32,
 ) -> Result<ClinicalHistory, AppError> {
-    let patient = patient_repo::get(conn, patient_id)?.ok_or_else(|| {
-        AppError::NotFound(format!("Paciente {patient_id} no encontrado"))
-    })?;
+    let patient = patient_repo::get(conn, patient_id)?
+        .ok_or_else(|| AppError::NotFound(format!("Paciente {patient_id} no encontrado")))?;
 
     let owner = patient_repo::get_owner(conn, patient.owner_id)?;
     let consultations = list_consultations(conn, patient_id)?;
@@ -179,9 +176,8 @@ pub fn set_consultation_status(
     let current: Option<(String,)> = conn
         .query_first("SELECT STATUS FROM CONSULTATIONS WHERE ID = ?", (&id,))
         .map_err(AppError::from)?;
-    let (current,) = current.ok_or_else(|| {
-        AppError::NotFound(format!("Consulta {id} no encontrada"))
-    })?;
+    let (current,) =
+        current.ok_or_else(|| AppError::NotFound(format!("Consulta {id} no encontrada")))?;
 
     let allowed = match status {
         "COMPLETADA" | "CANCELADA" => current == "PENDIENTE",
@@ -323,10 +319,7 @@ pub fn create_consultation(
 
 // ============================ MUESTRAS ======================================
 
-fn list_samples(
-    conn: &mut SimpleConnection,
-    patient_id: i32,
-) -> Result<Vec<Sample>, AppError> {
+fn list_samples(conn: &mut SimpleConnection, patient_id: i32) -> Result<Vec<Sample>, AppError> {
     let rows: Vec<SampleRow> = conn
         .query(
             "SELECT s.ID, s.CODE, s.PATIENT_ID, s.SAMPLE_TYPE_ID, st.NAME,
@@ -411,7 +404,6 @@ pub fn create_sample(
 // `list_results` vive en repositories/samples.rs (se reutiliza desde la
 // mesa de trabajo del laboratorio y el generador de PDF).
 
-
 /// Registra (o actualiza) un resultado validándolo contra los rangos de
 /// referencia del paciente mediante SP_VALIDATE_ANALYTICAL_RESULT. Mueve la
 /// muestra a EN_PROCESO (dispara SAMPLE_CHANGED → frontend); la finalización
@@ -453,7 +445,14 @@ pub fn register_lab_result(
             "INSERT INTO LAB_RESULTS
                 (ID, SAMPLE_ID, ANALYTE_ID, REFERENCE_RANGE_ID, RESULT_VALUE, STATUS, ANALYZED_AT)
              VALUES (?, ?, ?, ?, ?, ?, CURRENT_TIMESTAMP)",
-            (&nid, &input.sample_id, &input.analyte_id, &rr_id, &input.value, &status),
+            (
+                &nid,
+                &input.sample_id,
+                &input.analyte_id,
+                &rr_id,
+                &input.value,
+                &status,
+            ),
         )
         .map_err(AppError::from)?;
         nid
@@ -490,10 +489,10 @@ pub fn register_lab_result(
 #[cfg(test)]
 mod tests {
     use super::*;
-    use std::path::PathBuf;
     use crate::models::consultation::CreateConsultationInput;
     use crate::models::sample::{CreateSampleInput, RegisterResultInput};
     use crate::test_helpers::*;
+    use std::path::PathBuf;
 
     fn setup() -> (SimpleConnection, PathBuf) {
         let (conn, db_path) = setup_test_db();
@@ -671,8 +670,11 @@ mod tests {
         assert_eq!(updated.status, "COMPLETADA");
 
         // Resetear a PENDIENTE para probar CANCELADA
-        conn.execute("UPDATE CONSULTATIONS SET STATUS = 'PENDIENTE' WHERE ID = ?", (&c.id,))
-            .unwrap();
+        conn.execute(
+            "UPDATE CONSULTATIONS SET STATUS = 'PENDIENTE' WHERE ID = ?",
+            (&c.id,),
+        )
+        .unwrap();
 
         // PENDIENTE → CANCELADA
         let updated = set_consultation_status(&mut conn, c.id, "CANCELADA").unwrap();

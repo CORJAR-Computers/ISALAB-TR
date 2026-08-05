@@ -1,17 +1,20 @@
-use std::path::Path;
 use serde::{Deserialize, Serialize};
+use std::path::Path;
 
 use crate::models::owner::Owner;
 use crate::models::patient::Patient;
 use crate::models::surgery::Surgery;
 use crate::pdf_templates::builder::{
-    draw_multiline, save_pdf, truncate, CONTENT_W, C_MUTED, C_RULE, C_TEXT, MARGIN, PAGE_W,
-    PdfBuilder,
+    draw_multiline, save_pdf, truncate, PdfBuilder, CONTENT_W, C_MUTED, C_RULE, C_TEXT, MARGIN,
+    PAGE_W,
 };
 use crate::pdf_templates::header::{draw_header, ClinicHeader};
-use crate::pdf_templates::layout::{draw_footer, draw_grid, draw_signature, section_title, ReportSignature};
+use crate::pdf_templates::layout::{
+    draw_footer, draw_grid, draw_signature, section_title, ReportSignature,
+};
 
-pub const CONSENT_DECLARATION: &str = "Autorizo al médico veterinario y al personal de la clínica a \
+pub const CONSENT_DECLARATION: &str =
+    "Autorizo al médico veterinario y al personal de la clínica a \
 realizar sobre mi mascota el procedimiento descrito. Declaro haber sido informado(a) de los \
 riesgos, beneficios y alternativas, y de los cuidados posteriores necesarios. Entiendo que el \
 resultado del procedimiento no está garantizado y que pueden presentarse complicaciones \
@@ -69,11 +72,14 @@ pub fn generate_consentimiento(data: &ConsentimientoData, out_path: &Path) -> Re
     );
 
     section_title(&mut pdf, "INFORMACIÓN DEL PROCEDIMIENTO");
-    draw_grid(&mut pdf, &[
-        ("Fecha", data.procedure_date.clone()),
-        ("Tipo de procedimiento", data.procedure_type.clone()),
-        ("Código de atención", data.attention_code.clone()),
-    ]);
+    draw_grid(
+        &mut pdf,
+        &[
+            ("Fecha", data.procedure_date.clone()),
+            ("Tipo de procedimiento", data.procedure_type.clone()),
+            ("Código de atención", data.attention_code.clone()),
+        ],
+    );
 
     let owner_display = data
         .owner
@@ -126,12 +132,40 @@ pub fn generate_consentimiento(data: &ConsentimientoData, out_path: &Path) -> Re
     let sig_y = pdf.y;
     let half = CONTENT_W / 2.0 - 12.0;
     pdf.rule(MARGIN, sig_y, MARGIN + half, sig_y, C_RULE);
-    pdf.text(true, &truncate(&owner_display, 28), 8.5, MARGIN, sig_y - 6.0, C_TEXT);
-    pdf.text(false, "Firma del propietario", 7.5, MARGIN, sig_y - 11.0, C_MUTED);
+    pdf.text(
+        true,
+        &truncate(&owner_display, 28),
+        8.5,
+        MARGIN,
+        sig_y - 6.0,
+        C_TEXT,
+    );
+    pdf.text(
+        false,
+        "Firma del propietario",
+        7.5,
+        MARGIN,
+        sig_y - 11.0,
+        C_MUTED,
+    );
     let x2 = PAGE_W - MARGIN - half;
     pdf.rule(x2, sig_y, PAGE_W - MARGIN, sig_y, C_RULE);
-    pdf.text(true, &truncate(&data.veterinarian, 28), 8.5, x2, sig_y - 6.0, C_TEXT);
-    pdf.text(false, "Firma del médico veterinario", 7.5, x2, sig_y - 11.0, C_MUTED);
+    pdf.text(
+        true,
+        &truncate(&data.veterinarian, 28),
+        8.5,
+        x2,
+        sig_y - 6.0,
+        C_TEXT,
+    );
+    pdf.text(
+        false,
+        "Firma del médico veterinario",
+        7.5,
+        x2,
+        sig_y - 11.0,
+        C_MUTED,
+    );
     pdf.y = sig_y - 13.0;
 
     draw_footer(&mut pdf, "CONSENTIMIENTO INFORMADO");
@@ -155,41 +189,47 @@ pub fn generate_cirugia(data: &CirugiaData, out_path: &Path) -> Result<(), Strin
         .map(|o| o.full_name.clone())
         .unwrap_or_else(|| data.patient.owner_name.clone());
     section_title(&mut pdf, "DATOS DEL PACIENTE Y PROPIETARIO");
-    draw_grid(&mut pdf, &[
-        ("Paciente", data.patient.name.clone()),
-        (
-            "Especie / Raza",
-            format!(
-                "{} · {}",
-                data.patient.species_name,
-                data.patient.breed_name.as_deref().unwrap_or("—")
+    draw_grid(
+        &mut pdf,
+        &[
+            ("Paciente", data.patient.name.clone()),
+            (
+                "Especie / Raza",
+                format!(
+                    "{} · {}",
+                    data.patient.species_name,
+                    data.patient.breed_name.as_deref().unwrap_or("—")
+                ),
             ),
-        ),
-        (
-            "Sexo",
-            if data.patient.sex == "M" {
-                "Macho".to_string()
-            } else {
-                "Hembra".to_string()
-            },
-        ),
-        ("Propietario", owner),
-    ]);
+            (
+                "Sexo",
+                if data.patient.sex == "M" {
+                    "Macho".to_string()
+                } else {
+                    "Hembra".to_string()
+                },
+            ),
+            ("Propietario", owner),
+        ],
+    );
 
     section_title(&mut pdf, "PROCEDIMIENTO");
-    draw_grid(&mut pdf, &[
-        ("Tipo de cirugía", s.surgery_type.clone()),
-        ("Fecha programada", s.scheduled_at.clone()),
-        (
-            "Anestesia",
-            s.anesthesia_type.clone().unwrap_or_else(|| "—".into()),
-        ),
-        ("Estado", surgery_status_label(&s.status).to_string()),
-        (
-            "Veterinario",
-            s.veterinarian_name.clone().unwrap_or_else(|| "—".into()),
-        ),
-    ]);
+    draw_grid(
+        &mut pdf,
+        &[
+            ("Tipo de cirugía", s.surgery_type.clone()),
+            ("Fecha programada", s.scheduled_at.clone()),
+            (
+                "Anestesia",
+                s.anesthesia_type.clone().unwrap_or_else(|| "—".into()),
+            ),
+            ("Estado", surgery_status_label(&s.status).to_string()),
+            (
+                "Veterinario",
+                s.veterinarian_name.clone().unwrap_or_else(|| "—".into()),
+            ),
+        ],
+    );
 
     section_title(&mut pdf, "NOTAS PREOPERATORIAS");
     pdf.y = draw_multiline(

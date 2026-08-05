@@ -116,10 +116,7 @@ pub fn save(
         };
 
         let exists: Option<(i32,)> = conn
-            .query_first(
-                "SELECT 1 FROM CLINIC_SETTINGS WHERE KEY_NAME = ?",
-                (&key,),
-            )
+            .query_first("SELECT 1 FROM CLINIC_SETTINGS WHERE KEY_NAME = ?", (&key,))
             .map_err(AppError::from)?;
 
         if exists.is_some() {
@@ -143,9 +140,9 @@ pub fn save(
 
 #[cfg(test)]
 mod tests {
-    use std::path::PathBuf;
     use super::*;
     use crate::test_helpers::*;
+    use std::path::PathBuf;
 
     fn setup() -> (SimpleConnection, PathBuf) {
         setup_test_db()

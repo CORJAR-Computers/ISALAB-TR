@@ -31,22 +31,27 @@ pub fn list(conn: &mut SimpleConnection) -> Result<Vec<SecondaryLogo>, AppError>
     Ok(rows.into_iter().map(map_secondary_logo).collect())
 }
 
-pub fn insert(conn: &mut SimpleConnection, name: &str, logo_path: &str) -> Result<SecondaryLogo, AppError> {
+pub fn insert(
+    conn: &mut SimpleConnection,
+    name: &str,
+    logo_path: &str,
+) -> Result<SecondaryLogo, AppError> {
     let id = next_id(conn, "GEN_SECONDARY_LOGOS_SEQ")?;
     conn.execute(
         "INSERT INTO SECONDARY_LOGOS (ID, NAME, LOGO_PATH) VALUES (?, ?, ?)",
         (&id, name, logo_path),
     )
     .map_err(AppError::from)?;
-    
+
     let row: Option<SecondaryLogoRow> = conn
         .query_first(
             "SELECT ID, NAME, LOGO_PATH, CAST(CREATED_AT AS VARCHAR(30)) FROM SECONDARY_LOGOS WHERE ID = ?",
             (&id,),
         )
         .map_err(AppError::from)?;
-        
-    row.map(map_secondary_logo).ok_or_else(|| AppError::Internal("Logo no encontrado tras insertar".into()))
+
+    row.map(map_secondary_logo)
+        .ok_or_else(|| AppError::Internal("Logo no encontrado tras insertar".into()))
 }
 
 pub fn get(conn: &mut SimpleConnection, id: i32) -> Result<Option<SecondaryLogo>, AppError> {

@@ -1,4 +1,4 @@
-use std::path::PathBuf;
+use std::path::{Path, PathBuf};
 
 use tauri::{AppHandle, Manager, State};
 
@@ -19,7 +19,7 @@ const PKCS12_EXTENSIONS: [&str; 2] = ["p12", "pfx"];
 /// Valida que `path` exista y tenga una extensión PKCS#12 aceptada (.p12/.pfx).
 /// Devuelve la extensión en minúsculas si es válida, o un `AppError` de
 /// validación descriptivo en caso contrario.
-fn validate_pkcs12_source(path: &PathBuf) -> Result<String, AppError> {
+fn validate_pkcs12_source(path: &Path) -> Result<String, AppError> {
     if !path.exists() {
         return Err(AppError::Validation(
             "El archivo de certificado seleccionado ya no existe".into(),
@@ -31,8 +31,14 @@ fn validate_pkcs12_source(path: &PathBuf) -> Result<String, AppError> {
         .unwrap_or("")
         .to_lowercase();
     if !PKCS12_EXTENSIONS.contains(&ext.as_str()) {
+        // Sin extensión se muestra "()" (vacío); con extensión, "(.ext)".
+        let ext_label = if ext.is_empty() {
+            "()".to_string()
+        } else {
+            format!("(.{ext})")
+        };
         return Err(AppError::Validation(format!(
-            "Formato no soportado (.{ext}). Usa un archivo PKCS#12 (.p12 o .pfx)."
+            "Formato no soportado {ext_label}. Usa un archivo PKCS#12 (.p12 o .pfx)."
         )));
     }
     Ok(ext)
@@ -41,9 +47,7 @@ fn validate_pkcs12_source(path: &PathBuf) -> Result<String, AppError> {
 /// Configuración de la clínica (nombre, NIT, IVA, firma de reportes…).
 #[tauri::command]
 #[specta::specta]
-pub fn get_clinic_settings(
-    state: State<'_, AppState>,
-) -> Result<ClinicSettings, AppError> {
+pub fn get_clinic_settings(state: State<'_, AppState>) -> Result<ClinicSettings, AppError> {
     require_session(&state)?;
     let mut pooled = state.pool.acquire()?;
     settings_repo::get(pooled.conn())
@@ -63,10 +67,7 @@ pub fn save_clinic_settings(
     if let Some(ref pwd) = input.pkcs12_password {
         if !pwd.is_empty() {
             if let Some(ref p12) = input.pkcs12_path {
-                crate::pdf_templates::validate_pkcs12(
-                    std::path::Path::new(p12),
-                    pwd,
-                )?;
+                crate::pdf_templates::validate_pkcs12(std::path::Path::new(p12), pwd)?;
                 *state.pkcs12_password.lock().unwrap() = Some(pwd.clone());
             } else {
                 return Err(AppError::Validation(
@@ -86,7 +87,8 @@ pub fn save_clinic_settings(
             &admin.username,
             "SETTINGS_CHANGED",
             Some(&format!("Clínica: {}", input.clinic_name)),
-        ).ok();
+        )
+        .ok();
     }
 
     Ok(result)
@@ -116,8 +118,14 @@ pub fn import_clinic_logo(
         .unwrap_or("")
         .to_lowercase();
     if !LOGO_EXTENSIONS.contains(&ext.as_str()) {
+        // Sin extensión se muestra "()" (vacío); con extensión, "(.ext)".
+        let ext_label = if ext.is_empty() {
+            "()".to_string()
+        } else {
+            format!("(.{ext})")
+        };
         return Err(AppError::Validation(format!(
-            "Formato no soportado (.{ext}). Usa PNG, JPG o WebP."
+            "Formato no soportado {ext_label}. Usa PNG, JPG o WebP."
         )));
     }
 
@@ -130,9 +138,8 @@ pub fn import_clinic_logo(
         .map_err(|e| AppError::Internal(format!("No se pudo crear assets: {e}")))?;
 
     let dest = assets_dir.join(format!("clinic-logo.{ext}"));
-    std::fs::copy(&src, &dest).map_err(|e| {
-        AppError::Internal(format!("No se pudo copiar el logo: {e}"))
-    })?;
+    std::fs::copy(&src, &dest)
+        .map_err(|e| AppError::Internal(format!("No se pudo copiar el logo: {e}")))?;
 
     // Auditoría de importación de logo.
     if let Ok(mut audit_conn) = state.pool.acquire() {
@@ -142,7 +149,8 @@ pub fn import_clinic_logo(
             &admin.username,
             "LOGO_IMPORTED",
             Some(&format!("Logo: {}", dest.display())),
-        ).ok();
+        )
+        .ok();
     }
 
     Ok(dest.display().to_string())
@@ -150,7 +158,9 @@ pub fn import_clinic_logo(
 
 #[tauri::command]
 #[specta::specta]
-pub fn list_secondary_logos(state: State<'_, AppState>) -> Result<Vec<crate::models::logo::SecondaryLogo>, AppError> {
+pub fn list_secondary_logos(
+    state: State<'_, AppState>,
+) -> Result<Vec<crate::models::logo::SecondaryLogo>, AppError> {
     require_session(&state)?;
     let mut pooled = state.pool.acquire()?;
     logos_repo::list(pooled.conn())
@@ -167,25 +177,42 @@ pub fn import_secondary_logo(
     let admin = require_admin(&state)?;
     let src = PathBuf::from(&source_path);
     if !src.exists() {
-        return Err(AppError::Validation("El archivo de logo seleccionado ya no existe".into()));
+        return Err(AppError::Validation(
+            "El archivo de logo seleccionado ya no existe".into(),
+        ));
     }
-
-    let ext = src.extension().and_then(|e| e.to_str()).unwrap_or("").to_lowercase();
+    let ext = src
+        .extension()
+        .and_then(|e| e.to_str())
+        .unwrap_or("")
+        .to_lowercase();
     if !LOGO_EXTENSIONS.contains(&ext.as_str()) {
-        return Err(AppError::Validation(format!("Formato no soportado (.{ext}). Usa PNG, JPG o WebP.")));
+        // Sin extensión se muestra "()" (vacío); con extensión, "(.ext)".
+        let ext_label = if ext.is_empty() {
+            "()".to_string()
+        } else {
+            format!("(.{ext})")
+        };
+        return Err(AppError::Validation(format!(
+            "Formato no soportado {ext_label}. Usa PNG, JPG o WebP."
+        )));
     }
 
-    let assets_dir = app.path().app_data_dir()
+    let assets_dir = app
+        .path()
+        .app_data_dir()
         .map_err(|e| AppError::Internal(format!("Sin carpeta de datos: {e}")))?
-        .join("assets").join("logos");
+        .join("assets")
+        .join("logos");
     std::fs::create_dir_all(&assets_dir)
         .map_err(|e| AppError::Internal(format!("No se pudo crear assets/logos: {e}")))?;
 
     // Generar un nombre único para evitar colisiones
     let uuid = uuid::Uuid::new_v4().to_string();
     let dest = assets_dir.join(format!("{}.{}", uuid, ext));
-    
-    std::fs::copy(&src, &dest).map_err(|e| AppError::Internal(format!("No se pudo copiar el logo: {e}")))?;
+
+    std::fs::copy(&src, &dest)
+        .map_err(|e| AppError::Internal(format!("No se pudo copiar el logo: {e}")))?;
 
     let mut pooled = state.pool.acquire()?;
     let logo = logos_repo::insert(pooled.conn(), &name, &dest.display().to_string())?;
@@ -197,7 +224,8 @@ pub fn import_secondary_logo(
             &admin.username,
             "SECONDARY_LOGO_IMPORTED",
             Some(&format!("Logo: {} - {}", name, dest.display())),
-        ).ok();
+        )
+        .ok();
     }
 
     Ok(logo)
@@ -205,13 +233,10 @@ pub fn import_secondary_logo(
 
 #[tauri::command]
 #[specta::specta]
-pub fn delete_secondary_logo(
-    state: State<'_, AppState>,
-    id: i32,
-) -> Result<(), AppError> {
+pub fn delete_secondary_logo(state: State<'_, AppState>, id: i32) -> Result<(), AppError> {
     let admin = require_admin(&state)?;
     let mut pooled = state.pool.acquire()?;
-    
+
     // Buscar para obtener la ruta y eliminar el archivo
     if let Some(logo) = logos_repo::get(pooled.conn(), id)? {
         let path = PathBuf::from(&logo.logo_path);
@@ -219,7 +244,7 @@ pub fn delete_secondary_logo(
             let _ = std::fs::remove_file(path);
         }
         logos_repo::delete(pooled.conn(), id)?;
-        
+
         if let Ok(mut audit_conn) = state.pool.acquire() {
             auth_repo::log_audit(
                 audit_conn.conn(),
@@ -227,10 +252,11 @@ pub fn delete_secondary_logo(
                 &admin.username,
                 "SECONDARY_LOGO_DELETED",
                 Some(&format!("Logo: {} ({})", logo.name, logo.id)),
-            ).ok();
+            )
+            .ok();
         }
     }
-    
+
     Ok(())
 }
 
@@ -274,9 +300,8 @@ pub fn import_pkcs12(
         }
     }
 
-    std::fs::copy(&src, &dest).map_err(|e| {
-        AppError::Internal(format!("No se pudo copiar el certificado: {e}"))
-    })?;
+    std::fs::copy(&src, &dest)
+        .map_err(|e| AppError::Internal(format!("No se pudo copiar el certificado: {e}")))?;
 
     // Auditoría de importación de certificado.
     if let Ok(mut audit_conn) = state.pool.acquire() {

@@ -93,8 +93,6 @@ fn fbclient_path() -> PathBuf {
     resolve_firebird_dir().join("fbclient.dll")
 }
 
-
-
 /// Crea una base de datos temporal para tests con nombre único.
 /// Devuelve la conexión y la ruta de la DB.
 pub fn setup_test_db() -> (SimpleConnection, PathBuf) {
@@ -103,7 +101,8 @@ pub fn setup_test_db() -> (SimpleConnection, PathBuf) {
         .duration_since(std::time::UNIX_EPOCH)
         .unwrap_or_default()
         .as_nanos();
-    let db_path = std::env::temp_dir().join(format!("isalab_test_{:?}_{}.fdb", thread_id, timestamp));
+    let db_path =
+        std::env::temp_dir().join(format!("isalab_test_{:?}_{}.fdb", thread_id, timestamp));
 
     // Asegurar que no existe una DB previa
     let _ = std::fs::remove_file(&db_path);
@@ -117,12 +116,12 @@ pub fn setup_test_db() -> (SimpleConnection, PathBuf) {
     }
 
     // Crear la DB
-    let mut conn = create_database(&db_path, &fbclient)
-        .expect("No se pudo crear la base de datos de prueba");
+    let mut conn =
+        create_database(&db_path, &fbclient).expect("No se pudo crear la base de datos de prueba");
 
     // Ejecutar migraciones
-    let _version = migrations::run_migrations(&mut conn)
-        .expect("Las migraciones fallaron en la DB de prueba");
+    let _version =
+        migrations::run_migrations(&mut conn).expect("Las migraciones fallaron en la DB de prueba");
 
     // Limpiar datos de prueba de la migración 0005 (son para demo, no para tests)
     let cleanup_statements = [
@@ -147,7 +146,7 @@ pub fn setup_test_db() -> (SimpleConnection, PathBuf) {
         .ok()
         .flatten();
     let user_gen_value = max_user_id.map(|(id,)| id).unwrap_or(0);
-    
+
     let reset_generators = [
         "SET GENERATOR GEN_OWNERS_ID TO 0",
         "SET GENERATOR GEN_PATIENTS_ID TO 0",
@@ -162,12 +161,13 @@ pub fn setup_test_db() -> (SimpleConnection, PathBuf) {
     for stmt in &reset_generators {
         conn.execute(stmt, ()).ok();
     }
-    
+
     // Reset USERS generator to max ID to avoid conflicts with seed data
     conn.execute(
         &format!("SET GENERATOR GEN_USERS_ID TO {}", user_gen_value),
         (),
-    ).ok();
+    )
+    .ok();
 
     (conn, db_path)
 }

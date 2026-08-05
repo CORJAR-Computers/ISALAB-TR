@@ -3,7 +3,7 @@
 
 use crate::models::patient::Patient;
 use crate::pdf_templates::builder::{
-    format_value, CONTENT_W, C_MUTED, C_RULE, C_TEXT, MARGIN, PAGE_W, PdfBuilder,
+    format_value, PdfBuilder, CONTENT_W, C_MUTED, C_RULE, C_TEXT, MARGIN, PAGE_W,
 };
 use crate::pdf_templates::header::ClinicHeader;
 use serde::{Deserialize, Serialize};
@@ -62,7 +62,11 @@ pub fn draw_patient_metadata_grid(
         m if m < 12 => format!("{m} MESES"),
         m => format!("{} AÑOS", m / 12),
     };
-    let sexo = if patient.sex == "M" { "MACHO" } else { "HEMBRA" };
+    let sexo = if patient.sex == "M" {
+        "MACHO"
+    } else {
+        "HEMBRA"
+    };
     let vet = if signature.vet_name.is_empty() {
         "ISA RAMOS".to_string()
     } else {
@@ -134,7 +138,11 @@ pub fn draw_patient_block(pdf: &mut PdfBuilder, patient: &Patient) {
         m if m < 12 => format!("{m} meses"),
         m => format!("{} años", m / 12),
     };
-    let sexo = if patient.sex == "M" { "Macho" } else { "Hembra" };
+    let sexo = if patient.sex == "M" {
+        "Macho"
+    } else {
+        "Hembra"
+    };
 
     let rows: Vec<(&str, String)> = vec![
         ("Paciente", patient.name.clone()),
@@ -148,7 +156,14 @@ pub fn draw_patient_block(pdf: &mut PdfBuilder, patient: &Patient) {
         ),
         (
             "Sexo",
-            format!("{sexo}{}", if patient.neutered { " · Esterilizado" } else { "" }),
+            format!(
+                "{sexo}{}",
+                if patient.neutered {
+                    " · Esterilizado"
+                } else {
+                    ""
+                }
+            ),
         ),
         ("Edad", edad),
         ("Propietario", patient.owner_name.clone()),
@@ -207,9 +222,30 @@ pub fn draw_results_full(
 
     let y_text = pdf.y - 4.8;
     pdf.text(true, "Ítem", 8.5, MARGIN + 4.0, y_text, (255, 255, 255));
-    pdf.text(true, "Resultados", 8.5, MARGIN + w_item + 2.0, y_text, (255, 255, 255));
-    pdf.text(true, "Unidades", 8.5, MARGIN + w_item + w_res + 12.0, y_text, (255, 255, 255));
-    pdf.text(true, "Referencias", 8.5, MARGIN + w_item + w_res + w_unit + 10.0, y_text, (255, 255, 255));
+    pdf.text(
+        true,
+        "Resultados",
+        8.5,
+        MARGIN + w_item + 2.0,
+        y_text,
+        (255, 255, 255),
+    );
+    pdf.text(
+        true,
+        "Unidades",
+        8.5,
+        MARGIN + w_item + w_res + 12.0,
+        y_text,
+        (255, 255, 255),
+    );
+    pdf.text(
+        true,
+        "Referencias",
+        8.5,
+        MARGIN + w_item + w_res + w_unit + 10.0,
+        y_text,
+        (255, 255, 255),
+    );
 
     pdf.y -= row_h;
 
@@ -222,11 +258,25 @@ pub fn draw_results_full(
             Some((255, 255, 255))
         };
 
-        pdf.rect(MARGIN, pdf.y, CONTENT_W, row_h, bg_color, Some((226, 232, 240)));
+        pdf.rect(
+            MARGIN,
+            pdf.y,
+            CONTENT_W,
+            row_h,
+            bg_color,
+            Some((226, 232, 240)),
+        );
         let y_row_text = pdf.y - 4.8;
 
         // 1. Ítem (Nombre + Código corto ej: WBC#)
-        pdf.text(false, &r.analyte_name, 8.5, MARGIN + 4.0, y_row_text, C_TEXT);
+        pdf.text(
+            false,
+            &r.analyte_name,
+            8.5,
+            MARGIN + 4.0,
+            y_row_text,
+            C_TEXT,
+        );
         let code = get_analyte_code(&r.analyte_name);
         if !code.is_empty() {
             pdf.text(false, code, 7.5, MARGIN + 48.0, y_row_text, C_MUTED);
@@ -235,22 +285,43 @@ pub fn draw_results_full(
         // 2. Resultados (Destacado en Negrita, Rojo si ALTO, Azul si BAJO, Negro si NORMAL)
         let val_str = format_value(r.value);
         let val_color = match r.status.as_str() {
-            "ALTO" => (217, 56, 56),   // Red #D93838
-            "BAJO" => (0, 130, 200),   // Blue #0082C8
+            "ALTO" => (217, 56, 56), // Red #D93838
+            "BAJO" => (0, 130, 200), // Blue #0082C8
             _ => C_TEXT,
         };
-        pdf.text(true, &val_str, 8.5, MARGIN + w_item + 6.0, y_row_text, val_color);
+        pdf.text(
+            true,
+            &val_str,
+            8.5,
+            MARGIN + w_item + 6.0,
+            y_row_text,
+            val_color,
+        );
 
         // 3. Unidades
         let unit_str = r.unit.as_deref().unwrap_or("—");
-        pdf.text(false, unit_str, 8.5, MARGIN + w_item + w_res + 12.0, y_row_text, (60, 60, 60));
+        pdf.text(
+            false,
+            unit_str,
+            8.5,
+            MARGIN + w_item + w_res + 12.0,
+            y_row_text,
+            (60, 60, 60),
+        );
 
         // 4. Referencias (Min - Max)
         let ref_str = match (r.ref_min, r.ref_max) {
             (Some(min), Some(max)) => format!("{min:.1} – {max:.1}"),
             _ => "—".to_string(),
         };
-        pdf.text(false, &ref_str, 8.5, MARGIN + w_item + w_res + w_unit + 10.0, y_row_text, (60, 60, 60));
+        pdf.text(
+            false,
+            &ref_str,
+            8.5,
+            MARGIN + w_item + w_res + w_unit + 10.0,
+            y_row_text,
+            (60, 60, 60),
+        );
 
         pdf.y -= row_h;
     }
@@ -258,7 +329,14 @@ pub fn draw_results_full(
     pdf.y -= 3.0;
     // Nota técnica
     pdf.text(true, "Técnica:", 7.5, MARGIN, pdf.y, C_TEXT);
-    pdf.text(false, " Lectura Automatizada: MINDRAY B2800 RUFFOS LABS", 7.5, MARGIN + 12.0, pdf.y, (80, 80, 80));
+    pdf.text(
+        false,
+        " Lectura Automatizada: MINDRAY B2800 RUFFOS LABS",
+        7.5,
+        MARGIN + 12.0,
+        pdf.y,
+        (80, 80, 80),
+    );
     pdf.y -= 7.0;
 
     // Observaciones
@@ -299,23 +377,41 @@ pub fn draw_results_full(
 
 fn get_analyte_code(name: &str) -> &'static str {
     let n = name.to_lowercase();
-    if n.contains("leucocito") && !n.contains("%") { "WBC#" }
-    else if n.contains("linfocito") && !n.contains("%") { "LYM#" }
-    else if n.contains("monocito") && !n.contains("%") { "MON#" }
-    else if (n.contains("neutrófilo") || n.contains("neutrofilo")) && !n.contains("%") { "NEU#" }
-    else if (n.contains("eosinófilo") || n.contains("eosinofilo")) && !n.contains("%") { "EOS#" }
-    else if n.contains("linfocito") && n.contains("%") { "LYM%" }
-    else if n.contains("monocito") && n.contains("%") { "MON%" }
-    else if (n.contains("neutrófilo") || n.contains("neutrofilo")) && n.contains("%") { "NEU%" }
-    else if (n.contains("eosinófilo") || n.contains("eosinofilo")) && n.contains("%") { "EOS%" }
-    else if n.contains("eritrocito") || n.contains("glóbulos rojos") { "RBC" }
-    else if n.contains("hemoglobina") { "Hb" }
-    else if n.contains("hematocrito") { "HCT" }
-    else if n.contains("plaqueta") { "PLT" }
-    else if n.contains("mcv") || n.contains("vcm") { "MCV" }
-    else if n.contains("mch") || n.contains("hcm") { "MCH" }
-    else if n.contains("mchc") || n.contains("chcm") { "MCHC" }
-    else { "" }
+    if n.contains("leucocito") && !n.contains("%") {
+        "WBC#"
+    } else if n.contains("linfocito") && !n.contains("%") {
+        "LYM#"
+    } else if n.contains("monocito") && !n.contains("%") {
+        "MON#"
+    } else if (n.contains("neutrófilo") || n.contains("neutrofilo")) && !n.contains("%") {
+        "NEU#"
+    } else if (n.contains("eosinófilo") || n.contains("eosinofilo")) && !n.contains("%") {
+        "EOS#"
+    } else if n.contains("linfocito") && n.contains("%") {
+        "LYM%"
+    } else if n.contains("monocito") && n.contains("%") {
+        "MON%"
+    } else if (n.contains("neutrófilo") || n.contains("neutrofilo")) && n.contains("%") {
+        "NEU%"
+    } else if (n.contains("eosinófilo") || n.contains("eosinofilo")) && n.contains("%") {
+        "EOS%"
+    } else if n.contains("eritrocito") || n.contains("glóbulos rojos") {
+        "RBC"
+    } else if n.contains("hemoglobina") {
+        "Hb"
+    } else if n.contains("hematocrito") {
+        "HCT"
+    } else if n.contains("plaqueta") {
+        "PLT"
+    } else if n.contains("mcv") || n.contains("vcm") {
+        "MCV"
+    } else if n.contains("mch") || n.contains("hcm") {
+        "MCH"
+    } else if n.contains("mchc") || n.contains("chcm") {
+        "MCHC"
+    } else {
+        ""
+    }
 }
 
 /// Dibuja el bloque de firma del veterinario.
@@ -336,7 +432,14 @@ pub fn draw_signature(pdf: &mut PdfBuilder, signature: &ReportSignature) {
     pdf.text(true, &vet, 9.0, x, pdf.y, C_TEXT);
     if let Some(lic) = signature.vet_license.as_deref().filter(|l| !l.is_empty()) {
         pdf.y -= 5.0;
-        pdf.text(false, &format!("Tarjeta profesional MVZ {lic}"), 7.5, x, pdf.y, C_MUTED);
+        pdf.text(
+            false,
+            &format!("Tarjeta profesional MVZ {lic}"),
+            7.5,
+            x,
+            pdf.y,
+            C_MUTED,
+        );
     }
     pdf.y -= 5.0;
     pdf.text(false, "Firma", 7.5, x, pdf.y, C_MUTED);
