@@ -230,6 +230,13 @@ jobs:
       # Wrapper linker que instala cargo-xwin: enlaza contra el CRT/SDK de
       # Microsoft descargado por xwin (target MSVC).
       CARGO_TARGET_X86_64_PC_WINDOWS_MSVC_LINKER: xwin-cargo
+      # ring (vía cc-rs) busca el archiver MSVC lib.exe, que xwin NO provee
+      # (solo descarga CRT/SDK). llvm-lib emula lib.exe; sin esto el build
+      # falla en ring: 'failed to find tool "lib.exe"'.
+      CARGO_TARGET_X86_64_PC_WINDOWS_MSVC_AR: llvm-lib
+      # ring compila C con cc-rs: clang-cl es el compilador MSVC-compatible
+      # que ya viene en ubuntu-latest (o se instala con el paquete clang).
+      CARGO_TARGET_X86_64_PC_WINDOWS_MSVC_CC: clang-cl
     steps:
       - uses: actions/checkout@v7
         with:
@@ -258,9 +265,19 @@ jobs:
         # los templates oficiales de Tauri en ubuntu (el CLI puede verificar
         # deps de sistema aunque el target sea Windows; inofensivas si no se
         # usan).
+        # clang/lld/llvm: el archiver llvm-lib y el linker lld que xwin-cargo
+        # necesita para el target MSVC (ring usa cc-rs, que requiere lib.exe
+        # emulado por llvm-lib).
         run: |
           sudo apt-get update
-          sudo apt-get install -y nsis libwebkit2gtk-4.1-dev libayatana-appindicator3-dev librsvg2-dev
+          sudo apt-get install -y nsis libwebkit2gtk-4.1-dev libayatana-appindicator3-dev librsvg2-dev clang lld llvm
+          # llvm-lib se instala como llvm-lib-XX; exponerlo sin versión para
+          # que CARGO_TARGET_..._AR=llvm-lib lo encuentre.
+          if ! command -v llvm-lib >/dev/null 2>&1; then
+            lib=$(ls /usr/bin/llvm-lib-* 2>/dev/null | head -1)
+            [ -n "$lib" ] && sudo ln -sf "$lib" /usr/local/bin/llvm-lib
+          fi
+          command -v llvm-lib && command -v clang-cl && echo "toolchain MSVC OK"
 
       - name: Cache cargo registry
         uses: actions/cache@v6
