@@ -107,6 +107,13 @@ jobs:
           # upload-artifact): la Artifact Configuration de SignPath debe tener
           # raíz <zip-file>.
           github-artifact-id: ${{ steps.upload-unsigned.outputs.artifact-id }}
+          # Si la Artifact Configuration define parámetros de usuario (por
+          # ejemplo `version`, que SignPath suele exigir por su validación de
+          # metadatos estrictos), se pasan aquí. Se toma del tag del release
+          # (v0.3.2 → 0.3.2) y se serializa como string con toJSON para que el
+          # parser YAML no lo convierta a número.
+          parameters: |
+            version: ${{ toJSON(github.ref_name) }}
           wait-for-completion: true
           # La aprobación manual del aprobador puede tardar más de 10 min.
           wait-for-completion-timeout-in-seconds: 3600
