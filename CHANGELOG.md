@@ -4,7 +4,7 @@ All notable changes to ISALAB will be documented in this file.
 
 The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.1.0/).
 
-## [0.3.2] - Unreleased
+## [0.3.2] - 2026-08-05
 
 ### Added
 
@@ -30,6 +30,11 @@ The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.1.0/).
   real es bajo: la app solo firma PDFs generados por ella misma y nunca
   parsea PDFs de terceros. `pdf_signer` (GPL-3.0) es compatible con la
   licencia AGPL-3.0 del proyecto (sección 13).
+- **`cargo audit` en CI**: el job `backend` de `ci.yml` ejecuta la auditoría
+  de dependencias en cada push/PR. Los dos advisories conocidos sin fix
+  (`RUSTSEC-2026-0187` lopdf y `RUSTSEC-2023-0071` rsa) se ignoran de forma
+  explícita y documentada, de modo que el pipeline falla solo si aparece una
+  vulnerabilidad nueva en el árbol de dependencias.
 
 ## [0.3.1] - 2026-08-05
 
