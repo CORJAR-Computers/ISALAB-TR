@@ -1,4 +1,4 @@
-import { useState } from "react";
+import { useEffect, useRef, useState } from "react";
 import { useForm } from "react-hook-form";
 import { zodResolver } from "@hookform/resolvers/zod";
 import { z } from "zod";
@@ -15,6 +15,7 @@ import {
   Plus,
   MessageCircle,
   Bot,
+  X,
 } from "lucide-react";
 import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
@@ -107,6 +108,15 @@ export function SampleDetailDialog({
   const [confirmAnular, setConfirmAnular] = useState(false);
   const [aiInterpretation, setAiInterpretation] = useState<string | null>(null);
   const [interpreting, setInterpreting] = useState(false);
+  const aiRef = useRef<HTMLDivElement | null>(null);
+
+  // Lleva el contenido del diálogo hasta el bloque de interpretación IA en
+  // cuanto aparece, para que el usuario vea el resultado sin buscarlo.
+  useEffect(() => {
+    if (aiInterpretation) {
+      aiRef.current?.scrollIntoView({ behavior: "smooth", block: "start" });
+    }
+  }, [aiInterpretation]);
 
   const resultForm = useForm<z.input<typeof resultSchema>, unknown, z.output<typeof resultSchema>>({
     resolver: zodResolver(resultSchema),
@@ -272,7 +282,7 @@ export function SampleDetailDialog({
         onOpenChange(o);
       }}
     >
-      <DialogContent className="sm:max-w-2xl">
+      <DialogContent className="flex max-h-[90vh] flex-col gap-4 sm:max-w-2xl">
         <DialogHeader>
           <DialogTitle className="flex items-center gap-2">
             <StatusIcon className="size-4" />
@@ -286,6 +296,10 @@ export function SampleDetailDialog({
           </DialogDescription>
         </DialogHeader>
 
+        {/* El contenido crece con los resultados y la interpretación IA; el
+            scroll queda aquí para que el footer con las acciones nunca se
+            pierda fuera de pantalla. */}
+        <div className="min-h-0 flex-1 space-y-5 overflow-y-auto pr-1">
         {isLoading && !sample && (
           <div className="space-y-3">
             <Skeleton className="h-20 w-full" />
@@ -516,10 +530,22 @@ export function SampleDetailDialog({
 
             {/* Resultado IA */}
             {aiInterpretation && (
-              <div className="bg-primary/5 border border-primary/20 rounded-lg p-4 text-sm space-y-2">
+              <div
+                ref={aiRef}
+                className="bg-primary/5 border border-primary/20 rounded-lg p-4 text-sm space-y-2"
+              >
                 <div className="flex items-center gap-2 font-semibold text-primary">
                   <Bot className="size-4" />
                   Interpretación IA (Llama 3)
+                  <Button
+                    variant="ghost"
+                    size="sm"
+                    className="ml-auto h-6 gap-1 px-2 text-xs text-muted-foreground hover:text-foreground"
+                    onClick={() => setAiInterpretation(null)}
+                  >
+                    <X className="size-3.5" />
+                    Ocultar
+                  </Button>
                 </div>
                 <div className="prose prose-sm prose-neutral dark:prose-invert max-w-none">
                   <ReactMarkdown remarkPlugins={[remarkGfm]}>
@@ -530,8 +556,9 @@ export function SampleDetailDialog({
             )}
           </div>
         )}
+        </div>
 
-        <DialogFooter className="sm:justify-between">
+        <DialogFooter className="shrink-0 border-t pt-3 sm:justify-between">
           <div className="flex flex-wrap gap-2">
             {canProcess && (
               <Button variant="outline" onClick={markEnProceso} disabled={pending}>
