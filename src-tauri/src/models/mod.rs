@@ -1,5 +1,6 @@
 pub mod auth;
 pub mod clinical_history;
+pub mod search;
 pub mod consultation;
 pub mod dashboard;
 pub mod invoice;

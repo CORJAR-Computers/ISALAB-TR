@@ -1,4 +1,4 @@
-import { useMemo, useState } from "react";
+import { useEffect, useMemo, useState } from "react";
 import { toast } from "sonner";
 import {
   Ban,
@@ -40,6 +40,7 @@ import { cn, formatDateTime } from "@/lib/utils";
 import { sendWhatsAppMessage } from "@/lib/whatsapp";
 import { NewSurgeryDialog } from "./NewSurgeryDialog";
 import { usePermissions } from "@/hooks/use-permissions";
+import { useUiStore } from "@/stores/ui-store";
 
 const STATUS_TABS: Array<{ value: string | null; label: string }> = [
   { value: null, label: "Todas" },
@@ -57,6 +58,34 @@ export function SurgeriesPage() {
   const { data: all } = useSurgeryCounts();
   const setStatusMutation = useSetSurgeryStatus();
   const { isVetOrAdmin } = usePermissions();
+  const entityRequest = useUiStore((s) => s.entityRequest);
+  const consumeEntityRequest = useUiStore((s) => s.consumeEntityRequest);
+  const [focusId, setFocusId] = useState<number | null>(null);
+
+  // Solicitud externa (paleta Ctrl+K): limpia filtros y enfoca la cirugía.
+  useEffect(() => {
+    if (entityRequest?.kind === "surgery") {
+      setStatus(null);
+      setSearch("");
+      setFocusId(entityRequest.id);
+      consumeEntityRequest();
+    }
+  }, [entityRequest, consumeEntityRequest]);
+
+  // Desplaza la fila al centro y la resalta brevemente (reintenta al cargar).
+  useEffect(() => {
+    if (focusId == null) return;
+    const scroll = setTimeout(() => {
+      document
+        .querySelector(`[data-surgery-id="${focusId}"]`)
+        ?.scrollIntoView({ behavior: "smooth", block: "center" });
+    }, 150);
+    const clear = setTimeout(() => setFocusId(null), 3500);
+    return () => {
+      clearTimeout(scroll);
+      clearTimeout(clear);
+    };
+  }, [focusId, surgeries]);
 
   // Contadores reales por estado (independientes de filtros/búsqueda).
   const counts = useMemo(() => {
@@ -198,7 +227,15 @@ export function SurgeriesPage() {
                 };
                 const busy = setStatusMutation.isPending;
                 return (
-                  <TableRow key={s.id}>
+                  <TableRow
+                    key={s.id}
+                    data-surgery-id={s.id}
+                    className={cn(
+                      "transition-colors",
+                      focusId === s.id &&
+                        "bg-primary/10 ring-1 ring-primary ring-inset",
+                    )}
+                  >
                     <TableCell>
                       <div className="flex flex-col">
                         <span className="font-medium">{s.patientName}</span>

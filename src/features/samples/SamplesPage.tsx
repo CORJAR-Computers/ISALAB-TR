@@ -43,6 +43,7 @@ import { SAMPLE_STATUS } from "@/lib/status";
 import { cn, formatDateTime } from "@/lib/utils";
 import { api, getErrorMessage } from "@/lib/api";
 import { usePermissions } from "@/hooks/use-permissions";
+import { useUiStore } from "@/stores/ui-store";
 import { SampleDetailDialog } from "./SampleDetailDialog";
 import { NewSampleDialog } from "./NewSampleDialog";
 
@@ -122,6 +123,16 @@ export function SamplesPage() {
   const { data: all, isLoading: loadingCounts } = useSampleCounts();
   const generateLabels = useGenerateSampleLabels();
   const { isVetOrAdmin } = usePermissions();
+  const entityRequest = useUiStore((s) => s.entityRequest);
+  const consumeEntityRequest = useUiStore((s) => s.consumeEntityRequest);
+
+  // Solicitud externa (paleta Ctrl+K): abre el detalle de la muestra.
+  useEffect(() => {
+    if (entityRequest?.kind === "sample") {
+      setDetailId(entityRequest.id);
+      consumeEntityRequest();
+    }
+  }, [entityRequest, consumeEntityRequest]);
 
   const visibleIds = useMemo(
     () => new Set((samples ?? []).map((s) => s.id)),

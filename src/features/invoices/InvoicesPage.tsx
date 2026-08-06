@@ -1,4 +1,4 @@
-import { useMemo, useState } from "react";
+import { useEffect, useMemo, useState } from "react";
 import { Plus, Receipt, Search } from "lucide-react";
 import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
@@ -25,6 +25,7 @@ import { cn, formatCOP, formatDateTime } from "@/lib/utils";
 import { InvoiceDetailDialog } from "./InvoiceDetailDialog";
 import { NewInvoiceDialog } from "./NewInvoiceDialog";
 import { usePermissions } from "@/hooks/use-permissions";
+import { useUiStore } from "@/stores/ui-store";
 
 const STATUS_TABS: Array<{ value: string | null; label: string }> = [
   { value: null, label: "Todas" },
@@ -41,6 +42,16 @@ export function InvoicesPage() {
   const { data: invoices, isLoading, isError } = useInvoices(status, search);
   const { data: all } = useInvoiceCounts();
   const { isVetOrAdmin } = usePermissions();
+  const entityRequest = useUiStore((s) => s.entityRequest);
+  const consumeEntityRequest = useUiStore((s) => s.consumeEntityRequest);
+
+  // Solicitud externa (paleta Ctrl+K): abre el detalle de la factura.
+  useEffect(() => {
+    if (entityRequest?.kind === "invoice") {
+      setDetailId(entityRequest.id);
+      consumeEntityRequest();
+    }
+  }, [entityRequest, consumeEntityRequest]);
 
   // Contadores reales por estado (independientes de filtros/búsqueda).
   const counts = useMemo(() => {

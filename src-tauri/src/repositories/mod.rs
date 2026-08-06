@@ -6,6 +6,7 @@ pub mod invoices;
 pub mod logos;
 pub mod patient;
 pub mod samples;
+pub mod search;
 pub mod settings;
 pub mod surgeries;
 pub mod users;

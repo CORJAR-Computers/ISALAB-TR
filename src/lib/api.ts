@@ -18,6 +18,7 @@ import type {
   CreateVaccineInput,
   DashboardStats,
   DbHealth,
+  GlobalSearchResult,
   Invoice,
   InvoiceListItem,
   LabResult,
@@ -200,6 +201,10 @@ export const api = {
   getInvoice: (id: number) => invoke<Invoice | null>("get_invoice", { id }),
   setInvoiceStatus: (id: number, status: string) =>
     invoke<Invoice>("set_invoice_status", { id, status }),
+
+  // ---- Búsqueda global (paleta Ctrl+K) ----
+  globalSearch: (query: string) =>
+    invoke<GlobalSearchResult[]>("global_search", { query }),
 
   // ---- Dashboard ----
   getDashboardStats: () => invoke<DashboardStats>("get_dashboard_stats"),

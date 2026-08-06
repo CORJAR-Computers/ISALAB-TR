@@ -17,6 +17,9 @@ export type View =
   | "audit-log"
   | "settings";
 
+/** Entidad externa que una página debe abrir/enfocar (p. ej. desde la paleta Ctrl+K). */
+export type EntityKind = "sample" | "invoice" | "surgery";
+
 type UiState = {
   theme: Theme;
   sidebarOpen: boolean;
@@ -27,6 +30,10 @@ type UiState = {
   newPatientRequest: number;
   /** Control del diálogo Acerca de (CORJAR Computers Solutions). */
   aboutOpen: boolean;
+  /** Paleta de búsqueda global (Ctrl+K). */
+  searchOpen: boolean;
+  /** Solicitud pendiente para que una página abra/enfoque una entidad. */
+  entityRequest: { kind: EntityKind; id: number; nonce: number } | null;
   setTheme: (theme: Theme) => void;
   toggleTheme: () => void;
   setSidebarOpen: (open: boolean) => void;
@@ -35,6 +42,10 @@ type UiState = {
   requestNewPatient: () => void;
   consumeNewPatientRequest: () => void;
   setAboutOpen: (open: boolean) => void;
+  openSearch: () => void;
+  closeSearch: () => void;
+  requestEntity: (kind: EntityKind, id: number) => void;
+  consumeEntityRequest: () => void;
 };
 
 const storedTheme = (): Theme => {
@@ -53,6 +64,8 @@ export const useUiStore = create<UiState>((set) => ({
   activePatientId: null,
   newPatientRequest: 0,
   aboutOpen: false,
+  searchOpen: false,
+  entityRequest: null,
 
   setTheme: (theme) => {
     document.documentElement.classList.toggle("dark", theme === "dark");
@@ -82,4 +95,9 @@ export const useUiStore = create<UiState>((set) => ({
   requestNewPatient: () => set((s) => ({ newPatientRequest: s.newPatientRequest + 1 })),
   consumeNewPatientRequest: () => set({ newPatientRequest: 0 }),
   setAboutOpen: (open) => set({ aboutOpen: open }),
+  openSearch: () => set({ searchOpen: true }),
+  closeSearch: () => set({ searchOpen: false }),
+  requestEntity: (kind, id) =>
+    set((s) => ({ entityRequest: { kind, id, nonce: (s.entityRequest?.nonce ?? 0) + 1 } })),
+  consumeEntityRequest: () => set({ entityRequest: null }),
 }));

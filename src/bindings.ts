@@ -520,6 +520,18 @@ export type LabResultChangedEvent = {
 	patientId: number,
 };
 
+export type GlobalSearchResult = {
+	/**  patient | sample | invoice | surgery */
+	kind: string,
+	id: number,
+	/**  Etiqueta principal (nombre del paciente, cliente, etc.). */
+	title: string,
+	/**  Etiqueta secundaria (detalle contextual). */
+	subtitle: string,
+	/**  Código de trazabilidad cuando existe (PAC-, M-, FAC-…). */
+	code: string | null,
+};
+
 export type LoginInput = {
 	username: string,
 	password: string,

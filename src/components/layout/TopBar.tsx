@@ -1,4 +1,4 @@
-import { Info, KeyRound, LogOut, Menu, Moon, Settings, Sun } from "lucide-react";
+import { Info, KeyRound, LogOut, Menu, Moon, Search, Settings, Sun } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { Badge } from "@/components/ui/badge";
 import { useUiStore } from "@/stores/ui-store";
@@ -60,6 +60,7 @@ export function TopBar() {
   const toggleTheme = useUiStore((s) => s.toggleTheme);
   const setSidebarOpen = useUiStore((s) => s.setSidebarOpen);
   const setAboutOpen = useUiStore((s) => s.setAboutOpen);
+  const openSearch = useUiStore((s) => s.openSearch);
   const navigate = useUiStore((s) => s.navigate);
   const session = useSessionStore((s) => s.session);
   const openChangePassword = useSessionStore((s) => s.openChangePassword);
@@ -97,6 +98,19 @@ export function TopBar() {
       </div>
 
       <div className="ml-auto flex items-center gap-1">
+        <Button
+          variant="outline"
+          onClick={openSearch}
+          className="gap-2 px-2.5 text-muted-foreground"
+          title="Buscar en todo el sistema (Ctrl+K)"
+          aria-label="Buscar (Ctrl+K)"
+        >
+          <Search className="size-4" />
+          <span className="hidden text-sm lg:inline">Buscar…</span>
+          <kbd className="rounded border bg-muted hidden px-1.5 py-0.5 text-[10px] font-medium lg:inline">
+            Ctrl K
+          </kbd>
+        </Button>
         {session && (
           <>
             <Button

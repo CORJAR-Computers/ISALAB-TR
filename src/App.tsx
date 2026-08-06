@@ -31,6 +31,7 @@ import { SettingsPage } from "@/features/settings/SettingsPage";
 import { UsersPage } from "@/features/users/UsersPage";
 import { AuditLogPage } from "@/features/audit/AuditLogPage";
 import { LoginPage } from "@/features/auth/LoginPage";
+import { GlobalSearchPalette } from "@/features/search/GlobalSearchPalette";
 
 export default function App() {
   const theme = useUiStore((s) => s.theme);
@@ -95,6 +96,7 @@ export default function App() {
       <div className="min-h-svh">
         <Sidebar />
         <AboutDialog />
+        <GlobalSearchPalette />
         <ChangePasswordDialog
           open={mustChangePassword || changePasswordOpen}
           onOpenChange={mustChangePassword ? () => {} : closeChangePassword}

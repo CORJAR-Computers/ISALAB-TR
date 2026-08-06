@@ -52,6 +52,7 @@ use crate::commands::settings::{
 };
 use crate::commands::surgeries::{create_surgery, list_surgeries, set_surgery_status};
 use crate::commands::users::{change_password, create_user, list_users};
+use crate::commands::search::global_search;
 use crate::commands::vaccines::{create_vaccine, list_vaccines};
 use crate::state::AppState;
 
@@ -59,6 +60,7 @@ fn specta_builder() -> Builder<tauri::Wry> {
     Builder::<tauri::Wry>::new()
         .commands(collect_commands![
             db_health,
+            global_search,
             create_local_backup,
             export_samples_csv,
             export_results_csv,

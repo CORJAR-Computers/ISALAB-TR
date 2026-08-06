@@ -22,6 +22,23 @@ The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.1.0/).
   procesamiento (recepción→finalización en horas), % de muestras finalizadas
   con valores fuera de rango, tendencia de volumen diario de los últimos 7
   días y ranking de los 5 analitos más solicitados.
+- **Bandeja de trabajo diaria** (`get_worklist`): vista dedicada que agrupa
+  las muestras pendientes (RECIBIDA/EN_PROCESO) por tipo de muestra, con el
+  tiempo transcurrido desde la recepción y colores de urgencia (<2 h normal,
+  2–6 h aviso, >6 h crítica). Separa las recibidas hoy de las de días
+  anteriores (requieren atención) y se auto-refresca cada minuto; clic en una
+  muestra abre su ficha completa.
+- **Adjuntos por resultado de laboratorio** (`attach_result_file`,
+  `delete_result_attachment`): fotos de placas, frotis o electroforesis
+  asociadas a cada analito. El archivo se copia a `app_data/attachments` con
+  nombre único (uuid), miniaturas en la tabla de resultados, vista previa en
+  pantalla completa, apertura del original y eliminación con confirmación
+  (auditada). Se incluye la migración 0009 (`RESULT_ATTACHMENTS`).
+- **Búsqueda global (paleta Ctrl+K)** (`global_search`): salta a un
+  paciente, muestra, factura o cirugía por código (PAC-, M-, FAC-) o nombre.
+  Búsqueda con debounce, navegación por teclado (↑↓/↵/Esc), apertura de la
+  ficha de muestra/factura y resaltado de la cirugía en la agenda. Botón
+  "Buscar… Ctrl K" en la barra superior.
 
 ## [0.3.3] - 2026-08-06
 
