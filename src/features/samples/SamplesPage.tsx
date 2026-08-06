@@ -1,12 +1,18 @@
-import { useMemo, useState } from "react";
+import { useEffect, useMemo, useState } from "react";
+import { toast } from "sonner";
+import { openPath } from "@tauri-apps/plugin-opener";
+import { save as saveDialog } from "@tauri-apps/plugin-dialog";
 import {
   AlertTriangle,
   Ban,
   CheckCircle2,
+  Download,
   FileText,
   FlaskConical,
+  Loader2,
   PlayCircle,
   Plus,
+  Printer,
   Search,
 } from "lucide-react";
 import { Badge } from "@/components/ui/badge";
@@ -28,9 +34,15 @@ import {
   TableRow,
 } from "@/components/ui/table";
 import { Skeleton } from "@/components/ui/skeleton";
-import { useSampleCounts, useSamples } from "@/hooks/use-queries";
+import {
+  useGenerateSampleLabels,
+  useSampleCounts,
+  useSamples,
+} from "@/hooks/use-queries";
 import { SAMPLE_STATUS } from "@/lib/status";
 import { cn, formatDateTime } from "@/lib/utils";
+import { api, getErrorMessage } from "@/lib/api";
+import { usePermissions } from "@/hooks/use-permissions";
 import { SampleDetailDialog } from "./SampleDetailDialog";
 import { NewSampleDialog } from "./NewSampleDialog";
 
@@ -104,9 +116,113 @@ export function SamplesPage() {
   const [search, setSearch] = useState("");
   const [detailId, setDetailId] = useState<number | null>(null);
   const [newSampleOpen, setNewSampleOpen] = useState(false);
+  const [selected, setSelected] = useState<Set<number>>(new Set());
 
   const { data: samples, isLoading, isError } = useSamples(status, search);
   const { data: all, isLoading: loadingCounts } = useSampleCounts();
+  const generateLabels = useGenerateSampleLabels();
+  const { isVetOrAdmin } = usePermissions();
+
+  const visibleIds = useMemo(
+    () => new Set((samples ?? []).map((s) => s.id)),
+    [samples],
+  );
+  const selectedCount = selected.size;
+  const allVisibleSelected =
+    visibleIds.size > 0 && [...visibleIds].every((id) => selected.has(id));
+
+  const toggleAll = () => {
+    setSelected((prev) => {
+      if (allVisibleSelected) {
+        const next = new Set(prev);
+        for (const id of visibleIds) next.delete(id);
+        return next;
+      }
+      return new Set([...prev, ...visibleIds]);
+    });
+  };
+
+  const toggleOne = (id: number) => {
+    setSelected((prev) => {
+      const next = new Set(prev);
+      if (next.has(id)) next.delete(id);
+      else next.add(id);
+      return next;
+    });
+  };
+
+  const printLabels = async (ids: number[]) => {
+    if (ids.length > 100) {
+      toast.error("Máximo 100 etiquetas por hoja", {
+        description: "Selecciona menos muestras o imprime en lotes más pequeños.",
+      });
+      return;
+    }
+    try {
+      const report = await generateLabels.mutateAsync(ids);
+      toast.success(
+        ids.length === 1
+          ? "Etiqueta generada"
+          : `${ids.length} etiquetas generadas`,
+        {
+          description: "Se abrirá el PDF para imprimir y pegar en los tubos.",
+        },
+      );
+      try {
+        await api.openReportFile(report.path);
+      } catch {
+        await openPath(report.path);
+      }
+    } catch (err) {
+      toast.error("No se pudieron generar las etiquetas", {
+        description: getErrorMessage(err),
+      });
+    }
+  };
+
+  const changeStatus = (s: string | null) => {
+    setStatus(s);
+    setSelected(new Set());
+  };
+
+  // Al cambiar los filtros la selección deja de corresponder a lo visible.
+  useEffect(() => {
+    setSelected(new Set());
+  }, [status, search]);
+
+  const exportCsv = async (kind: "samples" | "results") => {
+    const stamp = new Date().toISOString().split("T")[0];
+    const selected = await saveDialog({
+      title:
+        kind === "samples"
+          ? "Exportar muestras a CSV"
+          : "Exportar resultados a CSV",
+      filters: [{ name: "CSV (Excel)", extensions: ["csv"] }],
+      defaultPath:
+        kind === "samples"
+          ? `ISALAB_Muestras_${stamp}.csv`
+          : `ISALAB_Resultados_${stamp}.csv`,
+    });
+    if (!selected) return;
+    try {
+      const path =
+        kind === "samples"
+          ? await api.exportSamplesCsv(selected, status, search.trim() || null)
+          : await api.exportResultsCsv(selected, status, search.trim() || null);
+      toast.success(
+        kind === "samples"
+          ? "Muestras exportadas a CSV"
+          : "Resultados exportados a CSV",
+        {
+          description: `Guardado en: ${path}`,
+        },
+      );
+    } catch (err) {
+      toast.error("No se pudo exportar el CSV", {
+        description: getErrorMessage(err),
+      });
+    }
+  };
 
   const counts = useMemo(() => {
     const c = {
@@ -137,10 +253,47 @@ export function SamplesPage() {
             de muestras en tiempo real.
           </p>
         </div>
-        <Button onClick={() => setNewSampleOpen(true)} className="shrink-0 gap-1.5">
-          <Plus className="size-4" />
-          Nueva toma de muestra
-        </Button>
+        <div className="flex flex-wrap items-center gap-2">
+          {selectedCount > 0 && isVetOrAdmin && (
+            <Button
+              variant="outline"
+              onClick={() => printLabels([...selected])}
+              disabled={generateLabels.isPending}
+              className="shrink-0 gap-1.5"
+            >
+              {generateLabels.isPending ? (
+                <Loader2 className="size-4 animate-spin" />
+              ) : (
+                <Printer className="size-4" />
+              )}
+              Etiquetas ({selectedCount})
+            </Button>
+          )}
+          {isVetOrAdmin && (
+            <>
+              <Button
+                variant="ghost"
+                onClick={() => exportCsv("samples")}
+                className="shrink-0 gap-1.5 text-muted-foreground hover:text-foreground"
+              >
+                <Download className="size-4" />
+                CSV muestras
+              </Button>
+              <Button
+                variant="ghost"
+                onClick={() => exportCsv("results")}
+                className="shrink-0 gap-1.5 text-muted-foreground hover:text-foreground"
+              >
+                <Download className="size-4" />
+                CSV resultados
+              </Button>
+            </>
+          )}
+          <Button onClick={() => setNewSampleOpen(true)} className="shrink-0 gap-1.5">
+            <Plus className="size-4" />
+            Nueva toma de muestra
+          </Button>
+        </div>
       </div>
 
       {/* Resumen */}
@@ -150,7 +303,7 @@ export function SamplesPage() {
           label="Total"
           value={counts.TOTAL}
           tone="bg-muted text-muted-foreground"
-          onClick={() => setStatus(null)}
+          onClick={() => changeStatus(null)}
           active={status === null}
         />
         <StatCard
@@ -158,7 +311,7 @@ export function SamplesPage() {
           label="En proceso"
           value={counts.EN_PROCESO}
           tone="bg-warning/15 text-warning"
-          onClick={() => setStatus("EN_PROCESO")}
+          onClick={() => changeStatus("EN_PROCESO")}
           active={status === "EN_PROCESO"}
         />
         <StatCard
@@ -166,7 +319,7 @@ export function SamplesPage() {
           label="Finalizadas"
           value={counts.FINALIZADA}
           tone="bg-success/15 text-success"
-          onClick={() => setStatus("FINALIZADA")}
+          onClick={() => changeStatus("FINALIZADA")}
           active={status === "FINALIZADA"}
         />
         <StatCard
@@ -174,7 +327,7 @@ export function SamplesPage() {
           label="Anuladas"
           value={counts.ANULADA}
           tone="bg-destructive/10 text-destructive"
-          onClick={() => setStatus("ANULADA")}
+          onClick={() => changeStatus("ANULADA")}
           active={status === "ANULADA"}
         />
         <StatCard
@@ -182,7 +335,7 @@ export function SamplesPage() {
           label="Con valores anormales"
           value={counts.ABNORMAL}
           tone="bg-orange-500/15 text-orange-600 dark:text-orange-400"
-          onClick={() => setStatus(null)}
+          onClick={() => changeStatus(null)}
           active={false}
           disabled
         />
@@ -195,7 +348,7 @@ export function SamplesPage() {
             <button
               key={tab.value ?? "all"}
               type="button"
-              onClick={() => setStatus(tab.value)}
+              onClick={() => changeStatus(tab.value)}
               className={cn(
                 "rounded-md px-3 py-1.5 text-sm font-medium transition-colors",
                 status === tab.value
@@ -237,6 +390,15 @@ export function SamplesPage() {
           <Table>
             <TableHeader>
               <TableRow className="hover:bg-transparent">
+                <TableHead className="w-10">
+                  <input
+                    type="checkbox"
+                    checked={allVisibleSelected}
+                    onChange={toggleAll}
+                    aria-label="Seleccionar todas las muestras visibles"
+                    className="size-4 accent-primary"
+                  />
+                </TableHead>
                 <TableHead>Código</TableHead>
                 <TableHead>Paciente</TableHead>
                 <TableHead>Tipo de muestra</TableHead>
@@ -250,7 +412,7 @@ export function SamplesPage() {
               {isLoading &&
                 Array.from({ length: 5 }).map((_, i) => (
                   <TableRow key={i}>
-                    <TableCell colSpan={7} className="h-12">
+                    <TableCell colSpan={8} className="h-12">
                       <Skeleton className="h-8 w-full" />
                     </TableCell>
                   </TableRow>
@@ -258,7 +420,7 @@ export function SamplesPage() {
 
               {!isLoading && isError && (
                 <TableRow>
-                  <TableCell colSpan={7} className="text-muted-foreground h-16 text-center">
+                  <TableCell colSpan={8} className="text-muted-foreground h-16 text-center">
                     No se pudo cargar la mesa de trabajo.
                   </TableCell>
                 </TableRow>
@@ -266,7 +428,7 @@ export function SamplesPage() {
 
               {!isLoading && samples?.length === 0 && (
                 <TableRow>
-                  <TableCell colSpan={7} className="text-muted-foreground py-10 text-center">
+                  <TableCell colSpan={8} className="text-muted-foreground py-10 text-center">
                     <div className="flex flex-col items-center justify-center gap-3">
                       <p className="text-sm">
                         {search
@@ -300,6 +462,15 @@ export function SamplesPage() {
                     className="cursor-pointer"
                     onClick={() => setDetailId(s.id)}
                   >
+                    <TableCell onClick={(e) => e.stopPropagation()}>
+                      <input
+                        type="checkbox"
+                        checked={selected.has(s.id)}
+                        onChange={() => toggleOne(s.id)}
+                        aria-label={`Seleccionar muestra ${s.code}`}
+                        className="size-4 accent-primary"
+                      />
+                    </TableCell>
                     <TableCell>
                       <span className="font-mono text-sm font-semibold">
                         {s.code}

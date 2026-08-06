@@ -482,7 +482,7 @@ const CODE128_SET_B: &str = "\u{0181}";
 
 /// Ancho en mm del código de barras Code 128 de `text` (sin dibujarlo), o
 /// `None` si el texto no es codificable.
-fn code128_width(text: &str, module_mm: f32) -> Option<f32> {
+pub fn code128_width(text: &str, module_mm: f32) -> Option<f32> {
     // barcoders no rechaza el marcador sin datos: un código vacío sería ilegible.
     if text.trim().is_empty() {
         return None;

@@ -393,6 +393,16 @@ export type CreateVaccineInput = {
  *  Métricas del panel de control (dashboard) con las próximas citas,
  *  cirugías y refuerzos de vacunación de la agenda.
  */
+export type AnalyteCount = {
+	analyteName: string,
+	count: number,
+};
+
+export type DailySampleVolume = {
+	date: string,
+	count: number,
+};
+
 export type DashboardStats = {
 	patientsTotal: number,
 	patientsActive: number,
@@ -401,6 +411,10 @@ export type DashboardStats = {
 	samplesFinished: number,
 	samplesCancelled: number,
 	abnormalResults: number,
+	avgProcessingHours: number,
+	abnormalRate: number,
+	weeklyVolume: DailySampleVolume[],
+	topAnalytes: AnalyteCount[],
 	consultationsPending: number,
 	surgeriesProgrammed: number,
 	/**  Refuerzos cuya fecha ya venció. */

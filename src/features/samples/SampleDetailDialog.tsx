@@ -15,6 +15,7 @@ import {
   Plus,
   MessageCircle,
   Bot,
+  Printer,
   X,
 } from "lucide-react";
 import { Badge } from "@/components/ui/badge";
@@ -55,6 +56,7 @@ import { Skeleton } from "@/components/ui/skeleton";
 import {
   useAnalytes,
   useGenerateReport,
+  useGenerateSampleLabels,
   usePatient,
   useRegisterLabResult,
   useSample,
@@ -100,6 +102,7 @@ export function SampleDetailDialog({
   const registerResult = useRegisterLabResult();
   const setStatus = useSetSampleStatus();
   const generate = useGenerateReport();
+  const generateLabels = useGenerateSampleLabels();
 
   const setActivePatient = useUiStore((s) => s.setActivePatient);
   const navigate = useUiStore((s) => s.navigate);
@@ -216,6 +219,25 @@ export function SampleDetailDialog({
       }
     } catch (err) {
       toast.error("No se pudo generar el PDF", {
+        description: getErrorMessage(err),
+      });
+    }
+  };
+
+  const printLabel = async () => {
+    if (!sample) return;
+    try {
+      const report = await generateLabels.mutateAsync([sample.id]);
+      toast.success("Etiqueta de muestra generada", {
+        description: "Ábrela con el visor de PDF para imprimirla y pegarla al tubo.",
+      });
+      try {
+        await api.openReportFile(report.path);
+      } catch {
+        await openPath(report.path);
+      }
+    } catch (err) {
+      toast.error("No se pudo generar la etiqueta", {
         description: getErrorMessage(err),
       });
     }
@@ -560,6 +582,20 @@ export function SampleDetailDialog({
 
         <DialogFooter className="shrink-0 border-t pt-3 sm:justify-between">
           <div className="flex flex-wrap gap-2">
+            {sample && sampleStatus !== "ANULADA" && isVetOrAdmin && (
+              <Button
+                variant="outline"
+                onClick={printLabel}
+                disabled={generateLabels.isPending}
+              >
+                {generateLabels.isPending ? (
+                  <Loader2 className="animate-spin" />
+                ) : (
+                  <Printer className="size-4" />
+                )}
+                Etiqueta
+              </Button>
+            )}
             {canProcess && (
               <Button variant="outline" onClick={markEnProceso} disabled={pending}>
                 <PlayCircle className="size-4" />

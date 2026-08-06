@@ -463,6 +463,14 @@ export function useGenerateReport() {
   });
 }
 
+export function useGenerateSampleLabels() {
+  const qc = useQueryClient();
+  return useMutation({
+    mutationFn: (sampleIds: number[]) => api.generateSampleLabels(sampleIds),
+    onSuccess: () => qc.invalidateQueries({ queryKey: ["reports"] }),
+  });
+}
+
 export function useGenerateFormulaMedica() {
   const qc = useQueryClient();
   return useMutation({

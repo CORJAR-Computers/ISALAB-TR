@@ -6,6 +6,23 @@ use crate::models::sample_list_item::SampleListItem;
 use crate::models::surgery::Surgery;
 use crate::models::vaccine::VaccineListItem;
 
+/// Conteo de un analito (para el ranking de los más solicitados).
+#[derive(Debug, Clone, Serialize, Deserialize, Type)]
+#[serde(rename_all = "camelCase")]
+pub struct AnalyteCount {
+    pub analyte_name: String,
+    pub count: i32,
+}
+
+/// Volumen de muestras recibidas en un día (tendencia).
+#[derive(Debug, Clone, Serialize, Deserialize, Type)]
+#[serde(rename_all = "camelCase")]
+pub struct DailySampleVolume {
+    /// YYYY-MM-DD
+    pub date: String,
+    pub count: i32,
+}
+
 /// Métricas del panel de control (dashboard) con las próximas citas,
 /// cirugías y refuerzos de vacunación de la agenda.
 #[derive(Debug, Clone, Serialize, Deserialize, Type)]
@@ -20,6 +37,14 @@ pub struct DashboardStats {
     pub samples_finished: i32,
     pub samples_cancelled: i32,
     pub abnormal_results: i32,
+    /// Tiempo promedio recepción → finalización (en horas).
+    pub avg_processing_hours: f64,
+    /// Porcentaje de muestras finalizadas con al menos un valor fuera de rango (0-100).
+    pub abnormal_rate: f64,
+    /// Volumen de muestras recibidas en los últimos 7 días (tendencia).
+    pub weekly_volume: Vec<DailySampleVolume>,
+    /// Analitos más solicitados (máx. 5).
+    pub top_analytes: Vec<AnalyteCount>,
     // ---- Agenda ----
     pub consultations_pending: i32,
     pub surgeries_programmed: i32,

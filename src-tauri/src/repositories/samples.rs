@@ -141,6 +141,60 @@ pub fn list(
         .collect())
 }
 
+/// Muestras por lista de ids (para etiquetas/lotes), en el mismo formato de la
+/// mesa de trabajo y ordenadas por fecha de recepción descendente.
+pub fn list_by_ids(
+    conn: &mut SimpleConnection,
+    ids: &[i32],
+) -> Result<Vec<SampleListItem>, AppError> {
+    if ids.is_empty() {
+        return Ok(Vec::new());
+    }
+    let placeholders = ids.iter().map(|_| "?").collect::<Vec<_>>().join(",");
+    let sql = format!(
+        "
+        SELECT s.ID, s.CODE, s.PATIENT_ID, p.NAME, o.FULL_NAME, sp.NAME,
+                s.SAMPLE_TYPE_ID, st.NAME,
+                LEFT(CAST(s.RECEIVED_AT AS VARCHAR(60)), 19),
+                s.STATUS, s.COLLECTED_BY, s.NOTES,
+                (SELECT COUNT(*) FROM LAB_RESULTS lr WHERE lr.SAMPLE_ID = s.ID),
+                (SELECT COUNT(*) FROM LAB_RESULTS lr
+                  WHERE lr.SAMPLE_ID = s.ID AND lr.STATUS IN ('ALTO', 'BAJO'))
+         FROM SAMPLES s
+         JOIN PATIENTS p ON p.ID = s.PATIENT_ID
+         JOIN OWNERS o ON o.ID = p.OWNER_ID
+         JOIN SPECIES sp ON sp.ID = p.SPECIES_ID
+         JOIN SAMPLE_TYPES st ON st.ID = s.SAMPLE_TYPE_ID
+         WHERE s.ID IN ({placeholders})
+         ORDER BY s.RECEIVED_AT DESC, s.ID DESC"
+    );
+    let params: Vec<rsfbclient::SqlType> = ids
+        .iter()
+        .map(|&id| rsfbclient::SqlType::Integer(id as i64))
+        .collect();
+    let rows: Vec<SampleListItemRow> = conn.query(&sql, params).map_err(AppError::from)?;
+
+    Ok(rows
+        .into_iter()
+        .map(|r| SampleListItem {
+            id: r.0,
+            code: r.1,
+            patient_id: r.2,
+            patient_name: r.3,
+            owner_name: r.4,
+            species_name: r.5,
+            sample_type_id: r.6,
+            sample_type_name: r.7,
+            received_at: r.8,
+            status: r.9,
+            collected_by: r.10,
+            notes: r.11,
+            result_count: r.12,
+            abnormal_count: r.13,
+        })
+        .collect())
+}
+
 /// Cambia el estado de una muestra validando la transición.
 /// FINALIZADA requiere al menos un resultado cargado (cierre del analista).
 pub fn set_status(conn: &mut SimpleConnection, id: i32, status: &str) -> Result<Sample, AppError> {
@@ -218,6 +272,78 @@ pub fn map_lab_result(r: LabResultRow) -> LabResult {
         ref_max: r.8,
         analyzed_at: r.9,
     }
+}
+
+/// Resultados de laboratorio con datos de muestra/paciente unidos, para
+/// exportación CSV (filtro opcional por estado y búsqueda global).
+pub fn list_results_for_export(
+    conn: &mut SimpleConnection,
+    status: Option<&str>,
+    search: Option<&str>,
+) -> Result<Vec<crate::csv::ResultExportRow>, AppError> {
+    let like = search
+        .map(|s| format!("%{}%", s.trim()))
+        .filter(|s| !s.trim_matches('%').is_empty());
+
+    let sql = "
+        SELECT s.CODE, p.NAME, o.FULL_NAME, sp.NAME, st.NAME,
+               LEFT(CAST(s.RECEIVED_AT AS VARCHAR(60)), 19),
+               a.NAME, a.UNIT, r.RESULT_VALUE, r.STATUS,
+               rr.MIN_VALUE, rr.MAX_VALUE,
+               LEFT(CAST(r.ANALYZED_AT AS VARCHAR(60)), 19)
+        FROM LAB_RESULTS r
+        JOIN SAMPLES s ON s.ID = r.SAMPLE_ID
+        JOIN PATIENTS p ON p.ID = s.PATIENT_ID
+        JOIN OWNERS o ON o.ID = p.OWNER_ID
+        JOIN SPECIES sp ON sp.ID = p.SPECIES_ID
+        JOIN SAMPLE_TYPES st ON st.ID = s.SAMPLE_TYPE_ID
+        JOIN ANALYTES a ON a.ID = r.ANALYTE_ID
+        LEFT JOIN REFERENCE_RANGES rr ON rr.ID = r.REFERENCE_RANGE_ID
+        WHERE (? IS NULL OR s.STATUS = ?)
+          AND (? IS NULL
+               OR UPPER(s.CODE) LIKE UPPER(?)
+               OR UPPER(p.NAME) LIKE UPPER(?)
+               OR UPPER(o.FULL_NAME) LIKE UPPER(?))
+        ORDER BY s.RECEIVED_AT DESC, s.ID DESC, a.NAME";
+
+    type Row = (
+        String,
+        String,
+        String,
+        String,
+        String,
+        String,
+        String,
+        Option<String>,
+        f64,
+        String,
+        Option<f64>,
+        Option<f64>,
+        Option<String>,
+    );
+
+    let rows: Vec<Row> = conn
+        .query(sql, (&status, &status, &like, &like, &like, &like))
+        .map_err(AppError::from)?;
+
+    Ok(rows
+        .into_iter()
+        .map(|r| crate::csv::ResultExportRow {
+            code: r.0,
+            patient_name: r.1,
+            owner_name: r.2,
+            species_name: r.3,
+            sample_type_name: r.4,
+            received_at: r.5,
+            analyte_name: r.6,
+            unit: r.7,
+            value: r.8,
+            status: r.9,
+            ref_min: r.10,
+            ref_max: r.11,
+            analyzed_at: r.12,
+        })
+        .collect())
 }
 
 pub fn get_patient_lab_trends(

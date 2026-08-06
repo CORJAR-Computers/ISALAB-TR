@@ -4,6 +4,7 @@ pub mod catalog;
 pub mod clinical_history;
 pub mod dashboard;
 pub mod db;
+pub mod exports;
 pub mod invoices;
 pub mod patients;
 pub mod reports;

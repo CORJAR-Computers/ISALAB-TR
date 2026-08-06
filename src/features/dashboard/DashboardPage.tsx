@@ -2,10 +2,13 @@ import { useMemo } from "react";
 import { toast } from "sonner";
 import {
   Activity,
+  AlertTriangle,
   Ban,
   CalendarClock,
   CheckCircle2,
+  Clock,
   FlaskConical,
+  Gauge,
   Loader2,
   PawPrint,
   Plus,
@@ -13,6 +16,7 @@ import {
   Scissors,
   Stethoscope,
   Syringe,
+  TrendingUp,
   Wallet,
 } from "lucide-react";
 import { Badge } from "@/components/ui/badge";
@@ -70,6 +74,21 @@ function StatCard({
       </div>
     </div>
   );
+}
+
+function formatHours(hours: number): string {
+  if (hours <= 0) return "—";
+  if (hours < 1) return `${Math.max(1, Math.round(hours * 60))} min`;
+  const h = Math.floor(hours);
+  const m = Math.round((hours - h) * 60);
+  return m > 0 ? `${h} h ${m} min` : `${h} h`;
+}
+
+function formatDayShort(date?: string): string {
+  if (!date) return "—";
+  const d = new Date(`${date}T12:00:00`);
+  if (Number.isNaN(d.getTime())) return date.slice(5);
+  return d.toLocaleDateString("es-CO", { weekday: "short" });
 }
 
 function AgendaList({
@@ -299,6 +318,138 @@ export function DashboardPage() {
           </div>
         </CardContent>
       </Card>
+
+      {/* Métricas de laboratorio: rendimiento, tendencia y analitos */}
+      <div className="grid gap-4 lg:grid-cols-3">
+        <Card className="gap-0 p-0">
+          <CardHeader className="border-b">
+            <CardTitle className="flex items-center gap-2 text-base">
+              <span className="bg-primary/10 text-primary flex size-7 items-center justify-center rounded-lg">
+                <Gauge className="size-4" />
+              </span>
+              Rendimiento
+            </CardTitle>
+          </CardHeader>
+          <CardContent className="grid grid-cols-2 gap-4 p-4">
+            <div>
+              <p className="text-muted-foreground flex items-center gap-1.5 text-[11px] font-medium tracking-wide uppercase">
+                <Clock className="size-3" />
+                Tiempo promedio
+              </p>
+              <p className="mt-1 text-2xl font-bold tabular-nums">
+                {formatHours(stats.avgProcessingHours ?? 0)}
+              </p>
+              <p className="text-muted-foreground text-xs">
+                recepción → finalización
+              </p>
+            </div>
+            <div>
+              <p className="text-muted-foreground flex items-center gap-1.5 text-[11px] font-medium tracking-wide uppercase">
+                <AlertTriangle className="size-3" />
+                % con anormales
+              </p>
+              <p className="mt-1 text-2xl font-bold tabular-nums">
+                {Math.round(stats.abnormalRate ?? 0)}%
+              </p>
+              <p className="text-muted-foreground text-xs">
+                de muestras finalizadas
+              </p>
+            </div>
+          </CardContent>
+        </Card>
+
+        <Card className="gap-0 p-0">
+          <CardHeader className="border-b">
+            <CardTitle className="flex items-center gap-2 text-base">
+              <span className="bg-primary/10 text-primary flex size-7 items-center justify-center rounded-lg">
+                <TrendingUp className="size-4" />
+              </span>
+              Tendencia semanal
+            </CardTitle>
+          </CardHeader>
+          <CardContent className="p-4">
+            <div className="flex h-24 items-end gap-1.5">
+              {stats.weeklyVolume.map((d) => {
+                const max = Math.max(
+                  1,
+                  ...stats.weeklyVolume.map((x) => x.count),
+                );
+                return (
+                  <div
+                    key={d.date}
+                    className="group relative flex flex-1 flex-col items-center gap-1"
+                  >
+                    <span className="text-muted-foreground text-[10px] font-semibold tabular-nums">
+                      {d.count}
+                    </span>
+                    <div
+                      className={cn(
+                        "bg-primary/70 hover:bg-primary w-full rounded-sm transition-all duration-300 group-hover:-translate-y-0.5",
+                        d.count === 0 && "bg-muted/70 hover:bg-muted",
+                      )}
+                      style={{
+                        height: `${Math.max(4, (d.count / max) * 100)}%`,
+                      }}
+                      title={`${d.date}: ${d.count} muestras`}
+                    />
+                  </div>
+                );
+              })}
+            </div>
+            <div className="mt-1.5 flex justify-between text-[10px] text-muted-foreground">
+              <span>
+                {formatDayShort(stats.weeklyVolume[0]?.date)}
+              </span>
+              <span>Hoy</span>
+            </div>
+          </CardContent>
+        </Card>
+
+        <Card className="gap-0 p-0">
+          <CardHeader className="border-b">
+            <CardTitle className="flex items-center gap-2 text-base">
+              <span className="bg-primary/10 text-primary flex size-7 items-center justify-center rounded-lg">
+                <FlaskConical className="size-4" />
+              </span>
+              Analitos más solicitados
+            </CardTitle>
+          </CardHeader>
+          <CardContent className="space-y-2 p-4">
+            {stats.topAnalytes.length === 0 ? (
+              <p className="text-muted-foreground py-4 text-center text-sm">
+                Sin resultados registrados todavía.
+              </p>
+            ) : (
+              stats.topAnalytes.map((a, i) => {
+                const max = Math.max(1, ...stats.topAnalytes.map((x) => x.count));
+                return (
+                  <div key={a.analyteName} className="flex items-center gap-3">
+                    <span className="text-muted-foreground w-4 text-center text-xs font-semibold">
+                      {i + 1}
+                    </span>
+                    <div className="min-w-0 flex-1">
+                      <div className="flex items-baseline justify-between gap-2">
+                        <p className="truncate text-sm font-medium">
+                          {a.analyteName}
+                        </p>
+                        <p className="text-muted-foreground text-xs tabular-nums">
+                          {a.count}
+                        </p>
+                      </div>
+                      <div className="bg-muted mt-1 h-1.5 overflow-hidden rounded-full">
+                        <div
+                          className="bg-primary/70 h-full rounded-full transition-all duration-500"
+                          style={{ width: `${(a.count / max) * 100}%` }}
+                        />
+                      </div>
+                    </div>
+                  </div>
+                );
+              })
+            )}
+          </CardContent>
+        </Card>
+      </div>
 
       {/* Agenda */}
       <div className="grid gap-4 lg:grid-cols-2">

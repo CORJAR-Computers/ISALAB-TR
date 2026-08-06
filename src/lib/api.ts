@@ -135,6 +135,18 @@ export const api = {
       dateTo: dateTo || null,
     }),
 
+  // ---- Exportación CSV ----
+  exportSamplesCsv: (
+    destPath: string,
+    status: string | null,
+    search: string | null,
+  ) => invoke<string>("export_samples_csv", { destPath, status, search }),
+  exportResultsCsv: (
+    destPath: string,
+    status: string | null,
+    search: string | null,
+  ) => invoke<string>("export_results_csv", { destPath, status, search }),
+
   // ---- Reportes PDF ----
   generateReport: (sampleId: number, overrideLogoPath?: string | null, saveLogoPreference?: boolean | null) =>
     invoke<ReportFile>("generate_clinical_report", { sampleId, overrideLogoPath, saveLogoPreference }),
@@ -149,6 +161,8 @@ export const api = {
   generateCarnetVacunacion: (patientId: number) =>
     invoke<ReportFile>("generate_carnet_vacunacion", { patientId }),
   listReports: () => invoke<ReportFile[]>("list_reports"),
+  generateSampleLabels: (sampleIds: number[]) =>
+    invoke<ReportFile>("generate_sample_labels", { sampleIds }),
   openReportFile: (path: string) => invoke<void>("open_report_file", { path }),
 
   // ---- Agenda de consultas ----

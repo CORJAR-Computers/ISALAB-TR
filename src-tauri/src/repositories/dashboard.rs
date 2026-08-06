@@ -3,7 +3,7 @@ use rsfbclient::SimpleConnection;
 
 use crate::error::AppError;
 use crate::models::consultation::ConsultationListItem;
-use crate::models::dashboard::DashboardStats;
+use crate::models::dashboard::{AnalyteCount, DailySampleVolume, DashboardStats};
 use crate::repositories::{
     samples as samples_repo, surgeries as surgeries_repo, vaccines as vaccines_repo,
 };
@@ -58,6 +58,62 @@ pub fn get_stats(conn: &mut SimpleConnection) -> Result<DashboardStats, AppError
         conn,
         "SELECT COUNT(*) FROM LAB_RESULTS WHERE STATUS IN ('ALTO', 'BAJO')",
     )?;
+
+    // Tiempo promedio recepción → finalización (horas) sobre muestras ya
+    // finalizadas con UPDATED_AT posterior a la recepción.
+    let avg_processing_hours = conn
+        .query_first(
+            "SELECT COALESCE(CAST(AVG(DATEDIFF(HOUR FROM s.RECEIVED_AT TO s.UPDATED_AT)) AS DOUBLE PRECISION), 0)
+             FROM SAMPLES s
+             WHERE s.STATUS = 'FINALIZADA' AND s.UPDATED_AT >= s.RECEIVED_AT",
+            (),
+        )
+        .map_err(AppError::from)?
+        .map(|(v,): (f64,)| v)
+        .unwrap_or(0.0);
+
+    // % de muestras finalizadas con al menos un valor fuera de rango.
+    let (finished_abnormal, finished_total): (i32, i32) = {
+        let row: Option<(i32, i32)> = conn
+            .query_first(
+                "SELECT
+                   (SELECT COUNT(DISTINCT r.SAMPLE_ID) FROM LAB_RESULTS r
+                     JOIN SAMPLES s ON s.ID = r.SAMPLE_ID
+                     WHERE s.STATUS = 'FINALIZADA' AND r.STATUS IN ('ALTO', 'BAJO')),
+                   (SELECT COUNT(*) FROM SAMPLES WHERE STATUS = 'FINALIZADA')
+                 FROM RDB$DATABASE",
+                (),
+            )
+            .map_err(AppError::from)?;
+        row.unwrap_or((0, 0))
+    };
+    let abnormal_rate = if finished_total > 0 {
+        (finished_abnormal as f64 / finished_total as f64) * 100.0
+    } else {
+        0.0
+    };
+
+    // Volumen diario de los últimos 7 días (incluye días sin muestras).
+    let weekly_volume = list_weekly_volume(conn)?;
+
+    // Analitos más solicitados.
+    let top_analytes = conn
+        .query(
+            "SELECT FIRST 5 a.NAME, COUNT(*) AS N
+             FROM LAB_RESULTS r
+             JOIN ANALYTES a ON a.ID = r.ANALYTE_ID
+             GROUP BY a.NAME
+             ORDER BY N DESC, a.NAME",
+            (),
+        )
+        .map_err(AppError::from)?
+        .into_iter()
+        .map(|(name, n): (String, i32)| AnalyteCount {
+            analyte_name: name,
+            count: n,
+        })
+        .collect();
+
     let consultations_pending = count_where(
         conn,
         "SELECT COUNT(*) FROM CONSULTATIONS WHERE STATUS = ?",
@@ -99,6 +155,10 @@ pub fn get_stats(conn: &mut SimpleConnection) -> Result<DashboardStats, AppError
         samples_finished,
         samples_cancelled,
         abnormal_results,
+        avg_processing_hours,
+        abnormal_rate,
+        weekly_volume,
+        top_analytes,
         consultations_pending,
         surgeries_programmed,
         vaccines_due,
@@ -109,6 +169,30 @@ pub fn get_stats(conn: &mut SimpleConnection) -> Result<DashboardStats, AppError
         upcoming_vaccines,
         recent_samples: recent,
     })
+}
+
+/// Volumen de muestras recibidas por día en los últimos 7 días (incluye días
+/// sin muestras con conteo 0, para dibujar la tendencia completa).
+fn list_weekly_volume(conn: &mut SimpleConnection) -> Result<Vec<DailySampleVolume>, AppError> {
+    let sql = "
+        SELECT d.DIA, COUNT(s.ID) AS N
+        FROM (
+            SELECT CAST(DATEADD(-6 DAY TO CURRENT_DATE) AS DATE) AS DIA FROM RDB$DATABASE
+            UNION ALL SELECT CAST(DATEADD(-5 DAY TO CURRENT_DATE) AS DATE) FROM RDB$DATABASE
+            UNION ALL SELECT CAST(DATEADD(-4 DAY TO CURRENT_DATE) AS DATE) FROM RDB$DATABASE
+            UNION ALL SELECT CAST(DATEADD(-3 DAY TO CURRENT_DATE) AS DATE) FROM RDB$DATABASE
+            UNION ALL SELECT CAST(DATEADD(-2 DAY TO CURRENT_DATE) AS DATE) FROM RDB$DATABASE
+            UNION ALL SELECT CAST(DATEADD(-1 DAY TO CURRENT_DATE) AS DATE) FROM RDB$DATABASE
+            UNION ALL SELECT CAST(CURRENT_DATE AS DATE) FROM RDB$DATABASE
+        ) d
+        LEFT JOIN SAMPLES s ON CAST(s.RECEIVED_AT AS DATE) = d.DIA
+        GROUP BY d.DIA
+        ORDER BY d.DIA";
+    let rows: Vec<(String, i32)> = conn.query(sql, ()).map_err(AppError::from)?;
+    Ok(rows
+        .into_iter()
+        .map(|(date, count)| DailySampleVolume { date, count })
+        .collect())
 }
 
 /// Próximas consultas PENDIENTE de la agenda (desde ahora, ascendente).
@@ -170,6 +254,12 @@ mod tests {
         assert_eq!(stats.samples_finished, 0);
         assert_eq!(stats.samples_cancelled, 0);
         assert_eq!(stats.abnormal_results, 0);
+        assert_eq!(stats.avg_processing_hours, 0.0);
+        assert_eq!(stats.abnormal_rate, 0.0);
+        // La tendencia semanal siempre trae los 7 días (con 0 muestras).
+        assert_eq!(stats.weekly_volume.len(), 7);
+        assert!(stats.weekly_volume.iter().all(|d| d.count == 0));
+        assert!(stats.top_analytes.is_empty());
         assert_eq!(stats.consultations_pending, 0);
         assert_eq!(stats.surgeries_programmed, 0);
         assert_eq!(stats.vaccines_due, 0);

@@ -4,6 +4,7 @@ pub mod ai_cache;
 pub mod auth;
 pub mod commands;
 pub mod crypto;
+pub mod csv;
 pub mod db;
 pub mod error;
 pub mod models;
@@ -30,6 +31,7 @@ use crate::commands::clinical_history::{
 };
 use crate::commands::dashboard::get_dashboard_stats;
 use crate::commands::db::{create_local_backup, db_health};
+use crate::commands::exports::{export_results_csv, export_samples_csv};
 use crate::commands::invoices::{create_invoice, get_invoice, list_invoices, set_invoice_status};
 use crate::commands::patients::{
     create_patient, get_patient, get_patient_by_code, get_patient_lab_trends, list_owners,
@@ -37,8 +39,8 @@ use crate::commands::patients::{
 };
 use crate::commands::reports::{
     generate_carnet_vacunacion, generate_certificado_cirugia, generate_clinical_report,
-    generate_consentimiento, generate_formula_medica, generate_recibo_invoice, list_reports,
-    open_report_file,
+    generate_consentimiento, generate_formula_medica, generate_recibo_invoice,
+    generate_sample_labels, list_reports, open_report_file,
 };
 use crate::commands::samples::{
     create_sample, get_sample, list_samples, register_lab_result, set_sample_status,
@@ -57,6 +59,8 @@ fn specta_builder() -> Builder<tauri::Wry> {
         .commands(collect_commands![
             db_health,
             create_local_backup,
+            export_samples_csv,
+            export_results_csv,
             list_species,
             list_breeds,
             list_sample_types,
@@ -91,6 +95,7 @@ fn specta_builder() -> Builder<tauri::Wry> {
             generate_recibo_invoice,
             generate_certificado_cirugia,
             generate_carnet_vacunacion,
+            generate_sample_labels,
             list_reports,
             open_report_file,
             list_users,

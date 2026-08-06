@@ -420,6 +420,53 @@ pub fn generate_carnet_vacunacion(
     })
 }
 
+/// Genera una hoja de etiquetas imprimibles para los tubos de las muestras
+/// indicadas (código de barras Code 128 + datos) y devuelve la ruta del PDF.
+#[tauri::command]
+#[specta::specta]
+pub fn generate_sample_labels(
+    state: State<'_, AppState>,
+    app: AppHandle,
+    sample_ids: Vec<i32>,
+) -> Result<ReportFile, AppError> {
+    require_vet_or_admin(&state)?;
+    if sample_ids.is_empty() {
+        return Err(AppError::Validation(
+            "Selecciona al menos una muestra para etiquetar".into(),
+        ));
+    }
+    if sample_ids.len() > 100 {
+        return Err(AppError::Validation(
+            "Máximo 100 etiquetas por hoja; selecciona menos muestras".into(),
+        ));
+    }
+    let mut pooled = state.pool.acquire()?;
+    let conn = pooled.conn();
+
+    let samples = samples_repo::list_by_ids(conn, &sample_ids)?;
+    if samples.is_empty() {
+        return Err(AppError::NotFound("Ninguna muestra encontrada".into()));
+    }
+
+    let dir = reports_dir(&app)?;
+    let stamp = chrono::Local::now().format("%Y%m%d-%H%M%S").to_string();
+    let label = if samples.len() == 1 {
+        format!("etiqueta-{}.pdf", samples[0].code)
+    } else {
+        format!("etiquetas-{stamp}.pdf")
+    };
+    let out_path = dir.join(&label);
+    crate::pdf_templates::generate_sample_labels(&samples, &out_path).map_err(AppError::Internal)?;
+
+    let generated_at = now_db(conn)?;
+    Ok(ReportFile {
+        path: out_path.display().to_string(),
+        file_name: label,
+        sample_code: samples[0].code.clone(),
+        generated_at,
+    })
+}
+
 /// Lista los informes ya generados (carpeta app_data/reports), más reciente primero.
 #[tauri::command]
 #[specta::specta]

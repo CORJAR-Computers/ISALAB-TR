@@ -4,6 +4,25 @@ All notable changes to ISALAB will be documented in this file.
 
 The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.1.0/).
 
+## [Unreleased]
+
+### Added
+
+- **Etiquetas de tubos de muestras** (`generate_sample_labels`): hoja Carta
+  con grilla 2×4 de etiquetas adhesivas, cada una con el código de
+  trazabilidad en grande + código de barras Code 128 (escaneable), datos del
+  paciente, tipo de muestra, fecha de recepción y responsable. Botón
+  individual en el detalle de muestra y selección múltiple por checkboxes en
+  la mesa de trabajo (máx. 100 por hoja). Reutiliza printpdf/barcoders.
+- **Exportación CSV de muestras y resultados** (`export_samples_csv`,
+  `export_results_csv`): guarda a disco con diálogo nativo, separador `;` y
+  BOM UTF-8 para apertura directa en Excel hispano. Filtros de la mesa de
+  trabajo (estado/búsqueda) aplican a la exportación.
+- **Métricas de laboratorio en el panel de control**: tiempo promedio de
+  procesamiento (recepción→finalización en horas), % de muestras finalizadas
+  con valores fuera de rango, tendencia de volumen diario de los últimos 7
+  días y ranking de los 5 analitos más solicitados.
+
 ## [0.3.3] - 2026-08-06
 
 ### Changed
