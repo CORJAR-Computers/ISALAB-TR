@@ -19,7 +19,8 @@ pub struct WorklistSample {
     pub status: String,
     pub received_at: String,
     /// Minutos transcurridos desde la recepción (para ordenar por urgencia).
-    pub elapsed_minutes: i64,
+    /// `i32` (no i64): Specta prohíbe exportar tipos BigInt a TypeScript.
+    pub elapsed_minutes: i32,
     /// Nº de resultados cargados (progreso del procesamiento).
     pub result_count: i32,
     /// Nº de resultados fuera de rango (ALTO/BAJO) — alerta visual.
@@ -36,7 +37,8 @@ pub struct WorklistGroup {
     /// Total de muestras pendientes del grupo.
     pub count: i32,
     /// Máximo tiempo transcurrido del grupo (para ordenar los grupos por urgencia).
-    pub max_elapsed_minutes: i64,
+    /// `i32` (no i64): Specta prohíbe exportar tipos BigInt a TypeScript.
+    pub max_elapsed_minutes: i32,
     pub samples: Vec<WorklistSample>,
 }
 

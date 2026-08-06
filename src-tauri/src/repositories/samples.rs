@@ -365,7 +365,7 @@ pub(crate) type WorklistRow = (
     String,         // sample_type_name
     String,         // status
     String,         // received_at
-    i64,            // elapsed_minutes
+    i32,            // elapsed_minutes (i32: Specta prohíbe i64 en bindings TS)
     i32,            // result_count
     i32,            // abnormal_count
 );
@@ -383,7 +383,7 @@ pub fn get_worklist(
         SELECT s.ID, s.CODE, s.PATIENT_ID, p.NAME, o.FULL_NAME, sp.NAME,
                s.SAMPLE_TYPE_ID, st.NAME, s.STATUS,
                LEFT(CAST(s.RECEIVED_AT AS VARCHAR(60)), 19),
-               CAST(DATEDIFF(MINUTE FROM s.RECEIVED_AT TO CURRENT_TIMESTAMP) AS BIGINT),
+               CAST(DATEDIFF(MINUTE FROM s.RECEIVED_AT TO CURRENT_TIMESTAMP) AS INTEGER),
                (SELECT COUNT(*) FROM LAB_RESULTS lr WHERE lr.SAMPLE_ID = s.ID),
                (SELECT COUNT(*) FROM LAB_RESULTS lr
                  WHERE lr.SAMPLE_ID = s.ID AND lr.STATUS IN ('ALTO', 'BAJO'))
@@ -626,7 +626,7 @@ mod tests {
     #[test]
     fn test_group_worklist_splits_today_and_overdue() {
         use crate::models::worklist::WorklistSample;
-        let mk = |id: i32, type_id: i32, type_name: &str, date: &str, mins: i64| WorklistSample {
+        let mk = |id: i32, type_id: i32, type_name: &str, date: &str, mins: i32| WorklistSample {
             id,
             code: format!("M-2026-{id:04}"),
             patient_id: 1,
@@ -668,7 +668,7 @@ mod tests {
     #[test]
     fn test_group_worklist_groups_by_type_with_counts() {
         use crate::models::worklist::WorklistSample;
-        let mk = |id: i32, type_id: i32, type_name: &str, mins: i64| WorklistSample {
+        let mk = |id: i32, type_id: i32, type_name: &str, mins: i32| WorklistSample {
             id,
             code: format!("M-2026-{id:04}"),
             patient_id: 1,

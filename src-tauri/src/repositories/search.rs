@@ -139,7 +139,7 @@ pub fn global_search(
             (&like, &like, &like),
         )
         .map_err(AppError::from)?;
-    for (id, patient, species, owner, surgery_type, status) in rows {
+    for (id, patient, species, owner, surgery_type, _status) in rows {
         results.push(GlobalSearchResult {
             kind: "surgery".into(),
             id,

@@ -6,7 +6,22 @@ import { invoke as __TAURI_INVOKE } from "@tauri-apps/api/core";
 export const commands = {
 	/**  Estado de la conexión Firebird Embedded (banner de setup en la UI). */
 	dbHealth: () => __TAURI_INVOKE<DbHealth>("db_health"),
+	/**
+	 *  Búsqueda global (paleta Ctrl+K): pacientes, muestras, facturas y cirugías
+	 *  por código o nombre, con su destino de navegación en la UI.
+	 */
+	globalSearch: (query: string) => typedError<GlobalSearchResult[], AppError>(__TAURI_INVOKE("global_search", { query })),
 	createLocalBackup: (destPath: string) => typedError<string, AppError>(__TAURI_INVOKE("create_local_backup", { destPath })),
+	/**
+	 *  Guarda el CSV de muestras (mesa de trabajo con filtros actuales) en
+	 *  `dest_path` (elegido con el diálogo de guardar del SO) y devuelve la ruta.
+	 */
+	exportSamplesCsv: (destPath: string, status: string | null, search: string | null) => typedError<string, AppError>(__TAURI_INVOKE("export_samples_csv", { destPath, status, search })),
+	/**
+	 *  Guarda el CSV de resultados analíticos (filtro opcional por estado y
+	 *  búsqueda) en `dest_path` y devuelve la ruta.
+	 */
+	exportResultsCsv: (destPath: string, status: string | null, search: string | null) => typedError<string, AppError>(__TAURI_INVOKE("export_results_csv", { destPath, status, search })),
 	listSpecies: () => typedError<Species[], AppError>(__TAURI_INVOKE("list_species")),
 	listBreeds: (speciesId: number) => typedError<Breed[], AppError>(__TAURI_INVOKE("list_breeds", { speciesId })),
 	listSampleTypes: () => typedError<SampleType[], AppError>(__TAURI_INVOKE("list_sample_types")),
@@ -18,7 +33,7 @@ export const commands = {
 	listPatients: (search: string | null) => typedError<Patient[], AppError>(__TAURI_INVOKE("list_patients", { search })),
 	getPatient: (id: number) => typedError<{
 	id: number,
-	/**  Código único legible: PAC-YYYY-NNNN */
+	/**  Código único legible: PAC-YYYY-NNNN (generado por Firebird al insertar). */
 	code: string,
 	ownerId: number,
 	speciesId: number,
@@ -33,17 +48,44 @@ export const commands = {
 	microchip: string | null,
 	active: boolean,
 	notes: string | null,
+	preferredLogoId: number | null,
 	speciesName: string,
 	breedName: string | null,
 	ownerName: string,
 	ownerPhone: string | null,
 	/**  Calculada en SQL (DATEDIFF meses desde birth_date). */
 	ageMonths: number,
-    preferredLogoId: number | null,
 } | null, AppError>(__TAURI_INVOKE("get_patient", { id })),
+	/**
+	 *  Busca un paciente por su código único legible (PAC-YYYY-NNNN).
+	 *  Permite identificar mascotas de forma inequívoca cuando varias comparten nombre.
+	 */
+	getPatientByCode: (code: string) => typedError<{
+	id: number,
+	/**  Código único legible: PAC-YYYY-NNNN (generado por Firebird al insertar). */
+	code: string,
+	ownerId: number,
+	speciesId: number,
+	breedId: number | null,
+	name: string,
+	/**  M | F */
+	sex: string,
+	/**  YYYY-MM-DD */
+	birthDate: string | null,
+	neutered: boolean,
+	color: string | null,
+	microchip: string | null,
+	active: boolean,
+	notes: string | null,
+	preferredLogoId: number | null,
+	speciesName: string,
+	breedName: string | null,
+	ownerName: string,
+	ownerPhone: string | null,
+	/**  Calculada en SQL (DATEDIFF meses desde birth_date). */
+	ageMonths: number,
+} | null, AppError>(__TAURI_INVOKE("get_patient_by_code", { code })),
 	createPatient: (input: CreatePatientInput) => typedError<Patient, AppError>(__TAURI_INVOKE("create_patient", { input })),
-	/**  Busca un paciente por su código único legible (PAC-YYYY-NNNN). */
-	getPatientByCode: (code: string) => typedError<Patient | null, AppError>(__TAURI_INVOKE("get_patient_by_code", { code })),
 	getClinicalHistory: (patientId: number) => typedError<ClinicalHistory, AppError>(__TAURI_INVOKE("get_clinical_history", { patientId })),
 	createConsultation: (input: CreateConsultationInput) => typedError<Consultation, AppError>(__TAURI_INVOKE("create_consultation", { input })),
 	/**  Recepción de muestra analítica (trazabilidad: código M-YYYY-NNNN, estado RECIBIDA). */
@@ -54,6 +96,12 @@ export const commands = {
 	 *  Invalida el cache de IA para esta muestra.
 	 */
 	registerLabResult: (input: RegisterResultInput) => typedError<LabResult, AppError>(__TAURI_INVOKE("register_lab_result", { input })),
+	/**
+	 *  Bandeja de trabajo diaria: muestras pendientes (RECIBIDA/EN_PROCESO)
+	 *  agrupadas por tipo de muestra con el tiempo transcurrido desde la
+	 *  recepción, para que el técnico sepa qué procesar primero.
+	 */
+	getWorklist: () => typedError<WorklistData, AppError>(__TAURI_INVOKE("get_worklist")),
 	/**
 	 *  Mesa de trabajo del laboratorio: listado global de muestras con filtros
 	 *  opcionales por estado y búsqueda (código, paciente o propietario).
@@ -84,15 +132,23 @@ export const commands = {
 	 *  ruta. De este modo el logo persiste aunque se mueva/borre el original.
 	 */
 	importClinicLogo: (sourcePath: string) => typedError<string, AppError>(__TAURI_INVOKE("import_clinic_logo", { sourcePath })),
+	/**
+	 *  Valida y copia un certificado digital PKCS#12 (.p12/.pfx) a la carpeta de
+	 *  datos de la app. Devuelve la ruta persistida para guardarla en la
+	 *  configuración. La contraseña solo se usa para la validación y NUNCA se
+	 *  guarda en la base de datos (se pide de nuevo al firmar).
+	 */
+	importPkcs12: (sourcePath: string, password: string) => typedError<string, AppError>(__TAURI_INVOKE("import_pkcs12", { sourcePath, password })),
 	listSecondaryLogos: () => typedError<SecondaryLogo[], AppError>(__TAURI_INVOKE("list_secondary_logos")),
 	importSecondaryLogo: (name: string, sourcePath: string) => typedError<SecondaryLogo, AppError>(__TAURI_INVOKE("import_secondary_logo", { name, sourcePath })),
 	deleteSecondaryLogo: (id: number) => typedError<null, AppError>(__TAURI_INVOKE("delete_secondary_logo", { id })),
 	/**
-	 *  Valida y copia un certificado digital PKCS#12 (.p12/.pfx) a la carpeta
-	 *  de datos de la app y devuelve la ruta persistida. La contraseña solo se
-	 *  usa para la validación y nunca se guarda en la base de datos.
+	 *  Prueba la conexión con la API de Groq usando la clave configurada.
+	 *  Devuelve `Ok` con un mensaje breve si la clave es válida, o un `AppError`
+	 *  descriptivo si falta, es inválida o hay problemas de red.
+	 *  Solo ADMIN (vive en la página de Configuración).
 	 */
-	importPkcs12: (sourcePath: string, password: string) => typedError<string, AppError>(__TAURI_INVOKE("import_pkcs12", { sourcePath, password })),
+	testGroqConnection: () => typedError<string, AppError>(__TAURI_INVOKE("test_groq_connection")),
 	/**
 	 *  Inicia sesión verificando la contraseña (Argon2id) contra la tabla USERS.
 	 *  La sesión es única: una app de escritorio con un operador a la vez.
@@ -124,6 +180,11 @@ export const commands = {
 	generateCertificadoCirugia: (surgeryId: number) => typedError<ReportFile, AppError>(__TAURI_INVOKE("generate_certificado_cirugia", { surgeryId })),
 	/**  Genera el certificado/carnet de vacunación de un paciente. */
 	generateCarnetVacunacion: (patientId: number) => typedError<ReportFile, AppError>(__TAURI_INVOKE("generate_carnet_vacunacion", { patientId })),
+	/**
+	 *  Genera una hoja de etiquetas imprimibles para los tubos de las muestras
+	 *  indicadas (código de barras Code 128 + datos) y devuelve la ruta del PDF.
+	 */
+	generateSampleLabels: (sampleIds: number[]) => typedError<ReportFile, AppError>(__TAURI_INVOKE("generate_sample_labels", { sampleIds })),
 	/**  Lista los informes ya generados (carpeta app_data/reports), más reciente primero. */
 	listReports: () => typedError<ReportFile[], AppError>(__TAURI_INVOKE("list_reports")),
 	/**  Abre un archivo de reporte PDF en el visor por defecto del sistema operativo. */
@@ -193,16 +254,19 @@ export const commands = {
 	 */
 	getDashboardStats: () => typedError<DashboardStats, AppError>(__TAURI_INVOKE("get_dashboard_stats")),
 	/**
+	 *  Copia una foto de placa, frotis o electroforesis a la carpeta de datos de
+	 *  la app (app_data/attachments) y la asocia al resultado. Devuelve el
+	 *  adjunto creado para refrescar la UI.
+	 */
+	attachResultFile: (resultId: number, sourcePath: string) => typedError<ResultAttachment, AppError>(__TAURI_INVOKE("attach_result_file", { resultId, sourcePath })),
+	/**  Elimina un adjunto: borra el archivo de la carpeta de datos y su registro. */
+	deleteResultAttachment: (id: number) => typedError<null, AppError>(__TAURI_INVOKE("delete_result_attachment", { id })),
+	/**
 	 *  Lista el registro de auditoría con paginación y filtros (solo ADMIN).
 	 *  Orden descendente (más reciente primero).
 	 */
 	listAuditLog: (limit: number | null, offset: number | null, username: string | null, action: string | null, dateFrom: string | null, dateTo: string | null) => typedError<AuditLogEntry[], AppError>(__TAURI_INVOKE("list_audit_log", { limit, offset, username, action, dateFrom, dateTo })),
 	interpretLabResults: (sampleId: number) => typedError<string, AppError>(__TAURI_INVOKE("interpret_lab_results", { sampleId })),
-	/**
-	 *  Prueba la conexión con la API de Groq usando la clave configurada y
-	 *  devuelve un mensaje breve si la clave es válida.
-	 */
-	testGroqConnection: () => typedError<string, AppError>(__TAURI_INVOKE("test_groq_connection")),
 	getPatientLabTrends: (patientId: number, analyteId: number) => typedError<TrendPoint[], AppError>(__TAURI_INVOKE("get_patient_lab_trends", { patientId, analyteId })),
 };
 
@@ -213,6 +277,12 @@ export type Analyte = {
 	name: string,
 	unit: string | null,
 	method: string | null,
+};
+
+/**  Conteo de un analito (para el ranking de los más solicitados). */
+export type AnalyteCount = {
+	analyteName: string,
+	count: number,
 };
 
 /**  Error tipado de la app. Se serializa como `{ type, data }` para el frontend. */
@@ -389,20 +459,17 @@ export type CreateVaccineInput = {
 	notes: string | null,
 };
 
-/**
- *  Métricas del panel de control (dashboard) con las próximas citas,
- *  cirugías y refuerzos de vacunación de la agenda.
- */
-export type AnalyteCount = {
-	analyteName: string,
-	count: number,
-};
-
+/**  Volumen de muestras recibidas en un día (tendencia). */
 export type DailySampleVolume = {
+	/**  YYYY-MM-DD */
 	date: string,
 	count: number,
 };
 
+/**
+ *  Métricas del panel de control (dashboard) con las próximas citas,
+ *  cirugías y refuerzos de vacunación de la agenda.
+ */
 export type DashboardStats = {
 	patientsTotal: number,
 	patientsActive: number,
@@ -411,9 +478,13 @@ export type DashboardStats = {
 	samplesFinished: number,
 	samplesCancelled: number,
 	abnormalResults: number,
-	avgProcessingHours: number,
-	abnormalRate: number,
+	/**  Tiempo promedio recepción → finalización (en horas). */
+	avgProcessingHours: number | null,
+	/**  Porcentaje de muestras finalizadas con al menos un valor fuera de rango (0-100). */
+	abnormalRate: number | null,
+	/**  Volumen de muestras recibidas en los últimos 7 días (tendencia). */
 	weeklyVolume: DailySampleVolume[],
+	/**  Analitos más solicitados (máx. 5). */
 	topAnalytes: AnalyteCount[],
 	consultationsPending: number,
 	surgeriesProgrammed: number,
@@ -440,6 +511,22 @@ export type DbHealth = {
 	fbclientFound: boolean,
 	fbclientPath: string,
 	schemaVersion: number,
+};
+
+/**
+ *  Resultado de la búsqueda global (paleta Ctrl+K): una entidad del sistema
+ *  con su destino de navegación en la UI.
+ */
+export type GlobalSearchResult = {
+	/**  patient | sample | invoice | surgery */
+	kind: string,
+	id: number,
+	/**  Etiqueta principal (nombre del paciente, cliente, etc.). */
+	title: string,
+	/**  Etiqueta secundaria (detalle contextual). */
+	subtitle: string,
+	/**  Código de trazabilidad cuando existe (PAC-, M-, FAC-…). */
+	code: string | null,
 };
 
 /**  Factura completa con items y datos del propietario/paciente unidos. */
@@ -489,16 +576,6 @@ export type InvoiceListItem = {
 	itemCount: number,
 };
 
-export type ResultAttachment = {
-	id: number,
-	resultId: number,
-	/**  Nombre original del archivo (para mostrarlo en la UI). */
-	fileName: string,
-	/**  Ruta persistida en la carpeta de datos de la app (app_data/attachments). */
-	filePath: string,
-	mimeType: string | null,
-	createdAt: string,
-};
 export type LabResult = {
 	id: number,
 	sampleId: number,
@@ -520,18 +597,6 @@ export type LabResultChangedEvent = {
 	patientId: number,
 };
 
-export type GlobalSearchResult = {
-	/**  patient | sample | invoice | surgery */
-	kind: string,
-	id: number,
-	/**  Etiqueta principal (nombre del paciente, cliente, etc.). */
-	title: string,
-	/**  Etiqueta secundaria (detalle contextual). */
-	subtitle: string,
-	/**  Código de trazabilidad cuando existe (PAC-, M-, FAC-…). */
-	code: string | null,
-};
-
 export type LoginInput = {
 	username: string,
 	password: string,
@@ -548,8 +613,32 @@ export type Owner = {
 	city: string | null,
 };
 
-/** Ficha de paciente con campos unidos (especie, raza, propietario, edad). */
-export type Patient = { id: number; code: string; ownerId: number; speciesId: number; breedId: number | null; name: string; sex: string; birthDate: string | null; neutered: boolean; color: string | null; microchip: string | null; active: boolean; notes: string | null; preferredLogoId: number | null; speciesName: string; breedName: string | null; ownerName: string; ownerPhone: string | null; ageMonths: number }
+/**  Ficha de paciente con campos unidos (especie, raza, propietario, edad). */
+export type Patient = {
+	id: number,
+	/**  Código único legible: PAC-YYYY-NNNN (generado por Firebird al insertar). */
+	code: string,
+	ownerId: number,
+	speciesId: number,
+	breedId: number | null,
+	name: string,
+	/**  M | F */
+	sex: string,
+	/**  YYYY-MM-DD */
+	birthDate: string | null,
+	neutered: boolean,
+	color: string | null,
+	microchip: string | null,
+	active: boolean,
+	notes: string | null,
+	preferredLogoId: number | null,
+	speciesName: string,
+	breedName: string | null,
+	ownerName: string,
+	ownerPhone: string | null,
+	/**  Calculada en SQL (DATEDIFF meses desde birth_date). */
+	ageMonths: number,
+};
 
 export type RegisterResultInput = {
 	sampleId: number,
@@ -566,6 +655,18 @@ export type ReportFile = {
 	sampleCode: string,
 	/**  YYYY-MM-DD HH:MM:SS (hora local de generación). */
 	generatedAt: string,
+};
+
+/**  Archivo adjunto de un resultado (foto de placa, frotis o electroforesis). */
+export type ResultAttachment = {
+	id: number,
+	resultId: number,
+	/**  Nombre original del archivo (para mostrarlo en la UI). */
+	fileName: string,
+	/**  Ruta persistida en la carpeta de datos de la app (app_data/attachments). */
+	filePath: string,
+	mimeType: string | null,
+	createdAt: string,
 };
 
 export type Sample = {
@@ -613,49 +714,18 @@ export type SampleListItem = {
 	/**  Nº de resultados fuera de rango (ALTO/BAJO) — alerta visual. */
 	abnormalCount: number,
 };
-export type WorklistData = {
-	date: string,
-	totalPending: number,
-	/**  Pendientes recibidos hoy, agrupados por tipo de muestra. */
-	today: WorklistGroup[],
-	/**  Pendientes recibidos antes de hoy (requieren atención), agrupados igual. */
-	overdue: WorklistGroup[],
-};
-export type WorklistGroup = {
-	sampleTypeId: number,
-	sampleTypeName: string,
-	/**  Total de muestras pendientes del grupo. */
-	count: number,
-	/**  Máximo tiempo transcurrido del grupo (para ordenar los grupos por urgencia). */
-	maxElapsedMinutes: number,
-	samples: WorklistSample[],
-};
-export type WorklistSample = {
-	id: number,
-	/**  Código único de trazabilidad (M-YYYY-NNNN) */
-	code: string,
-	patientId: number,
-	patientName: string,
-	ownerName: string,
-	speciesName: string,
-	sampleTypeId: number,
-	sampleTypeName: string,
-	/**  RECIBIDA | EN_PROCESO */
-	status: string,
-	receivedAt: string,
-	/**  Minutos transcurridos desde la recepción (para ordenar por urgencia). */
-	elapsedMinutes: number,
-	/**  Nº de resultados cargados (progreso del procesamiento). */
-	resultCount: number,
-	/**  Nº de resultados fuera de rango (ALTO/BAJO) — alerta visual. */
-	abnormalCount: number,
-};
-export type SecondaryLogo = { id: number; name: string; logoPath: string; createdAt: string }
 
 export type SampleType = {
 	id: number,
 	code: string,
 	name: string,
+};
+
+export type SecondaryLogo = {
+	id: number,
+	name: string,
+	logoPath: string,
+	createdAt: string,
 };
 
 /**  Usuario autenticado (sin hash de contraseña). */
@@ -749,6 +819,66 @@ export type VaccineType = {
 	id: number,
 	code: string,
 	name: string,
+};
+
+/**
+ *  Bandeja de trabajo diaria del laboratorio: muestras pendientes agrupadas
+ *  por tipo, separando las recibidas hoy de las de días anteriores.
+ */
+export type WorklistData = {
+	/**  Fecha de la bandeja (YYYY-MM-DD, hora local del equipo). */
+	date: string,
+	/**  Total de muestras pendientes (hoy + días anteriores). */
+	totalPending: number,
+	/**  Pendientes recibidos hoy, agrupados por tipo de muestra. */
+	today: WorklistGroup[],
+	/**  Pendientes recibidos antes de hoy (requieren atención), agrupados igual. */
+	overdue: WorklistGroup[],
+};
+
+/**
+ *  Grupo de la bandeja: un tipo de muestra con sus pendientes ordenados por
+ *  antigüedad (los más antiguos primero).
+ */
+export type WorklistGroup = {
+	sampleTypeId: number,
+	sampleTypeName: string,
+	/**  Total de muestras pendientes del grupo. */
+	count: number,
+	/**
+	 *  Máximo tiempo transcurrido del grupo (para ordenar los grupos por urgencia).
+	 *  `i32` (no i64): Specta prohíbe exportar tipos BigInt a TypeScript.
+	 */
+	maxElapsedMinutes: number,
+	samples: WorklistSample[],
+};
+
+/**
+ *  Muestra pendiente en la bandeja de trabajo con el tiempo transcurrido
+ *  desde su recepción (para priorizar qué procesar primero).
+ */
+export type WorklistSample = {
+	id: number,
+	/**  Código único de trazabilidad (M-YYYY-NNNN) */
+	code: string,
+	patientId: number,
+	patientName: string,
+	ownerName: string,
+	speciesName: string,
+	sampleTypeId: number,
+	sampleTypeName: string,
+	/**  RECIBIDA | EN_PROCESO */
+	status: string,
+	receivedAt: string,
+	/**
+	 *  Minutos transcurridos desde la recepción (para ordenar por urgencia).
+	 *  `i32` (no i64): Specta prohíbe exportar tipos BigInt a TypeScript.
+	 */
+	elapsedMinutes: number,
+	/**  Nº de resultados cargados (progreso del procesamiento). */
+	resultCount: number,
+	/**  Nº de resultados fuera de rango (ALTO/BAJO) — alerta visual. */
+	abnormalCount: number,
 };
 
 /* Tauri Specta runtime */
