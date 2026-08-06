@@ -79,7 +79,7 @@ export function NewVaccineDialog({
     !patientId,
   );
 
-  const form = useForm<Values>({
+  const form = useForm<z.input<typeof schema>, unknown, z.output<typeof schema>>({
     resolver: zodResolver(schema),
     defaultValues: {
       patientId: patientId ?? undefined,

@@ -59,7 +59,7 @@ export function NewSampleDialog({
   const { data: sampleTypes = [] } = useSampleTypes();
   const createSample = useCreateSample();
 
-  const form = useForm<Values>({
+  const form = useForm<z.input<typeof schema>, unknown, z.output<typeof schema>>({
     resolver: zodResolver(schema),
     defaultValues: {
       sampleTypeId: undefined,

@@ -64,7 +64,7 @@ export function NewSurgeryDialog({
   const { data: patients = [], isLoading: loadingPatients } =
     usePatients(search);
 
-  const form = useForm<Values>({
+  const form = useForm<z.input<typeof schema>, unknown, z.output<typeof schema>>({
     resolver: zodResolver(schema),
     defaultValues: {
       patientId: undefined,

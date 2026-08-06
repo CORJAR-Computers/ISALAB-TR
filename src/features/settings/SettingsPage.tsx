@@ -80,7 +80,7 @@ export function SettingsPage() {
   const [testingGroq, setTestingGroq] = useState(false);
   const [importingPkcs12, setImportingPkcs12] = useState(false);
 
-  const form = useForm<Values>({
+  const form = useForm<z.input<typeof schema>, unknown, z.output<typeof schema>>({
     resolver: zodResolver(schema),
     defaultValues: {
       clinicName: "",
@@ -539,6 +539,7 @@ export function SettingsPage() {
                         min={0}
                         max={100}
                         {...field}
+                        value={(field.value as number | undefined) ?? ""}
                       />
                     </FormControl>
                     <FormMessage />

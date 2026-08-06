@@ -71,7 +71,7 @@ import remarkGfm from "remark-gfm";
 const resultSchema = z.object({
   analyteId: z.coerce.number().min(1, "Selecciona el analito"),
   value: z.coerce
-    .number({ invalid_type_error: "Ingresa un número válido" })
+    .number({ error: "Ingresa un número válido" })
     .min(0, "El valor no puede ser negativo"),
 });
 
@@ -108,7 +108,7 @@ export function SampleDetailDialog({
   const [aiInterpretation, setAiInterpretation] = useState<string | null>(null);
   const [interpreting, setInterpreting] = useState(false);
 
-  const resultForm = useForm<ResultValues>({
+  const resultForm = useForm<z.input<typeof resultSchema>, unknown, z.output<typeof resultSchema>>({
     resolver: zodResolver(resultSchema),
     defaultValues: {
       analyteId: 0,
@@ -471,6 +471,7 @@ export function SampleDetailDialog({
                               placeholder="0.0"
                               className="font-mono"
                               {...field}
+                              value={(field.value as number | undefined) ?? ""}
                             />
                           </FormControl>
                           <FormMessage />
