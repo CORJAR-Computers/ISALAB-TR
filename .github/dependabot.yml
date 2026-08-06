@@ -29,6 +29,11 @@ updates:
       all-actions:
         patterns:
           - "*"
+        # Solo menores/parches se agrupan; las majors de actions llegan en
+        # PRs individuales (más fáciles de revisar y validar por el CI).
+        update-types:
+          - "minor"
+          - "patch"
 
   - package-ecosystem: "npm"
     directory: "/"
@@ -44,6 +49,15 @@ updates:
       # Dependencias de producción (lo que empaqueta el frontend).
       runtime:
         dependency-type: "production"
+        # Solo menores/parches se agrupan: las majors (p. ej. React 20, zod 5)
+        # vienen en PRs individuales y no bloquean a los menores seguros.
+        update-types:
+          - "minor"
+          - "patch"
       # Dependencias de desarrollo (build, test, lint, tipos).
       dev:
         dependency-type: "development"
+        # Igual que runtime: majors individuales, menores/parches agrupados.
+        update-types:
+          - "minor"
+          - "patch"
