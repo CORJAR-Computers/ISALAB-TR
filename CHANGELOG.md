@@ -15,6 +15,13 @@ The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.1.0/).
   ficha (Historial Clínico); si no, muestra «no encontrado» con el código
   consultado. Incluye tests de `renderHook` (`usePatientByCode.test.tsx`:
   trim, query deshabilitada con código vacío y datos del paciente).
+- **Smoke test E2E con Playwright** (`e2e/` + `playwright.config.ts`):
+  `npm run test:e2e` valida login → dashboard → flujo completo de una
+  muestra (RECIBIDA → EN PROCESO → resultado → FINALIZADA) contra la UI
+  real en el dev server de Vite con el IPC de Tauri mockeado
+  (`e2e/ipc-mock.script.js`). Nuevo job `e2e` en `ci.yml` con
+  `playwright install --with-deps chromium`; el backend real sigue cubierto
+  por `cargo test`.
 - **Código de barras Code 128 en el carnet de vacunación** (`vaccines.rs` +
   `layout.rs`): el código del paciente (PAC-…) se imprime como barras
   vectoriales (crate `barcoders` 2.0.0, sin incrustar fuentes) y es
