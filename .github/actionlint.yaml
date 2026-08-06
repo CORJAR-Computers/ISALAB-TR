@@ -1,0 +1,7 @@
+# Configuración de actionlint: declara los labels del runner self-hosted
+# de release (isalab-release-win) para que la validación no los marque
+# como desconocidos. La máquina vive en D:\actions-runner y solo se usa
+# en release.yml (workflow disparado por tags, nunca por PRs).
+self-hosted-runner:
+  labels:
+    - isalab-release

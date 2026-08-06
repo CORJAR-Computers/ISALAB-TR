@@ -1,0 +1,32 @@
+name: Runner Smoke Test
+
+# TEMPORAL: valida que el runner self-hosted isalab-release-win ejecuta jobs
+# con el toolchain del proyecto (Node 24+, cargo, npm ci y escritura en el
+# workspace). Se eliminará tras verificar. Disparado manualmente.
+
+on:
+  workflow_dispatch:
+
+jobs:
+  verify:
+    name: Verify self-hosted runner
+    runs-on: [self-hosted, Windows, X64, isalab-release]
+    steps:
+      - uses: actions/checkout@v7
+      - name: Toolchain versions
+        shell: pwsh
+        run: |
+          node --version
+          npm --version
+          cargo --version
+          rustc --version
+      - name: npm ci (red + permisos)
+        run: npm ci
+      - name: Write test file (permisos de escritura)
+        shell: pwsh
+        run: |
+          $f = Join-Path $env:GITHUB_WORKSPACE "runner-test-ok.txt"
+          Set-Content -Path $f -Value "self-hosted runner OK"
+          if (-not (Test-Path $f)) { throw "No se pudo escribir en el workspace" }
+          Write-Host "Workspace writable: $(Test-Path $f)"
+          Write-Host "Quién soy: $([System.Security.Principal.WindowsIdentity]::GetCurrent().Name)"

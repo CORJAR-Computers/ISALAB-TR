@@ -25,7 +25,16 @@ env:
 jobs:
   release:
     name: Build & Release
-    runs-on: windows-latest
+    # Runner self-hosted (isalab-release-win) en la máquina de desarrollo del
+    # mantenedor. GitHub-hosted windows-latest sufrió fallos transitorios de
+    # capacidad ("job was not acquired by Runner of type hosted") que dejaron
+    # el pipeline de release en cola >1h (v0.3.3). Este job solo se dispara con
+    # tags (push de mantenedores), NO con PRs, por lo que el riesgo de
+    # seguridad de un runner persistente en un repo público es limitado.
+    #
+    # ADVERTENCIA: NO usar este runner en jobs disparados por pull_request
+    # (ci.yml): cualquier PR podría ejecutar código arbitrario en esta máquina.
+    runs-on: [self-hosted, Windows, X64, isalab-release]
     steps:
       - uses: actions/checkout@v7
 
