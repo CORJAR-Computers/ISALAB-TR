@@ -7,6 +7,8 @@ on:
 
 permissions:
   contents: write
+  # SignPath necesita leer detalles del job y descargar el artefacto.
+  actions: read
 
 env:
   CARGO_TERM_COLOR: always
@@ -69,6 +71,66 @@ jobs:
 
       - name: Build Tauri app
         run: npx tauri build
+
+      # ---- Firmado Authenticode (SignPath Foundation) ----
+      # Elimina el aviso SmartScreen en el instalador NSIS. Gratuito para OSS,
+      # pero requiere: (1) solicitud/aprobación previa en signpath.io, (2) la
+      # instalación del GitHub App de SignPath y (3) una aprobación MANUAL de
+      # cada solicitud de firma (por eso el timeout largo).
+      #
+      # Mientras los secretos SIGNPATH_* no estén configurados, estos pasos se
+      # saltan y el release sale sin firmar (igual que hoy).
+      #
+      # Detalle crítico del updater: la firma Authenticode MODIFICA el .exe e
+      # invalida el .sig de minisign que generó `tauri build`; por eso, tras
+      # sustituir el instalador por el firmado, se vuelve a firmar con
+      # minisign y `latest.json` se genera después (lee el .sig nuevo).
+      - name: Upload unsigned installer (SignPath)
+        id: upload-unsigned
+        if: ${{ secrets.SIGNPATH_API_TOKEN != '' }}
+        uses: actions/upload-artifact@v7
+        with:
+          name: isalab-unsigned-installer
+          path: src-tauri/target/release/bundle/nsis/*.exe
+          if-no-files-found: error
+          retention-days: 1
+
+      - name: Submit signing request (SignPath)
+        if: ${{ secrets.SIGNPATH_API_TOKEN != '' }}
+        uses: signpath/github-action-submit-signing-request@v2
+        with:
+          api-token: ${{ secrets.SIGNPATH_API_TOKEN }}
+          organization-id: ${{ secrets.SIGNPATH_ORG_ID }}
+          project-slug: ${{ secrets.SIGNPATH_PROJECT_SLUG }}
+          signing-policy-slug: ${{ secrets.SIGNPATH_SIGNING_POLICY_SLUG }}
+          # El instalador se sube en ZIP (comportamiento por defecto de
+          # upload-artifact): la Artifact Configuration de SignPath debe tener
+          # raíz <zip-file>.
+          github-artifact-id: ${{ steps.upload-unsigned.outputs.artifact-id }}
+          wait-for-completion: true
+          # La aprobación manual del aprobador puede tardar más de 10 min.
+          wait-for-completion-timeout-in-seconds: 3600
+          output-artifact-directory: './signed'
+
+      - name: Replace installer with signed build and re-sign updater (minisign)
+        if: ${{ secrets.SIGNPATH_API_TOKEN != '' }}
+        shell: pwsh
+        run: |
+          $signed = Get-ChildItem './signed' -Recurse -Filter '*.exe' | Select-Object -First 1
+          if (-not $signed) { throw 'No se encontró el instalador firmado por SignPath' }
+          Copy-Item $signed.FullName -Destination 'src-tauri/target/release/bundle/nsis/' -Force
+          $exePath = (Get-ChildItem 'src-tauri/target/release/bundle/nsis/*.exe' | Select-Object -First 1).FullName
+          # El .sig de `tauri build` cubre el instalador SIN firmar; al sustituir
+          # el binario queda obsoleto. Se elimina antes de re-firmar para que el
+          # control posterior sea significativo (si no, un fallo silencioso del
+          # signer pasaría el Test-Path con el .sig antiguo y latest.json
+          # llevaría una firma inválida).
+          Remove-Item "$exePath.sig" -ErrorAction SilentlyContinue
+          Write-Host "Re-firmando con minisign: $exePath"
+          # La clave privada viene del env del workflow (TAURI_SIGNING_PRIVATE_KEY).
+          npx tauri signer sign -p "$env:TAURI_SIGNING_PRIVATE_KEY_PASSWORD" "$exePath"
+          if ($LASTEXITCODE -ne 0) { throw "Fallo al re-firmar con minisign (exit $LASTEXITCODE)" }
+          if (-not (Test-Path "$exePath.sig")) { throw 'Firma minisign no generada' }
 
       # `tauri build` genera el instalador y su firma .sig, pero NO el
       # manifiesto latest.json que el auto-updater consulta en el endpoint

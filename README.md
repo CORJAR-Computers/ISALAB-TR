@@ -189,26 +189,72 @@ npm run tauri:build     # ídem
 
 ## Firmado de código (SmartScreen)
 
+El pipeline de release (`release.yml`) incluye el **firmado Authenticode con
+SignPath Foundation** (gratis para proyectos OSS) para eliminar el aviso
+"Editor desconocido" de SmartScreen en el instalador NSIS.
+
 > [!NOTE]
-> La app está **sin firmar con Authenticode**: Windows mostrará el aviso
-> "Editor desconocido" (SmartScreen) al instalar y ejecutar. No bloquea la
-> instalación, pero puede disuadir a usuarios menos técnicos.
+> Los pasos de firmado están **desactivados hasta que se configuren los
+> secretos de SignPath** (`if: secrets.SIGNPATH_API_TOKEN != ''`). Mientras
+> tanto el release sale sin firmar: Windows muestra el aviso SmartScreen (no
+> bloquea la instalación).
 
-**Sigstore/cosign no sirve para esto**: firma artefactos OCI/blobs y
-certificados EFI, pero **no genera firmas Authenticode para .exe** de
-Windows, por lo que no elimina SmartScreen.
+### Cómo activar el firmado
 
-Opciones viables para proyectos de código abierto:
+1. **Solicita el acceso OSS** en <https://signpath.io> (SignPath Foundation,
+   gratis): el repo debe ser público, usar licencia OSI aprobada, runners de
+   GitHub-hosted y una política de firma publicada. El proyecto debe ser
+   aceptado por la fundación (colas de espera).
+2. **Instala el GitHub App de SignPath** y vincúlalo al repositorio.
+3. **Crea el Proyecto, la Artifact Configuration y la Signing Policy** en la
+   consola de SignPath. La Artifact Configuration debe tener raíz
+   `<zip-file>` (el instalador se sube como artefacto ZIP de GitHub Actions).
+4. **Añade los 4 secretos juntos** al repositorio (el workflow se activa solo
+   cuando `SIGNPATH_API_TOKEN` está definido; si falta alguno de los otros,
+   el paso de firma fallará):
+
+| Secreto | Valor |
+| --- | --- |
+| `SIGNPATH_API_TOKEN` | API token con permisos de submitter en el proyecto/policy |
+| `SIGNPATH_ORG_ID` | ID de la organización en SignPath |
+| `SIGNPATH_PROJECT_SLUG` | Slug del proyecto |
+| `SIGNPATH_SIGNING_POLICY_SLUG` | Slug de la signing policy (p. ej. `release-signing`) |
+
+   Si la **Artifact Configuration** de SignPath define parámetros de usuario
+   (por ejemplo `version`, que SignPath suele exigir por su validación de
+   metadatos estrictos), añádelos al paso `Submit signing request` del
+   workflow:
+
+   ```yaml
+   parameters: |
+     version: ${{ toJSON(github.ref_name) }}
+   ```
+
+5. **Cada release requiere aprobación manual** en el portal de SignPath (un
+   "approver" del proyecto) antes de firmarse; el workflow espera hasta 1 h.
+
+### Cómo funciona en el pipeline
+
+1. `tauri build` genera el instalador, su `.sig` de minisign y el manifiesto
+   `latest.json` del updater.
+2. El instalador sin firmar se sube a SignPath (`upload-artifact` +
+   `github-action-submit-signing-request@v2`).
+3. Al volver firmado, se sustituye el `.exe` y se **vuelve a firmar con
+   minisign** (`tauri signer sign`): la firma Authenticode modifica el binario
+   e invalidaría la firma del auto-updater, que verifica cada instalador con
+   la clave pública embebida.
+4. `latest.json` se regenera con la firma nueva y todo se adjunta al release.
+
+> **Sigstore/cosign no sirve para esto**: firma artefactos OCI/blobs y
+> certificados EFI, pero **no genera firmas Authenticode para .exe** de
+> Windows, por lo que no elimina SmartScreen.
+
+Alternativas si SignPath no encaja:
 
 | Opción | Costo | Notas |
 | --- | --- | --- |
-| **SignPath Foundation** | Gratis para OSS | Firma con certificado real vía GitHub Action; requiere aprobación del proyecto (colas de espera) |
-| **Azure Trusted Signing** | ~9 USD/mes + certificado | Configurable en CI; firma periódica (validez ~3 días con re-firma automática) |
+| **Azure Trusted Signing** | ~9 USD/mes + certificado | Configurable en CI con `azure/artifact-signing-action@v2`; requiere suscripción Azure y validación de identidad |
 | Certificado EV propio | ~300–500 USD/año | Firma local con `signtool`; requiere mantener el certificado y el HSM |
-
-Recomendación: **SignPath Foundation** (sin coste) o **Azure Trusted
-Signing** (sencillo de automatizar) si se quiere eliminar el aviso de
-SmartScreen en el instalador NSIS.
 
 ## Estructura
 
