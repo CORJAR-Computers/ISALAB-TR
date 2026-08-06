@@ -489,6 +489,16 @@ export type InvoiceListItem = {
 	itemCount: number,
 };
 
+export type ResultAttachment = {
+	id: number,
+	resultId: number,
+	/**  Nombre original del archivo (para mostrarlo en la UI). */
+	fileName: string,
+	/**  Ruta persistida en la carpeta de datos de la app (app_data/attachments). */
+	filePath: string,
+	mimeType: string | null,
+	createdAt: string,
+};
 export type LabResult = {
 	id: number,
 	sampleId: number,
@@ -501,6 +511,8 @@ export type LabResult = {
 	refMin: number | null,
 	refMax: number | null,
 	analyzedAt: string | null,
+	/**  Evidencias adjuntas (placas, frotis, electroforesis) para soporte del diagnóstico. */
+	attachments: ResultAttachment[],
 };
 
 export type LabResultChangedEvent = {

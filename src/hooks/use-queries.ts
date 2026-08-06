@@ -208,6 +208,36 @@ export function useSetSampleStatus() {
   });
 }
 
+/** Adjunta fotos (placas, frotis, electroforesis) a un resultado y refresca
+ *  la ficha de la muestra y el historial del paciente. */
+export function useAttachResultFile(sampleId: number | null) {
+  const qc = useQueryClient();
+  return useMutation({
+    mutationFn: ({ resultId, sourcePath }: { resultId: number; sourcePath: string }) =>
+      api.attachResultFile(resultId, sourcePath),
+    onSuccess: () => {
+      if (sampleId != null) {
+        qc.invalidateQueries({ queryKey: ["sample", sampleId] });
+      }
+      qc.invalidateQueries({ queryKey: ["clinical-history"] });
+    },
+  });
+}
+
+/** Elimina un adjunto (borra archivo + registro) y refresca la ficha. */
+export function useDeleteResultAttachment(sampleId: number | null) {
+  const qc = useQueryClient();
+  return useMutation({
+    mutationFn: (id: number) => api.deleteResultAttachment(id),
+    onSuccess: () => {
+      if (sampleId != null) {
+        qc.invalidateQueries({ queryKey: ["sample", sampleId] });
+      }
+      qc.invalidateQueries({ queryKey: ["clinical-history"] });
+    },
+  });
+}
+
 // ====================== CONFIGURACIÓN =======================================
 
 export function useClinicSettings() {

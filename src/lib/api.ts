@@ -26,6 +26,7 @@ import type {
   Patient,
   RegisterResultInput,
   ReportFile,
+  ResultAttachment,
   Sample,
   SampleListItem,
   SampleType,
@@ -92,6 +93,10 @@ export const api = {
   getSample: (id: number) => invoke<Sample | null>("get_sample", { id }),
   setSampleStatus: (id: number, status: string) =>
     invoke<Sample>("set_sample_status", { id, status }),
+  attachResultFile: (resultId: number, sourcePath: string) =>
+    invoke<ResultAttachment>("attach_result_file", { resultId, sourcePath }),
+  deleteResultAttachment: (id: number) =>
+    invoke<void>("delete_result_attachment", { id }),
 
   // ---- Configuración ----
   getClinicSettings: () => invoke<ClinicSettings>("get_clinic_settings"),

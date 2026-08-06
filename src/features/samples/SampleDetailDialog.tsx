@@ -3,19 +3,25 @@ import { useForm } from "react-hook-form";
 import { zodResolver } from "@hookform/resolvers/zod";
 import { z } from "zod";
 import { openPath } from "@tauri-apps/plugin-opener";
+import { open as openDialog } from "@tauri-apps/plugin-dialog";
+import { convertFileSrc } from "@tauri-apps/api/core";
 import { toast } from "sonner";
 import {
   Ban,
+  Bot,
   CheckCircle2,
+  ExternalLink,
   FileText,
   FlaskConical,
   HeartPulse,
+  ImagePlus,
   Loader2,
+  MessageCircle,
+  Paperclip,
   PlayCircle,
   Plus,
-  MessageCircle,
-  Bot,
   Printer,
+  Trash2,
   X,
 } from "lucide-react";
 import { Badge } from "@/components/ui/badge";
@@ -55,6 +61,8 @@ import {
 import { Skeleton } from "@/components/ui/skeleton";
 import {
   useAnalytes,
+  useAttachResultFile,
+  useDeleteResultAttachment,
   useGenerateReport,
   useGenerateSampleLabels,
   usePatient,
@@ -62,6 +70,7 @@ import {
   useSample,
   useSetSampleStatus,
 } from "@/hooks/use-queries";
+import type { LabResult, ResultAttachment } from "@/bindings";
 import { RESULT_STATUS, SAMPLE_STATUS } from "@/lib/status";
 import { cn, formatDateTime } from "@/lib/utils";
 import { api, getErrorMessage } from "@/lib/api";
@@ -103,6 +112,8 @@ export function SampleDetailDialog({
   const setStatus = useSetSampleStatus();
   const generate = useGenerateReport();
   const generateLabels = useGenerateSampleLabels();
+  const attachFile = useAttachResultFile(sampleId);
+  const removeAttachment = useDeleteResultAttachment(sampleId);
 
   const setActivePatient = useUiStore((s) => s.setActivePatient);
   const navigate = useUiStore((s) => s.navigate);
@@ -112,6 +123,9 @@ export function SampleDetailDialog({
   const [aiInterpretation, setAiInterpretation] = useState<string | null>(null);
   const [interpreting, setInterpreting] = useState(false);
   const aiRef = useRef<HTMLDivElement | null>(null);
+  const [previewAttachment, setPreviewAttachment] =
+    useState<ResultAttachment | null>(null);
+  const [confirmDelete, setConfirmDelete] = useState(false);
 
   // Lleva el contenido del diálogo hasta el bloque de interpretación IA en
   // cuanto aparece, para que el usuario vea el resultado sin buscarlo.
@@ -133,6 +147,8 @@ export function SampleDetailDialog({
     resultForm.reset({ analyteId: 0, value: 0 });
     setConfirmAnular(false);
     setAiInterpretation(null);
+    setPreviewAttachment(null);
+    setConfirmDelete(false);
   };
 
   const pending = registerResult.isPending || setStatus.isPending;
@@ -243,6 +259,79 @@ export function SampleDetailDialog({
     }
   };
 
+  const pickAndAttach = async (result: LabResult) => {
+    let selected: string | string[] | null;
+    try {
+      selected = await openDialog({
+        title: `Adjuntar imagen a ${result.analyteName}`,
+        multiple: true,
+        filters: [
+          {
+            name: "Imágenes (placas, frotis, electroforesis)",
+            extensions: ["png", "jpg", "jpeg", "webp", "gif"],
+          },
+        ],
+      });
+    } catch (err) {
+      toast.error("No se pudo abrir el selector de archivos", {
+        description: getErrorMessage(err),
+      });
+      return;
+    }
+    if (!selected) return;
+
+    // El lote continúa aunque algún archivo falle (formato/tamaño inválido).
+    const paths = Array.isArray(selected) ? selected : [selected];
+    let ok = 0;
+    let failed = 0;
+    for (const p of paths) {
+      try {
+        await attachFile.mutateAsync({ resultId: result.id, sourcePath: p });
+        ok += 1;
+      } catch {
+        failed += 1;
+      }
+    }
+    if (ok > 0) {
+      toast.success(
+        ok === 1 ? "Adjunto cargado" : `${ok} adjuntos cargados`,
+        {
+          description:
+            "La imagen quedó asociada al resultado como evidencia del diagnóstico.",
+        },
+      );
+    }
+    if (failed > 0) {
+      toast.error(
+        failed === 1 ? "1 archivo no se pudo adjuntar" : `${failed} archivos no se pudieron adjuntar`,
+        {
+          description:
+            "Revisa el formato (PNG, JPG, WebP o GIF) y el tamaño (máx. 20 MB).",
+        },
+      );
+    }
+  };
+
+  const handleDeleteAttachment = async () => {
+    if (!previewAttachment) return;
+    if (!confirmDelete) {
+      setConfirmDelete(true);
+      return;
+    }
+    try {
+      await removeAttachment.mutateAsync(previewAttachment.id);
+      toast.success("Adjunto eliminado", {
+        description: "El archivo se borró de la carpeta de datos.",
+      });
+      setPreviewAttachment(null);
+      setConfirmDelete(false);
+    } catch (err) {
+      toast.error("No se pudo eliminar el adjunto", {
+        description: getErrorMessage(err),
+      });
+    }
+  };
+
   const goToHistory = () => {
     if (!sample) return;
     setActivePatient(sample.patientId);
@@ -296,7 +385,11 @@ export function SampleDetailDialog({
     (a) => !sample?.results.some((r) => r.analyteId === a.id),
   );
 
+  const canDeleteAttachments =
+    isVetOrAdmin && sampleStatus !== "ANULADA";
+
   return (
+    <>
     <Dialog
       open={open}
       onOpenChange={(o) => {
@@ -393,6 +486,7 @@ export function SampleDetailDialog({
                       <TableHead>Resultado</TableHead>
                       <TableHead>Rango de referencia</TableHead>
                       <TableHead className="text-right">Estado</TableHead>
+                      <TableHead className="text-right">Adjuntos</TableHead>
                     </TableRow>
                   </TableHeader>
                   <TableBody>
@@ -432,6 +526,53 @@ export function SampleDetailDialog({
                           </TableCell>
                           <TableCell className="text-right">
                             <Badge variant={rs.variant}>{rs.label}</Badge>
+                          </TableCell>
+                          <TableCell className="text-right">
+                            {r.attachments.length > 0 && (
+                              <div className="mb-1 flex flex-wrap justify-end gap-1">
+                                {r.attachments.map((att) => (
+                                  <button
+                                    key={att.id}
+                                    type="button"
+                                    onClick={() => {
+                                      setConfirmDelete(false);
+                                      setPreviewAttachment(att);
+                                    }}
+                                    title={`${att.fileName} · abrir vista previa`}
+                                    className="group relative overflow-hidden rounded-md border shadow-sm"
+                                  >
+                                    <img
+                                      src={convertFileSrc(att.filePath)}
+                                      alt={att.fileName}
+                                      className="size-9 object-cover transition-transform group-hover:scale-110"
+                                    />
+                                  </button>
+                                ))}
+                              </div>
+                            )}
+                            {canAddResult && isVetOrAdmin ? (
+                              <Button
+                                variant="ghost"
+                                size="sm"
+                                className="text-muted-foreground h-6 gap-1 px-1.5 text-xs hover:text-foreground"
+                                onClick={() => pickAndAttach(r)}
+                                disabled={attachFile.isPending}
+                                title="Adjuntar foto de placa, frotis o electroforesis"
+                              >
+                                {attachFile.isPending ? (
+                                  <Loader2 className="size-3.5 animate-spin" />
+                                ) : (
+                                  <ImagePlus className="size-3.5" />
+                                )}
+                                Adjuntar
+                              </Button>
+                            ) : (
+                              r.attachments.length === 0 && (
+                                <span className="text-muted-foreground/40 text-xs">
+                                  —
+                                </span>
+                              )
+                            )}
                           </TableCell>
                         </TableRow>
                       );
@@ -660,5 +801,79 @@ export function SampleDetailDialog({
         </DialogFooter>
       </DialogContent>
     </Dialog>
+
+    {/* Vista previa de adjunto (foto de placa, frotis o electroforesis) */}
+    <Dialog
+      open={previewAttachment != null}
+      onOpenChange={(o) => {
+        if (!o) {
+          setPreviewAttachment(null);
+          setConfirmDelete(false);
+        }
+      }}
+    >
+      <DialogContent className="sm:max-w-2xl">
+        <DialogHeader>
+          <DialogTitle className="flex items-center gap-2 truncate">
+            <Paperclip className="size-4 shrink-0" />
+            <span className="truncate">{previewAttachment?.fileName}</span>
+          </DialogTitle>
+          <DialogDescription>
+            {previewAttachment &&
+              `Adjunto del resultado · cargado ${formatDateTime(previewAttachment.createdAt)}`}
+          </DialogDescription>
+        </DialogHeader>
+        <div className="bg-muted/40 flex min-h-48 items-center justify-center rounded-lg p-2">
+          {previewAttachment && (
+            <img
+              src={convertFileSrc(previewAttachment.filePath)}
+              alt={previewAttachment.fileName}
+              className="max-h-[55vh] w-auto rounded-md object-contain"
+            />
+          )}
+        </div>
+        <DialogFooter className="sm:justify-between">
+          <div className="flex flex-wrap gap-2">
+            {previewAttachment && (
+              <Button
+                variant="outline"
+                onClick={() => openPath(previewAttachment.filePath)}
+                className="gap-1.5"
+              >
+                <ExternalLink className="size-4" />
+                Abrir original
+              </Button>
+            )}
+            {canDeleteAttachments && previewAttachment && (
+              <Button
+                variant={confirmDelete ? "destructive" : "outline"}
+                onClick={handleDeleteAttachment}
+                disabled={removeAttachment.isPending}
+                className={
+                  confirmDelete ? "" : "gap-1.5 text-destructive hover:text-destructive"
+                }
+              >
+                {removeAttachment.isPending ? (
+                  <Loader2 className="size-4 animate-spin" />
+                ) : (
+                  <Trash2 className="size-4" />
+                )}
+                {confirmDelete ? "¿Confirmar eliminación?" : "Eliminar"}
+              </Button>
+            )}
+          </div>
+          <Button
+            variant="ghost"
+            onClick={() => {
+              setPreviewAttachment(null);
+              setConfirmDelete(false);
+            }}
+          >
+            Cerrar
+          </Button>
+        </DialogFooter>
+      </DialogContent>
+    </Dialog>
+    </>
   );
 }

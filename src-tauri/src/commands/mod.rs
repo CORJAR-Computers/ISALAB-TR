@@ -1,4 +1,5 @@
 pub mod ai;
+pub mod attachments;
 pub mod auth;
 pub mod catalog;
 pub mod clinical_history;

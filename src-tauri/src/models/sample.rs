@@ -1,6 +1,20 @@
 use serde::{Deserialize, Serialize};
 use specta::Type;
 
+/// Archivo adjunto de un resultado (foto de placa, frotis o electroforesis).
+#[derive(Debug, Clone, Serialize, Deserialize, Type)]
+#[serde(rename_all = "camelCase")]
+pub struct ResultAttachment {
+    pub id: i32,
+    pub result_id: i32,
+    /// Nombre original del archivo (para mostrarlo en la UI).
+    pub file_name: String,
+    /// Ruta persistida en la carpeta de datos de la app (app_data/attachments).
+    pub file_path: String,
+    pub mime_type: Option<String>,
+    pub created_at: String,
+}
+
 #[derive(Debug, Clone, Serialize, Deserialize, Type)]
 #[serde(rename_all = "camelCase")]
 pub struct LabResult {
@@ -15,6 +29,8 @@ pub struct LabResult {
     pub ref_min: Option<f64>,
     pub ref_max: Option<f64>,
     pub analyzed_at: Option<String>,
+    /// Evidencias adjuntas (placas, frotis, electroforesis) para soporte del diagnóstico.
+    pub attachments: Vec<ResultAttachment>,
 }
 
 #[derive(Debug, Clone, Serialize, Deserialize, Type)]

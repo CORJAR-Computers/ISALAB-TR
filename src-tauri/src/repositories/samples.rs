@@ -256,7 +256,14 @@ pub fn list_results(
         )
         .map_err(AppError::from)?;
 
-    Ok(rows.into_iter().map(map_lab_result).collect())
+    let mut results: Vec<LabResult> = rows.into_iter().map(map_lab_result).collect();
+
+    // Evidencias adjuntas (placas, frotis, electroforesis) por resultado.
+    for r in &mut results {
+        r.attachments = crate::repositories::attachments::list_for_result(conn, r.id)?;
+    }
+
+    Ok(results)
 }
 
 pub fn map_lab_result(r: LabResultRow) -> LabResult {
@@ -271,6 +278,7 @@ pub fn map_lab_result(r: LabResultRow) -> LabResult {
         ref_min: r.7,
         ref_max: r.8,
         analyzed_at: r.9,
+        attachments: Vec::new(),
     }
 }
 

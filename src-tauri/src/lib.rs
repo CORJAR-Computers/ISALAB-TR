@@ -22,6 +22,7 @@ use tauri::Manager;
 use tauri_specta::{collect_commands, Builder};
 
 use crate::commands::ai::{interpret_lab_results, test_groq_connection};
+use crate::commands::attachments::{attach_result_file, delete_result_attachment};
 use crate::commands::auth::{get_session, list_audit_log, login, logout};
 use crate::commands::catalog::{
     list_analytes, list_breeds, list_sample_types, list_species, list_vaccine_types,
@@ -114,6 +115,8 @@ fn specta_builder() -> Builder<tauri::Wry> {
             get_invoice,
             set_invoice_status,
             get_dashboard_stats,
+            attach_result_file,
+            delete_result_attachment,
             list_audit_log,
             interpret_lab_results,
             get_patient_lab_trends,

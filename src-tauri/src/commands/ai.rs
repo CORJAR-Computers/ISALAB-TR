@@ -472,6 +472,7 @@ fn get_previous_results(
             ref_min: r.7,
             ref_max: r.8,
             analyzed_at: r.9,
+            attachments: Vec::new(),
         })
         .collect())
 }
@@ -582,6 +583,7 @@ mod tests {
             ref_min: Some(37.0),
             ref_max: Some(55.0),
             analyzed_at: Some("2026-08-04 10:30:00".to_string()),
+            attachments: Vec::new(),
         }
     }
 
@@ -764,6 +766,7 @@ mod tests {
                 ref_min: Some(37.0),
                 ref_max: Some(55.0),
                 analyzed_at: Some("2026-06-01 10:00:00".to_string()),
+                attachments: Vec::new(),
             }],
         };
 
