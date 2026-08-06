@@ -4,7 +4,23 @@ All notable changes to ISALAB will be documented in this file.
 
 The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.1.0/).
 
-## [Unreleased]
+## [0.3.3] - 2026-08-06
+
+### Changed
+
+- **Migración a Zod 4** (`zod 3→4.4` + `@hookform/resolvers 5.0→5.7`):
+  los schemas con `z.coerce` exigen el patrón de tres genéricos en
+  `useForm<z.input, unknown, z.output>`, se renombró
+  `invalid_type_error → error` y `z.string().email() → z.email()`. Incluido
+  en el PR #1 de Dependabot junto con `lucide-react 0.525→1.28`.
+- **Toolchain de build modernizada**: `vite 7→8` (minifier Oxc en lugar de
+  esbuild), `vitest 3→4`, `@vitejs/plugin-react 4→6`, `jsdom 26→30`,
+  `@types/node 22→26`, `@vitest/coverage-v8 3→4` y
+  `@testing-library/jest-dom 6→7`. TypeScript se mantiene en 5.8 a
+  propósito: `typescript-eslint` aún no soporta TS 7 (rewrite en Go);
+  llegará en su propio PR individual.
+- **Dependabot**: los grupos ahora agrupan solo `minor`/`patch`; los majors
+  llegan en PRs individuales para no bloquear las actualizaciones seguras.
 
 ### Added
 

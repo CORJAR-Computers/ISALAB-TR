@@ -1,7 +1,7 @@
 {
   "name": "isalab",
   "private": true,
-  "version": "0.3.2",
+  "version": "0.3.3",
   "type": "module",
   "description": "ISALAB — Sistema de gestión para laboratorios veterinarios (Tauri v2 + Rust + Firebird 5 Embedded + React 19)",
   "scripts": {
