@@ -2639,7 +2639,7 @@ dependencies = [
 
 [[package]]
 name = "isalab"
-version = "0.3.2"
+version = "0.3.3"
 dependencies = [
  "argon2",
  "barcoders",
