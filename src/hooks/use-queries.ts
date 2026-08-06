@@ -134,6 +134,7 @@ export function useCreateSample() {
       });
       qc.invalidateQueries({ queryKey: ["samples"] });
       qc.invalidateQueries({ queryKey: ["sample-counts"] });
+      qc.invalidateQueries({ queryKey: ["worklist"] });
       qc.invalidateQueries({ queryKey: ["dashboard"] });
     },
   });
@@ -147,6 +148,7 @@ export function useRegisterLabResult() {
       qc.invalidateQueries({ queryKey: ["clinical-history"] });
       qc.invalidateQueries({ queryKey: ["samples"] });
       qc.invalidateQueries({ queryKey: ["sample-counts"] });
+      qc.invalidateQueries({ queryKey: ["worklist"] });
       qc.invalidateQueries({ queryKey: ["sample", result.sampleId] });
     },
   });
@@ -171,6 +173,16 @@ export function useSampleCounts() {
   });
 }
 
+/** Bandeja de trabajo diaria: pendientes por tipo con tiempo transcurrido.
+ *  Se auto-refresca cada minuto porque el tiempo transcurrido avanza en vivo. */
+export function useWorklist() {
+  return useQuery({
+    queryKey: ["worklist"],
+    queryFn: api.getWorklist,
+    refetchInterval: 60_000,
+  });
+}
+
 export function useSample(id: number | null) {
   return useQuery({
     queryKey: ["sample", id],
@@ -187,6 +199,7 @@ export function useSetSampleStatus() {
     onSuccess: (sample) => {
       qc.invalidateQueries({ queryKey: ["samples"] });
       qc.invalidateQueries({ queryKey: ["sample-counts"] });
+      qc.invalidateQueries({ queryKey: ["worklist"] });
       qc.invalidateQueries({ queryKey: ["sample", sample.id] });
       qc.invalidateQueries({
         queryKey: ["clinical-history", sample.patientId],

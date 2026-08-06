@@ -589,6 +589,43 @@ export type SampleListItem = {
 	/**  Nº de resultados fuera de rango (ALTO/BAJO) — alerta visual. */
 	abnormalCount: number,
 };
+export type WorklistData = {
+	date: string,
+	totalPending: number,
+	/**  Pendientes recibidos hoy, agrupados por tipo de muestra. */
+	today: WorklistGroup[],
+	/**  Pendientes recibidos antes de hoy (requieren atención), agrupados igual. */
+	overdue: WorklistGroup[],
+};
+export type WorklistGroup = {
+	sampleTypeId: number,
+	sampleTypeName: string,
+	/**  Total de muestras pendientes del grupo. */
+	count: number,
+	/**  Máximo tiempo transcurrido del grupo (para ordenar los grupos por urgencia). */
+	maxElapsedMinutes: number,
+	samples: WorklistSample[],
+};
+export type WorklistSample = {
+	id: number,
+	/**  Código único de trazabilidad (M-YYYY-NNNN) */
+	code: string,
+	patientId: number,
+	patientName: string,
+	ownerName: string,
+	speciesName: string,
+	sampleTypeId: number,
+	sampleTypeName: string,
+	/**  RECIBIDA | EN_PROCESO */
+	status: string,
+	receivedAt: string,
+	/**  Minutos transcurridos desde la recepción (para ordenar por urgencia). */
+	elapsedMinutes: number,
+	/**  Nº de resultados cargados (progreso del procesamiento). */
+	resultCount: number,
+	/**  Nº de resultados fuera de rango (ALTO/BAJO) — alerta visual. */
+	abnormalCount: number,
+};
 export type SecondaryLogo = { id: number; name: string; logoPath: string; createdAt: string }
 
 export type SampleType = {

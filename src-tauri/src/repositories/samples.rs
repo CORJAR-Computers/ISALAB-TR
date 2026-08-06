@@ -346,6 +346,126 @@ pub fn list_results_for_export(
         .collect())
 }
 
+pub(crate) type WorklistRow = (
+    i32,            // id
+    String,         // code
+    i32,            // patient_id
+    String,         // patient_name
+    String,         // owner_name
+    String,         // species_name
+    i32,            // sample_type_id
+    String,         // sample_type_name
+    String,         // status
+    String,         // received_at
+    i64,            // elapsed_minutes
+    i32,            // result_count
+    i32,            // abnormal_count
+);
+
+/// Bandeja de trabajo del laboratorio: muestras pendientes (RECIBIDA /
+/// EN_PROCESO) agrupadas por tipo de muestra, separando las recibidas hoy
+/// de las de días anteriores, con el tiempo transcurrido desde la recepción.
+pub fn get_worklist(
+    conn: &mut SimpleConnection,
+) -> Result<crate::models::worklist::WorklistData, AppError> {
+    use crate::models::worklist::WorklistSample;
+
+    let today = chrono::Local::now().format("%Y-%m-%d").to_string();
+    let sql = "
+        SELECT s.ID, s.CODE, s.PATIENT_ID, p.NAME, o.FULL_NAME, sp.NAME,
+               s.SAMPLE_TYPE_ID, st.NAME, s.STATUS,
+               LEFT(CAST(s.RECEIVED_AT AS VARCHAR(60)), 19),
+               CAST(DATEDIFF(MINUTE FROM s.RECEIVED_AT TO CURRENT_TIMESTAMP) AS BIGINT),
+               (SELECT COUNT(*) FROM LAB_RESULTS lr WHERE lr.SAMPLE_ID = s.ID),
+               (SELECT COUNT(*) FROM LAB_RESULTS lr
+                 WHERE lr.SAMPLE_ID = s.ID AND lr.STATUS IN ('ALTO', 'BAJO'))
+        FROM SAMPLES s
+        JOIN PATIENTS p ON p.ID = s.PATIENT_ID
+        JOIN OWNERS o ON o.ID = p.OWNER_ID
+        JOIN SPECIES sp ON sp.ID = p.SPECIES_ID
+        JOIN SAMPLE_TYPES st ON st.ID = s.SAMPLE_TYPE_ID
+        WHERE s.STATUS IN ('RECIBIDA', 'EN_PROCESO')
+        ORDER BY s.RECEIVED_AT ASC, s.ID ASC";
+
+    let rows: Vec<WorklistRow> = conn.query(sql, ()).map_err(AppError::from)?;
+    let samples = rows
+        .into_iter()
+        .map(|r| WorklistSample {
+            id: r.0,
+            code: r.1,
+            patient_id: r.2,
+            patient_name: r.3,
+            owner_name: r.4,
+            species_name: r.5,
+            sample_type_id: r.6,
+            sample_type_name: r.7,
+            status: r.8,
+            received_at: r.9,
+            elapsed_minutes: r.10,
+            result_count: r.11,
+            abnormal_count: r.12,
+        })
+        .collect();
+
+    Ok(group_worklist(samples, &today))
+}
+
+/// Agrupa las muestras pendientes por tipo y las separa entre recibidas hoy
+/// y de días anteriores. Función pura (testeable sin base de datos); los
+/// grupos y las muestras llegan ordenados por antigüedad ascendente.
+pub fn group_worklist(
+    samples: Vec<crate::models::worklist::WorklistSample>,
+    today: &str,
+) -> crate::models::worklist::WorklistData {
+    use crate::models::worklist::{WorklistData, WorklistGroup};
+
+    let mut today_groups: Vec<WorklistGroup> = Vec::new();
+    let mut overdue_groups: Vec<WorklistGroup> = Vec::new();
+
+    for s in samples {
+        // RECEIVED_AT llega como "YYYY-MM-DD HH:MM:SS"; la fecha es el primer token.
+        let received_date = s.received_at.split(' ').next().unwrap_or(&s.received_at);
+        let is_today = received_date == today;
+        let target = if is_today {
+            &mut today_groups
+        } else {
+            &mut overdue_groups
+        };
+
+        match target.iter_mut().find(|g| g.sample_type_id == s.sample_type_id) {
+            Some(g) => {
+                g.count += 1;
+                g.max_elapsed_minutes = g.max_elapsed_minutes.max(s.elapsed_minutes);
+                g.samples.push(s);
+            }
+            None => {
+                let sample_type_name = s.sample_type_name.clone();
+                target.push(WorklistGroup {
+                    sample_type_id: s.sample_type_id,
+                    sample_type_name,
+                    count: 1,
+                    max_elapsed_minutes: s.elapsed_minutes,
+                    samples: vec![s],
+                });
+            }
+        }
+    }
+
+    // Los grupos con la muestra más antigua primero (mayor urgencia).
+    today_groups.sort_by_key(|g| std::cmp::Reverse(g.max_elapsed_minutes));
+    overdue_groups.sort_by_key(|g| std::cmp::Reverse(g.max_elapsed_minutes));
+
+    let total_pending = today_groups.iter().map(|g| g.count).sum::<i32>()
+        + overdue_groups.iter().map(|g| g.count).sum::<i32>();
+
+    WorklistData {
+        date: today.to_string(),
+        total_pending,
+        today: today_groups,
+        overdue: overdue_groups,
+    }
+}
+
 pub fn get_patient_lab_trends(
     conn: &mut SimpleConnection,
     patient_id: i32,
@@ -496,6 +616,93 @@ mod tests {
     }
 
     #[test]
+    fn test_group_worklist_splits_today_and_overdue() {
+        use crate::models::worklist::WorklistSample;
+        let mk = |id: i32, type_id: i32, type_name: &str, date: &str, mins: i64| WorklistSample {
+            id,
+            code: format!("M-2026-{id:04}"),
+            patient_id: 1,
+            patient_name: "Luna".into(),
+            owner_name: "Juan Pérez".into(),
+            species_name: "Canino".into(),
+            sample_type_id: type_id,
+            sample_type_name: type_name.to_string(),
+            status: "RECIBIDA".into(),
+            received_at: format!("{date} 10:00:00"),
+            elapsed_minutes: mins,
+            result_count: 0,
+            abnormal_count: 0,
+        };
+        let rows = vec![
+            mk(1, 1, "Sangre total (EDTA)", "2026-08-06", 45),
+            mk(2, 2, "Suero", "2026-08-06", 120),
+            mk(3, 1, "Sangre total (EDTA)", "2026-08-05", 1500),
+            mk(4, 2, "Suero", "2026-08-05", 2000),
+        ];
+        let wl = group_worklist(rows, "2026-08-06");
+
+        assert_eq!(wl.date, "2026-08-06");
+        assert_eq!(wl.total_pending, 4);
+        assert_eq!(wl.today.len(), 2);
+        assert_eq!(wl.overdue.len(), 2);
+        // Grupos de hoy ordenados por urgencia desc (el más antiguo primero).
+        assert_eq!(wl.today[0].sample_type_name, "Suero"); // 120 min
+        assert_eq!(wl.today[0].max_elapsed_minutes, 120);
+        assert_eq!(wl.today[0].samples[0].id, 2);
+        assert_eq!(wl.today[1].sample_type_name, "Sangre total (EDTA)"); // 45 min
+        assert_eq!(wl.today[1].max_elapsed_minutes, 45);
+        // Pendientes de días anteriores, también por urgencia.
+        assert_eq!(wl.overdue[0].sample_type_name, "Suero"); // 2000 min
+        assert_eq!(wl.overdue[0].max_elapsed_minutes, 2000);
+        assert_eq!(wl.overdue[1].sample_type_name, "Sangre total (EDTA)"); // 1500 min
+    }
+
+    #[test]
+    fn test_group_worklist_groups_by_type_with_counts() {
+        use crate::models::worklist::WorklistSample;
+        let mk = |id: i32, type_id: i32, type_name: &str, mins: i64| WorklistSample {
+            id,
+            code: format!("M-2026-{id:04}"),
+            patient_id: 1,
+            patient_name: "Luna".into(),
+            owner_name: "Juan Pérez".into(),
+            species_name: "Canino".into(),
+            sample_type_id: type_id,
+            sample_type_name: type_name.to_string(),
+            status: "EN_PROCESO".into(),
+            received_at: format!("2026-08-06 09:{id:02}:00"),
+            elapsed_minutes: mins,
+            result_count: 0,
+            abnormal_count: 0,
+        };
+        let rows = vec![
+            mk(1, 1, "Sangre", 30),
+            mk(2, 1, "Sangre", 60),
+            mk(3, 2, "Orina", 90),
+        ];
+        let wl = group_worklist(rows, "2026-08-06");
+
+        assert_eq!(wl.today.len(), 2);
+        let sangre = wl
+            .today
+            .iter()
+            .find(|g| g.sample_type_name == "Sangre")
+            .unwrap();
+        assert_eq!(sangre.count, 2);
+        assert_eq!(sangre.max_elapsed_minutes, 60);
+        assert_eq!(sangre.samples.len(), 2);
+        assert!(wl.overdue.is_empty());
+    }
+
+    #[test]
+    fn test_group_worklist_empty() {
+        let wl = group_worklist(Vec::new(), "2026-08-06");
+        assert_eq!(wl.total_pending, 0);
+        assert!(wl.today.is_empty());
+        assert!(wl.overdue.is_empty());
+    }
+
+    #[test]
     fn test_sample_list_item_row_mapping() {
         let row: SampleListItemRow = (
             1,
@@ -627,6 +834,47 @@ mod integration_tests {
         // RECIBIDA -> EN_PROCESO
         let updated = set_status(&mut conn, 1, "EN_PROCESO").unwrap();
         assert_eq!(updated.status, "EN_PROCESO");
+
+        test_helpers::cleanup_test_db(&db_path);
+    }
+
+    #[test]
+    fn test_get_worklist_today_and_overdue() {
+        let (mut conn, db_path) = setup();
+        let patient_id = test_helpers::insert_test_patient(&mut conn);
+        test_helpers::insert_test_sample_type(&mut conn);
+
+        // Pendiente recibida hoy.
+        conn.execute(
+            "INSERT INTO SAMPLES (ID, CODE, PATIENT_ID, SAMPLE_TYPE_ID, RECEIVED_AT, STATUS)
+             VALUES (1, 'M-2026-0001', ?, 1, CURRENT_TIMESTAMP, 'RECIBIDA')",
+            (&patient_id,),
+        )
+        .unwrap();
+        // Pendiente de ayer (requiere atención).
+        conn.execute(
+            "INSERT INTO SAMPLES (ID, CODE, PATIENT_ID, SAMPLE_TYPE_ID, RECEIVED_AT, STATUS)
+             VALUES (2, 'M-2026-0002', ?, 1, DATEADD(-1 DAY TO CURRENT_TIMESTAMP), 'EN_PROCESO')",
+            (&patient_id,),
+        )
+        .unwrap();
+        // Finalizada: NO debe aparecer en la bandeja.
+        conn.execute(
+            "INSERT INTO SAMPLES (ID, CODE, PATIENT_ID, SAMPLE_TYPE_ID, RECEIVED_AT, STATUS)
+             VALUES (3, 'M-2026-0003', ?, 1, CURRENT_TIMESTAMP, 'FINALIZADA')",
+            (&patient_id,),
+        )
+        .unwrap();
+
+        let wl = get_worklist(&mut conn).unwrap();
+        assert_eq!(wl.total_pending, 2);
+        assert_eq!(wl.today.len(), 1);
+        assert_eq!(wl.today[0].count, 1);
+        assert_eq!(wl.today[0].samples[0].code, "M-2026-0001");
+        assert!(wl.today[0].samples[0].elapsed_minutes >= 0);
+        assert_eq!(wl.overdue.len(), 1);
+        assert_eq!(wl.overdue[0].samples[0].code, "M-2026-0002");
+        assert!(wl.overdue[0].samples[0].elapsed_minutes >= 1000);
 
         test_helpers::cleanup_test_db(&db_path);
     }

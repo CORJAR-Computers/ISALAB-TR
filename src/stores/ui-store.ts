@@ -1,12 +1,14 @@
 import { create } from "zustand";
 
 export type Theme = "light" | "dark";
+
 export type View =
   | "dashboard"
   | "agenda"
   | "patients"
   | "clinical-history"
   | "samples"
+  | "worklist"
   | "surgeries"
   | "vaccines"
   | "invoices"

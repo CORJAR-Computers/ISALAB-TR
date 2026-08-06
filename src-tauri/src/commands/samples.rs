@@ -4,6 +4,7 @@ use crate::auth::{require_session, require_vet_or_admin};
 use crate::error::AppError;
 use crate::models::sample::{CreateSampleInput, LabResult, RegisterResultInput, Sample};
 use crate::models::sample_list_item::SampleListItem;
+use crate::models::worklist::WorklistData;
 use crate::repositories::clinical_history as history_repo;
 use crate::repositories::samples as samples_repo;
 use crate::state::AppState;
@@ -37,6 +38,17 @@ pub fn register_lab_result(
     state.ai_cache.invalidate(input.sample_id);
 
     Ok(result)
+}
+
+/// Bandeja de trabajo diaria: muestras pendientes (RECIBIDA/EN_PROCESO)
+/// agrupadas por tipo de muestra con el tiempo transcurrido desde la
+/// recepción, para que el técnico sepa qué procesar primero.
+#[tauri::command]
+#[specta::specta]
+pub fn get_worklist(state: State<'_, AppState>) -> Result<WorklistData, AppError> {
+    require_session(&state)?;
+    let mut pooled = state.pool.acquire()?;
+    samples_repo::get_worklist(pooled.conn())
 }
 
 /// Mesa de trabajo del laboratorio: listado global de muestras con filtros

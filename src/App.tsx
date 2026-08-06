@@ -22,6 +22,7 @@ import { ConsultationsPage } from "@/features/agenda/ConsultationsPage";
 import { PatientsPage } from "@/features/patients/PatientsPage";
 import { ClinicalHistoryPage } from "@/features/clinical-history/ClinicalHistoryPage";
 import { SamplesPage } from "@/features/samples/SamplesPage";
+import { WorklistPage } from "@/features/worklist/WorklistPage";
 import { SurgeriesPage } from "@/features/surgeries/SurgeriesPage";
 import { VaccinesPage } from "@/features/vaccines/VaccinesPage";
 import { InvoicesPage } from "@/features/invoices/InvoicesPage";
@@ -173,6 +174,7 @@ export default function App() {
               {view === "patients" && <PatientsPage />}
               {view === "clinical-history" && <ClinicalHistoryPage />}
               {view === "samples" && <SamplesPage />}
+              {view === "worklist" && <WorklistPage />}
               {view === "surgeries" && <SurgeriesPage />}
               {view === "vaccines" && <VaccinesPage />}
               {view === "invoices" && <InvoicesPage />}

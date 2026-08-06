@@ -23,6 +23,7 @@ export function useFirebirdEvents() {
       qc.invalidateQueries({ queryKey: ["clinical-history", patientId] });
       qc.invalidateQueries({ queryKey: ["samples"] });
       qc.invalidateQueries({ queryKey: ["sample-counts"] });
+      qc.invalidateQueries({ queryKey: ["worklist"] });
       qc.invalidateQueries({ queryKey: ["patient", patientId] });
     }).then((un) => unlisteners.push(un));
 
@@ -31,6 +32,7 @@ export function useFirebirdEvents() {
       qc.invalidateQueries({ queryKey: ["clinical-history", patientId] });
       qc.invalidateQueries({ queryKey: ["samples"] });
       qc.invalidateQueries({ queryKey: ["sample-counts"] });
+      qc.invalidateQueries({ queryKey: ["worklist"] });
       qc.invalidateQueries({ queryKey: ["sample", event.payload.sampleId] });
     }).then((un) => unlisteners.push(un));
 

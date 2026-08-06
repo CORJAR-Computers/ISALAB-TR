@@ -13,3 +13,4 @@ pub mod settings;
 pub mod species;
 pub mod surgery;
 pub mod vaccine;
+pub mod worklist;

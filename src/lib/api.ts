@@ -37,6 +37,7 @@ import type {
   VaccineListItem,
   VaccineType,
   SecondaryLogo,
+  WorklistData,
 } from "@/bindings";
 
 /** Extrae el mensaje legible de un AppError serializado por Tauri. */
@@ -81,6 +82,7 @@ export const api = {
     invoke<Consultation>("create_consultation", { input }),
 
   // ---- Laboratorio ----
+  getWorklist: () => invoke<WorklistData>("get_worklist"),
   createSample: (input: CreateSampleInput) =>
     invoke<Sample>("create_sample", { input }),
   registerLabResult: (input: RegisterResultInput) =>

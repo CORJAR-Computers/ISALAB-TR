@@ -43,7 +43,7 @@ use crate::commands::reports::{
     generate_sample_labels, list_reports, open_report_file,
 };
 use crate::commands::samples::{
-    create_sample, get_sample, list_samples, register_lab_result, set_sample_status,
+    create_sample, get_sample, get_worklist, list_samples, register_lab_result, set_sample_status,
 };
 use crate::commands::settings::{
     delete_secondary_logo, get_clinic_settings, import_clinic_logo, import_pkcs12,
@@ -75,6 +75,7 @@ fn specta_builder() -> Builder<tauri::Wry> {
             create_consultation,
             create_sample,
             register_lab_result,
+            get_worklist,
             list_samples,
             get_sample,
             set_sample_status,
