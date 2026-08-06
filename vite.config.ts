@@ -38,7 +38,8 @@ export default defineConfig({
   build: {
     // Tauri uses Chromium on Windows; improve browser compatibility.
     target: process.env.TAURI_ENV_PLATFORM === "windows" ? "chrome105" : "safari13",
-    minify: !process.env.TAURI_ENV_DEBUG ? "esbuild" : false,
+    // Vite 8 usa Oxc (rolldown) en vez de esbuild como minifier nativo.
+    minify: !process.env.TAURI_ENV_DEBUG ? "oxc" : false,
     sourcemap: !!process.env.TAURI_ENV_DEBUG,
     rollupOptions: {
       output: {
