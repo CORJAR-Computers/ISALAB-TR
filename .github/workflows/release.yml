@@ -4,6 +4,14 @@ on:
   push:
     tags:
       - 'v*'
+  # Fallback de emergencia: publica el tag indicado cross-compilando desde
+  # ubuntu-latest cuando la máquina del runner self-hosted está apagada.
+  workflow_dispatch:
+    inputs:
+      tag:
+        description: 'Tag a publicar (ej. v0.3.4). Debe existir en el repo.'
+        required: true
+        type: string
 
 permissions:
   contents: write
@@ -25,6 +33,9 @@ env:
 jobs:
   release:
     name: Build & Release
+    # Solo el push de tags dispara el build nativo; el fallback se ejecuta con
+    # workflow_dispatch y no debe duplicar el release.
+    if: github.event_name == 'push'
     # Runner self-hosted (isalab-release-win) en la máquina de desarrollo del
     # mantenedor. GitHub-hosted windows-latest sufrió fallos transitorios de
     # capacidad ("job was not acquired by Runner of type hosted") que dejaron
@@ -193,3 +204,135 @@ jobs:
       # borrador, los clientes no reciben la actualización hasta publicarlo.
       # Publica el borrador (botón "Publish release") cuando quieras
       # distribuirlo.
+
+  # ---- Fallback de emergencia: cross-compile Windows x64 desde Linux ----
+  # Se dispara MANUALMENTE (workflow_dispatch, input `tag`) cuando la máquina
+  # del runner self-hosted está apagada y hay que publicar una release.
+  # Cross-compila el instalador NSIS con cargo-xwin (CRT/MSVC vía xwin) +
+  # makensis, y genera los artefactos del updater (.sig + latest.json).
+  #
+  # Limitaciones frente al job principal:
+  # - No firma con SignPath (ese paso usa pwsh en el runner Windows). El
+  #   instalador del fallback sale sin Authenticode; el auto-updater igual
+  #   funciona (usa la firma minisign .sig, que sí se genera).
+  # - Cross-compile: los -sys de C (ring, openssl, zstd) requieren clang + lld
+  #   que cargo-xwin instala/usa automáticamente.
+  release-fallback:
+    name: Build & Release (fallback cross-compile)
+    if: github.event_name == 'workflow_dispatch'
+    runs-on: ubuntu-latest
+    env:
+      # El config.toml local fija un target-dir de Windows; se fuerza uno
+      # ABSOLUTO bajo el workspace (el CLI de Tauri invoca cargo con cwd en
+      # src-tauri, y una ruta relativa resolvería en src-tauri/src-tauri/target,
+      # rompiendo el cache y el glob de assets del release).
+      CARGO_TARGET_DIR: ${{ github.workspace }}/src-tauri/target
+      # Wrapper linker que instala cargo-xwin: enlaza contra el CRT/SDK de
+      # Microsoft descargado por xwin (target MSVC).
+      CARGO_TARGET_X86_64_PC_WINDOWS_MSVC_LINKER: xwin-cargo
+    steps:
+      - uses: actions/checkout@v7
+        with:
+          # El workflow_dispatch corre desde master; el input `tag` indica qué
+          # tag publicar (debe existir en el repo).
+          ref: ${{ inputs.tag }}
+
+      - name: Setup Node.js
+        uses: actions/setup-node@v7
+        with:
+          node-version: 24
+          cache: 'npm'
+
+      - name: Install Rust (target Windows MSVC)
+        uses: dtolnay/rust-toolchain@stable
+        with:
+          targets: x86_64-pc-windows-msvc
+
+      - name: Install cargo-xwin
+        uses: taiki-e/install-action@v2
+        with:
+          tool: cargo-xwin
+
+      - name: Install NSIS + system deps
+        # makensis genera el instalador NSIS; las libs WebKit/GTK las instalan
+        # los templates oficiales de Tauri en ubuntu (el CLI puede verificar
+        # deps de sistema aunque el target sea Windows; inofensivas si no se
+        # usan).
+        run: |
+          sudo apt-get update
+          sudo apt-get install -y nsis libwebkit2gtk-4.1-dev libayatana-appindicator3-dev librsvg2-dev
+
+      - name: Cache cargo registry
+        uses: actions/cache@v6
+        with:
+          path: |
+            ~/.cargo/registry
+            ~/.cargo/git
+            src-tauri/target
+          key: ${{ runner.os }}-cargo-${{ hashFiles('**/Cargo.lock') }}
+
+      - name: Install frontend dependencies
+        run: npm ci
+
+      - name: Download Firebird 5 Embedded (bundled runtime)
+        shell: bash
+        run: |
+          url="https://github.com/FirebirdSQL/firebird/releases/download/v5.0.3/Firebird-5.0.3.1683-0-windows-x64.zip"
+          zip="/tmp/firebird5.zip"
+          curl -sSL -o "$zip" "$url"
+          unzip -q "$zip" -d "$GITHUB_WORKSPACE/firebird5_tmp"
+          dll=$(find "$GITHUB_WORKSPACE/firebird5_tmp" -name fbclient.dll | head -1)
+          if [ -z "$dll" ]; then echo "fbclient.dll no encontrado en el ZIP" >&2; exit 1; fi
+          src=$(dirname "$dll")
+          dest="$GITHUB_WORKSPACE/src-tauri/binaries/firebird"
+          mkdir -p "$dest"
+          cp -r "$src"/* "$dest"/
+          rm -f "$zip"
+          test -f "$dest/fbclient.dll" && echo "fbclient.dll bundled: true" || { echo "fbclient.dll no se copió al bundle" >&2; exit 1; }
+
+      - name: Prune Firebird to embedded subset
+        run: node scripts/prune-firebird.mjs
+
+      - name: Build Tauri app (cross-compile Windows x64)
+        run: npx tauri build --target x86_64-pc-windows-msvc --bundles nsis
+
+      # `tauri build` genera el instalador y su .sig (updater), pero NO el
+      # manifiesto latest.json; se genera aquí en bash (el fallback no tiene
+      # pwsh).
+      - name: Generate updater manifest (latest.json)
+        shell: bash
+        run: |
+          version=$(node -p "require('./package.json').version")
+          exe="ISALAB_${version}_x64-setup.exe"
+          bundle="src-tauri/target/x86_64-pc-windows-msvc/release/bundle/nsis"
+          sig_path="$bundle/${exe}.sig"
+          if [ ! -f "$sig_path" ]; then echo "Firma del instalador no encontrada: $sig_path" >&2; exit 1; fi
+          signature=$(tr -d '\r\n' < "$sig_path")
+          url="https://github.com/${{ github.repository }}/releases/download/${{ inputs.tag }}/${exe}"
+          pub_date=$(date -u +%Y-%m-%dT%H:%M:%S.000Z)
+          node -e '
+            const fs = require("fs");
+            const [version, pubDate, signature, url, out] = process.argv.slice(1);
+            const manifest = {
+              version,
+              notes: `ISALAB v${version}`,
+              pub_date: pubDate,
+              platforms: {
+                "windows-x86_64": { signature, url },
+              },
+            };
+            fs.writeFileSync(out, JSON.stringify(manifest, null, 2) + "\n");
+          ' "$version" "$pub_date" "$signature" "$url" "$bundle/latest.json"
+          echo "latest.json generado para v${version}: $url"
+
+      - name: Create GitHub Release
+        uses: softprops/action-gh-release@v3
+        with:
+          # Si el job principal ya creó el draft para este tag (runner
+          # encendido a medias), no fallar: sube los assets del fallback.
+          skipIfReleaseExists: true
+          tag_name: ${{ inputs.tag }}
+          files: |
+            src-tauri/target/x86_64-pc-windows-msvc/release/bundle/**/*
+          draft: true
+          generate_release_notes: true
