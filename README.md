@@ -63,6 +63,40 @@ El pipeline de release (`release.yml`) compila el instalador en GitHub
 Actions, adjunta el artefacto al release y genera notas de cambios
 automáticas.
 
+### Auto-actualización (v0.3.1)
+
+Desde la **v0.3.1** la app incluye el **plugin oficial de auto-actualización**
+de Tauri. Al iniciar (solo en builds de producción) comprueba si hay una
+versión nueva en el release más reciente de GitHub; si la hay, muestra un
+diálogo para descargarla, instalarla y reiniciar la aplicación.
+
+- **Endpoint**: `…/releases/latest/download/latest.json` (generado por
+  `tauri build` junto al instalador gracias a `createUpdaterArtifacts: true`).
+- **Firma**: cada instalador se firma con la **clave privada de minisign**
+  (par `isalab.key` / `isalab.key.pub`); el cliente verifica la firma con la
+  clave pública embebida en `tauri.conf.json`. Actualizaciones no firmadas
+  por el mantenedor **no se instalan**.
+- **Instalación silenciosa**: NSIS en modo `currentUser` + updater en modo
+  `passive` (barra de progreso, sin prompts de elevación).
+
+#### Claves de firma y CI
+
+La clave privada se guarda como secreto del repositorio (necesaria para que
+`tauri build` genere los artefactos del updater):
+
+| Secreto | Valor |
+| --- | --- |
+| `TAURI_SIGNING_PRIVATE_KEY` | contenido de `isalab.key` (cifrado) |
+| `TAURI_SIGNING_PRIVATE_KEY_PASSWORD` | frase de paso (vacía si se generó con `-p ""`) |
+
+Regeneración (solo si se pierde la clave; invalidaría las instalaciones
+anteriores):
+
+```bash
+npx tauri signer generate -w ~/.tauri/isalab.key --ci -p ""
+# copia isalab.key a los secretos y isalab.key.pub a tauri.conf.json > plugins.updater.pubkey
+```
+
 ### Compilación local del instalador
 
 ```bash
@@ -152,6 +186,29 @@ npm run tauri:build     # ídem
 - **Auditoría**: tabla `USER_AUDIT_LOG` registra inicios/cierres de sesión, intentos fallidos de login, cambios de contraseña, creación de usuarios, cambios de configuración, importación de logos/certificados y transiciones de estado en muestras, facturas, consultas y cirugías. Desde la v0.3.0 el historial se consulta en la **UI de Auditoría** (solo `ADMIN`, tabla paginada con filtros).
 - **CSP**: Content Security Policy configurado (`script-src 'self'`, sin eval).
 - **Tests**: 208 tests de Rust (`cargo test`) + 102 de frontend con Vitest (`npm test`).
+
+## Firmado de código (SmartScreen)
+
+> [!NOTE]
+> La app está **sin firmar con Authenticode**: Windows mostrará el aviso
+> "Editor desconocido" (SmartScreen) al instalar y ejecutar. No bloquea la
+> instalación, pero puede disuadir a usuarios menos técnicos.
+
+**Sigstore/cosign no sirve para esto**: firma artefactos OCI/blobs y
+certificados EFI, pero **no genera firmas Authenticode para .exe** de
+Windows, por lo que no elimina SmartScreen.
+
+Opciones viables para proyectos de código abierto:
+
+| Opción | Costo | Notas |
+| --- | --- | --- |
+| **SignPath Foundation** | Gratis para OSS | Firma con certificado real vía GitHub Action; requiere aprobación del proyecto (colas de espera) |
+| **Azure Trusted Signing** | ~9 USD/mes + certificado | Configurable en CI; firma periódica (validez ~3 días con re-firma automática) |
+| Certificado EV propio | ~300–500 USD/año | Firma local con `signtool`; requiere mantener el certificado y el HSM |
+
+Recomendación: **SignPath Foundation** (sin coste) o **Azure Trusted
+Signing** (sencillo de automatizar) si se quiere eliminar el aviso de
+SmartScreen en el instalador NSIS.
 
 ## Estructura
 

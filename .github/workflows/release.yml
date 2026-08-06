@@ -70,6 +70,32 @@ jobs:
       - name: Build Tauri app
         run: npx tauri build
 
+      # `tauri build` genera el instalador y su firma .sig, pero NO el
+      # manifiesto latest.json que el auto-updater consulta en el endpoint
+      # .../releases/latest/download/latest.json. Se genera aquí.
+      - name: Generate updater manifest (latest.json)
+        shell: pwsh
+        run: |
+          $version = (Get-Content package.json | ConvertFrom-Json).version
+          $exe = "ISALAB_${version}_x64-setup.exe"
+          $sigPath = "src-tauri/target/release/bundle/nsis/${exe}.sig"
+          if (-not (Test-Path $sigPath)) { throw "Firma del instalador no encontrada: $sigPath" }
+          $signature = (Get-Content $sigPath -Raw).Trim()
+          $url = "https://github.com/${{ github.repository }}/releases/download/${{ github.ref_name }}/${exe}"
+          $manifest = [ordered]@{
+            version   = $version
+            notes     = "ISALAB v${version}"
+            pub_date  = (Get-Date).ToUniversalTime().ToString("yyyy-MM-ddTHH:mm:ss.fffZ")
+            platforms = [ordered]@{
+              "windows-x86_64" = [ordered]@{
+                signature = $signature
+                url       = $url
+              }
+            }
+          }
+          $manifest | ConvertTo-Json -Depth 5 | Set-Content -Path "src-tauri/target/release/bundle/nsis/latest.json" -Encoding UTF8
+          Write-Host "latest.json generado para v${version}: $url"
+
       - name: Create GitHub Release
         uses: softprops/action-gh-release@v3
         with:

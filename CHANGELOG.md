@@ -4,6 +4,33 @@ All notable changes to ISALAB will be documented in this file.
 
 The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.1.0/).
 
+## [0.3.2] - Unreleased
+
+### Added
+
+- **Auto-actualización (plugin oficial de Tauri Updater)**: al iniciar la app
+  (solo builds de producción) se comprueba si hay una versión nueva en GitHub
+  Releases; si existe, un diálogo permite descargarla, instalarla y reiniciar
+  (`use-app-updater.ts` + `UpdateDialog.tsx` con barra de progreso).
+  - `createUpdaterArtifacts: true` → `tauri build` genera el instalador, su
+    firma `.sig` y el manifiesto `latest.json` (endpoint
+    `…/releases/latest/download/latest.json`).
+  - Instalación silenciosa: NSIS `currentUser` + updater `passive`.
+  - Clave de firma minisign (`isalab.key`) guardada como secreto
+    `TAURI_SIGNING_PRIVATE_KEY` en GitHub; la clave pública va embebida en
+    `tauri.conf.json` y el cliente verifica cada actualización.
+  - `release.yml` ahora adjunta `bundle/**/*` (incluye `.sig` y
+    `latest.json`); `ci.yml` inyecta la clave de firma en el job `tauri-build`.
+
+### Security
+
+- **Auditoría de dependencias Rust** (`cargo audit` 0.22.2): 0 vulnerabilidades
+  explotables. `lopdf` 0.36 (alto 7.5, vía `pdf_signer` para firmas PKCS#12)
+  y `rsa` 0.9.10 (medio, Marvin Attack) no tienen fix disponible; el riesgo
+  real es bajo: la app solo firma PDFs generados por ella misma y nunca
+  parsea PDFs de terceros. `pdf_signer` (GPL-3.0) es compatible con la
+  licencia AGPL-3.0 del proyecto (sección 13).
+
 ## [0.3.1] - 2026-08-05
 
 ### Security & Hardening

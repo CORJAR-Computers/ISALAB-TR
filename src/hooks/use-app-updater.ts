@@ -19,6 +19,7 @@ export function useAppUpdater() {
   const [downloading, setDownloading] = useState(false);
   const [progress, setProgress] = useState<UpdateProgress | null>(null);
   const checkedRef = useRef(false);
+  const installingRef = useRef(false);
 
   useEffect(() => {
     if (checkedRef.current) return;
@@ -44,9 +45,11 @@ export function useAppUpdater() {
   const dismiss = useCallback(() => setAvailable(null), []);
 
   const install = useCallback(async () => {
-    if (!available) return;
+    if (!available || installingRef.current) return;
+    installingRef.current = true;
     setDownloading(true);
     setProgress({ downloaded: 0, contentLength: 0 });
+
     try {
       await available.downloadAndInstall((event) => {
         switch (event.event) {
@@ -76,6 +79,7 @@ export function useAppUpdater() {
       toast.error("No se pudo instalar la actualización. Inténtalo de nuevo.");
       setDownloading(false);
       setProgress(null);
+      installingRef.current = false;
     }
   }, [available]);
 
