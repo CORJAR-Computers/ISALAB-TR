@@ -24,6 +24,7 @@ import { formatAge } from "@/lib/utils";
 import { SEX_LABEL } from "@/lib/status";
 import { useUiStore } from "@/stores/ui-store";
 import { NewPatientDialog } from "./NewPatientDialog";
+import { PatientScanner } from "./PatientScanner";
 
 export function PatientsPage() {
   const [search, setSearch] = useState("");
@@ -65,6 +66,8 @@ export function PatientsPage() {
           Nuevo paciente
         </Button>
       </div>
+
+      <PatientScanner onFound={openHistory} />
 
       <div className="relative max-w-sm">
         <Search className="text-muted-foreground absolute top-1/2 left-3 size-4 -translate-y-1/2" />

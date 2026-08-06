@@ -69,6 +69,8 @@ export const api = {
   listPatients: (search?: string) =>
     invoke<Patient[]>("list_patients", { search: search || null }),
   getPatient: (id: number) => invoke<Patient | null>("get_patient", { id }),
+  getPatientByCode: (code: string) =>
+    invoke<Patient | null>("get_patient_by_code", { code }),
   createPatient: (input: CreatePatientInput) =>
     invoke<Patient>("create_patient", { input }),
 

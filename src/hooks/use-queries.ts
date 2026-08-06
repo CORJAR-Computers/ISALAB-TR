@@ -79,6 +79,16 @@ export function usePatient(id: number | null) {
   });
 }
 
+/** Busca un paciente por su código (p. ej. escáner de código de barras). */
+export function usePatientByCode(code: string | null) {
+  const normalized = code?.trim() ?? null;
+  return useQuery({
+    queryKey: ["patient-by-code", normalized],
+    queryFn: () => api.getPatientByCode(normalized!),
+    enabled: normalized != null && normalized.length > 0,
+  });
+}
+
 export function useClinicalHistory(patientId: number | null) {
   return useQuery({
     queryKey: ["clinical-history", patientId],

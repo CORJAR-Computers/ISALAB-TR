@@ -4,6 +4,29 @@ All notable changes to ISALAB will be documented in this file.
 
 The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.1.0/).
 
+## [Unreleased]
+
+### Added
+
+- **Escáner de paciente por código** (`PatientScanner.tsx`): input con
+  autofocus en Pacientes que resuelve el código PAC-… al pulsar Enter
+  (envío del escáner) mediante el nuevo hook `usePatientByCode` y el comando
+  `get_patient_by_code` expuesto en `api.ts`. Si el paciente existe abre su
+  ficha (Historial Clínico); si no, muestra «no encontrado» con el código
+  consultado. Incluye tests de `renderHook` (`usePatientByCode.test.tsx`:
+  trim, query deshabilitada con código vacío y datos del paciente).
+- **Código de barras Code 128 en el carnet de vacunación** (`vaccines.rs` +
+  `layout.rs`): el código del paciente (PAC-…) se imprime como barras
+  vectoriales (crate `barcoders` 2.0.0, sin incrustar fuentes) y es
+  escaneable desde el escáner de Pacientes para abrir la ficha al instante.
+- **Firmado Authenticode con SignPath Foundation en el pipeline de release**
+  (`release.yml`): elimina el aviso SmartScreen del instalador NSIS. Los
+  pasos de firmado son condicionales a los secretos `SIGNPATH_*` (si no
+  están configurados, el release sale sin firmar como hasta ahora). Tras
+  recibir el instalador firmado se vuelve a firmar con minisign
+  (`tauri signer sign`) y se regenera `latest.json`, porque la firma
+  Authenticode modifica el `.exe` e invalidaría la firma del auto-updater.
+
 ## [0.3.2] - 2026-08-05
 
 ### Added
