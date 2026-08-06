@@ -201,6 +201,12 @@ SignPath Foundation** (gratis para proyectos OSS) para eliminar el aviso
 
 ### Cómo activar el firmado
 
+> [!TIP]
+> Para los mantenedores: abre un issue con la plantilla
+> **"🔏 Solicitud OSS — Firma de código (SignPath Foundation)"**
+> (`.github/ISSUE_TEMPLATE/signpath-oss-request.yml`): documenta el proceso
+> completo con checklists y sirve de tracker hasta el primer release firmado.
+
 1. **Solicita el acceso OSS** en <https://signpath.io> (SignPath Foundation,
    gratis): el repo debe ser público, usar licencia OSI aprobada, runners de
    GitHub-hosted y una política de firma publicada. El proyecto debe ser

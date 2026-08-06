@@ -1,0 +1,119 @@
+name: "🔏 Solicitud OSS — Firma de código (SignPath Foundation)"
+description: "Solicita y tramita la firma Authenticode gratuita del instalador NSIS vía SignPath Foundation para eliminar el aviso SmartScreen."
+title: "🔏 Solicitud OSS SignPath: firma Authenticode del instalador"
+labels: ["ci", "infra"]
+body:
+  - type: markdown
+    attributes:
+      value: |
+        ## Proceso de solicitud OSS (SignPath Foundation)
+
+        Esta plantilla documenta el proceso completo para conseguir **firma de
+        código Authenticode gratuita** (programa OSS de SignPath Foundation) y
+        dejar el pipeline de release firmando el instalador NSIS
+        automáticamente. El issue sirve de **tracker**: se abre al solicitar y
+        se cierra cuando el primer release sale firmado.
+
+        > El workflow (`release.yml`) ya tiene los pasos de firmado
+        > implementados y **condicionados a los secretos `SIGNPATH_*`**: hasta
+        > que existan, el release sale sin firmar (SmartScreen avisa, pero no
+        > bloquea la instalación). No hace falta tocar código para activarlo.
+
+        Documentación oficial: <https://docs.signpath.io>
+        Aplicación OSS: <https://signpath.io> → *Apply for OSS signing*.
+
+  - type: markdown
+    attributes:
+      value: |
+        ### 1. Requisitos del programa OSS
+
+        - [ ] El repositorio es **público**.
+        - [ ] La licencia del proyecto está **aprobada por OSI** (AGPL-3.0 ✓).
+        - [ ] El build usa **runners GitHub-hosted** (sí: `ubuntu-latest` /
+              `windows-latest` en `release.yml`).
+        - [ ] La **Signing Policy** del proyecto estará **publicada** en SignPath.
+
+  - type: input
+    id: application-url
+    attributes:
+      label: "URL de la solicitud presentada"
+      description: "Tras enviar el formulario de la aplicación OSS, SignPath genera una URL/vista de la solicitud. Pégala aquí para seguimiento."
+      placeholder: "https://signpath.io/... (o «enviada por email»)"
+    validations:
+      required: true
+
+  - type: textarea
+    id: application-info
+    attributes:
+      label: "Información solicitada en el formulario (a rellenar antes de enviar)"
+      description: "El formulario de SignPath suele pedir, al menos, esta información. Prepárala de antemano."
+      value: |
+        - **Nombre del proyecto**: ISALAB
+        - **Repositorio**: https://github.com/CORJAR-Computers/ISALAB-TR
+        - **Licencia**: AGPL-3.0 (aprobada OSI)
+        - **Contacto del mantenedor**: <correo del mantenedor>
+        - **Uso de la firma**: instalador NSIS (`ISALAB_<versión>_x64-setup.exe`)
+          generado en GitHub Actions (workflow `release.yml`)
+        - **Runner**: GitHub-hosted (`windows-latest`)
+      validations:
+        required: false
+
+  - type: markdown
+    attributes:
+      value: |
+        ### 2. Tras la aprobación de la fundación
+
+        - [ ] **Instalar el GitHub App de SignPath** y vincularlo al repo
+              (Settings → *Install GitHub App*). Es el mecanismo por el que la
+              acción descarga y sube artefactos.
+        - [ ] En la consola de SignPath, crear el **Proyecto** (ISALAB) con su
+              **Artifact Configuration** y su **Signing Policy** publicada.
+        - [ ] La **Artifact Configuration** debe tener raíz **`<zip-file>`**:
+              el instalador se sube como artefacto ZIP (comportamiento por
+              defecto de `actions/upload-artifact`).
+        - [ ] Si la Artifact Configuration define parámetros de usuario (p. ej.
+              `version`, habitual por la validación de metadatos estrictos),
+              el workflow ya los envía:
+              `parameters: version: ${{ toJSON(github.ref_name) }}`.
+
+  - type: markdown
+    attributes:
+      value: |
+        ### 3. Añadir los 4 secretos al repositorio (todos juntos)
+
+        | Secreto | Valor |
+        | --- | --- |
+        | `SIGNPATH_API_TOKEN` | API token con permisos de submitter en el proyecto/policy |
+        | `SIGNPATH_ORG_ID` | ID de la organización en SignPath |
+        | `SIGNPATH_PROJECT_SLUG` | Slug del proyecto |
+        | `SIGNPATH_SIGNING_POLICY_SLUG` | Slug de la signing policy (p. ej. `release-signing`) |
+
+        - [ ] Los 4 secretos añadidos en
+              *Settings → Secrets and variables → Actions*.
+
+  - type: markdown
+    attributes:
+      value: |
+        ### 4. Verificación en el pipeline
+
+        - [ ] **Cada release requiere aprobación manual**: un *approver* del
+              proyecto acepta la solicitud en el portal de SignPath. El
+              workflow espera hasta **1 hora** (`wait-for-completion-timeout-in-seconds: 3600`).
+        - [ ] Tras firmar, el workflow **re-firma con minisign** y regenera
+              `latest.json` (la firma Authenticode modifica el `.exe` e
+              invalidaría la firma del auto-updater). Verificar en el log del
+              release: *"Replace installer with signed build and re-sign
+              updater (minisign)"* sin errores.
+        - [ ] Descargar el instalador del release y confirmar:
+              *Firma digital* → pestaña *Firma digital* → firmante válido
+              (SmartScreen sin aviso de "Editor desconocido").
+
+  - type: checkboxes
+    id: done
+    attributes:
+      label: "Cierre"
+      options:
+        - label: "El último release salió firmado por SignPath (verificado manualmente)"
+        - label: "Se cerró el issue y se actualizó el README si el proceso cambió"
+    validations:
+      required: true
