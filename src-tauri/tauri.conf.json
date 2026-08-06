@@ -55,6 +55,21 @@
     ],
     "resources": ["binaries/firebird/**/*"],
     "shortDescription": "Sistema de gestión para laboratorios veterinarios",
-    "longDescription": "ISALAB — historiales clínicos, muestras analíticas, vacunación, reportes PDF y facturación. Tauri v2 · Rust · Firebird 5 Embedded."
+    "longDescription": "ISALAB — historiales clínicos, muestras analíticas, vacunación, reportes PDF y facturación. Tauri v2 · Rust · Firebird 5 Embedded.",
+    "createUpdaterArtifacts": true,
+    "windows": {
+      "nsis": {
+        "installMode": "currentUser"
+      }
+    }
+  },
+  "plugins": {
+    "updater": {
+      "pubkey": "dW50cnVzdGVkIGNvbW1lbnQ6IG1pbmlzaWduIHB1YmxpYyBrZXk6IDYxQUZBRjNCQTlGNzUzQTYKUldTbVUvZXBPNit2WVZXUnk2c3gvUkR5bnhsWXNnd2JxS2Q4OE5RV2h6ZXZDMUxVclVBZExEWSsK",
+      "endpoints": ["https://github.com/CORJAR-Computers/ISALAB-TR/releases/latest/download/latest.json"],
+      "windows": {
+        "installMode": "passive"
+      }
+    }
   }
 }

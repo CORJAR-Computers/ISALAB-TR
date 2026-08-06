@@ -13,6 +13,8 @@ import { useUiStore } from "@/stores/ui-store";
 import { ErrorBoundary } from "react-error-boundary";
 import { GlobalErrorFallback } from "@/components/layout/GlobalErrorBoundary";
 import { useSessionTimeout } from "@/hooks/use-session-timeout";
+import { useAppUpdater } from "@/hooks/use-app-updater";
+import { UpdateDialog } from "@/components/layout/UpdateDialog";
 import { useSessionStore } from "@/stores/session-store";
 import { api } from "@/lib/api";
 import { DashboardPage } from "@/features/dashboard/DashboardPage";
@@ -41,6 +43,7 @@ export default function App() {
 
   useFirebirdEvents();
   useSessionTimeout();
+  const updater = useAppUpdater();
 
   // Aplica el tema guardado al montar.
   useEffect(() => {
@@ -96,6 +99,15 @@ export default function App() {
           onOpenChange={mustChangePassword ? () => {} : closeChangePassword}
           forced={mustChangePassword}
         />
+        {updater.available && (
+          <UpdateDialog
+            update={updater.available}
+            downloading={updater.downloading}
+            progress={updater.progress}
+            onInstall={updater.install}
+            onDismiss={updater.dismiss}
+          />
+        )}
 
         <div className="lg:pl-64">
           <TopBar />

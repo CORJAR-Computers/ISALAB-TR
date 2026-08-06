@@ -10,6 +10,10 @@ permissions:
 
 env:
   CARGO_TERM_COLOR: always
+  # Clave privada de firma de actualizaciones (secreto del repo):
+  # sin ella `tauri build` no puede generar los artefactos del updater.
+  TAURI_SIGNING_PRIVATE_KEY: ${{ secrets.TAURI_SIGNING_PRIVATE_KEY }}
+  TAURI_SIGNING_PRIVATE_KEY_PASSWORD: ${{ secrets.TAURI_SIGNING_PRIVATE_KEY_PASSWORD }}
 
 jobs:
   release:
@@ -69,8 +73,14 @@ jobs:
       - name: Create GitHub Release
         uses: softprops/action-gh-release@v3
         with:
+          # Incluye instalador NSIS, firma .sig y el manifiesto latest.json
+          # del auto-updater (endpoint: .../releases/latest/download/latest.json).
           files: |
-            src-tauri/target/release/bundle/**/*.msi
-            src-tauri/target/release/bundle/**/*.exe
+            src-tauri/target/release/bundle/**/*
           draft: true
           generate_release_notes: true
+
+      # El endpoint del updater apunta a "latest": si el release queda en
+      # borrador, los clientes no reciben la actualización hasta publicarlo.
+      # Publica el borrador (botón "Publish release") cuando quieras
+      # distribuirlo.

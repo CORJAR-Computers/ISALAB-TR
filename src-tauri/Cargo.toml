@@ -41,6 +41,8 @@ specta-typescript = "0.0.12"
 # src-tauri/binaries/firebird/). Sin `linking` para no requerir la lib en build.
 rsfbclient = { version = "0.27", default-features = false, features = ["dynamic_loading"] }
 tauri-plugin-dialog = "2"
+tauri-plugin-updater = "2"
+tauri-plugin-process = "2"
 zip = "4.2.0"
 walkdir = "2.5.0"
 pdf_signer = "0.2"

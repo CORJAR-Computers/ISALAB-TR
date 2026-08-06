@@ -104,6 +104,10 @@ jobs:
     name: Tauri Build
     needs: [frontend, backend]
     runs-on: windows-latest
+    env:
+      # createUpdaterArtifacts está activo: sin la clave de firma el build falla.
+      TAURI_SIGNING_PRIVATE_KEY: ${{ secrets.TAURI_SIGNING_PRIVATE_KEY }}
+      TAURI_SIGNING_PRIVATE_KEY_PASSWORD: ${{ secrets.TAURI_SIGNING_PRIVATE_KEY_PASSWORD }}
     steps:
       - uses: actions/checkout@v7
       - name: Setup Node.js
