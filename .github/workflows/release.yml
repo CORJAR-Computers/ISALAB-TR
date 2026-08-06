@@ -16,6 +16,11 @@ env:
   # sin ella `tauri build` no puede generar los artefactos del updater.
   TAURI_SIGNING_PRIVATE_KEY: ${{ secrets.TAURI_SIGNING_PRIVATE_KEY }}
   TAURI_SIGNING_PRIVATE_KEY_PASSWORD: ${{ secrets.TAURI_SIGNING_PRIVATE_KEY_PASSWORD }}
+  # El contexto `secrets` NO está disponible en condiciones `if:` de pasos
+  # (invalida el workflow file). Se expone vía env y se compara con
+  # `env.SIGNPATH_API_TOKEN` (contexto `env` sí permitido en `if:`). Si el
+  # secreto no está configurado, queda vacío y los pasos de firmado se saltan.
+  SIGNPATH_API_TOKEN: ${{ secrets.SIGNPATH_API_TOKEN }}
 
 jobs:
   release:
@@ -87,7 +92,7 @@ jobs:
       # minisign y `latest.json` se genera después (lee el .sig nuevo).
       - name: Upload unsigned installer (SignPath)
         id: upload-unsigned
-        if: ${{ secrets.SIGNPATH_API_TOKEN != '' }}
+        if: ${{ env.SIGNPATH_API_TOKEN != '' }}
         uses: actions/upload-artifact@v7
         with:
           name: isalab-unsigned-installer
@@ -96,7 +101,7 @@ jobs:
           retention-days: 1
 
       - name: Submit signing request (SignPath)
-        if: ${{ secrets.SIGNPATH_API_TOKEN != '' }}
+        if: ${{ env.SIGNPATH_API_TOKEN != '' }}
         uses: signpath/github-action-submit-signing-request@v2
         with:
           api-token: ${{ secrets.SIGNPATH_API_TOKEN }}
@@ -120,7 +125,7 @@ jobs:
           output-artifact-directory: './signed'
 
       - name: Replace installer with signed build and re-sign updater (minisign)
-        if: ${{ secrets.SIGNPATH_API_TOKEN != '' }}
+        if: ${{ env.SIGNPATH_API_TOKEN != '' }}
         shell: pwsh
         run: |
           $signed = Get-ChildItem './signed' -Recurse -Filter '*.exe' | Select-Object -First 1
