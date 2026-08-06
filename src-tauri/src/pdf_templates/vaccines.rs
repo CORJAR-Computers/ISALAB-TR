@@ -9,7 +9,7 @@ use crate::pdf_templates::builder::{
     MARGIN, PAGE_H, PAGE_W,
 };
 use crate::pdf_templates::header::{draw_header, ClinicHeader};
-use crate::pdf_templates::layout::{draw_footer, draw_grid, section_title};
+use crate::pdf_templates::layout::{draw_code128_centered, draw_footer, draw_grid, section_title};
 
 /// Datos del certificado/carnet de vacunación.
 #[derive(Debug, Clone, Serialize, Deserialize)]
@@ -109,6 +109,11 @@ pub fn generate_vacunacion(data: &VacunacionData, out_path: &Path) -> Result<(),
             ("Edad", edad),
         ],
     );
+
+    // Código de barras del paciente (Code 128): se escanea en recepción para
+    // abrir la ficha con el escáner de Pacientes (código PAC-…). Módulos de
+    // 0.33 mm (X-dimension estándar de impresión) y ~12 mm de alto.
+    draw_code128_centered(&mut pdf, &data.patient.code, 12.0, 0.33);
 
     section_title(&mut pdf, "VACUNAS ADMINISTRADAS");
     if data.vaccines.is_empty() {

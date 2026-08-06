@@ -1,6 +1,8 @@
 //! Helpers de dibujo compartidos entre todos los tipos de reporte PDF.
 //! Replicación fiel del formato institucional de reporte de laboratorio.
 
+use barcoders::sym::code128::Code128;
+
 use crate::models::patient::Patient;
 use crate::pdf_templates::builder::{
     format_value, PdfBuilder, CONTENT_W, C_MUTED, C_RULE, C_TEXT, MARGIN, PAGE_W,
@@ -470,4 +472,128 @@ pub fn draw_contact_footer(pdf: &mut PdfBuilder, phone: Option<&str>) {
     let ph = phone.unwrap_or("(+57) 314 6754530");
     pdf.text_centered(false, "Numero de contacto", 8.5, MARGIN + 4.0, C_MUTED);
     pdf.text_centered(true, ph, 9.5, MARGIN - 1.0, C_TEXT);
+}
+
+// ---------- Código de barras (Code 128) ----------
+
+/// Marcador de charset inicial que exige barcoders v2 (Ɓ = character-set B,
+/// cubre ASCII imprimible: letras, dígitos y guiones de los códigos PAC-…).
+const CODE128_SET_B: &str = "\u{0181}";
+
+/// Ancho en mm del código de barras Code 128 de `text` (sin dibujarlo), o
+/// `None` si el texto no es codificable.
+fn code128_width(text: &str, module_mm: f32) -> Option<f32> {
+    // barcoders no rechaza el marcador sin datos: un código vacío sería ilegible.
+    if text.trim().is_empty() {
+        return None;
+    }
+    let code = Code128::new(format!("{CODE128_SET_B}{text}")).ok()?;
+    let bits = code.encode();
+    if bits.is_empty() {
+        return None;
+    }
+    Some(bits.len() as f32 * module_mm)
+}
+
+/// Dibuja un código de barras Code 128 en `(x, y)` (esquina superior
+/// izquierda) con `height_mm` de alto y módulos de `module_mm`. Los bits de
+/// `encode()` se dibujan como barras vectoriales de un módulo (las barras
+/// adyacentes se fusionan en barras más anchas, como exige el estándar).
+/// Devuelve el ancho total en mm (0 si no se pudo codificar).
+pub fn draw_code128(
+    pdf: &mut PdfBuilder,
+    text: &str,
+    x: f32,
+    y: f32,
+    height_mm: f32,
+    module_mm: f32,
+) -> f32 {
+    if text.trim().is_empty() {
+        return 0.0;
+    }
+    let Ok(code) = Code128::new(format!("{CODE128_SET_B}{text}")) else {
+        return 0.0;
+    };
+    let bits = code.encode();
+    if bits.is_empty() {
+        return 0.0;
+    }
+    let mut x = x;
+    for &bit in &bits {
+        if bit == 1 {
+            pdf.rect(x, y, module_mm, height_mm, Some(C_TEXT), None);
+        }
+        x += module_mm;
+    }
+    bits.len() as f32 * module_mm
+}
+
+/// Dibuja el código de barras centrado horizontalmente en la página y, debajo,
+/// el código en texto legible (para humanos). No dibuja nada si el texto no es
+/// codificable.
+pub fn draw_code128_centered(pdf: &mut PdfBuilder, text: &str, height_mm: f32, module_mm: f32) {
+    let Some(total) = code128_width(text, module_mm) else {
+        return;
+    };
+    pdf.ensure_space(height_mm + 10.0);
+    draw_code128(
+        pdf,
+        text,
+        (PAGE_W - total) / 2.0,
+        pdf.y,
+        height_mm,
+        module_mm,
+    );
+    // Gap de 3 mm para que el ascensor del texto no toque las barras.
+    pdf.y -= height_mm + 3.0;
+    pdf.text_centered(false, text, 7.5, pdf.y, C_MUTED);
+    pdf.y -= 4.0;
+}
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+
+    #[test]
+    fn test_code128_width_pac_code() {
+        // "PAC-2026-0001" (13 chars, set B): start 11 + 13*11 + check 11 +
+        // stop 13 + term 1 = 179 módulos. A 0.33 mm ≈ 59 mm.
+        let w = code128_width("PAC-2026-0001", 0.33).expect("código válido");
+        assert!(w > 50.0 && w < 70.0, "ancho inesperado: {w}");
+    }
+
+    #[test]
+    fn test_code128_invalid_text_returns_none() {
+        assert!(code128_width("", 0.33).is_none());
+        // Caracteres fuera del charset B (p. ej. ñ) no codifican.
+        assert!(code128_width("PAC-Ñ-1", 0.33).is_none());
+    }
+
+    #[test]
+    fn test_draw_code128_draws_bars_and_returns_width() {
+        let mut pdf = PdfBuilder::new();
+        let before = pdf.ops.len();
+        let w = draw_code128(&mut pdf, "PAC-2026-0001", 20.0, 250.0, 12.0, 0.33);
+        assert!(w > 50.0 && w < 70.0);
+        assert!(pdf.ops.len() > before, "debe añadir operaciones de dibujo");
+    }
+
+    #[test]
+    fn test_draw_code128_invalid_draws_nothing() {
+        let mut pdf = PdfBuilder::new();
+        let before = pdf.ops.len();
+        let w = draw_code128(&mut pdf, "", 20.0, 250.0, 12.0, 0.33);
+        assert_eq!(w, 0.0);
+        assert_eq!(pdf.ops.len(), before);
+    }
+
+    #[test]
+    fn test_code128_bits_start_and_end_with_bar() {
+        let code = Code128::new(format!("{CODE128_SET_B}PAC-2026-0001")).unwrap();
+        let bits = code.encode();
+        assert_eq!(bits.first(), Some(&1), "debe empezar con barra");
+        assert_eq!(bits.last(), Some(&1), "debe terminar con barra");
+        // 13 caracteres en set B: start 11 + 13*11 + check 11 + stop 11 + term 2 = 178.
+        assert_eq!(bits.len(), 178);
+    }
 }

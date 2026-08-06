@@ -51,6 +51,7 @@ x509-cert = "0.2.5"
 
 # ---- Cifrado de secretos en repositorio (DPAPI de Windows) ----
 base64 = "0.22"
+barcoders = "2.0.0"
 [target.'cfg(windows)'.dependencies]
 windows-sys = { version = "0.59", features = ["Win32_Foundation", "Win32_Security_Cryptography"] }
 
