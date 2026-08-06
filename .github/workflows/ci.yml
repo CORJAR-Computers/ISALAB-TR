@@ -99,6 +99,18 @@ jobs:
       - name: Run tests
         run: cargo test
         working-directory: ./src-tauri
+      - name: Install cargo-audit
+        uses: taiki-e/install-action@v2
+        with:
+          tool: cargo-audit
+      - name: Audit Rust dependencies (RustSec)
+        working-directory: ./src-tauri
+        run: |
+          # RUSTSEC-2026-0187 (lopdf 0.36, vía pdf_signer) y RUSTSEC-2023-0071
+          # (rsa 0.9, Marvin Attack) no tienen fix disponible y están
+          # documentadas en CHANGELOG. Se ignoran explícitamente para que este
+          # paso falle solo cuando aparezca una vulnerabilidad NUEVA.
+          cargo audit --ignore RUSTSEC-2026-0187 --ignore RUSTSEC-2023-0071
 
   tauri-build:
     name: Tauri Build

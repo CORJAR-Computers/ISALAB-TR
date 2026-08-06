@@ -63,9 +63,9 @@ El pipeline de release (`release.yml`) compila el instalador en GitHub
 Actions, adjunta el artefacto al release y genera notas de cambios
 automáticas.
 
-### Auto-actualización (v0.3.1)
+### Auto-actualización (v0.3.2)
 
-Desde la **v0.3.1** la app incluye el **plugin oficial de auto-actualización**
+Desde la **v0.3.2** la app incluye el **plugin oficial de auto-actualización**
 de Tauri. Al iniciar (solo en builds de producción) comprueba si hay una
 versión nueva en el release más reciente de GitHub; si la hay, muestra un
 diálogo para descargarla, instalarla y reiniciar la aplicación.
