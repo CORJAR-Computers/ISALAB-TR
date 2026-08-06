@@ -79,7 +79,7 @@ export function NewInvoiceDialog({
   const { data: patients = [], isLoading: loadingPatients } =
     usePatients(patientSearch);
 
-  const form = useForm<InvoiceValues>({
+  const form = useForm<z.input<typeof invoiceSchema>, unknown, z.output<typeof invoiceSchema>>({
     resolver: zodResolver(invoiceSchema),
     defaultValues: {
       ownerId: 0,
@@ -292,6 +292,7 @@ export function NewInvoiceDialog({
                           placeholder="Cant."
                           className="w-20"
                           aria-label="Cantidad"
+                          value={(f.value as number | undefined) ?? ""}
                         />
                       )}
                     />
@@ -307,6 +308,7 @@ export function NewInvoiceDialog({
                           placeholder="$ 0"
                           className="w-28"
                           aria-label="Precio unitario"
+                          value={(f.value as number | undefined) ?? ""}
                         />
                       )}
                     />
@@ -378,7 +380,7 @@ export function NewInvoiceDialog({
                         min={0}
                         max={100}
                         step="0.01"
-                        value={field.value ?? ""}
+                        value={(field.value as number | null | undefined) ?? ""}
                         onChange={(e) => field.onChange(e.target.value ? Number(e.target.value) : null)}
                         placeholder="19"
                       />

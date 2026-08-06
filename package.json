@@ -24,7 +24,7 @@
     "test:e2e:install": "playwright install chromium"
   },
   "dependencies": {
-    "@hookform/resolvers": "^5.0.1",
+    "@hookform/resolvers": "^5.7.1",
     "@radix-ui/react-dialog": "^1.1.14",
     "@radix-ui/react-label": "^2.1.7",
     "@radix-ui/react-scroll-area": "^1.2.9",
@@ -40,7 +40,7 @@
     "@tauri-apps/plugin-updater": "^2.10.1",
     "class-variance-authority": "^0.7.1",
     "clsx": "^2.1.1",
-    "lucide-react": "^0.525.0",
+    "lucide-react": "^1.28.0",
     "react": "^19.1.0",
     "react-dom": "^19.1.0",
     "react-error-boundary": "^6.1.2",
@@ -50,7 +50,7 @@
     "remark-gfm": "^4.0.1",
     "sonner": "^2.0.5",
     "tailwind-merge": "^3.2.0",
-    "zod": "^3.25.0",
+    "zod": "^4.4.3",
     "zustand": "^5.0.4"
   },
   "devDependencies": {

@@ -48,7 +48,7 @@ const patientSchema = z.object({
     documentNumber: z.string().min(3, "Documento inválido"),
     fullName: z.string().min(3, "Nombre del propietario requerido"),
     phone: z.string().optional(),
-    email: z.string().email("Correo inválido").or(z.literal("")),
+    email: z.email("Correo inválido").or(z.literal("")),
     address: z.string().optional(),
     city: z.string().optional(),
   }),
@@ -77,7 +77,7 @@ export function NewPatientDialog({
   const { data: species = [] } = useSpecies();
   const createPatient = useCreatePatient();
 
-  const form = useForm<PatientFormValues>({
+  const form = useForm<z.input<typeof patientSchema>, unknown, z.output<typeof patientSchema>>({
     resolver: zodResolver(patientSchema),
     defaultValues: {
       owner: {
@@ -101,7 +101,7 @@ export function NewPatientDialog({
     },
   });
 
-  const currentSpeciesId = form.watch("speciesId");
+  const currentSpeciesId = form.watch("speciesId") as number | undefined;
   const { data: breeds = [] } = useBreeds(currentSpeciesId || null);
 
   // Al cambiar de especie, limpia la raza si no pertenece.
