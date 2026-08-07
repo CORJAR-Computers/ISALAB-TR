@@ -131,8 +131,7 @@ pub fn generate_sample_labels(samples: &[SampleListItem], out_path: &Path) -> Re
     let label_h = (usable_h - GAP_Y * (ROWS as f32 - 1.0)) / ROWS as f32;
 
     let per_page = COLS * ROWS;
-    let mut placed = 0;
-    for s in samples {
+    for (placed, s) in samples.iter().enumerate() {
         let idx = placed % per_page;
         if idx == 0 && placed > 0 {
             pdf.new_page();
@@ -143,7 +142,6 @@ pub fn generate_sample_labels(samples: &[SampleListItem], out_path: &Path) -> Re
         let x = PAGE_MARGIN + col * (label_w + GAP_X);
         let y = PAGE_MARGIN + row * (label_h + GAP_Y);
         draw_label(&mut pdf, s, x, y, label_w, label_h);
-        placed += 1;
     }
 
     save_pdf(pdf, out_path, "Etiquetas de muestras")

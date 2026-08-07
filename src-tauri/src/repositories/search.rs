@@ -154,7 +154,7 @@ pub fn global_search(
         let is_prefix = r.title.to_lowercase().starts_with(&q_lower)
             || r.code
                 .as_deref()
-                .map_or(false, |c| c.to_lowercase().starts_with(&q_lower));
+                .is_some_and(|c| c.to_lowercase().starts_with(&q_lower));
         let priority = match r.kind.as_str() {
             "patient" => PATIENT_PRIORITY,
             "sample" => SAMPLE_PRIORITY,
