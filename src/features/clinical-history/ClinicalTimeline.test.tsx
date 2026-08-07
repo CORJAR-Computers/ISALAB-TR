@@ -122,6 +122,8 @@ describe("ClinicalTimeline", () => {
           status: "RECIBIDA",
           collectedBy: "Auxiliar María",
           notes: null,
+          analyzerId: null,
+          analyzerName: null,
           results: [],
         },
       ],

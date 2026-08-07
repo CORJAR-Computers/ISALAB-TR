@@ -117,12 +117,6 @@ const toOptNumber = (s: string | undefined) => {
   return t && !Number.isNaN(Number(t)) ? Number(t) : null;
 };
 
-const SEX_LABEL: Record<string, string> = {
-  BOTH: "Ambos sexos",
-  M: "Macho (M)",
-  F: "Hembra (F)",
-};
-
 // ======================== Diálogo de equipo =================================
 
 function AnalyzerDialog({
@@ -494,7 +488,15 @@ function RangeDialog({
                     <FormItem>
                       <FormLabel>Edad mín (meses)</FormLabel>
                       <FormControl>
-                        <Input type="number" min={0} {...field} />
+                        <Input
+                          type="number"
+                          min={0}
+                          name={field.name}
+                          ref={field.ref}
+                          onBlur={field.onBlur}
+                          onChange={field.onChange}
+                          value={field.value != null ? String(field.value) : ""}
+                        />
                       </FormControl>
                       <FormMessage />
                     </FormItem>
@@ -507,7 +509,15 @@ function RangeDialog({
                     <FormItem>
                       <FormLabel>Edad máx (meses)</FormLabel>
                       <FormControl>
-                        <Input type="number" min={0} {...field} />
+                        <Input
+                          type="number"
+                          min={0}
+                          name={field.name}
+                          ref={field.ref}
+                          onBlur={field.onBlur}
+                          onChange={field.onChange}
+                          value={field.value != null ? String(field.value) : ""}
+                        />
                       </FormControl>
                       <FormMessage />
                     </FormItem>
@@ -521,7 +531,15 @@ function RangeDialog({
                   <FormItem>
                     <FormLabel>Valor mínimo</FormLabel>
                     <FormControl>
-                      <Input type="number" step="any" {...field} />
+                      <Input
+                        type="number"
+                        step="any"
+                        name={field.name}
+                        ref={field.ref}
+                        onBlur={field.onBlur}
+                        onChange={field.onChange}
+                        value={field.value != null ? String(field.value) : ""}
+                      />
                     </FormControl>
                     <FormMessage />
                   </FormItem>
@@ -534,7 +552,15 @@ function RangeDialog({
                   <FormItem>
                     <FormLabel>Valor máximo</FormLabel>
                     <FormControl>
-                      <Input type="number" step="any" {...field} />
+                      <Input
+                        type="number"
+                        step="any"
+                        name={field.name}
+                        ref={field.ref}
+                        onBlur={field.onBlur}
+                        onChange={field.onChange}
+                        value={field.value != null ? String(field.value) : ""}
+                      />
                     </FormControl>
                     <FormMessage />
                   </FormItem>
