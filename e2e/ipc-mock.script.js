@@ -173,6 +173,28 @@
     },
     list_sample_types: () => sampleTypes,
     list_analytes: () => analytes,
+    list_analyzers: () => [
+      {
+        id: 1,
+        code: "GENERAL",
+        name: "Perfil GENERAL (lectura manual)",
+        manufacturer: null,
+        model: null,
+        isActive: true,
+        notes: null,
+        rangeCount: 0,
+      },
+      {
+        id: 2,
+        code: "MB2800",
+        name: "MINDRAY B2800",
+        manufacturer: "Mindray",
+        model: "B2800",
+        isActive: true,
+        notes: null,
+        rangeCount: 0,
+      },
+    ],
     list_patients: (args) => {
       const q = (args.search ?? "").toLowerCase();
       if (!q) return patients;
@@ -254,6 +276,20 @@
       s.status = args.status;
       return { ...s, results: [...s.results] };
     },
+    generate_sample_labels: (args) => {
+      const ids = args.sampleIds ?? [];
+      for (const id of ids) {
+        if (!sampleById(id))
+          throw { type: "NotFound", data: "Muestra no encontrada" };
+      }
+      return {
+        path: `C:/mock/etiquetas-${ids.join("-")}.pdf`,
+        fileName: `ISALAB_Etiquetas_${ids.join("-")}.pdf`,
+        sampleCode: "M-2026-0001",
+        generatedAt: new Date().toISOString().slice(0, 19).replace("T", " "),
+      };
+    },
+    open_report_file: () => null,
     get_worklist: () => {
       const now = new Date();
       // Fecha LOCAL (igual que chrono::Local::now() en el backend).

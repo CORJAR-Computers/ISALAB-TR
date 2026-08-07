@@ -1,3 +1,4 @@
+pub mod analyzers;
 pub mod attachments;
 pub mod auth;
 pub mod clinical_history;

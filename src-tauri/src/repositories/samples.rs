@@ -37,13 +37,15 @@ pub(crate) type LabResultRow = (
 
 pub(crate) type TrendPointRow = (String, f64, Option<f64>, Option<f64>, String);
 
-/// Columnas de una muestra con el tipo unido.
+/// Columnas de una muestra con el tipo unido y el equipo analizador.
 const SAMPLE_SELECT: &str = "
     SELECT s.ID, s.CODE, s.PATIENT_ID, s.SAMPLE_TYPE_ID, st.NAME,
            LEFT(CAST(s.RECEIVED_AT AS VARCHAR(60)), 19),
-           s.STATUS, s.COLLECTED_BY, s.NOTES
+           s.STATUS, s.COLLECTED_BY, s.NOTES,
+           s.ANALYZER_ID, az.NAME
     FROM SAMPLES s
-    JOIN SAMPLE_TYPES st ON st.ID = s.SAMPLE_TYPE_ID";
+    JOIN SAMPLE_TYPES st ON st.ID = s.SAMPLE_TYPE_ID
+    LEFT JOIN ANALYZERS az ON az.ID = s.ANALYZER_ID";
 
 pub(crate) type SampleRow = (
     i32,            // id
@@ -55,6 +57,8 @@ pub(crate) type SampleRow = (
     String,         // status
     Option<String>, // collected_by
     Option<String>, // notes
+    Option<i32>,    // analyzer_id
+    Option<String>, // analyzer_name
 );
 
 pub(crate) fn map_sample(r: SampleRow) -> Sample {
@@ -68,6 +72,8 @@ pub(crate) fn map_sample(r: SampleRow) -> Sample {
         status: r.6,
         collected_by: r.7,
         notes: r.8,
+        analyzer_id: r.9,
+        analyzer_name: r.10,
         results: Vec::new(),
     }
 }
@@ -523,6 +529,8 @@ mod tests {
             "RECIBIDA".into(),                 // status
             Some("Dr. Ramos".into()),          // collected_by
             Some("Muestra de control".into()), // notes
+            Some(2),                           // analyzer_id
+            Some("MINDRAY B2800".into()),      // analyzer_name
         );
         let sample = map_sample(row);
 
@@ -535,6 +543,8 @@ mod tests {
         assert_eq!(sample.status, "RECIBIDA");
         assert_eq!(sample.collected_by.as_deref(), Some("Dr. Ramos"));
         assert_eq!(sample.notes.as_deref(), Some("Muestra de control"));
+        assert_eq!(sample.analyzer_id, Some(2));
+        assert_eq!(sample.analyzer_name.as_deref(), Some("MINDRAY B2800"));
         assert!(sample.results.is_empty()); // map_sample siempre devuelve results vacío
     }
 
@@ -550,12 +560,16 @@ mod tests {
             "EN_PROCESO".into(),
             None,
             None,
+            None,
+            None,
         );
         let sample = map_sample(row);
 
         assert_eq!(sample.id, 2);
         assert_eq!(sample.collected_by, None);
         assert_eq!(sample.notes, None);
+        assert_eq!(sample.analyzer_id, None);
+        assert_eq!(sample.analyzer_name, None);
     }
 
     #[test]

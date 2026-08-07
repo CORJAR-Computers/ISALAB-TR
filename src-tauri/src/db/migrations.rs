@@ -42,6 +42,10 @@ pub const MIGRATIONS: &[(&str, &str)] = &[
         "0009_result_attachments",
         include_str!("../../migrations/0009_result_attachments.sql"),
     ),
+    (
+        "0010_analyzer_profiles",
+        include_str!("../../migrations/0010_analyzer_profiles.sql"),
+    ),
 ];
 
 /// Aplica las migraciones pendientes. Devuelve la versión de schema resultante.

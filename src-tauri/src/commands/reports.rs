@@ -166,6 +166,7 @@ pub fn generate_clinical_report(
         sample_code: sample.code.clone(),
         sample_type: sample.sample_type_name.clone(),
         received_at: sample.received_at.clone(),
+        analyzer_name: sample.analyzer_name.clone().unwrap_or_default(),
         results: sample.results,
         signature: report_signature(&settings, pkcs12_password_from(&state)),
     };

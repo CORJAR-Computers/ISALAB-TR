@@ -1,3 +1,4 @@
+pub mod analyzer;
 pub mod auth;
 pub mod clinical_history;
 pub mod consultation;

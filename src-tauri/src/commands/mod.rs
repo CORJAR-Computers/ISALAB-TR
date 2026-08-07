@@ -1,4 +1,5 @@
 pub mod ai;
+pub mod analyzers;
 pub mod attachments;
 pub mod auth;
 pub mod catalog;

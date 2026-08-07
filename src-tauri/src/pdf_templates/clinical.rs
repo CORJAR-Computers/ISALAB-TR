@@ -22,6 +22,8 @@ pub struct ClinicalReportData {
     pub sample_code: String,
     pub sample_type: String,
     pub received_at: String,
+    /// Equipo analizador usado (vacío = lectura manual/estándar).
+    pub analyzer_name: String,
     pub results: Vec<LabResult>,
     pub signature: ReportSignature,
 }
@@ -56,7 +58,13 @@ pub fn generate_report(data: &ClinicalReportData, out_path: &Path) -> Result<(),
         &data.signature,
         &data.received_at,
     );
-    draw_results_full(&mut pdf, &data.sample_type, &data.results, None);
+    draw_results_full(
+        &mut pdf,
+        &data.sample_type,
+        &data.results,
+        None,
+        Some(data.analyzer_name.as_str()),
+    );
     draw_contact_footer(&mut pdf, data.clinic.phone.as_deref());
 
     // Si el modo es DIGITAL, agregar bloque de firma digital con metadatos reales del certificado

@@ -119,6 +119,12 @@ pub(crate) fn build_interpretation_prompt(
         "- **Fecha de recepción**: {}\n",
         sample.received_at
     ));
+    if let Some(analyzer) = &sample.analyzer_name {
+        prompt.push_str(&format!(
+            "- **Equipo analizador**: {} (los rangos mostrados corresponden a este equipo)\n",
+            analyzer
+        ));
+    }
     if let Some(collector) = &sample.collected_by {
         prompt.push_str(&format!("- **Recogida por**: {}\n", collector));
     }
@@ -559,6 +565,8 @@ mod tests {
             status: "FINALIZADA".to_string(),
             collected_by: Some("Dr. García".to_string()),
             notes: None,
+            analyzer_id: Some(2),
+            analyzer_name: Some("MINDRAY B2800".to_string()),
             results: vec![],
         }
     }

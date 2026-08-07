@@ -22,6 +22,11 @@ use tauri::Manager;
 use tauri_specta::{collect_commands, Builder};
 
 use crate::commands::ai::{interpret_lab_results, test_groq_connection};
+use crate::commands::analyzers::{
+    create_analyzer, create_reference_range, delete_analyzer, delete_reference_range,
+    list_analyzers, list_reference_ranges, set_analyzer_active, update_analyzer,
+    update_reference_range,
+};
 use crate::commands::attachments::{attach_result_file, delete_result_attachment};
 use crate::commands::auth::{get_session, list_audit_log, login, logout};
 use crate::commands::catalog::{
@@ -122,6 +127,15 @@ fn specta_builder() -> Builder<tauri::Wry> {
             list_audit_log,
             interpret_lab_results,
             get_patient_lab_trends,
+            list_analyzers,
+            create_analyzer,
+            update_analyzer,
+            set_analyzer_active,
+            delete_analyzer,
+            list_reference_ranges,
+            create_reference_range,
+            update_reference_range,
+            delete_reference_range,
         ])
         // Tipos expuestos para la UI (eventos Firebird → Tauri, auditoría).
         .typ::<crate::models::sample::SampleChangedEvent>()

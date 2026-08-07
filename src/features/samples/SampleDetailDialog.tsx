@@ -452,6 +452,14 @@ export function SampleDetailDialog({
                   <p>{sample.collectedBy}</p>
                 </div>
               )}
+              {sample.analyzerName && (
+                <div>
+                  <p className="text-muted-foreground text-[11px] font-medium tracking-wide uppercase">
+                    Equipo analizador
+                  </p>
+                  <p>{sample.analyzerName}</p>
+                </div>
+              )}
               <Button
                 variant="ghost"
                 size="sm"

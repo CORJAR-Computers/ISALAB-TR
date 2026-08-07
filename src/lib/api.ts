@@ -1,6 +1,7 @@
 import { invoke } from "@tauri-apps/api/core";
 import type {
   Analyte,
+  Analyzer,
   AppError,
   AuditLogEntry,
   Breed,
@@ -9,6 +10,7 @@ import type {
   ClinicSettings,
   Consultation,
   ConsultationListItem,
+  CreateAnalyzerInput,
   CreateConsultationInput,
   CreateInvoiceInput,
   CreatePatientInput,
@@ -25,6 +27,8 @@ import type {
   LoginInput,
   Owner,
   Patient,
+  ReferenceRange,
+  ReferenceRangeInput,
   RegisterResultInput,
   ReportFile,
   ResultAttachment,
@@ -34,6 +38,7 @@ import type {
   SessionUser,
   Species,
   Surgery,
+  UpdateAnalyzerInput,
   UserListItem,
   Vaccine,
   VaccineListItem,
@@ -98,6 +103,24 @@ export const api = {
     invoke<ResultAttachment>("attach_result_file", { resultId, sourcePath }),
   deleteResultAttachment: (id: number) =>
     invoke<void>("delete_result_attachment", { id }),
+
+  // ---- Equipos analizadores y rangos de referencia ----
+  listAnalyzers: () => invoke<Analyzer[]>("list_analyzers"),
+  createAnalyzer: (input: CreateAnalyzerInput) =>
+    invoke<Analyzer>("create_analyzer", { input }),
+  updateAnalyzer: (input: UpdateAnalyzerInput) =>
+    invoke<Analyzer>("update_analyzer", { input }),
+  setAnalyzerActive: (id: number, active: boolean) =>
+    invoke<Analyzer>("set_analyzer_active", { id, active }),
+  deleteAnalyzer: (id: number) => invoke<void>("delete_analyzer", { id }),
+  listReferenceRanges: (analyzerId: number | null) =>
+    invoke<ReferenceRange[]>("list_reference_ranges", { analyzerId }),
+  createReferenceRange: (input: ReferenceRangeInput) =>
+    invoke<ReferenceRange>("create_reference_range", { input }),
+  updateReferenceRange: (id: number, input: ReferenceRangeInput) =>
+    invoke<ReferenceRange>("update_reference_range", { id, input }),
+  deleteReferenceRange: (id: number) =>
+    invoke<void>("delete_reference_range", { id }),
 
   // ---- Configuración ----
   getClinicSettings: () => invoke<ClinicSettings>("get_clinic_settings"),

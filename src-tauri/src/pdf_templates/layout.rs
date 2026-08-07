@@ -183,7 +183,7 @@ pub fn draw_patient_block(pdf: &mut PdfBuilder, patient: &Patient) {
 
 /// Dibuja la tabla de resultados analíticos idéntica al modelo de reporte de laboratorio.
 pub fn draw_results(pdf: &mut PdfBuilder, results: &[crate::models::sample::LabResult]) {
-    draw_results_full(pdf, "HEMATOLOGÍA", results, None);
+    draw_results_full(pdf, "HEMATOLOGÍA", results, None, None);
 }
 
 pub fn draw_results_full(
@@ -191,6 +191,7 @@ pub fn draw_results_full(
     sample_type: &str,
     results: &[crate::models::sample::LabResult],
     notes: Option<&str>,
+    analyzer: Option<&str>,
 ) {
     pdf.y -= 4.0;
     pdf.ensure_space(25.0);
@@ -329,16 +330,13 @@ pub fn draw_results_full(
     }
 
     pdf.y -= 3.0;
-    // Nota técnica
+    // Nota técnica: equipo analizador real de la muestra (o lectura manual).
     pdf.text(true, "Técnica:", 7.5, MARGIN, pdf.y, C_TEXT);
-    pdf.text(
-        false,
-        " Lectura Automatizada: MINDRAY B2800 RUFFOS LABS",
-        7.5,
-        MARGIN + 12.0,
-        pdf.y,
-        (80, 80, 80),
-    );
+    let técnica = match analyzer.filter(|a| !a.trim().is_empty()) {
+        Some(a) => format!(" Lectura Automatizada: {}", a.trim()),
+        None => " Lectura manual / estándar".to_string(),
+    };
+    pdf.text(false, &técnica, 7.5, MARGIN + 12.0, pdf.y, (80, 80, 80));
     pdf.y -= 7.0;
 
     // Observaciones

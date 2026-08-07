@@ -54,12 +54,28 @@ test("login → dashboard → flujo completo de muestra", async ({ page }) => {
   await dialog.getByPlaceholder(/Buscar paciente/).fill("Rocky");
   await dialog.locator("button").filter({ hasText: "Rocky" }).first().click();
 
-  // Tipo de muestra (Radix Select)
-  await dialog.getByRole("combobox").click();
+  // Tipo de muestra (Radix Select; el diálogo también tiene el combobox
+  // "Equipo analizador (opcional)", así que se acota por nombre).
+  await dialog.getByRole("combobox", { name: "Tipo de muestra" }).click();
   await page.getByRole("option", { name: "Suero" }).click();
 
   // Registrar la muestra
   await dialog.getByRole("button", { name: "Registrar muestra" }).click();
+
+  // Pantalla de éxito: genera la etiqueta con código de barras para el tubo
+  const success = page.getByRole("dialog");
+  await expect(
+    success.getByRole("heading", { name: /Muestra M-2026-0001 registrada/ }),
+  ).toBeVisible();
+  await expect(
+    success.getByRole("button", { name: /Generar e imprimir etiqueta/ }),
+  ).toBeVisible();
+
+  // Generar la etiqueta y abrirla para imprimirla
+  await success
+    .getByRole("button", { name: /Generar e imprimir etiqueta/ })
+    .click();
+  await expect(page.getByText("Etiqueta de muestra generada")).toBeVisible();
 
   // Se abre el detalle con la muestra RECIBIDA
   const detail = page.getByRole("dialog");

@@ -1,8 +1,11 @@
+import { useState } from "react";
 import { useForm } from "react-hook-form";
 import { zodResolver } from "@hookform/resolvers/zod";
 import { z } from "zod";
 import { toast } from "sonner";
-import { Loader2 } from "lucide-react";
+import { openPath } from "@tauri-apps/plugin-opener";
+import { CheckCircle2, Loader2, Printer } from "lucide-react";
+import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
 import {
   Dialog,
@@ -29,8 +32,14 @@ import {
   SelectTrigger,
   SelectValue,
 } from "@/components/ui/select";
-import { useCreateSample, useSampleTypes } from "@/hooks/use-queries";
-import { getErrorMessage } from "@/lib/api";
+import {
+  useAnalyzers,
+  useCreateSample,
+  useGenerateSampleLabels,
+  useSampleTypes,
+} from "@/hooks/use-queries";
+import { api, getErrorMessage } from "@/lib/api";
+import type { Sample } from "@/bindings";
 
 const nowLocal = () => {
   const d = new Date();
@@ -40,6 +49,7 @@ const nowLocal = () => {
 
 const schema = z.object({
   sampleTypeId: z.coerce.number().min(1, "Selecciona el tipo de muestra"),
+  analyzerId: z.coerce.number().optional(),
   receivedAt: z.string().min(1, "Fecha requerida"),
   collectedBy: z.string().optional(),
   notes: z.string().optional(),
@@ -57,12 +67,17 @@ export function NewSampleDialog({
   patientId: number;
 }) {
   const { data: sampleTypes = [] } = useSampleTypes();
+  const { data: analyzers = [] } = useAnalyzers();
+  const activeAnalyzers = analyzers.filter((a) => a.isActive);
   const createSample = useCreateSample();
+  const generateLabels = useGenerateSampleLabels();
+  const [createdSample, setCreatedSample] = useState<Sample | null>(null);
 
   const form = useForm<z.input<typeof schema>, unknown, z.output<typeof schema>>({
     resolver: zodResolver(schema),
     defaultValues: {
       sampleTypeId: undefined,
+      analyzerId: undefined,
       receivedAt: nowLocal(),
       collectedBy: "",
       notes: "",
@@ -75,15 +90,12 @@ export function NewSampleDialog({
       const sample = await createSample.mutateAsync({
         patientId,
         sampleTypeId: values.sampleTypeId,
+        analyzerId: values.analyzerId ?? null,
         receivedAt: date,
         collectedBy: values.collectedBy?.trim() || null,
         notes: values.notes?.trim() || null,
       });
-      toast.success(`Muestra ${sample.code} registrada`, {
-        description: "Estado: recibida. Quedó en la cadena de custodia.",
-      });
-      onOpenChange(false);
-      form.reset({ receivedAt: nowLocal() });
+      setCreatedSample(sample);
     } catch (e) {
       toast.error("No se pudo registrar la muestra", {
         description: getErrorMessage(e),
@@ -91,16 +103,104 @@ export function NewSampleDialog({
     }
   };
 
+  /** Cierra el diálogo tras registrar la muestra. */
+  const finish = () => {
+    onOpenChange(false);
+    form.reset({ receivedAt: nowLocal() });
+    setCreatedSample(null);
+  };
+
+  /** Escape/clic fuera en la pantalla de éxito también cierran vía `finish`,
+   *  para que el formulario se reinicie correctamente. */
+  const handleOpenChange = (o: boolean) => {
+    if (!o && createdSample) {
+      finish();
+      return;
+    }
+    onOpenChange(o);
+  };
+
+  /** Genera la etiqueta con el código de barras de la muestra y la abre
+   *  para imprimirla y pegarla en el tubo. */
+  const printLabel = async () => {
+    if (!createdSample) return;
+    try {
+      const report = await generateLabels.mutateAsync([createdSample.id]);
+      toast.success("Etiqueta de muestra generada", {
+        description: "Se abrirá el PDF para imprimirla y pegarla en el tubo.",
+      });
+      try {
+        await api.openReportFile(report.path);
+      } catch {
+        await openPath(report.path);
+      }
+      finish();
+    } catch (err) {
+      toast.error("No se pudo generar la etiqueta", {
+        description: getErrorMessage(err),
+      });
+    }
+  };
+
   return (
-    <Dialog open={open} onOpenChange={onOpenChange}>
+    <Dialog open={open} onOpenChange={handleOpenChange}>
       <DialogContent>
-        <DialogHeader>
-          <DialogTitle>Registrar muestra analítica</DialogTitle>
-          <DialogDescription>
-            La muestra queda vinculada inequívocamente al paciente con código
-            propio y estado "recibida".
-          </DialogDescription>
-        </DialogHeader>
+        {createdSample ? (
+          <>
+            <DialogHeader>
+              <DialogTitle className="flex items-center gap-2">
+                <CheckCircle2 className="size-5 text-success" />
+                Muestra {createdSample.code} registrada
+              </DialogTitle>
+              <DialogDescription>
+                Estado: recibida. Genera la etiqueta con el código de barras e
+                imprímela para pegarla en el tubo.
+              </DialogDescription>
+            </DialogHeader>
+
+            <div className="bg-muted/50 flex items-center justify-between rounded-lg border px-4 py-3">
+              <div>
+                <p className="text-muted-foreground text-[11px] font-medium tracking-wide uppercase">
+                  Código de muestra
+                </p>
+                <p className="font-mono text-lg font-semibold">
+                  {createdSample.code}
+                </p>
+              </div>
+              <Badge variant="secondary">Recibida</Badge>
+            </div>
+
+            <DialogFooter className="flex-col-reverse gap-2 pt-2 sm:flex-row sm:justify-between">
+              <Button
+                variant="ghost"
+                onClick={finish}
+                disabled={generateLabels.isPending}
+              >
+                Cerrar
+              </Button>
+              <Button
+                onClick={printLabel}
+                disabled={generateLabels.isPending}
+                className="gap-1.5"
+              >
+                {generateLabels.isPending ? (
+                  <Loader2 className="animate-spin" />
+                ) : (
+                  <Printer className="size-4" />
+                )}
+                Generar e imprimir etiqueta
+              </Button>
+            </DialogFooter>
+          </>
+        ) : (
+          <>
+            <DialogHeader>
+              <DialogTitle>Registrar muestra analítica</DialogTitle>
+              <DialogDescription>
+                La muestra queda vinculada inequívocamente al paciente con código
+                propio y estado "recibida".
+              </DialogDescription>
+            </DialogHeader>
 
         <Form {...form}>
           <form onSubmit={form.handleSubmit(onSubmit)} className="space-y-4">
@@ -125,6 +225,42 @@ export function NewSampleDialog({
                           {t.name}
                         </SelectItem>
                       ))}
+                    </SelectContent>
+                  </Select>
+                  <FormMessage />
+                </FormItem>
+              )}
+            />
+
+            <FormField
+              control={form.control}
+              name="analyzerId"
+              render={({ field }) => (
+                <FormItem>
+                  <FormLabel>Equipo analizador (opcional)</FormLabel>
+                  <Select
+                    value={field.value ? field.value.toString() : "0"}
+                    onValueChange={(val) =>
+                      field.onChange(val === "0" ? undefined : Number(val))
+                    }
+                  >
+                    <FormControl>
+                      <SelectTrigger className="w-full">
+                        <SelectValue placeholder="Sin equipo (lectura manual / estándar)" />
+                      </SelectTrigger>
+                    </FormControl>
+                    <SelectContent>
+                      <SelectItem value="0">
+                        Sin equipo (lectura manual / estándar)
+                      </SelectItem>
+                      {activeAnalyzers
+                        .filter((a) => a.code !== "GENERAL")
+                        .map((a) => (
+                          <SelectItem key={a.id} value={a.id.toString()}>
+                            {a.name}
+                            {a.model ? ` · ${a.model}` : ""}
+                          </SelectItem>
+                        ))}
                     </SelectContent>
                   </Select>
                   <FormMessage />
@@ -193,6 +329,8 @@ export function NewSampleDialog({
             </DialogFooter>
           </form>
         </Form>
+          </>
+        )}
       </DialogContent>
     </Dialog>
   );

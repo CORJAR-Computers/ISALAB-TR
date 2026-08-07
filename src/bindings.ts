@@ -120,6 +120,10 @@ export const commands = {
 	status: string,
 	collectedBy: string | null,
 	notes: string | null,
+	/**  Equipo analizador elegido por el operario (NULL = lectura manual/estándar). */
+	analyzerId: number | null,
+	/**  Nombre del equipo (para la UI y el reporte PDF). */
+	analyzerName: string | null,
 	results: LabResult[],
 } | null, AppError>(__TAURI_INVOKE("get_sample", { id })),
 	/**  Cambia el estado de una muestra (RECIBIDA→EN_PROCESO, →ANULADA). */
@@ -268,6 +272,24 @@ export const commands = {
 	listAuditLog: (limit: number | null, offset: number | null, username: string | null, action: string | null, dateFrom: string | null, dateTo: string | null) => typedError<AuditLogEntry[], AppError>(__TAURI_INVOKE("list_audit_log", { limit, offset, username, action, dateFrom, dateTo })),
 	interpretLabResults: (sampleId: number) => typedError<string, AppError>(__TAURI_INVOKE("interpret_lab_results", { sampleId })),
 	getPatientLabTrends: (patientId: number, analyteId: number) => typedError<TrendPoint[], AppError>(__TAURI_INVOKE("get_patient_lab_trends", { patientId, analyteId })),
+	/**  Lista los equipos analizadores configurados (con su nº de rangos). */
+	listAnalyzers: () => typedError<Analyzer[], AppError>(__TAURI_INVOKE("list_analyzers")),
+	/**  Crea un equipo analizador (marca/modelo). */
+	createAnalyzer: (input: CreateAnalyzerInput) => typedError<Analyzer, AppError>(__TAURI_INVOKE("create_analyzer", { input })),
+	/**  Actualiza los datos de un equipo. */
+	updateAnalyzer: (input: UpdateAnalyzerInput) => typedError<Analyzer, AppError>(__TAURI_INVOKE("update_analyzer", { input })),
+	/**  Activa/desactiva un equipo (los inactivos no aparecen en el selector). */
+	setAnalyzerActive: (id: number, active: boolean) => typedError<Analyzer, AppError>(__TAURI_INVOKE("set_analyzer_active", { id, active })),
+	/**  Elimina un equipo que no tenga muestras asociadas (borra sus rangos). */
+	deleteAnalyzer: (id: number) => typedError<null, AppError>(__TAURI_INVOKE("delete_analyzer", { id })),
+	/**  Rangos de referencia de un equipo (o de todos si `analyzer_id` es NULL). */
+	listReferenceRanges: (analyzerId: number | null) => typedError<ReferenceRange[], AppError>(__TAURI_INVOKE("list_reference_ranges", { analyzerId })),
+	/**  Crea un rango de referencia para un equipo. */
+	createReferenceRange: (input: ReferenceRangeInput) => typedError<ReferenceRange, AppError>(__TAURI_INVOKE("create_reference_range", { input })),
+	/**  Actualiza un rango de referencia existente. */
+	updateReferenceRange: (id: number, input: ReferenceRangeInput) => typedError<ReferenceRange, AppError>(__TAURI_INVOKE("update_reference_range", { id, input })),
+	/**  Elimina un rango de referencia. */
+	deleteReferenceRange: (id: number) => typedError<null, AppError>(__TAURI_INVOKE("delete_reference_range", { id })),
 };
 
 /* Types */
@@ -283,6 +305,22 @@ export type Analyte = {
 export type AnalyteCount = {
 	analyteName: string,
 	count: number,
+};
+
+/**
+ *  Equipo analizador de laboratorio (marca/modelo). El perfil GENERAL (ID 1)
+ *  agrupa los rangos estándar por especie/sexo/edad sin equipo automatizado.
+ */
+export type Analyzer = {
+	id: number,
+	code: string,
+	name: string,
+	manufacturer: string | null,
+	model: string | null,
+	isActive: boolean,
+	notes: string | null,
+	/**  Nº de rangos de referencia configurados para este equipo. */
+	rangeCount: number,
 };
 
 /**  Error tipado de la app. Se serializa como `{ type, data }` para el frontend. */
@@ -369,6 +407,14 @@ export type ConsultationListItem = {
 	veterinarianName: string | null,
 };
 
+export type CreateAnalyzerInput = {
+	code: string,
+	name: string,
+	manufacturer: string | null,
+	model: string | null,
+	notes: string | null,
+};
+
 export type CreateConsultationInput = {
 	patientId: number,
 	consultationDate: string,
@@ -426,6 +472,8 @@ export type CreateSampleInput = {
 	receivedAt: string,
 	collectedBy: string | null,
 	notes: string | null,
+	/**  Equipo analizador (NULL = perfil GENERAL/estándar). */
+	analyzerId: number | null,
 };
 
 export type CreateSurgeryInput = {
@@ -640,6 +688,43 @@ export type Patient = {
 	ageMonths: number,
 };
 
+/**
+ *  Rango de referencia de un analito para un equipo y especie, con sexo y
+ *  franja de edad opcionales (SEX NULL = ambos sexos).
+ */
+export type ReferenceRange = {
+	id: number,
+	analyzerId: number,
+	analyzerName: string,
+	analyteId: number,
+	analyteName: string,
+	unit: string | null,
+	speciesId: number,
+	speciesName: string,
+	sex: string | null,
+	ageMinMonths: number,
+	ageMaxMonths: number,
+	minValue: number | null,
+	maxValue: number | null,
+	criticalMin: number | null,
+	criticalMax: number | null,
+	notes: string | null,
+};
+
+export type ReferenceRangeInput = {
+	analyzerId: number,
+	analyteId: number,
+	speciesId: number,
+	sex: string | null,
+	ageMinMonths: number,
+	ageMaxMonths: number,
+	minValue: number | null,
+	maxValue: number | null,
+	criticalMin: number | null,
+	criticalMax: number | null,
+	notes: string | null,
+};
+
 export type RegisterResultInput = {
 	sampleId: number,
 	analyteId: number,
@@ -681,6 +766,10 @@ export type Sample = {
 	status: string,
 	collectedBy: string | null,
 	notes: string | null,
+	/**  Equipo analizador elegido por el operario (NULL = lectura manual/estándar). */
+	analyzerId: number | null,
+	/**  Nombre del equipo (para la UI y el reporte PDF). */
+	analyzerName: string | null,
 	results: LabResult[],
 };
 
@@ -771,6 +860,15 @@ export type TrendPoint = {
 	refMin: number | null,
 	refMax: number | null,
 	status: string,
+};
+
+export type UpdateAnalyzerInput = {
+	id: number,
+	code: string,
+	name: string,
+	manufacturer: string | null,
+	model: string | null,
+	notes: string | null,
 };
 
 /**  Fila del listado de usuarios (nunca expone el hash). */

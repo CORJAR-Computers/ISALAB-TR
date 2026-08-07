@@ -57,6 +57,10 @@ pub struct Sample {
     pub status: String,
     pub collected_by: Option<String>,
     pub notes: Option<String>,
+    /// Equipo analizador elegido por el operario (NULL = lectura manual/estándar).
+    pub analyzer_id: Option<i32>,
+    /// Nombre del equipo (para la UI y el reporte PDF).
+    pub analyzer_name: Option<String>,
     pub results: Vec<LabResult>,
 }
 
@@ -68,6 +72,8 @@ pub struct CreateSampleInput {
     pub received_at: String,
     pub collected_by: Option<String>,
     pub notes: Option<String>,
+    /// Equipo analizador (NULL = perfil GENERAL/estándar).
+    pub analyzer_id: Option<i32>,
 }
 
 #[derive(Debug, Clone, Serialize, Deserialize, Type)]

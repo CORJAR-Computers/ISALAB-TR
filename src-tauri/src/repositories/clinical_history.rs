@@ -45,6 +45,8 @@ type SampleRow = (
     String,
     Option<String>,
     Option<String>,
+    Option<i32>,    // analyzer_id
+    Option<String>, // analyzer_name
 );
 
 type LabResultRow = (
@@ -324,9 +326,11 @@ fn list_samples(conn: &mut SimpleConnection, patient_id: i32) -> Result<Vec<Samp
         .query(
             "SELECT s.ID, s.CODE, s.PATIENT_ID, s.SAMPLE_TYPE_ID, st.NAME,
                     LEFT(CAST(s.RECEIVED_AT AS VARCHAR(60)), 19),
-                    s.STATUS, s.COLLECTED_BY, s.NOTES
+                    s.STATUS, s.COLLECTED_BY, s.NOTES,
+                    s.ANALYZER_ID, az.NAME
              FROM SAMPLES s
              JOIN SAMPLE_TYPES st ON st.ID = s.SAMPLE_TYPE_ID
+             LEFT JOIN ANALYZERS az ON az.ID = s.ANALYZER_ID
              WHERE s.PATIENT_ID = ?
              ORDER BY s.RECEIVED_AT DESC",
             (&patient_id,),
@@ -346,6 +350,8 @@ fn list_samples(conn: &mut SimpleConnection, patient_id: i32) -> Result<Vec<Samp
             status: r.6,
             collected_by: r.7,
             notes: r.8,
+            analyzer_id: r.9,
+            analyzer_name: r.10,
             results,
         });
     }
@@ -359,8 +365,8 @@ pub fn create_sample(
     let id = next_id(conn, "GEN_SAMPLES_ID")?;
     conn.execute(
         "INSERT INTO SAMPLES
-            (ID, PATIENT_ID, SAMPLE_TYPE_ID, RECEIVED_AT, STATUS, COLLECTED_BY, NOTES)
-         VALUES (?, ?, ?, ?, 'RECIBIDA', ?, ?)",
+            (ID, PATIENT_ID, SAMPLE_TYPE_ID, RECEIVED_AT, STATUS, COLLECTED_BY, NOTES, ANALYZER_ID)
+         VALUES (?, ?, ?, ?, 'RECIBIDA', ?, ?, ?)",
         (
             &id,
             &input.patient_id,
@@ -368,6 +374,7 @@ pub fn create_sample(
             &input.received_at,
             &input.collected_by,
             &input.notes,
+            &input.analyzer_id,
         ),
     )
     .map_err(AppError::from)?;
@@ -376,9 +383,11 @@ pub fn create_sample(
         .query_first(
             "SELECT s.ID, s.CODE, s.PATIENT_ID, s.SAMPLE_TYPE_ID, st.NAME,
                     LEFT(CAST(s.RECEIVED_AT AS VARCHAR(60)), 19),
-                    s.STATUS, s.COLLECTED_BY, s.NOTES
+                    s.STATUS, s.COLLECTED_BY, s.NOTES,
+                    s.ANALYZER_ID, az.NAME
              FROM SAMPLES s
              JOIN SAMPLE_TYPES st ON st.ID = s.SAMPLE_TYPE_ID
+             LEFT JOIN ANALYZERS az ON az.ID = s.ANALYZER_ID
              WHERE s.ID = ?",
             (&id,),
         )
@@ -394,6 +403,8 @@ pub fn create_sample(
         status: r.6,
         collected_by: r.7,
         notes: r.8,
+        analyzer_id: r.9,
+        analyzer_name: r.10,
         results: Vec::new(),
     })
     .ok_or_else(|| AppError::Internal("Muestra creada pero no recuperada".into()))
@@ -745,6 +756,7 @@ mod tests {
             received_at: "2026-08-01 11:00:00".to_string(),
             collected_by: Some("Dr. García".to_string()),
             notes: None,
+            analyzer_id: None,
         };
         let sample = create_sample(&mut conn, &sample_input).unwrap();
 
@@ -804,6 +816,7 @@ mod tests {
             received_at: "2026-08-04 09:30:00".to_string(),
             collected_by: Some("Enf. López".to_string()),
             notes: Some("Muestra en ayunas".to_string()),
+            analyzer_id: None,
         };
 
         let sample = create_sample(&mut conn, &input).unwrap();
@@ -832,6 +845,7 @@ mod tests {
             received_at: "2026-08-04 10:00:00".to_string(),
             collected_by: None,
             notes: None,
+            analyzer_id: None,
         };
         let sample = create_sample(&mut conn, &sample_input).unwrap();
 

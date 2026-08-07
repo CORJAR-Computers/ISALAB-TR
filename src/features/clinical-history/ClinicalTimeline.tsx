@@ -357,6 +357,13 @@ function SampleEntry({
         </p>
       )}
 
+      {s.analyzerName && (
+        <p className="text-muted-foreground mt-1 text-xs">
+          <span className="font-medium">Equipo analizador:</span>{" "}
+          {s.analyzerName}
+        </p>
+      )}
+
       {expanded && (
         <div className="mt-3 overflow-hidden rounded-lg border">
           {s.results.length === 0 ? (

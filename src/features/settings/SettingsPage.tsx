@@ -42,6 +42,7 @@ import {
   useImportSecondaryLogo,
   useDeleteSecondaryLogo,
 } from "@/hooks/use-queries";
+import { AnalyzerManagementCard } from "@/features/settings/AnalyzerManagementCard";
 import { api, getErrorMessage } from "@/lib/api";
 import type { ClinicSettings } from "@/bindings";
 import { Trash2 } from "lucide-react";
@@ -799,6 +800,10 @@ export function SettingsPage() {
           </div>
         </form>
       </Form>
+
+      {/* Equipos de laboratorio: gestión de equipos y rangos por marca/modelo
+          (fuera del form principal porque tiene sus propios formularios). */}
+      <AnalyzerManagementCard />
     </div>
   );
 }
