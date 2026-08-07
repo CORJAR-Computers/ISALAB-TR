@@ -355,19 +355,19 @@ pub fn list_results_for_export(
 }
 
 pub(crate) type WorklistRow = (
-    i32,            // id
-    String,         // code
-    i32,            // patient_id
-    String,         // patient_name
-    String,         // owner_name
-    String,         // species_name
-    i32,            // sample_type_id
-    String,         // sample_type_name
-    String,         // status
-    String,         // received_at
-    i32,            // elapsed_minutes (i32: Specta prohíbe i64 en bindings TS)
-    i32,            // result_count
-    i32,            // abnormal_count
+    i32,    // id
+    String, // code
+    i32,    // patient_id
+    String, // patient_name
+    String, // owner_name
+    String, // species_name
+    i32,    // sample_type_id
+    String, // sample_type_name
+    String, // status
+    String, // received_at
+    i32,    // elapsed_minutes (i32: Specta prohíbe i64 en bindings TS)
+    i32,    // result_count
+    i32,    // abnormal_count
 );
 
 /// Bandeja de trabajo del laboratorio: muestras pendientes (RECIBIDA /
@@ -440,7 +440,10 @@ pub fn group_worklist(
             &mut overdue_groups
         };
 
-        match target.iter_mut().find(|g| g.sample_type_id == s.sample_type_id) {
+        match target
+            .iter_mut()
+            .find(|g| g.sample_type_id == s.sample_type_id)
+        {
             Some(g) => {
                 g.count += 1;
                 g.max_elapsed_minutes = g.max_elapsed_minutes.max(s.elapsed_minutes);

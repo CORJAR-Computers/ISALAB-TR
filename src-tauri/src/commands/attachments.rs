@@ -154,7 +154,10 @@ pub fn delete_result_attachment(state: State<'_, AppState>, id: i32) -> Result<(
             Some(user.id),
             &user.username,
             "RESULT_ATTACHMENT_DELETED",
-            Some(&format!("Adjunto \"{}\" del resultado {}", att.file_name, att.result_id)),
+            Some(&format!(
+                "Adjunto \"{}\" del resultado {}",
+                att.file_name, att.result_id
+            )),
         )
         .ok();
     }

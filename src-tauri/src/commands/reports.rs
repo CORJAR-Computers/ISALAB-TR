@@ -456,7 +456,8 @@ pub fn generate_sample_labels(
         format!("etiquetas-{stamp}.pdf")
     };
     let out_path = dir.join(&label);
-    crate::pdf_templates::generate_sample_labels(&samples, &out_path).map_err(AppError::Internal)?;
+    crate::pdf_templates::generate_sample_labels(&samples, &out_path)
+        .map_err(AppError::Internal)?;
 
     let generated_at = now_db(conn)?;
     Ok(ReportFile {

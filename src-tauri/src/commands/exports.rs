@@ -19,11 +19,7 @@ pub fn export_samples_csv(
 ) -> Result<String, AppError> {
     require_vet_or_admin(&state)?;
     let mut pooled = state.pool.acquire()?;
-    let samples = samples_repo::list(
-        pooled.conn(),
-        status.as_deref(),
-        search.as_deref(),
-    )?;
+    let samples = samples_repo::list(pooled.conn(), status.as_deref(), search.as_deref())?;
     let csv = crate::csv::samples_to_csv(&samples);
     write_csv(&dest_path, &csv)?;
     Ok(dest_path)
@@ -41,11 +37,8 @@ pub fn export_results_csv(
 ) -> Result<String, AppError> {
     require_vet_or_admin(&state)?;
     let mut pooled = state.pool.acquire()?;
-    let rows = samples_repo::list_results_for_export(
-        pooled.conn(),
-        status.as_deref(),
-        search.as_deref(),
-    )?;
+    let rows =
+        samples_repo::list_results_for_export(pooled.conn(), status.as_deref(), search.as_deref())?;
     let csv = crate::csv::results_to_csv(&rows);
     write_csv(&dest_path, &csv)?;
     Ok(dest_path)
@@ -53,9 +46,6 @@ pub fn export_results_csv(
 
 fn write_csv(dest_path: &str, csv: &str) -> Result<(), AppError> {
     fs::write(dest_path, csv).map_err(|e| {
-        AppError::Internal(format!(
-            "No se pudo escribir el CSV en {}: {e}",
-            dest_path
-        ))
+        AppError::Internal(format!("No se pudo escribir el CSV en {}: {e}", dest_path))
     })
 }

@@ -64,8 +64,7 @@ pub fn insert(
     )
     .map_err(AppError::from)?;
 
-    get(conn, id)?
-        .ok_or_else(|| AppError::Internal("Adjunto no encontrado tras insertar".into()))
+    get(conn, id)?.ok_or_else(|| AppError::Internal("Adjunto no encontrado tras insertar".into()))
 }
 
 pub fn delete(conn: &mut SimpleConnection, id: i32) -> Result<(), AppError> {

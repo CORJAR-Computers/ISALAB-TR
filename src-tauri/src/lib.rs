@@ -46,13 +46,13 @@ use crate::commands::reports::{
 use crate::commands::samples::{
     create_sample, get_sample, get_worklist, list_samples, register_lab_result, set_sample_status,
 };
+use crate::commands::search::global_search;
 use crate::commands::settings::{
     delete_secondary_logo, get_clinic_settings, import_clinic_logo, import_pkcs12,
     import_secondary_logo, list_secondary_logos, save_clinic_settings,
 };
 use crate::commands::surgeries::{create_surgery, list_surgeries, set_surgery_status};
 use crate::commands::users::{change_password, create_user, list_users};
-use crate::commands::search::global_search;
 use crate::commands::vaccines::{create_vaccine, list_vaccines};
 use crate::state::AppState;
 

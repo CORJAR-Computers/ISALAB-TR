@@ -47,14 +47,7 @@ fn status_label(status: &str) -> String {
 
 /// Dibuja una etiqueta en la celda con esquina superior izquierda `(x, y)`.
 /// `y` crece hacia abajo en el espacio del PdfBuilder.
-fn draw_label(
-    pdf: &mut PdfBuilder,
-    s: &SampleListItem,
-    x: f32,
-    y: f32,
-    w: f32,
-    h: f32,
-) {
+fn draw_label(pdf: &mut PdfBuilder, s: &SampleListItem, x: f32, y: f32, w: f32, h: f32) {
     // Marco de corte (línea fina para guillotinar).
     pdf.rect(x, y, w, h, None, Some(C_RULE));
 
@@ -78,18 +71,18 @@ fn draw_label(
     // Código de barras centrado.
     let barcode_h = 16.0;
     if let Some(bw) = code128_width(&s.code, 0.33) {
-        draw_code128(
-            pdf,
-            &s.code,
-            x + (w - bw) / 2.0,
-            y - 18.0,
-            barcode_h,
-            0.33,
-        );
+        draw_code128(pdf, &s.code, x + (w - bw) / 2.0, y - 18.0, barcode_h, 0.33);
     }
 
     // Datos del paciente.
-    pdf.text(true, &sanitize(&s.patient_name), 11.0, x + 3.0, y - 38.0, C_TEXT);
+    pdf.text(
+        true,
+        &sanitize(&s.patient_name),
+        11.0,
+        x + 3.0,
+        y - 38.0,
+        C_TEXT,
+    );
     let mut line2 = s.species_name.clone();
     if !line2.is_empty() {
         line2.push_str(" · ");
@@ -124,10 +117,7 @@ fn draw_label(
 /// Genera la hoja de etiquetas para las muestras dadas y la guarda en
 /// `out_path`. Reordena las muestras por fecha de recepción (más reciente
 /// primero) y las reparte en páginas de 8.
-pub fn generate_sample_labels(
-    samples: &[SampleListItem],
-    out_path: &Path,
-) -> Result<(), String> {
+pub fn generate_sample_labels(samples: &[SampleListItem], out_path: &Path) -> Result<(), String> {
     if samples.is_empty() {
         return Err("No hay muestras para etiquetar".into());
     }

@@ -1,6 +1,5 @@
 pub mod auth;
 pub mod clinical_history;
-pub mod search;
 pub mod consultation;
 pub mod dashboard;
 pub mod invoice;
@@ -10,6 +9,7 @@ pub mod patient;
 pub mod report;
 pub mod sample;
 pub mod sample_list_item;
+pub mod search;
 pub mod settings;
 pub mod species;
 pub mod surgery;

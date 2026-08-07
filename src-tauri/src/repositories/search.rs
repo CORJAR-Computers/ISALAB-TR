@@ -264,7 +264,9 @@ mod tests {
     #[test]
     fn test_search_no_results() {
         let (mut conn, db_path) = setup();
-        assert!(global_search(&mut conn, "zzz_inexistente").unwrap().is_empty());
+        assert!(global_search(&mut conn, "zzz_inexistente")
+            .unwrap()
+            .is_empty());
         test_helpers::cleanup_test_db(&db_path);
     }
 }
