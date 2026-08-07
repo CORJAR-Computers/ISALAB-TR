@@ -137,6 +137,17 @@
     get_dashboard_stats: () => {
       const list = samples.map(toListItem);
       const count = (st) => list.filter((s) => s.status === st).length;
+      // Tendencia: últimos 7 días con el volumen de muestras recibidas.
+      const weeklyVolume = [];
+      for (let i = 6; i >= 0; i -= 1) {
+        const d = new Date();
+        d.setDate(d.getDate() - i);
+        const key = d.toISOString().slice(0, 10);
+        weeklyVolume.push({
+          date: key,
+          count: samples.filter((s) => s.receivedAt.slice(0, 10) === key).length,
+        });
+      }
       return {
         patientsTotal: patients.length,
         patientsActive: patients.length,
@@ -145,6 +156,10 @@
         samplesFinished: count("FINALIZADA"),
         samplesCancelled: count("ANULADA"),
         abnormalResults: list.filter((s) => s.abnormalCount > 0).length,
+        avgProcessingHours: null,
+        abnormalRate: null,
+        weeklyVolume,
+        topAnalytes: [],
         consultationsPending: 0,
         surgeriesProgrammed: 0,
         vaccinesDue: 0,
@@ -225,6 +240,7 @@
         refMin,
         refMax,
         analyzedAt: new Date().toISOString().slice(0, 19).replace("T", " "),
+        attachments: [],
       };
       nextResultId += 1;
       s.results.push(result);
@@ -238,6 +254,152 @@
       s.status = args.status;
       return { ...s, results: [...s.results] };
     },
+    get_worklist: () => {
+      const now = new Date();
+      // Fecha LOCAL (igual que chrono::Local::now() en el backend).
+      const p2 = (n) => String(n).padStart(2, "0");
+      const today = `${now.getFullYear()}-${p2(now.getMonth() + 1)}-${p2(now.getDate())}`;
+      const pending = samples.filter((s) =>
+        ["RECIBIDA", "EN_PROCESO"].includes(s.status),
+      );
+      const elapsedMin = (s) => {
+        const t = new Date(s.receivedAt.replace(" ", "T"));
+        return Math.max(0, Math.floor((now.getTime() - t.getTime()) / 60000));
+      };
+      const toGroup = (list) => {
+        const groups = [];
+        for (const s of list) {
+          const p = patientById(s.patientId);
+          let g = groups.find((x) => x.sampleTypeId === s.sampleTypeId);
+          if (!g) {
+            g = {
+              sampleTypeId: s.sampleTypeId,
+              sampleTypeName: s.sampleTypeName,
+              count: 0,
+              maxElapsedMinutes: 0,
+              samples: [],
+            };
+            groups.push(g);
+          }
+          g.count += 1;
+          g.maxElapsedMinutes = Math.max(g.maxElapsedMinutes, elapsedMin(s));
+          g.samples.push({
+            id: s.id,
+            code: s.code,
+            patientId: s.patientId,
+            patientName: p?.name ?? "?",
+            ownerName: p?.ownerName ?? "?",
+            speciesName: p?.speciesName ?? "?",
+            sampleTypeId: s.sampleTypeId,
+            sampleTypeName: s.sampleTypeName,
+            status: s.status,
+            receivedAt: s.receivedAt,
+            elapsedMinutes: elapsedMin(s),
+            resultCount: s.results.length,
+            abnormalCount: s.results.filter(
+              (r) => r.status === "ALTO" || r.status === "BAJO",
+            ).length,
+          });
+        }
+        return groups.sort((a, b) => b.maxElapsedMinutes - a.maxElapsedMinutes);
+      };
+      const todayList = pending.filter((s) => s.receivedAt.slice(0, 10) === today);
+      const overdueList = pending.filter((s) => s.receivedAt.slice(0, 10) !== today);
+      return {
+        date: today,
+        totalPending: pending.length,
+        today: toGroup(todayList),
+        overdue: toGroup(overdueList),
+      };
+    },
+    global_search: (args) => {
+      const q = (args.query ?? "").trim().toLowerCase();
+      if (!q) return [];
+      const results = [];
+      for (const p of patients) {
+        if (
+          p.name.toLowerCase().includes(q) ||
+          p.code.toLowerCase().includes(q) ||
+          p.ownerName.toLowerCase().includes(q)
+        ) {
+          results.push({
+            kind: "patient",
+            id: p.id,
+            title: p.name,
+            subtitle: `${p.speciesName} · ${p.ownerName}`,
+            code: p.code,
+          });
+        }
+      }
+      for (const s of samples) {
+        const p = patientById(s.patientId);
+        if (
+          s.code.toLowerCase().includes(q) ||
+          (p?.name ?? "").toLowerCase().includes(q)
+        ) {
+          results.push({
+            kind: "sample",
+            id: s.id,
+            title: p?.name ?? "?",
+            subtitle: `${s.sampleTypeName} · ${s.status}`, // eslint-disable-line
+            code: s.code,
+          });
+        }
+      }
+      // Coincidencias por prefijo primero (igual que el backend).
+      return results.sort((a, b) => {
+        const ap =
+          a.title.toLowerCase().startsWith(q) ||
+          (a.code ?? "").toLowerCase().startsWith(q)
+            ? 0
+            : 1;
+        const bp =
+          b.title.toLowerCase().startsWith(q) ||
+          (b.code ?? "").toLowerCase().startsWith(q)
+            ? 0
+            : 1;
+        return ap - bp;
+      });
+    },
+    get_clinic_settings: () => ({
+      clinicName: "Clínica Veterinaria Central",
+      clinicNit: "900000000-0",
+      address: "Calle 12 # 34-56",
+      phone: "3001234567",
+      city: "Bogotá D.C.",
+      logoPath: null,
+      taxRate: 19,
+      currency: "COP",
+      signatureMode: "GRAPHIC",
+      vetName: "Dra. Ana Pérez",
+      vetLicense: "MVZ 12345",
+      groqApiKey: null,
+      pkcs12Path: null,
+      pkcs12Password: null,
+    }),
+    save_clinic_settings: (args) => args.input,
+    import_clinic_logo: (args) => args.sourcePath,
+    list_secondary_logos: () => [
+      {
+        id: 1,
+        name: "Logo Falso",
+        logoPath: "C:/logos/falso.png",
+        createdAt: "2026-08-01 10:00:00",
+      },
+      {
+        id: 2,
+        name: "Proyecto X",
+        logoPath: "C:/logos/proyecto-x.png",
+        createdAt: "2026-08-02 11:00:00",
+      },
+    ],
+    import_secondary_logo: (args) => ({
+      id: 3,
+      name: args.input.name,
+      logoPath: args.input.sourcePath,
+      createdAt: "2026-08-03 12:00:00",
+    }),
+    delete_secondary_logo: () => null,
     // Listeners/emits del runtime Tauri (Firebird events, app-ready, …)
     "plugin:event|listen": () => () => {},
     "plugin:event|unlisten": () => null,
@@ -260,6 +422,11 @@
   let callbackId = 0;
   window.__TAURI_INTERNALS__ = {
     invoke,
+    // La UI usa convertFileSrc (p. ej. para previsualizar logos). En el
+    // navegador no existe el protocolo asset:// de Tauri, así que se devuelve
+    // un PNG transparente 1x1 para que el <img> cargue sin errores.
+    convertFileSrc: () =>
+      "data:image/png;base64,iVBORw0KGgoAAAANSUhEUgAAAAEAAAABCAYAAAAfFcSJAAAADUlEQVR42mNkYPhfDwAChwGA60e6kgAAAABJRU5ErkJggg==",
     // getCurrentWindow() lee esta metadata (etiqueta de la ventana).
     metadata: {
       currentWindow: { label: "main" },
