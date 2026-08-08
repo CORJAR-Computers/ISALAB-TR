@@ -195,9 +195,26 @@ SignPath Foundation** (gratis para proyectos OSS) para eliminar el aviso
 
 > [!NOTE]
 > Los pasos de firmado están **desactivados hasta que se configuren los
-> secretos de SignPath** (`if: secrets.SIGNPATH_API_TOKEN != ''`). Mientras
+> secretos de SignPath** (`if: env.SIGNPATH_API_TOKEN != ''`). Mientras
 > tanto el release sale sin firmar: Windows muestra el aviso SmartScreen (no
 > bloquea la instalación).
+
+### Runner del release (automático)
+
+El job `release` **elige su runner automáticamente** mediante el job
+`decide-runner` (`release.yml`), según exista o no el secreto:
+
+| `SIGNPATH_API_TOKEN` | Runner del job `release` |
+| --- | --- |
+| **Definido** (SignPath activo) | `windows-latest` (**GitHub-hosted**) |
+| **Ausente** (hoy) | self-hosted (`isalab-release`) |
+
+Esto importa para el **programa OSS de SignPath**: exige que **todos** los
+jobs del workflow que llevan a la solicitud de firma corran en runners
+GitHub-hosted. Al configurar `SIGNPATH_API_TOKEN`, el workflow pasa solo a
+`windows-latest` y cumple el requisito sin tocar nada más; sin él, seguimos
+en el runner self-hosted (evita los fallos transitorios de capacidad de
+`windows-latest`) y los pasos de firma se saltan igualmente.
 
 ### Cómo activar el firmado
 
@@ -208,9 +225,11 @@ SignPath Foundation** (gratis para proyectos OSS) para eliminar el aviso
 > completo con checklists y sirve de tracker hasta el primer release firmado.
 
 1. **Solicita el acceso OSS** en <https://signpath.io> (SignPath Foundation,
-   gratis): el repo debe ser público, usar licencia OSI aprobada, runners de
-   GitHub-hosted y una política de firma publicada. El proyecto debe ser
-   aceptado por la fundación (colas de espera).
+   gratis): el repo debe ser público (sí), usar licencia OSI aprobada
+   (AGPL-3.0) y runners de GitHub-hosted — el workflow ya los usa
+   automáticamente cuando SignPath está activo (ver *Runner del release*
+   arriba). El proyecto debe ser aceptado por la fundación (colas de
+   espera).
 2. **Instala el GitHub App de SignPath** y vincúlalo al repositorio.
 3. **Crea el Proyecto, la Artifact Configuration y la Signing Policy** en la
    consola de SignPath. La Artifact Configuration debe tener raíz

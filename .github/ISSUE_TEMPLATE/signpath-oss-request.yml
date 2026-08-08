@@ -48,7 +48,7 @@ body:
       label: "Información solicitada en el formulario (a rellenar antes de enviar)"
       description: "El formulario de SignPath suele pedir, al menos, esta información. Prepárala de antemano."
       value: |
-        - **Nombre del proyecto**: ISALAB
+        - **Nombre del proyecto**: **ISALAB-TR** (app de escritorio Tauri/Rust; el producto se llama ISALAB)
         - **Repositorio**: https://github.com/CORJAR-Computers/ISALAB-TR
         - **Licencia**: AGPL-3.0 (aprobada OSI)
         - **Contacto del mantenedor**: <correo del mantenedor>
@@ -85,7 +85,7 @@ body:
         | --- | --- |
         | `SIGNPATH_API_TOKEN` | API token con permisos de submitter en el proyecto/policy |
         | `SIGNPATH_ORG_ID` | ID de la organización en SignPath |
-        | `SIGNPATH_PROJECT_SLUG` | Slug del proyecto |
+        | `SIGNPATH_PROJECT_SLUG` | Slug del proyecto (p. ej. `isalab-tr`, acorde al repo) |
         | `SIGNPATH_SIGNING_POLICY_SLUG` | Slug de la signing policy (p. ej. `release-signing`) |
 
         - [ ] Los 4 secretos añadidos en
