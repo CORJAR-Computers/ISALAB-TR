@@ -31,21 +31,57 @@ env:
   SIGNPATH_API_TOKEN: ${{ secrets.SIGNPATH_API_TOKEN }}
 
 jobs:
+  # Decide el runner del job de release según si SignPath está activo.
+  # `runs-on` no puede leer los contextos `secrets`/`env` directamente, así
+  # que un job previo en GitHub-hosted (ubuntu-latest, barato) lee el secreto
+  # (vía el env del workflow) y expone la etiqueta del runner elegido.
+  #
+  # Por qué importa: el programa OSS de SignPath exige que TODOS los jobs del
+  # workflow que llevan a la solicitud de firma corran en runners
+  # GitHub-hosted. Sin SignPath seguimos en el runner self-hosted (evita los
+  # fallos transitorios de capacidad de windows-latest que dejaron el release
+  # en cola >1h en v0.3.3); con SignPath activo pasamos a windows-latest.
+  decide-runner:
+    # Acoplamiento intencionado: este `if` debe ser un espejo del del job
+    # `release` (que le hace `needs`). Si release pasara a dispararse por otro
+    # evento y este job se saltara, release se saltaría también (propagación
+    # de skip de los jobs `needs`).
+    if: github.event_name == 'push'
+    runs-on: ubuntu-latest
+    # Defensivo: un job de ubuntu atascado no debe bloquear el release.
+    timeout-minutes: 10
+    outputs:
+      runner: ${{ steps.decide.outputs.runner }}
+    steps:
+      - id: decide
+        shell: bash
+        run: |
+          if [[ -n "$SIGNPATH_API_TOKEN" ]]; then
+            # JSON válido para que `fromJSON` lo convierta al string "windows-latest".
+            echo 'runner="windows-latest"' >> "$GITHUB_OUTPUT"
+          else
+            echo 'runner=["self-hosted","Windows","X64","isalab-release"]' >> "$GITHUB_OUTPUT"
+          fi
+
   release:
     name: Build & Release
     # Solo el push de tags dispara el build nativo; el fallback se ejecuta con
     # workflow_dispatch y no debe duplicar el release.
     if: github.event_name == 'push'
-    # Runner self-hosted (isalab-release-win) en la máquina de desarrollo del
-    # mantenedor. GitHub-hosted windows-latest sufrió fallos transitorios de
-    # capacidad ("job was not acquired by Runner of type hosted") que dejaron
-    # el pipeline de release en cola >1h (v0.3.3). Este job solo se dispara con
-    # tags (push de mantenedores), NO con PRs, por lo que el riesgo de
-    # seguridad de un runner persistente en un repo público es limitado.
+    needs: decide-runner
+    # Runner elegido por `decide-runner`:
+    # - sin SignPath: self-hosted (isalab-release-win), máquina del mantenedor.
+    #   GitHub-hosted windows-latest sufrió fallos transitorios de capacidad
+    #   ("job was not acquired by Runner of type hosted") que dejaron el
+    #   pipeline en cola >1h (v0.3.3). Este job solo se dispara con tags (push
+    #   de mantenedores), NO con PRs, por lo que el riesgo de seguridad de un
+    #   runner persistente en un repo público es limitado.
+    # - con SignPath: windows-latest (requisito OSS de GitHub-hosted).
     #
-    # ADVERTENCIA: NO usar este runner en jobs disparados por pull_request
-    # (ci.yml): cualquier PR podría ejecutar código arbitrario en esta máquina.
-    runs-on: [self-hosted, Windows, X64, isalab-release]
+    # ADVERTENCIA: NO usar el runner self-hosted en jobs disparados por
+    # pull_request (ci.yml): cualquier PR podría ejecutar código arbitrario en
+    # esa máquina.
+    runs-on: ${{ fromJSON(needs.decide-runner.outputs.runner) }}
     steps:
       - uses: actions/checkout@v7
 
