@@ -70,10 +70,10 @@ export function InvoicesPage() {
 
   const paidTotal = useMemo(
     () =>
-      (all ?? [])
+      (invoices ?? [])
         .filter((i) => i.status === "PAGADA")
         .reduce((acc, i) => acc + (i.total ?? 0), 0),
-    [all],
+    [invoices],
   );
 
   return (
