@@ -33,7 +33,8 @@ use crate::commands::catalog::{
     list_analytes, list_breeds, list_sample_types, list_species, list_vaccine_types,
 };
 use crate::commands::clinical_history::{
-    create_consultation, get_clinical_history, list_consultations, set_consultation_status,
+    count_consultations, create_consultation, get_clinical_history, list_consultations,
+    set_consultation_status,
 };
 use crate::commands::dashboard::get_dashboard_stats;
 use crate::commands::db::{create_local_backup, db_health};
