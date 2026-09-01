@@ -61,7 +61,9 @@ pub fn set_surgery_status(
 /// Conteo de cirugías por estado (sin cargar las filas completas).
 #[tauri::command]
 #[specta::specta]
-pub fn count_surgeries(state: State<'_, AppState>) -> Result<Vec<crate::models::status_count::StatusCount>, AppError> {
+pub fn count_surgeries(
+    state: State<'_, AppState>,
+) -> Result<Vec<crate::models::status_count::StatusCount>, AppError> {
     require_session(&state)?;
     let mut pooled = state.pool.acquire()?;
     surgeries_repo::count_by_status(pooled.conn())
