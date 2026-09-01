@@ -538,9 +538,8 @@ pub fn open_report_file(
     let dir = reports_dir(&app)?;
     let dir_canon = std::fs::canonicalize(&dir).unwrap_or_else(|_| dir.clone());
     let p = std::path::PathBuf::from(&path);
-    let canon = std::fs::canonicalize(&p).map_err(|_| {
-        AppError::Validation("El archivo PDF no existe".into())
-    })?;
+    let canon = std::fs::canonicalize(&p)
+        .map_err(|_| AppError::Validation("El archivo PDF no existe".into()))?;
     if !canon.starts_with(&dir_canon) {
         return Err(AppError::Forbidden(
             "El archivo está fuera de la carpeta de reportes".into(),

@@ -92,7 +92,10 @@ pub fn list_audit_log(
 ) -> Result<Vec<AuditLogEntry>, AppError> {
     // Normaliza los filtros: trim + descarta vacíos -> None.
     let norm = |v: &Option<String>| -> Option<String> {
-        v.as_deref().map(str::trim).filter(|s| !s.is_empty()).map(String::from)
+        v.as_deref()
+            .map(str::trim)
+            .filter(|s| !s.is_empty())
+            .map(String::from)
     };
     let empty = AuditFilters {
         username: None,
@@ -123,7 +126,10 @@ pub fn list_audit_log(
          ORDER BY l.ID DESC";
 
     let rows: Vec<AuditLogRow> = conn
-        .query(sql, (&limit, &offset, &username, &action, &date_from, &date_to))
+        .query(
+            sql,
+            (&limit, &offset, &username, &action, &date_from, &date_to),
+        )
         .map_err(AppError::from)?;
 
     Ok(rows

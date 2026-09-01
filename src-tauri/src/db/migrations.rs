@@ -63,7 +63,9 @@ fn should_seed_demo_data() -> bool {
     if cfg!(debug_assertions) {
         return true;
     }
-    std::env::var("ISALAB_SEED_DEMO").map(|v| v == "1").unwrap_or(false)
+    std::env::var("ISALAB_SEED_DEMO")
+        .map(|v| v == "1")
+        .unwrap_or(false)
 }
 
 /// Aplica las migraciones pendientes. Devuelve la versión de schema resultante.
