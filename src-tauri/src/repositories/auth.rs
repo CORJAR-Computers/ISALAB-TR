@@ -119,10 +119,10 @@ pub fn list_audit_log(
             l.ID, l.USER_ID, l.USERNAME, l.ACTION, l.DETAILS,
             LEFT(CAST(l.CREATED_AT AS VARCHAR(60)), 19)
          FROM USER_AUDIT_LOG l
-         WHERE UPPER(l.USERNAME) LIKE UPPER(COALESCE('%' || ? || '%', '%'))
-           AND l.ACTION = COALESCE(?, l.ACTION)
-           AND l.CREATED_AT >= COALESCE(?, '0001-01-01 00:00:00')
-           AND l.CREATED_AT <= COALESCE(? || ' 23:59:59', '9999-12-31 23:59:59')
+         WHERE UPPER(l.USERNAME) LIKE UPPER(COALESCE('%' || CAST(? AS VARCHAR(100)) || '%', '%'))
+           AND l.ACTION = COALESCE(CAST(? AS VARCHAR(100)), l.ACTION)
+           AND l.CREATED_AT >= COALESCE(CAST(? AS TIMESTAMP), '0001-01-01 00:00:00')
+           AND l.CREATED_AT <= COALESCE(CAST(? AS VARCHAR(20)) || ' 23:59:59', '9999-12-31 23:59:59')
          ORDER BY l.ID DESC";
 
     let rows: Vec<AuditLogRow> = conn
