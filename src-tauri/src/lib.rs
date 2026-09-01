@@ -118,7 +118,6 @@ fn specta_builder() -> Builder<tauri::Wry> {
             create_user,
             change_password,
             count_consultations,
-            count_consultations,
             list_consultations,
             set_consultation_status,
             create_vaccine,
