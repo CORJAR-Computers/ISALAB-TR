@@ -38,7 +38,7 @@ use crate::commands::clinical_history::{
 use crate::commands::dashboard::get_dashboard_stats;
 use crate::commands::db::{create_local_backup, db_health};
 use crate::commands::exports::{export_results_csv, export_samples_csv};
-use crate::commands::invoices::{create_invoice, get_invoice, list_invoices, set_invoice_status};
+use crate::commands::invoices::{count_invoices, create_invoice, get_invoice, list_invoices, set_invoice_status};
 use crate::commands::patients::{
     create_patient, get_patient, get_patient_by_code, get_patient_lab_trends, list_owners,
     list_patients,
@@ -49,14 +49,14 @@ use crate::commands::reports::{
     generate_sample_labels, list_reports, open_report_file,
 };
 use crate::commands::samples::{
-    create_sample, get_sample, get_worklist, list_samples, register_lab_result, set_sample_status,
+    count_samples, create_sample, get_sample, get_worklist, list_samples, register_lab_result, set_sample_status,
 };
 use crate::commands::search::global_search;
 use crate::commands::settings::{
     delete_secondary_logo, get_clinic_settings, import_clinic_logo, import_pkcs12,
     import_secondary_logo, list_secondary_logos, save_clinic_settings,
 };
-use crate::commands::surgeries::{create_surgery, list_surgeries, set_surgery_status};
+use crate::commands::surgeries::{count_surgeries, create_surgery, list_surgeries, set_surgery_status};
 use crate::commands::users::{change_password, create_user, list_users};
 use crate::commands::vaccines::{create_vaccine, list_vaccines};
 use crate::state::AppState;
@@ -85,6 +85,7 @@ fn specta_builder() -> Builder<tauri::Wry> {
             register_lab_result,
             get_worklist,
             list_samples,
+            count_samples,
             get_sample,
             set_sample_status,
             get_clinic_settings,
@@ -110,15 +111,19 @@ fn specta_builder() -> Builder<tauri::Wry> {
             list_users,
             create_user,
             change_password,
+            count_consultations,
+            count_consultations,
             list_consultations,
             set_consultation_status,
             create_vaccine,
             list_vaccines,
             create_surgery,
             list_surgeries,
+            count_surgeries,
             set_surgery_status,
             create_invoice,
             list_invoices,
+            count_invoices,
             get_invoice,
             set_invoice_status,
             get_dashboard_stats,

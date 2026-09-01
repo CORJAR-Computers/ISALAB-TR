@@ -879,3 +879,11 @@ mod tests {
         cleanup_test_db(&db_path);
     }
 }
+
+/// Conteo de consultas agrupado por estado (para las pestañas de la agenda).
+pub fn count_consultations_by_status(conn: &mut SimpleConnection) -> Result<Vec<crate::models::status_count::StatusCount>, AppError> {
+    let rows: Vec<(String, i32)> = conn
+        .query("SELECT STATUS, COUNT(*) FROM CONSULTATIONS GROUP BY STATUS ORDER BY STATUS", ())
+        .map_err(AppError::from)?;
+    Ok(rows.into_iter().map(|(status, count)| crate::models::status_count::StatusCount { status, count }).collect())
+}

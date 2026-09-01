@@ -10,6 +10,7 @@ pub mod patient;
 pub mod report;
 pub mod sample;
 pub mod sample_list_item;
+pub mod status_count;
 pub mod search;
 pub mod settings;
 pub mod species;

@@ -236,7 +236,7 @@ export function SamplesPage() {
   };
 
   const counts = useMemo(() => {
-    const c = {
+    const c: Record<string, number> = {
       TOTAL: 0,
       RECIBIDA: 0,
       EN_PROCESO: 0,
@@ -245,9 +245,8 @@ export function SamplesPage() {
       ABNORMAL: 0,
     };
     for (const s of all ?? []) {
-      c.TOTAL += 1;
-      c[s.status as keyof typeof c] = ((c[s.status as keyof typeof c] ?? 0) as number) + 1;
-      if (s.abnormalCount > 0) c.ABNORMAL += 1;
+      c.TOTAL += s.count;
+      c[s.status] = (c[s.status] ?? 0) + s.count;
     }
     return c;
   }, [all]);

@@ -1,6 +1,7 @@
 import { invoke } from "@tauri-apps/api/core";
 import type {
   Analyte,
+  StatusCount,
   Analyzer,
   AppError,
   AuditLogEntry,
@@ -238,4 +239,10 @@ export const api = {
   interpretLabResults: (sampleId: number) =>
     invoke<string>("interpret_lab_results", { sampleId }),
   testGroqConnection: () => invoke<string>("test_groq_connection"),
+
+  // ---- Contadores por estado ----
+  countSamples: () => invoke<StatusCount[]>("count_samples"),
+  countConsultations: () => invoke<StatusCount[]>("count_consultations"),
+  countSurgeries: () => invoke<StatusCount[]>("count_surgeries"),
+  countInvoices: () => invoke<StatusCount[]>("count_invoices"),
 };

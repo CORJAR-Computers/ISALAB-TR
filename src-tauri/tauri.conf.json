@@ -1,7 +1,7 @@
 {
   "$schema": "https://schema.tauri.app/config/2",
   "productName": "ISALAB",
-  "version": "0.3.4",
+  "version": "0.4.0",
   "identifier": "com.isalab.clinic",
   "build": {
     "beforeDevCommand": "npm run dev",
@@ -39,13 +39,17 @@
       "csp": "default-src 'self'; script-src 'self'; style-src 'self' 'unsafe-inline'; img-src 'self' asset: https: data: blob:;",
       "assetProtocol": {
         "enable": true,
-        "scope": ["$APPDATA/**"]
+        "scope": [
+          "$APPDATA/**"
+        ]
       }
     }
   },
   "bundle": {
     "active": true,
-    "targets": ["nsis"],
+    "targets": [
+      "nsis"
+    ],
     "icon": [
       "icons/32x32.png",
       "icons/128x128.png",
@@ -53,7 +57,9 @@
       "icons/icon.ico",
       "icons/icon.png"
     ],
-    "resources": ["binaries/firebird/**/*"],
+    "resources": [
+      "binaries/firebird/**/*"
+    ],
     "shortDescription": "Sistema de gestión para laboratorios veterinarios",
     "longDescription": "ISALAB — historiales clínicos, muestras analíticas, vacunación, reportes PDF y facturación. Tauri v2 · Rust · Firebird 5 Embedded.",
     "createUpdaterArtifacts": true,
@@ -66,7 +72,9 @@
   "plugins": {
     "updater": {
       "pubkey": "dW50cnVzdGVkIGNvbW1lbnQ6IG1pbmlzaWduIHB1YmxpYyBrZXk6IDYxQUZBRjNCQTlGNzUzQTYKUldTbVUvZXBPNit2WVZXUnk2c3gvUkR5bnhsWXNnd2JxS2Q4OE5RV2h6ZXZDMUxVclVBZExEWSsK",
-      "endpoints": ["https://github.com/CORJAR-Computers/ISALAB-TR/releases/latest/download/latest.json"],
+      "endpoints": [
+        "https://github.com/CORJAR-Computers/ISALAB-TR/releases/latest/download/latest.json"
+      ],
       "windows": {
         "installMode": "passive"
       }

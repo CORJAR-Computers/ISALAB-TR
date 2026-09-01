@@ -558,3 +558,11 @@ mod integration_tests {
         test_helpers::cleanup_test_db(&db_path);
     }
 }
+
+/// Conteo de facturas agrupado por estado (para las pestañas de facturación).
+pub fn count_by_status(conn: &mut SimpleConnection) -> Result<Vec<crate::models::status_count::StatusCount>, AppError> {
+    let rows: Vec<(String, i32)> = conn
+        .query("SELECT STATUS, COUNT(*) FROM INVOICES GROUP BY STATUS ORDER BY STATUS", ())
+        .map_err(AppError::from)?;
+    Ok(rows.into_iter().map(|(status, count)| crate::models::status_count::StatusCount { status, count }).collect())
+}

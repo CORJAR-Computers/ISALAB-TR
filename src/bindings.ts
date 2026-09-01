@@ -979,6 +979,10 @@ export type WorklistSample = {
 	abnormalCount: number,
 };
 
+export type StatusCount = {
+	status: string,
+	count: number,
+};
 /* Tauri Specta runtime */
 async function typedError<T, E>(result: Promise<T>): Promise<{ status: "ok"; data: T } | { status: "error"; error: E }> {
     try {

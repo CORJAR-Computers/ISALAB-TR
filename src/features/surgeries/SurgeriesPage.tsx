@@ -97,8 +97,8 @@ export function SurgeriesPage() {
       CANCELADA: 0,
     };
     for (const s of all ?? []) {
-      c.TOTAL += 1;
-      c[s.status] = (c[s.status] ?? 0) + 1;
+      c.TOTAL += s.count;
+      c[s.status] = (c[s.status] ?? 0) + s.count;
     }
     return c;
   }, [all]);

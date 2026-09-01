@@ -923,3 +923,16 @@ mod integration_tests {
         test_helpers::cleanup_test_db(&db_path);
     }
 }
+
+/// Conteo de muestras agrupado por estado (para las pestañas de la mesa de trabajo).
+pub fn count_by_status(conn: &mut SimpleConnection) -> Result<Vec<crate::models::status_count::StatusCount>, AppError> {
+    let rows: Vec<(String, i32)> = conn
+        .query("SELECT STATUS, COUNT(*) FROM SAMPLES GROUP BY STATUS
+                UNION ALL
+                SELECT 'ABNORMAL' AS STATUS, COUNT(*) FROM SAMPLES s
+                WHERE EXISTS (SELECT 1 FROM LAB_RESULTS lr
+                  WHERE lr.SAMPLE_ID = s.ID AND lr.STATUS IN ('ALTO', 'BAJO'))
+                ORDER BY 1", ())
+        .map_err(AppError::from)?;
+    Ok(rows.into_iter().map(|(status, count)| crate::models::status_count::StatusCount { status, count }).collect())
+}

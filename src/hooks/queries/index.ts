@@ -1,24 +1,20 @@
-/**
- * Barrel re-export — mantiene compatibilidad con todos los imports existentes
- * de `@/hooks/use-queries`. Los hooks viven ahora en ./queries/use-*.ts.
- *
- * @deprecated Importa directamente desde el módulo específico:
- *   import { usePatients } from "@/hooks/queries/use-patients";
- *   import { useSamples } from "@/hooks/queries/use-samples";
- */
+export { useDbHealth } from "./use-db-health";
 export {
-  useDbHealth,
   useSpecies,
   useBreeds,
   useSampleTypes,
   useAnalytes,
   useVaccineTypes,
   useOwners,
+} from "./use-catalogs";
+export {
   usePatients,
   usePatient,
   usePatientByCode,
   useClinicalHistory,
   useCreatePatient,
+} from "./use-patients";
+export {
   useSamples,
   useSampleCounts,
   useWorklist,
@@ -28,6 +24,8 @@ export {
   useSetSampleStatus,
   useAttachResultFile,
   useDeleteResultAttachment,
+} from "./use-samples";
+export {
   useAnalyzers,
   useReferenceRanges,
   useCreateAnalyzer,
@@ -37,34 +35,40 @@ export {
   useCreateReferenceRange,
   useUpdateReferenceRange,
   useDeleteReferenceRange,
+} from "./use-analyzers";
+export {
   useClinicSettings,
   useSaveClinicSettings,
   useImportClinicLogo,
   useSecondaryLogos,
   useImportSecondaryLogo,
   useDeleteSecondaryLogo,
-  useLogin,
-  useLogout,
-  useUsers,
-  useCreateUser,
-  useChangePassword,
+} from "./use-settings";
+export { useLogin, useLogout } from "./use-auth";
+export { useUsers, useCreateUser, useChangePassword } from "./use-users";
+export {
   useConsultations,
   useConsultationCounts,
   useSetConsultationStatus,
   useCreateConsultation,
-  useVaccines,
-  useCreateVaccine,
+} from "./use-consultations";
+export { useVaccines, useCreateVaccine } from "./use-vaccines";
+export {
   useSurgeries,
   useSurgeryCounts,
   useCreateSurgery,
   useSetSurgeryStatus,
+} from "./use-surgeries";
+export {
   useInvoices,
   useInvoiceCounts,
   useInvoice,
   useCreateInvoice,
   useSetInvoiceStatus,
-  useGlobalSearch,
-  useDashboardStats,
+} from "./use-invoices";
+export { useGlobalSearch } from "./use-search";
+export { useDashboardStats } from "./use-dashboard";
+export {
   useReports,
   useGenerateReport,
   useGenerateSampleLabels,
@@ -73,5 +77,5 @@ export {
   useGenerateReciboInvoice,
   useGenerateCertificadoCirugia,
   useGenerateCarnetVacunacion,
-  useAuditLog,
-} from "./queries";
+} from "./use-reports";
+export { useAuditLog } from "./use-audit";

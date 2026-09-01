@@ -62,8 +62,8 @@ export function InvoicesPage() {
       ANULADA: 0,
     };
     for (const i of all ?? []) {
-      c.TOTAL += 1;
-      c[i.status] = (c[i.status] ?? 0) + 1;
+      c.TOTAL += i.count;
+      c[i.status] = (c[i.status] ?? 0) + i.count;
     }
     return c;
   }, [all]);

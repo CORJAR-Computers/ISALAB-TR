@@ -1,4 +1,4 @@
-import { useEffect } from "react";
+import { lazy, Suspense, useEffect } from "react";
 import { AlertTriangle, Loader2, RefreshCw } from "lucide-react";
 import { emit } from "@tauri-apps/api/event";
 import { Sidebar } from "@/components/layout/Sidebar";
@@ -17,21 +17,59 @@ import { useAppUpdater } from "@/hooks/use-app-updater";
 import { UpdateDialog } from "@/components/layout/UpdateDialog";
 import { useSessionStore } from "@/stores/session-store";
 import { api } from "@/lib/api";
-import { DashboardPage } from "@/features/dashboard/DashboardPage";
-import { ConsultationsPage } from "@/features/agenda/ConsultationsPage";
-import { PatientsPage } from "@/features/patients/PatientsPage";
-import { ClinicalHistoryPage } from "@/features/clinical-history/ClinicalHistoryPage";
-import { SamplesPage } from "@/features/samples/SamplesPage";
-import { WorklistPage } from "@/features/worklist/WorklistPage";
-import { SurgeriesPage } from "@/features/surgeries/SurgeriesPage";
-import { VaccinesPage } from "@/features/vaccines/VaccinesPage";
-import { InvoicesPage } from "@/features/invoices/InvoicesPage";
-import { ReportsPage } from "@/features/reports/ReportsPage";
-import { SettingsPage } from "@/features/settings/SettingsPage";
-import { UsersPage } from "@/features/users/UsersPage";
-import { AuditLogPage } from "@/features/audit/AuditLogPage";
 import { LoginPage } from "@/features/auth/LoginPage";
 import { GlobalSearchPalette } from "@/features/search/GlobalSearchPalette";
+
+// Code-splitting: cada pagina se carga solo cuando el usuario navega a ella.
+const DashboardPage = lazy(() =>
+  import("@/features/dashboard/DashboardPage").then((m) => ({ default: m.DashboardPage })),
+);
+const ConsultationsPage = lazy(() =>
+  import("@/features/agenda/ConsultationsPage").then((m) => ({ default: m.ConsultationsPage })),
+);
+const PatientsPage = lazy(() =>
+  import("@/features/patients/PatientsPage").then((m) => ({ default: m.PatientsPage })),
+);
+const ClinicalHistoryPage = lazy(() =>
+  import("@/features/clinical-history/ClinicalHistoryPage").then((m) => ({ default: m.ClinicalHistoryPage })),
+);
+const SamplesPage = lazy(() =>
+  import("@/features/samples/SamplesPage").then((m) => ({ default: m.SamplesPage })),
+);
+const WorklistPage = lazy(() =>
+  import("@/features/worklist/WorklistPage").then((m) => ({ default: m.WorklistPage })),
+);
+const SurgeriesPage = lazy(() =>
+  import("@/features/surgeries/SurgeriesPage").then((m) => ({ default: m.SurgeriesPage })),
+);
+const VaccinesPage = lazy(() =>
+  import("@/features/vaccines/VaccinesPage").then((m) => ({ default: m.VaccinesPage })),
+);
+const InvoicesPage = lazy(() =>
+  import("@/features/invoices/InvoicesPage").then((m) => ({ default: m.InvoicesPage })),
+);
+const ReportsPage = lazy(() =>
+  import("@/features/reports/ReportsPage").then((m) => ({ default: m.ReportsPage })),
+);
+const SettingsPage = lazy(() =>
+  import("@/features/settings/SettingsPage").then((m) => ({ default: m.SettingsPage })),
+);
+const UsersPage = lazy(() =>
+  import("@/features/users/UsersPage").then((m) => ({ default: m.UsersPage })),
+);
+const AuditLogPage = lazy(() =>
+  import("@/features/audit/AuditLogPage").then((m) => ({ default: m.AuditLogPage })),
+);
+
+/** Fallback mientras se carga la pagina. */
+function PageFallback() {
+  return (
+    <div className="flex min-h-[40vh] items-center justify-center gap-3">
+      <Loader2 className="text-muted-foreground size-5 animate-spin" />
+      <span className="text-muted-foreground text-sm">Cargando...</span>
+    </div>
+  );
+}
 
 export default function App() {
   const theme = useUiStore((s) => s.theme);
@@ -171,7 +209,7 @@ export default function App() {
 
           <main className="mx-auto max-w-6xl px-4 py-6 lg:px-6">
             <div key={view} className="animate-fade-in-up">
-              {view === "dashboard" && <DashboardPage />}
+              <Suspense fallback={<PageFallback />}>{view === "dashboard" && <DashboardPage />}
               {view === "agenda" && <ConsultationsPage />}
               {view === "patients" && <PatientsPage />}
               {view === "clinical-history" && <ClinicalHistoryPage />}
@@ -183,7 +221,7 @@ export default function App() {
               {view === "reports" && <ReportsPage />}
               {view === "settings" && <SettingsPage />}
               {view === "users" && <UsersPage />}
-              {view === "audit-log" && <AuditLogPage />}
+              {view === "audit-log" && <AuditLogPage />}</Suspense>
             </div>
           </main>
         </div>

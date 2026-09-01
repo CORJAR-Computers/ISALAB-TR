@@ -68,3 +68,12 @@ pub fn set_consultation_status(
 
     Ok(result)
 }
+
+/// Conteo de consultas por estado (sin cargar las filas completas).
+#[tauri::command]
+#[specta::specta]
+pub fn count_consultations(state: State<'_, AppState>) -> Result<Vec<crate::models::status_count::StatusCount>, AppError> {
+    require_session(&state)?;
+    let mut pooled = state.pool.acquire()?;
+    history_repo::count_consultations_by_status(pooled.conn())
+}

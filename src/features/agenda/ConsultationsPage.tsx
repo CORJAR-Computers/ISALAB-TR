@@ -72,8 +72,8 @@ export function ConsultationsPage() {
       CANCELADA: 0,
     };
     for (const item of all ?? []) {
-      c.TOTAL += 1;
-      c[item.status] = (c[item.status] ?? 0) + 1;
+      c.TOTAL += item.count;
+      c[item.status] = (c[item.status] ?? 0) + item.count;
     }
     return c;
   }, [all]);

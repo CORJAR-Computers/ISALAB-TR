@@ -1,6 +1,6 @@
 [package]
 name = "isalab"
-version = "0.3.4"
+version = "0.4.0"
 description = "Sistema de gestión para laboratorios veterinarios (Firebird 5 Embedded)"
 authors = ["ISALAB"]
 edition = "2021"
