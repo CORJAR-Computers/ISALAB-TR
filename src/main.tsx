@@ -2,7 +2,7 @@ import { StrictMode } from "react";
 import { createRoot } from "react-dom/client";
 import { QueryClient, QueryClientProvider } from "@tanstack/react-query";
 import { getCurrentWindow } from "@tauri-apps/api/window";
-import { Toaster } from "sonner";
+import { Toaster } from "@/components/ui/sonner";
 import App from "./App";
 import { SplashScreen } from "./components/splash/SplashScreen";
 import "./index.css";
@@ -43,9 +43,7 @@ createRoot(document.getElementById("root")!).render(
           <Toaster
             position="top-right"
             richColors
-            toastOptions={{
-              className: "font-sans",
-            }}
+            toastOptions={{ className: "font-sans" }}
           />
         </>
       )}

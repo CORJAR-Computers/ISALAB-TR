@@ -39,7 +39,7 @@
       speciesId: 1,
       breedId: 2,
       name: "Luna",
-      sex: "H",
+      sex: "F",
       birthDate: "2023-07-01",
       neutered: true,
       color: "Negro",
@@ -132,7 +132,7 @@
       dbPath: "C:/mock/isalab.fdb",
       fbclientFound: true,
       fbclientPath: "fbclient.dll",
-      schemaVersion: 9,
+      schemaVersion: 11,
     }),
     get_dashboard_stats: () => {
       const list = samples.map(toListItem);

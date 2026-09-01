@@ -46,7 +46,25 @@ pub const MIGRATIONS: &[(&str, &str)] = &[
         "0010_analyzer_profiles",
         include_str!("../../migrations/0010_analyzer_profiles.sql"),
     ),
+    (
+        "0011_widen_password_hash",
+        include_str!("../../migrations/0011_widen_password_hash.sql"),
+    ),
 ];
+
+/// Indica si una migración de datos de demostración debe aplicarse.
+///
+/// La migración `0005_test_data` inserta pacientes, muestras y facturas
+/// ficticios pensados **solo para desarrollo**. En builds de release (la
+/// distribución que se instala en las clínicas) se omite para no ensuciar la
+/// BD de producción; se puede forzar su aplicación con la variable de entorno
+/// `ISALAB_SEED_DEMO=1` (p. ej. para pruebas manuales sobre un instalador).
+fn should_seed_demo_data() -> bool {
+    if cfg!(debug_assertions) {
+        return true;
+    }
+    std::env::var("ISALAB_SEED_DEMO").map(|v| v == "1").unwrap_or(false)
+}
 
 /// Aplica las migraciones pendientes. Devuelve la versión de schema resultante.
 pub fn run_migrations(conn: &mut SimpleConnection) -> Result<i32, AppError> {
@@ -59,6 +77,18 @@ pub fn run_migrations(conn: &mut SimpleConnection) -> Result<i32, AppError> {
     for (idx, (name, sql)) in MIGRATIONS.iter().enumerate() {
         let version = (idx + 1) as i32;
         if applied.iter().any(|(v,)| *v == version) {
+            continue;
+        }
+
+        // La migración de datos de demostración (0005) solo se aplica en
+        // desarrollo. En producción se marca como aplicada sin ejecutar sus
+        // INSERT, para que la BD quede limpia y el runner no la reintente.
+        if *name == "0005_test_data" && !should_seed_demo_data() {
+            conn.execute(
+                "INSERT INTO SCHEMA_MIGRATIONS (VERSION, NAME) VALUES (?, ?)",
+                (&version, name),
+            )
+            .map_err(AppError::from)?;
             continue;
         }
 
@@ -122,10 +152,11 @@ fn split_statements(sql: &str) -> Result<Vec<String>, AppError> {
         if line.starts_with("--") {
             continue;
         }
-        // Directiva de terminador: "SET TERM ^ ;" o "SET TERM ; ^"
+        // Directiva de terminador: "SET TERM ^ ;" o "SET TERM ^" (3 tokens,
+        // la forma habitual de isql). Se acepta también el de 4 tokens.
         if line.to_ascii_uppercase().starts_with("SET TERM") {
             let parts: Vec<&str> = line.split_whitespace().collect();
-            if parts.len() >= 4 {
+            if parts.len() >= 3 {
                 terminator = parts[2].to_string();
             }
             continue;

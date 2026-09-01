@@ -79,55 +79,51 @@ pub struct AuditFilters {
 
 /// Lista entradas del registro de auditoría con paginación y filtros.
 /// Orden descendente (más reciente primero). `limit` máximo 500, `offset` desde 0.
+///
+/// Todos los filtros se enlazan como parámetros (`?`) — nunca se interpolan
+/// en el SQL. Un filtro ausente/vacío se normaliza a `NULL` y el `COALESCE`
+/// lo convierte en una condición que siempre se cumple (match-all), de modo
+/// que la signatura de parámetros es fija (6) y a prueba de inyección SQL.
 pub fn list_audit_log(
     conn: &mut SimpleConnection,
     limit: i32,
     offset: i32,
     filters: Option<&AuditFilters>,
 ) -> Result<Vec<AuditLogEntry>, AppError> {
-    let mut sql = String::from(
-        "SELECT FIRST ? SKIP ?
+    // Normaliza los filtros: trim + descarta vacíos -> None.
+    let norm = |v: &Option<String>| -> Option<String> {
+        v.as_deref().map(str::trim).filter(|s| !s.is_empty()).map(String::from)
+    };
+    let empty = AuditFilters {
+        username: None,
+        action: None,
+        date_from: None,
+        date_to: None,
+    };
+    let f = filters.unwrap_or(&empty);
+    let username = norm(&f.username);
+    let action = norm(&f.action);
+    let date_from = norm(&f.date_from);
+    let date_to = norm(&f.date_to);
+
+    // COALESCE(... , <match-all>) hace que un parámetro NULL no filtre nada,
+    // sin necesidad de duplicar el `?` ni de armar WHERE dinámico.
+    //   username  -> '%' || ? || '%'   (NULL -> '%'   -> LIKE todo)
+    //   action    -> ?                  (NULL -> l.ACTION = l.ACTION)
+    //   date_from -> ?                  (NULL -> >= '0001-01-01 00:00:00')
+    //   date_to   -> ? || ' 23:59:59'   (NULL -> <= '9999-12-31 23:59:59')
+    let sql = "SELECT FIRST ? SKIP ?
             l.ID, l.USER_ID, l.USERNAME, l.ACTION, l.DETAILS,
             LEFT(CAST(l.CREATED_AT AS VARCHAR(60)), 19)
-         FROM USER_AUDIT_LOG l",
-    );
-    let mut conditions: Vec<String> = Vec::new();
-
-    if let Some(f) = filters {
-        if let Some(ref u) = f.username {
-            if !u.is_empty() {
-                let sanitized = u.replace('\\', "");
-                conditions.push(format!("UPPER(l.USERNAME) LIKE UPPER('%{}%')", sanitized));
-            }
-        }
-        if let Some(ref a) = f.action {
-            if !a.is_empty() {
-                let sanitized = a.replace('\\', "");
-                conditions.push(format!("l.ACTION = '{}'", sanitized));
-            }
-        }
-        if let Some(ref df) = f.date_from {
-            if !df.is_empty() {
-                let sanitized = df.replace('\\', "");
-                conditions.push(format!("l.CREATED_AT >= '{}'", sanitized));
-            }
-        }
-        if let Some(ref dt) = f.date_to {
-            if !dt.is_empty() {
-                let sanitized = dt.replace('\\', "");
-                conditions.push(format!("l.CREATED_AT <= '{} 23:59:59'", sanitized));
-            }
-        }
-    }
-
-    if !conditions.is_empty() {
-        sql.push_str(" WHERE ");
-        sql.push_str(&conditions.join(" AND "));
-    }
-    sql.push_str(" ORDER BY l.ID DESC");
+         FROM USER_AUDIT_LOG l
+         WHERE UPPER(l.USERNAME) LIKE UPPER(COALESCE('%' || ? || '%', '%'))
+           AND l.ACTION = COALESCE(?, l.ACTION)
+           AND l.CREATED_AT >= COALESCE(?, '0001-01-01 00:00:00')
+           AND l.CREATED_AT <= COALESCE(? || ' 23:59:59', '9999-12-31 23:59:59')
+         ORDER BY l.ID DESC";
 
     let rows: Vec<AuditLogRow> = conn
-        .query(&sql, (&limit, &offset))
+        .query(sql, (&limit, &offset, &username, &action, &date_from, &date_to))
         .map_err(AppError::from)?;
 
     Ok(rows

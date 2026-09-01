@@ -14,13 +14,18 @@ use crate::state::AppState;
 #[tauri::command]
 #[specta::specta]
 pub fn login(state: State<'_, AppState>, input: LoginInput) -> Result<SessionUser, AppError> {
+    // La búsqueda en BD es case-insensitive (UPPER(USERNAME) = UPPER(?)), por
+    // lo que la clave del contador de intentos también debe normalizarse para
+    // evitar bypass por variantes de mayúsculas ("admin" / "Admin" / "ADMIN").
+    let attempt_key = input.username.trim().to_lowercase();
+
     // --- Rate limiting: verificar si el usuario está bloqueado ---
     {
         let attempts = state
             .login_attempts
             .lock()
             .map_err(|_| AppError::Internal("Contador bloqueado".into()))?;
-        if let Some(remaining) = attempts.get(&input.username).and_then(|a| a.check_locked()) {
+        if let Some(remaining) = attempts.get(&attempt_key).and_then(|a| a.check_locked()) {
             let mins = remaining / 60;
             let secs = remaining % 60;
             return Err(AppError::Forbidden(format!(
@@ -45,14 +50,14 @@ pub fn login(state: State<'_, AppState>, input: LoginInput) -> Result<SessionUse
                 )
                 .ok();
             }
-            // Registrar intento fallido (usar el username como clave).
+            // Registrar intento fallido (clave normalizada).
             {
                 let mut attempts = state
                     .login_attempts
                     .lock()
                     .map_err(|_| AppError::Internal("Contador bloqueado".into()))?;
                 attempts
-                    .entry(input.username.clone())
+                    .entry(attempt_key.clone())
                     .or_default()
                     .record_failure();
             }
@@ -80,7 +85,7 @@ pub fn login(state: State<'_, AppState>, input: LoginInput) -> Result<SessionUse
                 .lock()
                 .map_err(|_| AppError::Internal("Contador bloqueado".into()))?;
             attempts
-                .entry(user.username.clone())
+                .entry(attempt_key.clone())
                 .or_default()
                 .record_failure();
         }
@@ -112,7 +117,7 @@ pub fn login(state: State<'_, AppState>, input: LoginInput) -> Result<SessionUse
                 .lock()
                 .map_err(|_| AppError::Internal("Contador bloqueado".into()))?;
             attempts
-                .entry(user.username.clone())
+                .entry(attempt_key.clone())
                 .or_default()
                 .record_failure();
         }
@@ -135,13 +140,13 @@ pub fn login(state: State<'_, AppState>, input: LoginInput) -> Result<SessionUse
         .ok();
     }
 
-    // Reiniciar contador de intentos fallidos para este usuario.
+    // Reiniciar contador de intentos fallidos para este usuario (clave normalizada).
     {
         let mut attempts = state
             .login_attempts
             .lock()
             .map_err(|_| AppError::Internal("Contador bloqueado".into()))?;
-        if let Some(a) = attempts.get_mut(&input.username) {
+        if let Some(a) = attempts.get_mut(&attempt_key) {
             a.reset();
         }
     }

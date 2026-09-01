@@ -523,6 +523,10 @@ pub fn list_reports(
 }
 
 /// Abre un archivo de reporte PDF en el visor por defecto del sistema operativo.
+///
+/// Por seguridad, el `path` se canonicaliza y se exige que quede **dentro** de
+/// la carpeta `app_data_dir/reports`; así no es posible pedirle al SO que abra
+/// un archivo arbitrario (p. ej. un ejecutable de otra ubicación).
 #[tauri::command]
 #[specta::specta]
 pub fn open_report_file(
@@ -531,12 +535,19 @@ pub fn open_report_file(
     path: String,
 ) -> Result<(), AppError> {
     require_session(&state)?;
+    let dir = reports_dir(&app)?;
+    let dir_canon = std::fs::canonicalize(&dir).unwrap_or_else(|_| dir.clone());
     let p = std::path::PathBuf::from(&path);
-    if !p.exists() {
-        return Err(AppError::Validation("El archivo PDF no existe".into()));
+    let canon = std::fs::canonicalize(&p).map_err(|_| {
+        AppError::Validation("El archivo PDF no existe".into())
+    })?;
+    if !canon.starts_with(&dir_canon) {
+        return Err(AppError::Forbidden(
+            "El archivo está fuera de la carpeta de reportes".into(),
+        ));
     }
     app.opener()
-        .open_path(p.to_string_lossy().to_string(), None::<&str>)
+        .open_path(canon.to_string_lossy().to_string(), None::<&str>)
         .map_err(|e| AppError::Internal(format!("No se pudo abrir el PDF: {e}")))?;
     Ok(())
 }

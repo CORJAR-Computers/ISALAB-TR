@@ -44,9 +44,17 @@ const TITLES: Record<string, { title: string; subtitle: string }> = {
     title: "Reportes PDF",
     subtitle: "Informes generados en Rust",
   },
+  worklist: {
+    title: "Bandeja de trabajo",
+    subtitle: "Muestras pendientes por tipo de análisis",
+  },
   users: {
     title: "Usuarios",
     subtitle: "Cuentas y roles del sistema",
+  },
+  "audit-log": {
+    title: "Auditoría",
+    subtitle: "Registro de acciones del sistema",
   },
   settings: {
     title: "Configuración",

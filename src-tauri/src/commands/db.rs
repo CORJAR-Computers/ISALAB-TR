@@ -40,9 +40,13 @@ pub fn db_health(state: State<'_, AppState>) -> DbHealth {
 #[specta::specta]
 pub fn create_local_backup(
     app: tauri::AppHandle,
-    _state: State<'_, AppState>,
+    state: State<'_, AppState>,
     dest_path: String,
 ) -> Result<String, AppError> {
+    // Exige sesión de ADMIN: el backup recorre toda la carpeta de datos de la
+    // app (BD Firebird viva, clave de IA cifrada con DPAPI, certificado PKCS#12)
+    // y no debe ser invocable sin autenticación.
+    crate::auth::require_admin(&state)?;
     use std::fs::File;
     use std::io::{Read, Write};
     use tauri::Manager;

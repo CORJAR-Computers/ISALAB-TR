@@ -38,6 +38,7 @@ import { getErrorMessage } from "@/lib/api";
 import { CONSULTATION_STATUS } from "@/lib/status";
 import { cn, formatDateTime } from "@/lib/utils";
 import { useUiStore } from "@/stores/ui-store";
+import { usePermissions } from "@/hooks/use-permissions";
 import { NewConsultationDialog } from "@/features/clinical-history/NewConsultationDialog";
 
 const STATUS_TABS: Array<{ value: string | null; label: string }> = [
@@ -53,6 +54,7 @@ export function ConsultationsPage() {
   const [dialogOpen, setDialogOpen] = useState(false);
   const navigate = useUiStore((s) => s.navigate);
   const setActivePatient = useUiStore((s) => s.setActivePatient);
+  const { isVetOrAdmin } = usePermissions();
 
   const { data: consultations, isLoading, isError } = useConsultations(
     status,
@@ -104,10 +106,12 @@ export function ConsultationsPage() {
             pendientes y consulta el historial del paciente.
           </p>
         </div>
-        <Button onClick={() => setDialogOpen(true)}>
-          <Plus className="size-4" />
-          Nueva consulta
-        </Button>
+        {isVetOrAdmin && (
+          <Button onClick={() => setDialogOpen(true)}>
+            <Plus className="size-4" />
+            Nueva consulta
+          </Button>
+        )}
       </div>
 
       <div className="flex flex-col gap-3 lg:flex-row lg:items-center">

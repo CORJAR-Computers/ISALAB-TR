@@ -195,7 +195,18 @@ jobs:
           # llevaría una firma inválida).
           Remove-Item "$exePath.sig" -ErrorAction SilentlyContinue
           Write-Host "Re-firmando con minisign: $exePath"
-          # La clave privada viene del env del workflow (TAURI_SIGNING_PRIVATE_KEY).
+          # La clave privada y la contraseña vienen de secretos del repo (env
+          # del workflow: TAURI_SIGNING_PRIVATE_KEY / _PASSWORD).
+          #
+          # Nota de seguridad: pasar la contraseña con -p la expone en la línea
+          # de comandos del proceso (legible por procesos co-residentes vía
+          # GetCommandLineW y en crash dumps). El subcomando standalone
+          # `tauri signer sign` NO lee TAURI_SIGNING_PRIVATE_KEY_PASSWORD del
+          # env automáticamente (solo `tauri build` lo hace durante el build),
+          # por lo que -p es la única forma no-interactiva disponible hoy en la
+          # CLI de Tauri. La mitigación real del riesgo es migrar a SignPath
+          # (ya configurado más abajo en este workflow) o a firma keyless OIDC;
+          # mientras tanto, en un runner efímero de CI el riesgo es bajo.
           npx tauri signer sign -p "$env:TAURI_SIGNING_PRIVATE_KEY_PASSWORD" "$exePath"
           if ($LASTEXITCODE -ne 0) { throw "Fallo al re-firmar con minisign (exit $LASTEXITCODE)" }
           if (-not (Test-Path "$exePath.sig")) { throw 'Firma minisign no generada' }

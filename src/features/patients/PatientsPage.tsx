@@ -1,4 +1,4 @@
-import { useEffect, useMemo, useState } from "react";
+import { useEffect, useState } from "react";
 import { HeartPulse, Plus, Search } from "lucide-react";
 import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
@@ -28,8 +28,9 @@ import { PatientScanner } from "./PatientScanner";
 
 export function PatientsPage() {
   const [search, setSearch] = useState("");
+  const [debouncedSearch, setDebouncedSearch] = useState("");
   const [dialogOpen, setDialogOpen] = useState(false);
-  const { data, isLoading, isError } = usePatients(search);
+  const { data, isLoading, isError } = usePatients(debouncedSearch);
   const setActivePatient = useUiStore((s) => s.setActivePatient);
   const navigate = useUiStore((s) => s.navigate);
   const newPatientRequest = useUiStore((s) => s.newPatientRequest);
@@ -37,7 +38,13 @@ export function PatientsPage() {
     (s) => s.consumeNewPatientRequest,
   );
 
-  const debounced = useMemo(() => search.trim(), [search]);
+  // Debounce real: la consulta a la BD se dispara 250 ms después de que el
+  // usuario deja de escribir. El input se enlaza a `search` (sin trim), de
+  // modo que se puedan escribir espacios (p. ej. nombres de varias palabras).
+  useEffect(() => {
+    const t = setTimeout(() => setDebouncedSearch(search.trim()), 250);
+    return () => clearTimeout(t);
+  }, [search]);
 
   // Abre el diálogo cuando llega una solicitud externa (p. ej. dashboard).
   useEffect(() => {
@@ -72,7 +79,7 @@ export function PatientsPage() {
       <div className="relative max-w-sm">
         <Search className="text-muted-foreground absolute top-1/2 left-3 size-4 -translate-y-1/2" />
         <Input
-          value={debounced}
+          value={search}
           onChange={(e) => setSearch(e.target.value)}
           placeholder="PAC-2026-0001 o buscar por nombre…"
           className="pl-9"

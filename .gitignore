@@ -45,3 +45,5 @@ test-results/
 
 # Carpetas de mejoras / temporales
 ISALAB-TR-improvements/
+isalab-tr-improvements.patch
+isalab-tr-revision-fullstack.md

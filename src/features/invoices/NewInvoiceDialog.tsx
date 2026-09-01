@@ -103,7 +103,11 @@ export function NewInvoiceDialog({
     }
   }, [open, settings, form]);
 
-  // Reinicia el formulario al abrir.
+  // Reinicia el formulario al abrir (solo en la transición open=false→true).
+  // Nota: `settings` se lee en el momento de abrir, pero NO se incluye en las
+  // dependencias: si llegara tarde, sobreescribiría los ítems que el usuario
+  // ya empezó a diligenciar. El IVA por defecto se aplica aparte en el efecto
+  // anterior, que sí es seguro.
   useEffect(() => {
     if (open) {
       form.reset({
@@ -117,7 +121,8 @@ export function NewInvoiceDialog({
       setOwnerSearch("");
       setPatientSearch("");
     }
-  }, [open, settings, form]);
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [open]);
 
   const watchedItems = form.watch("items");
   const watchedTaxRate = form.watch("taxRate");
@@ -380,8 +385,8 @@ export function NewInvoiceDialog({
                         min={0}
                         max={100}
                         step="0.01"
+                        {...field}
                         value={(field.value as number | null | undefined) ?? ""}
-                        onChange={(e) => field.onChange(e.target.value ? Number(e.target.value) : null)}
                         placeholder="19"
                       />
                     </FormControl>

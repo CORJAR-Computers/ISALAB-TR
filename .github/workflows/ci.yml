@@ -6,6 +6,12 @@ on:
   pull_request:
     branches: [ "master" ]
 
+# Los jobs de CI solo suben artefactos (upload-artifact), no escriben en el
+# repo. Mínimo privilegio: lectura. (release.yml declara su propio permiso de
+# escritura cuando necesita publicar el release.)
+permissions:
+  contents: read
+
 env:
   CARGO_TERM_COLOR: always
 

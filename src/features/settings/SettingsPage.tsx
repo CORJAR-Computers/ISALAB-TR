@@ -5,8 +5,9 @@ import { z } from "zod";
 import { toast } from "sonner";
 import { convertFileSrc } from "@tauri-apps/api/core";
 import { open, save as saveDialog } from "@tauri-apps/plugin-dialog";
-import { Building2, CreditCard, FileKey2, ImageUp, Loader2, PenLine, Save, X, Bot, DatabaseBackup, Wifi } from "lucide-react";
+import { Building2, CreditCard, FileKey2, ImageUp, Loader2, PenLine, Save, X, Bot, DatabaseBackup, Wifi, ShieldAlert } from "lucide-react";
 import { invoke } from "@tauri-apps/api/core";
+import { usePermissions } from "@/hooks/use-permissions";
 import { Button } from "@/components/ui/button";
 import {
   Card,
@@ -76,6 +77,7 @@ export function SettingsPage() {
   const { data: secondaryLogos } = useSecondaryLogos();
   const importSecondaryLogo = useImportSecondaryLogo();
   const deleteSecondaryLogo = useDeleteSecondaryLogo();
+  const { isAdmin } = usePermissions();
 
   const [backingUp, setBackingUp] = useState(false);
   const [testingGroq, setTestingGroq] = useState(false);
@@ -306,6 +308,17 @@ export function SettingsPage() {
         <Skeleton className="h-28 w-full" />
         <Skeleton className="h-28 w-full" />
         <Skeleton className="h-28 w-full" />
+      </div>
+    );
+  }
+
+  if (!isAdmin) {
+    return (
+      <div className="flex flex-col items-center justify-center gap-3 py-20">
+        <ShieldAlert className="size-10 text-muted-foreground" />
+        <p className="text-muted-foreground text-sm">
+          Solo los administradores pueden modificar la configuración.
+        </p>
       </div>
     );
   }

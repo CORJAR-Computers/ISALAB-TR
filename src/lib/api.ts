@@ -51,9 +51,11 @@ import type {
 export function getErrorMessage(e: unknown): string {
   if (e && typeof e === "object") {
     const err = e as Partial<AppError> & { message?: string };
-    if (typeof err.message === "string" && err.message) return err.message;
+    if (typeof err.message === "string" && err.message.length > 0) return err.message;
     if (err.type && "data" in err) {
-      return `${err.type}: ${(err as { data: string }).data}`;
+      const data = (err as { data: unknown }).data;
+      if (typeof data === "string" && data.length > 0) return `${err.type}: ${data}`;
+      return err.type;
     }
   }
   return String(e ?? "Error desconocido");

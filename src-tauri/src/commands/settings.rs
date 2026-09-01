@@ -16,6 +16,11 @@ const LOGO_EXTENSIONS: [&str; 4] = ["png", "jpg", "jpeg", "webp"];
 /// Extensiones aceptadas para el certificado digital PKCS#12.
 const PKCS12_EXTENSIONS: [&str; 2] = ["p12", "pfx"];
 
+/// Marcador que se envía al frontend para indicar que un secreto existe pero
+/// no se expone en claro. Cuando el admin guarda sin editar el campo, se
+/// detecta este marcador y se conserva el valor ya almacenado (cifrado).
+pub(crate) const REDACTED_SECRET: &str = "••••••••";
+
 /// Valida que `path` exista y tenga una extensión PKCS#12 aceptada (.p12/.pfx).
 /// Devuelve la extensión en minúsculas si es válida, o un `AppError` de
 /// validación descriptivo en caso contrario.
@@ -45,22 +50,50 @@ fn validate_pkcs12_source(path: &Path) -> Result<String, AppError> {
 }
 
 /// Configuración de la clínica (nombre, NIT, IVA, firma de reportes…).
+///
+/// Los secretos (`groq_api_key`, `pkcs12_password`) se devuelven siempre
+/// redactados: nunca cruzan el IPC en claro. Además, para sesiones que no
+/// son ADMIN también se ocultan `pkcs12_path` (defensa en profundidad, ya
+/// que la UI oculta el formulario de configuración para no-admins).
 #[tauri::command]
 #[specta::specta]
 pub fn get_clinic_settings(state: State<'_, AppState>) -> Result<ClinicSettings, AppError> {
-    require_session(&state)?;
+    let session = require_session(&state)?;
     let mut pooled = state.pool.acquire()?;
-    settings_repo::get(pooled.conn())
+    let mut settings = settings_repo::get(pooled.conn())?;
+
+    // Los secretos nunca se exponen al frontend, ni siquiera para el admin.
+    // El admin los re-ingresa desde el formulario; el campo vacío significa
+    // "conservar el valor actual" (ver `save_clinic_settings`).
+    settings.groq_api_key = settings
+        .groq_api_key
+        .as_ref()
+        .map(|_| REDACTED_SECRET.to_string());
+    settings.pkcs12_password = None;
+
+    if session.role != "ADMIN" {
+        settings.pkcs12_path = None;
+    }
+
+    Ok(settings)
 }
 
 #[tauri::command]
 #[specta::specta]
 pub fn save_clinic_settings(
     state: State<'_, AppState>,
-    input: ClinicSettings,
+    mut input: ClinicSettings,
 ) -> Result<ClinicSettings, AppError> {
     let admin = require_admin(&state)?;
     let mut pooled = state.pool.acquire()?;
+
+    // Si el admin reenvía el marcador de secreto sin editar la clave de IA,
+    // conservamos el valor ya almacenado (cifrado) en vez de sobrescribirlo
+    // con el marcador.
+    if input.groq_api_key.as_deref() == Some(REDACTED_SECRET) {
+        let current = settings_repo::get(pooled.conn())?;
+        input.groq_api_key = current.groq_api_key;
+    }
 
     // Si llega una contraseña PKCS#12, se valida contra el certificado
     // configurado y se guarda SOLO en memoria (nunca se persiste).
@@ -68,7 +101,11 @@ pub fn save_clinic_settings(
         if !pwd.is_empty() {
             if let Some(ref p12) = input.pkcs12_path {
                 crate::pdf_templates::validate_pkcs12(std::path::Path::new(p12), pwd)?;
-                *state.pkcs12_password.lock().unwrap() = Some(pwd.clone());
+                *state
+                    .pkcs12_password
+                    .lock()
+                    .map_err(|_| AppError::Internal("Certificado bloqueado".into()))? =
+                    Some(pwd.clone());
             } else {
                 return Err(AppError::Validation(
                     "Se indicó una contraseña PKCS#12 pero no hay certificado configurado. Importa el certificado primero.".into(),
@@ -279,7 +316,10 @@ pub fn import_pkcs12(
     // Validación real: descifra el PKCS#12 con la contraseña y extrae metadatos.
     validate_pkcs12(&src, &password)?;
     // La contraseña queda en memoria para poder firmar reportes; nunca en BD.
-    *state.pkcs12_password.lock().unwrap() = Some(password);
+    *state
+        .pkcs12_password
+        .lock()
+        .map_err(|_| AppError::Internal("Certificado bloqueado".into()))? = Some(password);
 
     let assets_dir = app
         .path()

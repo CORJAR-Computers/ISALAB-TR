@@ -300,10 +300,12 @@ export function SamplesPage() {
               </Button>
             </>
           )}
-          <Button onClick={() => setNewSampleOpen(true)} className="shrink-0 gap-1.5">
-            <Plus className="size-4" />
-            Nueva toma de muestra
-          </Button>
+          {isVetOrAdmin && (
+            <Button onClick={() => setNewSampleOpen(true)} className="shrink-0 gap-1.5">
+              <Plus className="size-4" />
+              Nueva toma de muestra
+            </Button>
+          )}
         </div>
       </div>
 

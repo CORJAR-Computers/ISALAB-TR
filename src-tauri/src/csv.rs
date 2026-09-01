@@ -8,12 +8,30 @@ use crate::models::sample_list_item::SampleListItem;
 
 /// Escapa un campo CSV: comillas dobles duplicadas y entrecomillado si contiene
 /// separador, comillas o salto de línea.
+///
+/// Además, neutraliza la **inyección de fórmulas** de hojas de cálculo: si la
+/// celda empieza por `=`, `+`, `-`, `@`, tabulación o retorno de carro, se le
+/// antepone una comilla simple `'` para que Excel/LibreOffice la trate como
+/// texto y no como una fórmula (p. ej. un propietario llamado `=cmd|...`).
 pub fn esc(value: &str) -> String {
-    let needs_quotes = value.contains(';') || value.contains('"') || value.contains('\n');
+    const FORMULA_PREFIXES: [char; 6] = ['=', '+', '-', '@', '\t', '\r'];
+
+    let needs_quotes = value.contains(';')
+        || value.contains('"')
+        || value.contains('\n')
+        || value.starts_with(FORMULA_PREFIXES);
+
+    // Neutraliza la inyección de fórmulas anteponiendo una comilla simple.
+    let neutralized = if value.starts_with(FORMULA_PREFIXES) {
+        format!("'{}", value)
+    } else {
+        value.to_string()
+    };
+
     if !needs_quotes {
-        return value.to_string();
+        return neutralized;
     }
-    format!("\"{}\"", value.replace('"', "\"\""))
+    format!("\"{}\"", neutralized.replace('"', "\"\""))
 }
 
 /// BOM UTF-8 para que Excel detecte el encoding correctamente.

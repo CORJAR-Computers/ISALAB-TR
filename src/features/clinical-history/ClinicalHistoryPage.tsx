@@ -120,10 +120,12 @@ export function ClinicalHistoryPage() {
             Nueva consulta
           </Button>
         )}
-        <Button variant="outline" onClick={() => setSampleOpen(true)}>
-          <FlaskConical className="size-4" />
-          Registrar muestra
-        </Button>
+        {isVetOrAdmin && (
+          <Button variant="outline" onClick={() => setSampleOpen(true)}>
+            <FlaskConical className="size-4" />
+            Registrar muestra
+          </Button>
+        )}
         {isVetOrAdmin && (
           <Button variant="outline" onClick={() => setVaccineOpen(true)}>
             <Syringe className="size-4" />

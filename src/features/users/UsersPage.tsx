@@ -58,6 +58,7 @@ import { zodResolver } from "@hookform/resolvers/zod";
 import { z } from "zod";
 import { useCreateUser, useUsers } from "@/hooks/use-queries";
 import { getErrorMessage } from "@/lib/api";
+import { usePermissions } from "@/hooks/use-permissions";
 import { ROLE_LABEL } from "@/lib/status";
 import { useSessionStore } from "@/stores/session-store";
 import type { CreateUserInput } from "@/bindings";
@@ -239,12 +240,24 @@ export function UsersPage() {
   const { data: users, isLoading } = useUsers();
   const session = useSessionStore((s) => s.session);
   const openChangePassword = useSessionStore((s) => s.openChangePassword);
+  const { isAdmin } = usePermissions();
 
   const roleVariants: Record<string, "default" | "secondary" | "outline"> = {
     ADMIN: "default",
     VETERINARIO: "secondary",
     AUXILIAR: "outline",
   };
+
+  if (!isAdmin) {
+    return (
+      <div className="flex flex-col items-center justify-center gap-3 py-20">
+        <ShieldAlert className="size-10 text-muted-foreground" />
+        <p className="text-muted-foreground text-sm">
+          Solo los administradores pueden gestionar usuarios.
+        </p>
+      </div>
+    );
+  }
 
   return (
     <div className="space-y-5">

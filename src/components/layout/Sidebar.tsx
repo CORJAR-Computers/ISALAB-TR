@@ -1,5 +1,6 @@
 import { cn } from "@/lib/utils";
 import { useUiStore, type View } from "@/stores/ui-store";
+import { usePermissions } from "@/hooks/use-permissions";
 import {
   CalendarClock,
   FlaskConical,
@@ -20,7 +21,7 @@ import {
 import { Button } from "@/components/ui/button";
 import logoSidebar from "@/assets/logo_sidebar.png";
 
-const NAV_ITEMS: Array<{ view: View; label: string; icon: typeof Users }> = [
+const NAV_ITEMS: Array<{ view: View; label: string; icon: typeof Users; adminOnly?: boolean }> = [
   { view: "dashboard", label: "Panel de control", icon: LayoutDashboard },
   { view: "agenda", label: "Agenda de consultas", icon: CalendarClock },
   { view: "patients", label: "Pacientes", icon: Users },
@@ -31,9 +32,9 @@ const NAV_ITEMS: Array<{ view: View; label: string; icon: typeof Users }> = [
   { view: "vaccines", label: "Vacunación", icon: Syringe },
   { view: "invoices", label: "Facturación", icon: Receipt },
   { view: "reports", label: "Reportes PDF", icon: FileText },
-  { view: "users", label: "Usuarios", icon: Shield },
-  { view: "audit-log", label: "Auditoría", icon: ScrollText },
-  { view: "settings", label: "Configuración", icon: Settings },
+  { view: "users", label: "Usuarios", icon: Shield, adminOnly: true },
+  { view: "audit-log", label: "Auditoría", icon: ScrollText, adminOnly: true },
+  { view: "settings", label: "Configuración", icon: Settings, adminOnly: true },
 ];
 
 export function Sidebar() {
@@ -42,6 +43,8 @@ export function Sidebar() {
   const setAboutOpen = useUiStore((s) => s.setAboutOpen);
   const view = useUiStore((s) => s.view);
   const navigate = useUiStore((s) => s.navigate);
+  const { isAdmin } = usePermissions();
+  const items = NAV_ITEMS.filter((item) => !item.adminOnly || isAdmin);
 
   return (
     <>
@@ -83,7 +86,7 @@ export function Sidebar() {
 
         {/* Navegación */}
         <nav className="flex-1 space-y-1 overflow-y-auto p-3">
-          {NAV_ITEMS.map((item) => {
+          {items.map((item) => {
             const Icon = item.icon;
             const active = view === item.view;
             return (

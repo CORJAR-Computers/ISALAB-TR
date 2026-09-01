@@ -68,9 +68,23 @@ ALTER TABLE REFERENCE_RANGES ADD CONSTRAINT FK_REFERENCE_RANGES_ANALYZER
 ALTER TABLE REFERENCE_RANGES ADD CONSTRAINT UQ_REFERENCE_RANGES_ANALYZER
     UNIQUE (ANALYZER_ID, ANALYTE_ID, SPECIES_ID, SEX, AGE_MIN_MONTHS, AGE_MAX_MONTHS);
 
--- Avanza el generador más allá de los rangos sembrados (IDs 1-47) para que
--- los rangos creados por la UI no colisionen.
-SET GENERATOR GEN_REFERENCE_RANGES_ID TO 47;
+-- Avanza el generador por encima de los rangos sembrados (IDs 1-47) **solo si**
+-- todavía está por debajo de 47. Usar `SET GENERATOR ... TO 47` de forma
+-- incondicional regresaría el generador en clínicas que ya crearon rangos
+-- propios con ID >= 48 al actualizar desde un esquema anterior, lo que
+-- provocaría colisiones de PK en el próximo INSERT. El EXECUTE BLOCK es
+-- idempotente y seguro tanto para instalaciones nuevas como para upgrades.
+SET TERM ^ ;
+
+EXECUTE BLOCK AS
+    DECLARE VARIABLE CURR INTEGER;
+BEGIN
+    CURR = GEN_ID(GEN_REFERENCE_RANGES_ID, 0);
+    IF (CURR < 47) THEN
+        CURR = GEN_ID(GEN_REFERENCE_RANGES_ID, 47 - CURR);
+END^
+
+SET TERM ; ^
 
 -- ================ EQUIPO EN LA MUESTRA (SAMPLES) ============================
 -- NULL = sin equipo seleccionado → se valida contra el perfil GENERAL.
