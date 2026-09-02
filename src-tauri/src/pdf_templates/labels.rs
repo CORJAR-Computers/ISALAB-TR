@@ -9,20 +9,8 @@
 use std::path::Path;
 
 use crate::models::sample_list_item::SampleListItem;
-use crate::pdf_templates::builder::{
-    sanitize, save_pdf, text_right, PdfBuilder, C_MUTED, C_RULE, C_TEXT, PAGE_H, PAGE_W,
-};
+use crate::pdf_templates::builder::{sanitize, save_pdf, text_right, PdfBuilder, C_MUTED, C_TEXT};
 use crate::pdf_templates::layout::{code128_width, draw_code128};
-
-/// Margen exterior de la página (mm).
-const PAGE_MARGIN: f32 = 10.0;
-/// Separación horizontal entre etiquetas (mm).
-const GAP_X: f32 = 6.0;
-/// Separación vertical entre etiquetas (mm).
-const GAP_Y: f32 = 8.0;
-/// Columnas y filas de la grilla.
-const COLS: usize = 2;
-const ROWS: usize = 4;
 
 /// Colores por estado de la muestra (barra superior de la etiqueta).
 fn status_color(status: &str) -> (u8, u8, u8) {
@@ -45,7 +33,7 @@ fn status_label(status: &str) -> String {
     }
 }
 
-fn draw_label(pdf: &mut PdfBuilder, s: &SampleListItem, x: f32, y: f32, w: f32, h: f32) {
+fn draw_label(pdf: &mut PdfBuilder, s: &SampleListItem, x: f32, y: f32, w: f32) {
     // Barra de estado superior.
     let bar_h = 4.0;
     pdf.rect(x, y, w, bar_h, Some(status_color(&s.status)), None);
@@ -62,7 +50,15 @@ fn draw_label(pdf: &mut PdfBuilder, s: &SampleListItem, x: f32, y: f32, w: f32, 
 
     // Código de la muestra (izq) y código de paciente (der).
     pdf.text(true, &sanitize(&s.code), 11.0, x + 2.0, y - 8.0, C_TEXT);
-    text_right(pdf, false, &sanitize(&s.patient_code), 7.0, x + w - 2.0, y - 8.0, C_TEXT);
+    text_right(
+        pdf,
+        false,
+        &sanitize(&s.patient_code),
+        7.0,
+        x + w - 2.0,
+        y - 8.0,
+        C_TEXT,
+    );
 
     // Código de barras centrado.
     let barcode_h = 9.0;
@@ -102,7 +98,7 @@ pub fn generate_sample_labels(samples: &[SampleListItem], out_path: &Path) -> Re
         if i > 0 {
             pdf.new_page();
         }
-        draw_label(&mut pdf, s, 1.0, 29.0, 48.0, 28.0);
+        draw_label(&mut pdf, s, 1.0, 29.0, 48.0);
     }
 
     save_pdf(pdf, out_path, "Etiquetas de muestras")

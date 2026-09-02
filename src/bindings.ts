@@ -809,6 +809,7 @@ export type SampleListItem = {
 	/**  Código único de trazabilidad (M-YYYY-NNNN) */
 	code: string,
 	patientId: number,
+	patientCode: string,
 	patientName: string,
 	ownerName: string,
 	speciesName: string,
