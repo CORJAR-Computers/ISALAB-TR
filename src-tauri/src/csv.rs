@@ -152,6 +152,7 @@ mod tests {
             id: 1,
             code: code.into(),
             patient_id: 1,
+            patient_code: "P-2026-0001".into(),
             patient_name: "Luna".into(),
             owner_name: "Pérez, Juan".into(),
             species_name: "Canino".into(),

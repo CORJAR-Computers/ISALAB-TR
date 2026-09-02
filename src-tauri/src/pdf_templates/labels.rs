@@ -45,42 +45,38 @@ fn status_label(status: &str) -> String {
     }
 }
 
-/// Dibuja una etiqueta en la celda con esquina superior izquierda `(x, y)`.
-/// `y` crece hacia abajo en el espacio del PdfBuilder.
 fn draw_label(pdf: &mut PdfBuilder, s: &SampleListItem, x: f32, y: f32, w: f32, h: f32) {
-    // Marco de corte (línea fina para guillotinar).
-    pdf.rect(x, y, w, h, None, Some(C_RULE));
-
     // Barra de estado superior.
-    let bar_h = 6.0;
+    let bar_h = 4.0;
     pdf.rect(x, y, w, bar_h, Some(status_color(&s.status)), None);
-    pdf.text(true, "ISALAB", 7.0, x + 3.0, y - 4.4, (255, 255, 255));
+    pdf.text(true, "ISALAB", 5.0, x + 2.0, y - 3.0, (255, 255, 255));
     text_right(
         pdf,
         true,
         &status_label(&s.status),
-        7.0,
-        x + w - 3.0,
-        y - 4.4,
+        5.0,
+        x + w - 2.0,
+        y - 3.0,
         (255, 255, 255),
     );
 
-    // Código de la muestra (grande, legible).
-    pdf.text(true, &sanitize(&s.code), 16.0, x + 3.0, y - 13.0, C_TEXT);
+    // Código de la muestra (izq) y código de paciente (der).
+    pdf.text(true, &sanitize(&s.code), 11.0, x + 2.0, y - 8.0, C_TEXT);
+    text_right(pdf, false, &sanitize(&s.patient_code), 7.0, x + w - 2.0, y - 8.0, C_TEXT);
 
     // Código de barras centrado.
-    let barcode_h = 16.0;
-    if let Some(bw) = code128_width(&s.code, 0.33) {
-        draw_code128(pdf, &s.code, x + (w - bw) / 2.0, y - 18.0, barcode_h, 0.33);
+    let barcode_h = 9.0;
+    if let Some(bw) = code128_width(&s.code, 0.25) {
+        draw_code128(pdf, &s.code, x + (w - bw) / 2.0, y - 10.5, barcode_h, 0.25);
     }
 
     // Datos del paciente.
     pdf.text(
         true,
         &sanitize(&s.patient_name),
-        11.0,
-        x + 3.0,
-        y - 38.0,
+        8.0,
+        x + 2.0,
+        y - 23.5,
         C_TEXT,
     );
     let mut line2 = s.species_name.clone();
@@ -88,30 +84,7 @@ fn draw_label(pdf: &mut PdfBuilder, s: &SampleListItem, x: f32, y: f32, w: f32, 
         line2.push_str(" · ");
     }
     line2.push_str(&s.sample_type_name);
-    pdf.text(false, &sanitize(&line2), 8.5, x + 3.0, y - 43.5, C_MUTED);
-
-    // Fecha de recepción y responsable.
-    let date = s.received_at.split(' ').next().unwrap_or(&s.received_at);
-    let collected = s
-        .collected_by
-        .as_deref()
-        .filter(|c| !c.trim().is_empty())
-        .map(|c| format!("Responsable: {c}"))
-        .unwrap_or_default();
-    let mut line3 = format!("Recibida: {date}");
-    if !collected.is_empty() {
-        line3.push_str("  ·  ");
-        line3.push_str(&collected);
-    }
-    pdf.text(false, &sanitize(&line3), 7.5, x + 3.0, y - 49.0, C_TEXT);
-
-    // Separador inferior + propietario.
-    let owner = if s.owner_name.is_empty() {
-        String::new()
-    } else {
-        format!("Propietario: {}", s.owner_name)
-    };
-    pdf.text(false, &sanitize(&owner), 7.0, x + 3.0, y - h + 4.0, C_MUTED);
+    pdf.text(false, &sanitize(&line2), 6.5, x + 2.0, y - 27.5, C_MUTED);
 }
 
 /// Genera la hoja de etiquetas para las muestras dadas y la guarda en
@@ -122,26 +95,14 @@ pub fn generate_sample_labels(samples: &[SampleListItem], out_path: &Path) -> Re
         return Err("No hay muestras para etiquetar".into());
     }
 
-    let mut pdf = PdfBuilder::new();
-    pdf.y = PAGE_H - PAGE_MARGIN;
+    // 50x30 mm
+    let mut pdf = PdfBuilder::new_custom(50.0, 30.0);
 
-    let usable_w = PAGE_W - PAGE_MARGIN * 2.0;
-    let usable_h = PAGE_H - PAGE_MARGIN * 2.0;
-    let label_w = (usable_w - GAP_X * (COLS as f32 - 1.0)) / COLS as f32;
-    let label_h = (usable_h - GAP_Y * (ROWS as f32 - 1.0)) / ROWS as f32;
-
-    let per_page = COLS * ROWS;
-    for (placed, s) in samples.iter().enumerate() {
-        let idx = placed % per_page;
-        if idx == 0 && placed > 0 {
+    for (i, s) in samples.iter().enumerate() {
+        if i > 0 {
             pdf.new_page();
-            pdf.y = PAGE_H - PAGE_MARGIN;
         }
-        let col = (idx % COLS) as f32;
-        let row = (idx / COLS) as f32;
-        let x = PAGE_MARGIN + col * (label_w + GAP_X);
-        let y = PAGE_MARGIN + row * (label_h + GAP_Y);
-        draw_label(&mut pdf, s, x, y, label_w, label_h);
+        draw_label(&mut pdf, s, 1.0, 29.0, 48.0, 28.0);
     }
 
     save_pdf(pdf, out_path, "Etiquetas de muestras")
@@ -156,6 +117,7 @@ mod tests {
             id: 1,
             code: code.into(),
             patient_id: 1,
+            patient_code: "P-2026-0001".into(),
             patient_name: "Luna".into(),
             owner_name: "Juan Pérez".into(),
             species_name: "Canino".into(),
@@ -197,15 +159,9 @@ mod tests {
 
     #[test]
     fn test_label_geometry_fits_page() {
-        let usable_w = PAGE_W - PAGE_MARGIN * 2.0;
-        let usable_h = PAGE_H - PAGE_MARGIN * 2.0;
-        let label_w = (usable_w - GAP_X) / 2.0;
-        let label_h = (usable_h - GAP_Y * 3.0) / 4.0;
-        // 2 columnas no se solapan.
-        assert!(2.0 * label_w + GAP_X <= usable_w + 0.01);
-        // 4 filas no se solapan.
-        assert!(4.0 * label_h + GAP_Y * 3.0 <= usable_h + 0.01);
-        // Proporción razonable de etiqueta adhesiva.
-        assert!(label_w > 60.0 && label_h > 30.0);
+        let label_w = 48.0;
+        let label_h = 28.0;
+        assert!(label_w <= 50.0);
+        assert!(label_h <= 30.0);
     }
 }

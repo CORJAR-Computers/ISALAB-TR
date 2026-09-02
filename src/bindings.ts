@@ -107,6 +107,8 @@ export const commands = {
 	 *  opcionales por estado y búsqueda (código, paciente o propietario).
 	 */
 	listSamples: (status: string | null, search: string | null) => typedError<SampleListItem[], AppError>(__TAURI_INVOKE("list_samples", { status, search })),
+	/**  Conteo de muestras por estado (sin cargar las filas completas). */
+	countSamples: () => typedError<StatusCount[], AppError>(__TAURI_INVOKE("count_samples")),
 	/**  Ficha completa de una muestra (con resultados) para el detalle del lab. */
 	getSample: (id: number) => typedError<{
 	id: number,
@@ -128,7 +130,14 @@ export const commands = {
 } | null, AppError>(__TAURI_INVOKE("get_sample", { id })),
 	/**  Cambia el estado de una muestra (RECIBIDA→EN_PROCESO, →ANULADA). */
 	setSampleStatus: (id: number, status: string) => typedError<Sample, AppError>(__TAURI_INVOKE("set_sample_status", { id, status })),
-	/**  Configuración de la clínica (nombre, NIT, IVA, firma de reportes…). */
+	/**
+	 *  Configuración de la clínica (nombre, NIT, IVA, firma de reportes…).
+	 * 
+	 *  Los secretos (`groq_api_key`, `pkcs12_password`) se devuelven siempre
+	 *  redactados: nunca cruzan el IPC en claro. Además, para sesiones que no
+	 *  son ADMIN también se ocultan `pkcs12_path` (defensa en profundidad, ya
+	 *  que la UI oculta el formulario de configuración para no-admins).
+	 */
 	getClinicSettings: () => typedError<ClinicSettings, AppError>(__TAURI_INVOKE("get_clinic_settings")),
 	saveClinicSettings: (input: ClinicSettings) => typedError<ClinicSettings, AppError>(__TAURI_INVOKE("save_clinic_settings", { input })),
 	/**
@@ -191,7 +200,13 @@ export const commands = {
 	generateSampleLabels: (sampleIds: number[]) => typedError<ReportFile, AppError>(__TAURI_INVOKE("generate_sample_labels", { sampleIds })),
 	/**  Lista los informes ya generados (carpeta app_data/reports), más reciente primero. */
 	listReports: () => typedError<ReportFile[], AppError>(__TAURI_INVOKE("list_reports")),
-	/**  Abre un archivo de reporte PDF en el visor por defecto del sistema operativo. */
+	/**
+	 *  Abre un archivo de reporte PDF en el visor por defecto del sistema operativo.
+	 * 
+	 *  Por seguridad, el `path` se canonicaliza y se exige que quede **dentro** de
+	 *  la carpeta `app_data_dir/reports`; así no es posible pedirle al SO que abra
+	 *  un archivo arbitrario (p. ej. un ejecutable de otra ubicación).
+	 */
 	openReportFile: (path: string) => typedError<null, AppError>(__TAURI_INVOKE("open_report_file", { path })),
 	/**  Listado de usuarios (sin hashes) — solo ADMIN. */
 	listUsers: () => typedError<UserListItem[], AppError>(__TAURI_INVOKE("list_users")),
@@ -206,6 +221,8 @@ export const commands = {
 	 *  actualizada.
 	 */
 	changePassword: (input: ChangePasswordInput) => typedError<SessionUser, AppError>(__TAURI_INVOKE("change_password", { input })),
+	/**  Conteo de consultas por estado (sin cargar las filas completas). */
+	countConsultations: () => typedError<StatusCount[], AppError>(__TAURI_INVOKE("count_consultations")),
 	/**  Agenda: listado global de consultas con filtros por estado y búsqueda. */
 	listConsultations: (status: string | null, search: string | null) => typedError<ConsultationListItem[], AppError>(__TAURI_INVOKE("list_consultations", { status, search })),
 	/**  Agenda: completa o cancela una consulta pendiente. */
@@ -221,12 +238,16 @@ export const commands = {
 	createSurgery: (input: CreateSurgeryInput) => typedError<Surgery, AppError>(__TAURI_INVOKE("create_surgery", { input })),
 	/**  Agenda quirúrgica: listado con filtros por estado y búsqueda. */
 	listSurgeries: (status: string | null, search: string | null) => typedError<Surgery[], AppError>(__TAURI_INVOKE("list_surgeries", { status, search })),
+	/**  Conteo de cirugías por estado (sin cargar las filas completas). */
+	countSurgeries: () => typedError<StatusCount[], AppError>(__TAURI_INVOKE("count_surgeries")),
 	/**  Cambia el estado de una cirugía (PROGRAMADA→EN_CURSO/COMPLETADA/CANCELADA). */
 	setSurgeryStatus: (id: number, status: string) => typedError<Surgery, AppError>(__TAURI_INVOKE("set_surgery_status", { id, status })),
 	/**  Emite una factura con items; calcula subtotal, IVA y total en Rust. */
 	createInvoice: (input: CreateInvoiceInput) => typedError<Invoice, AppError>(__TAURI_INVOKE("create_invoice", { input })),
 	/**  Listado de facturas con filtros por estado y búsqueda. */
 	listInvoices: (status: string | null, search: string | null) => typedError<InvoiceListItem[], AppError>(__TAURI_INVOKE("list_invoices", { status, search })),
+	/**  Conteo de facturas por estado (sin cargar las filas completas). */
+	countInvoices: () => typedError<StatusCount[], AppError>(__TAURI_INVOKE("count_invoices")),
 	/**  Ficha completa de una factura (con items). */
 	getInvoice: (id: number) => typedError<{
 	id: number,
@@ -834,6 +855,12 @@ export type Species = {
 	name: string,
 };
 
+/**  Conteo de registros agrupados por estado, devuelto por los endpoints de contadores. */
+export type StatusCount = {
+	status: string,
+	count: number,
+};
+
 /**  Cirugía programada con datos del paciente unidos (agenda quirúrgica). */
 export type Surgery = {
 	id: number,
@@ -979,10 +1006,6 @@ export type WorklistSample = {
 	abnormalCount: number,
 };
 
-export type StatusCount = {
-	status: string,
-	count: number,
-};
 /* Tauri Specta runtime */
 async function typedError<T, E>(result: Promise<T>): Promise<{ status: "ok"; data: T } | { status: "error"; error: E }> {
     try {

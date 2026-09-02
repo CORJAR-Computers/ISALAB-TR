@@ -12,6 +12,7 @@ pub(crate) type SampleListItemRow = (
     String,
     String,
     String,
+    String,
     i32,
     String,
     String,
@@ -103,7 +104,7 @@ pub fn list(
         .filter(|s| !s.trim_matches('%').is_empty());
 
     let sql = "
-        SELECT s.ID, s.CODE, s.PATIENT_ID, p.NAME, o.FULL_NAME, sp.NAME,
+        SELECT s.ID, s.CODE, s.PATIENT_ID, p.CODE, p.NAME, o.FULL_NAME, sp.NAME,
                 s.SAMPLE_TYPE_ID, st.NAME,
                 LEFT(CAST(s.RECEIVED_AT AS VARCHAR(60)), 19),
                 s.STATUS, s.COLLECTED_BY, s.NOTES,
@@ -132,17 +133,18 @@ pub fn list(
             id: r.0,
             code: r.1,
             patient_id: r.2,
-            patient_name: r.3,
-            owner_name: r.4,
-            species_name: r.5,
-            sample_type_id: r.6,
-            sample_type_name: r.7,
-            received_at: r.8,
-            status: r.9,
-            collected_by: r.10,
-            notes: r.11,
-            result_count: r.12,
-            abnormal_count: r.13,
+            patient_code: r.3,
+            patient_name: r.4,
+            owner_name: r.5,
+            species_name: r.6,
+            sample_type_id: r.7,
+            sample_type_name: r.8,
+            received_at: r.9,
+            status: r.10,
+            collected_by: r.11,
+            notes: r.12,
+            result_count: r.13,
+            abnormal_count: r.14,
         })
         .collect())
 }
@@ -159,7 +161,7 @@ pub fn list_by_ids(
     let placeholders = ids.iter().map(|_| "?").collect::<Vec<_>>().join(",");
     let sql = format!(
         "
-        SELECT s.ID, s.CODE, s.PATIENT_ID, p.NAME, o.FULL_NAME, sp.NAME,
+        SELECT s.ID, s.CODE, s.PATIENT_ID, p.CODE, p.NAME, o.FULL_NAME, sp.NAME,
                 s.SAMPLE_TYPE_ID, st.NAME,
                 LEFT(CAST(s.RECEIVED_AT AS VARCHAR(60)), 19),
                 s.STATUS, s.COLLECTED_BY, s.NOTES,
@@ -186,17 +188,18 @@ pub fn list_by_ids(
             id: r.0,
             code: r.1,
             patient_id: r.2,
-            patient_name: r.3,
-            owner_name: r.4,
-            species_name: r.5,
-            sample_type_id: r.6,
-            sample_type_name: r.7,
-            received_at: r.8,
-            status: r.9,
-            collected_by: r.10,
-            notes: r.11,
-            result_count: r.12,
-            abnormal_count: r.13,
+            patient_code: r.3,
+            patient_name: r.4,
+            owner_name: r.5,
+            species_name: r.6,
+            sample_type_id: r.7,
+            sample_type_name: r.8,
+            received_at: r.9,
+            status: r.10,
+            collected_by: r.11,
+            notes: r.12,
+            result_count: r.13,
+            abnormal_count: r.14,
         })
         .collect())
 }
@@ -733,6 +736,7 @@ mod tests {
             1,
             "M-2026-0001".into(),
             10,
+            "P-2026-0010".into(),
             "Luna".into(),
             "Juan Pérez".into(),
             "Canino".into(),
@@ -748,7 +752,6 @@ mod tests {
 
         assert_eq!(row.0, 1);
         assert_eq!(row.1, "M-2026-0001");
-        assert_eq!(row.12, 3); // result_count
         assert_eq!(row.13, 1); // abnormal_count
     }
 }

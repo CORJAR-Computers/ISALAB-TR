@@ -10,6 +10,7 @@ pub struct SampleListItem {
     /// Código único de trazabilidad (M-YYYY-NNNN)
     pub code: String,
     pub patient_id: i32,
+    pub patient_code: String,
     pub patient_name: String,
     pub owner_name: String,
     pub species_name: String,

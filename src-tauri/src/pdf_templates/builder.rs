@@ -98,6 +98,8 @@ pub struct PdfBuilder {
     pub right_logo: Option<RawImage>,
     /// Logo marca de agua suavizado (centro de la página).
     pub watermark_logo: Option<RawImage>,
+    pub page_w: f32,
+    pub page_h: f32,
 }
 
 impl Default for PdfBuilder {
@@ -108,27 +110,33 @@ impl Default for PdfBuilder {
 
 impl PdfBuilder {
     pub fn new() -> Self {
+        Self::new_custom(PAGE_W, PAGE_H)
+    }
+
+    pub fn new_custom(w: f32, h: f32) -> Self {
         Self {
             pages: Vec::new(),
             ops: Vec::new(),
-            y: PAGE_H - MARGIN,
+            y: h - MARGIN,
             left_logo: None,
             right_logo: None,
             watermark_logo: None,
+            page_w: w,
+            page_h: h,
         }
     }
 
     pub fn flush(&mut self) {
         self.pages.push(PdfPage::new(
-            Mm(PAGE_W),
-            Mm(PAGE_H),
+            Mm(self.page_w),
+            Mm(self.page_h),
             std::mem::take(&mut self.ops),
         ));
     }
 
     pub fn new_page(&mut self) {
         self.flush();
-        self.y = PAGE_H - MARGIN;
+        self.y = self.page_h - MARGIN;
     }
 
     pub fn ensure_space(&mut self, height_mm: f32) {
@@ -173,7 +181,7 @@ impl PdfBuilder {
         color: (u8, u8, u8),
     ) {
         let w = text_width_mm(text, size_pt);
-        self.text(bold, text, size_pt, (PAGE_W - w) / 2.0, y_mm, color);
+        self.text(bold, text, size_pt, (self.page_w - w) / 2.0, y_mm, color);
     }
 
     pub fn rule(&mut self, x1: f32, y1: f32, x2: f32, y2: f32, color: (u8, u8, u8)) {
