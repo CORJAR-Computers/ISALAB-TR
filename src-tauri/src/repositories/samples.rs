@@ -752,7 +752,8 @@ mod tests {
 
         assert_eq!(row.0, 1);
         assert_eq!(row.1, "M-2026-0001");
-        assert_eq!(row.13, 1); // abnormal_count
+        assert_eq!(row.13, 3); // result_count
+        assert_eq!(row.14, 1); // abnormal_count
     }
 }
 
