@@ -550,6 +550,9 @@ mod tests {
                 collected_by: None,
                 notes: None,
                 analyzer_id: Some(2),
+                quality_index: None,
+                quality_severity: None,
+                quality_note: None,
             },
         )
         .unwrap();
@@ -739,6 +742,9 @@ mod tests {
                 collected_by: None,
                 notes: None,
                 analyzer_id: Some(2),
+                quality_index: None,
+                quality_severity: None,
+                quality_note: None,
             },
         )
         .unwrap();
@@ -792,6 +798,9 @@ mod tests {
                 collected_by: None,
                 notes: None,
                 analyzer_id: None,
+                quality_index: None,
+                quality_severity: None,
+                quality_note: None,
             },
         )
         .unwrap();

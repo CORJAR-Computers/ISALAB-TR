@@ -47,6 +47,8 @@ import {
   usePatients,
   useSampleTypes,
 } from "@/hooks/use-queries";
+import { useQcAnalyzerStatus } from "@/hooks/queries/use-qc";
+import { QUALITY_INDEX_LABEL, QUALITY_SEVERITY_LABEL } from "@/lib/status";
 import { api, getErrorMessage } from "@/lib/api";
 import type { Sample } from "@/bindings";
 
@@ -70,6 +72,9 @@ const schema = z.object({
   receivedAt: z.string().min(1, "Fecha de recepción requerida"),
   collectedBy: z.string().optional(),
   notes: z.string().optional(),
+  qualityIndex: z.string().optional(),
+  qualitySeverity: z.string().optional(),
+  qualityNote: z.string().optional(),
 });
 
 type Values = z.infer<typeof schema>;
@@ -89,7 +94,11 @@ export function NewSampleDialog({
   const generateLabels = useGenerateSampleLabels();
   const { data: sampleTypes = [] } = useSampleTypes();
   const { data: analyzers = [] } = useAnalyzers();
+  const { data: qcStatus = [] } = useQcAnalyzerStatus();
   const activeAnalyzers = analyzers.filter((a) => a.isActive);
+  const qcRejected = new Set(
+    qcStatus.filter((s) => s.latestStatus === "RECHAZADO").map((s) => s.analyzerId),
+  );
   const [search, setSearch] = useState("");
   const [createdSample, setCreatedSample] = useState<Sample | null>(null);
   const { data: patients = [], isLoading: loadingPatients } = usePatients(
@@ -106,6 +115,9 @@ export function NewSampleDialog({
       receivedAt: nowLocal(),
       collectedBy: "",
       notes: "",
+      qualityIndex: undefined,
+      qualitySeverity: undefined,
+      qualityNote: "",
     },
   });
 
@@ -131,6 +143,9 @@ export function NewSampleDialog({
         receivedAt: formatDbDateTime(values.receivedAt),
         collectedBy: values.collectedBy?.trim() || null,
         notes: values.notes?.trim() || null,
+        qualityIndex: values.qualityIndex?.trim() || null,
+        qualitySeverity: values.qualitySeverity?.trim() || null,
+        qualityNote: values.qualityNote?.trim() || null,
       });
 
       setCreatedSample(sample);
@@ -353,6 +368,20 @@ export function NewSampleDialog({
               )}
             />
 
+            {/* Información del tubo recomendado para el tipo elegido */}
+            {(() => {
+              const st = sampleTypes.find((t) => t.id === form.watch("sampleTypeId"));
+              if (!st?.tubeType) return null;
+              return (
+                <div className="bg-muted/50 rounded-lg border px-3 py-2 text-xs">
+                  <span className="font-medium">Tubo recomendado:</span>{" "}
+                  {st.tubeType}
+                  {st.anticoagulant ? ` · ${st.anticoagulant}` : ""}
+                  {st.minVolumeMl != null ? ` · mínimo ${st.minVolumeMl} mL` : ""}
+                </div>
+              );
+            })()}
+
             {/* Equipo analizador */}
             <FormField
               control={form.control}
@@ -381,6 +410,7 @@ export function NewSampleDialog({
                           <SelectItem key={a.id} value={a.id.toString()}>
                             {a.name}
                             {a.model ? ` · ${a.model}` : ""}
+                            {qcRejected.has(a.id) ? " ⚠ QC rechazado" : ""}
                           </SelectItem>
                         ))}
                     </SelectContent>
@@ -389,6 +419,68 @@ export function NewSampleDialog({
                 </FormItem>
               )}
             />
+
+            {/* Calidad preanalítica (HIL) */}
+            <div className="grid gap-3 sm:grid-cols-2">
+              <FormField
+                control={form.control}
+                name="qualityIndex"
+                render={({ field }) => (
+                  <FormItem>
+                    <FormLabel>Interferencia (opcional)</FormLabel>
+                    <Select
+                      value={field.value ?? ""}
+                      onValueChange={(v) => field.onChange(v === "" ? undefined : v)}
+                    >
+                      <FormControl>
+                        <SelectTrigger>
+                          <SelectValue placeholder="Sin interferencia" />
+                        </SelectTrigger>
+                      </FormControl>
+                      <SelectContent>
+                        <SelectItem value="">Sin interferencia</SelectItem>
+                        {Object.entries(QUALITY_INDEX_LABEL).map(([k, v]) =>
+                          k === "NORMAL" ? null : (
+                            <SelectItem key={k} value={k}>
+                              {v}
+                            </SelectItem>
+                          ),
+                        )}
+                      </SelectContent>
+                    </Select>
+                    <FormMessage />
+                  </FormItem>
+                )}
+              />
+              <FormField
+                control={form.control}
+                name="qualitySeverity"
+                render={({ field }) => (
+                  <FormItem>
+                    <FormLabel>Severidad (opcional)</FormLabel>
+                    <Select
+                      value={field.value ?? ""}
+                      onValueChange={(v) => field.onChange(v === "" ? undefined : v)}
+                      disabled={!form.watch("qualityIndex")}
+                    >
+                      <FormControl>
+                        <SelectTrigger>
+                          <SelectValue placeholder="Selecciona severidad…" />
+                        </SelectTrigger>
+                      </FormControl>
+                      <SelectContent>
+                        {Object.entries(QUALITY_SEVERITY_LABEL).map(([k, v]) => (
+                          <SelectItem key={k} value={k}>
+                            {v}
+                          </SelectItem>
+                        ))}
+                      </SelectContent>
+                    </Select>
+                    <FormMessage />
+                  </FormItem>
+                )}
+              />
+            </div>
 
             {/* Fecha y hora de recepción */}
             <FormField

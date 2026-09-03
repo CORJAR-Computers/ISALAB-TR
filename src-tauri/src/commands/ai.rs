@@ -467,18 +467,23 @@ fn get_previous_results(
 
     Ok(rows
         .into_iter()
-        .map(|r| LabResult {
-            id: r.0,
-            sample_id: r.1,
-            analyte_id: r.2,
-            analyte_name: r.3,
-            unit: r.4,
-            value: r.5,
-            status: r.6,
-            ref_min: r.7,
-            ref_max: r.8,
-            analyzed_at: r.9,
-            attachments: Vec::new(),
+        .map(|r| {
+            let status = r.6;
+            LabResult {
+                id: r.0,
+                sample_id: r.1,
+                analyte_id: r.2,
+                analyte_name: r.3,
+                unit: r.4,
+                value: r.5,
+                status: status.clone(),
+                ref_min: r.7,
+                ref_max: r.8,
+                analyzed_at: r.9,
+                delta_variation: None,
+                is_critical: matches!(status.as_str(), "CRITICO_ALTO" | "CRITICO_BAJO"),
+                attachments: Vec::new(),
+            }
         })
         .collect())
 }
@@ -568,6 +573,12 @@ mod tests {
             analyzer_id: Some(2),
             analyzer_name: Some("MINDRAY B2800".to_string()),
             results: vec![],
+            quality_index: None,
+            quality_severity: None,
+            quality_note: None,
+            rejected_at: None,
+            rejected_by: None,
+            rejection_reason: None,
         }
     }
 
@@ -591,6 +602,8 @@ mod tests {
             ref_min: Some(37.0),
             ref_max: Some(55.0),
             analyzed_at: Some("2026-08-04 10:30:00".to_string()),
+            delta_variation: None,
+            is_critical: false,
             attachments: Vec::new(),
         }
     }
@@ -774,6 +787,8 @@ mod tests {
                 ref_min: Some(37.0),
                 ref_max: Some(55.0),
                 analyzed_at: Some("2026-06-01 10:00:00".to_string()),
+                delta_variation: None,
+                is_critical: false,
                 attachments: Vec::new(),
             }],
         };

@@ -7,6 +7,14 @@ use crate::models::species::{Analyte, Breed, SampleType, Species, VaccineType};
 use crate::state::AppState;
 
 type SpeciesRow = (i32, String, String);
+type SampleTypeRow = (
+    i32,
+    String,
+    String,
+    Option<String>,
+    Option<String>,
+    Option<f64>,
+);
 type BreedRow = (i32, i32, String);
 type AnalyteRow = (i32, String, String, Option<String>, Option<String>);
 
@@ -60,10 +68,11 @@ pub fn list_breeds(state: State<'_, AppState>, species_id: i32) -> Result<Vec<Br
 pub fn list_sample_types(state: State<'_, AppState>) -> Result<Vec<SampleType>, AppError> {
     require_session(&state)?;
     let mut pooled = state.pool.acquire()?;
-    let rows: Vec<SpeciesRow> = pooled
+    let rows: Vec<SampleTypeRow> = pooled
         .conn()
         .query(
-            "SELECT ID, CODE, NAME FROM SAMPLE_TYPES WHERE IS_ACTIVE = TRUE ORDER BY NAME",
+            "SELECT ID, CODE, NAME, TUBE_TYPE, ANTICOAGULANT, MIN_VOLUME_ML
+             FROM SAMPLE_TYPES WHERE IS_ACTIVE = TRUE ORDER BY NAME",
             (),
         )
         .map_err(AppError::from)?;
@@ -73,6 +82,9 @@ pub fn list_sample_types(state: State<'_, AppState>) -> Result<Vec<SampleType>, 
             id: r.0,
             code: r.1,
             name: r.2,
+            tube_type: r.3,
+            anticoagulant: r.4,
+            min_volume_ml: r.5,
         })
         .collect())
 }
@@ -215,9 +227,10 @@ mod tests {
     #[test]
     fn test_list_sample_types_from_seed() {
         let (mut conn, db_path) = setup();
-        let rows: Vec<SpeciesRow> = conn
+        let rows: Vec<SampleTypeRow> = conn
             .query(
-                "SELECT ID, CODE, NAME FROM SAMPLE_TYPES WHERE IS_ACTIVE = TRUE ORDER BY NAME",
+                "SELECT ID, CODE, NAME, TUBE_TYPE, ANTICOAGULANT, MIN_VOLUME_ML
+                 FROM SAMPLE_TYPES WHERE IS_ACTIVE = TRUE ORDER BY NAME",
                 (),
             )
             .unwrap();

@@ -25,4 +25,10 @@ pub struct SampleListItem {
     pub result_count: i32,
     /// Nº de resultados fuera de rango (ALTO/BAJO) — alerta visual.
     pub abnormal_count: i32,
+    /// Nº de resultados críticos (CRITICO_ALTO/CRITICO_BAJO).
+    pub critical_count: i32,
+    /// Interferencia preanalítica (NULL = sin interferencia).
+    pub quality_index: Option<String>,
+    pub quality_severity: Option<String>,
+    pub rejection_reason: Option<String>,
 }

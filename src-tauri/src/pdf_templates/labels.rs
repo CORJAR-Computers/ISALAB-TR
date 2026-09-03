@@ -19,6 +19,7 @@ fn status_color(status: &str) -> (u8, u8, u8) {
         "EN_PROCESO" => (190, 110, 0), // ámbar
         "FINALIZADA" => (0, 100, 180), // azul
         "ANULADA" => (190, 45, 45),    // rojo
+        "RECHAZADA" => (150, 40, 60),  // rojo oscuro
         _ => C_MUTED,
     }
 }
@@ -29,6 +30,7 @@ fn status_label(status: &str) -> String {
         "EN_PROCESO" => "EN PROCESO".to_string(),
         "FINALIZADA" => "FINALIZADA".to_string(),
         "ANULADA" => "ANULADA".to_string(),
+        "RECHAZADA" => "RECHAZADA".to_string(),
         _ => status.to_string(),
     }
 }
@@ -125,6 +127,10 @@ mod tests {
             notes: None,
             result_count: 0,
             abnormal_count: 0,
+            critical_count: 0,
+            quality_index: None,
+            quality_severity: None,
+            rejection_reason: None,
         }
     }
 

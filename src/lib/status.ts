@@ -13,6 +13,7 @@ export const SAMPLE_STATUS: Record<
   EN_PROCESO: { label: "En proceso", variant: "warning" },
   FINALIZADA: { label: "Finalizada", variant: "success" },
   ANULADA: { label: "Anulada", variant: "destructive" },
+  RECHAZADA: { label: "Rechazada", variant: "destructive" },
 };
 
 export const RESULT_STATUS: Record<
@@ -23,6 +24,33 @@ export const RESULT_STATUS: Record<
   ALTO: { label: "Alto ↑", variant: "warning" },
   BAJO: { label: "Bajo ↓", variant: "destructive" },
   SIN_RANGO: { label: "Sin rango", variant: "outline" },
+  CRITICO_ALTO: {
+    label: "Crítico alto ⚠",
+    variant: "destructive",
+    className: "animate-pulse",
+  },
+  CRITICO_BAJO: {
+    label: "Crítico bajo ⚠",
+    variant: "destructive",
+    className: "animate-pulse",
+  },
+};
+
+/** Interferencias preanalíticas registradas en la recepción de la muestra. */
+export const QUALITY_INDEX_LABEL: Record<string, string> = {
+  NORMAL: "Sin interferencia",
+  HEMOLISIS: "Hemólisis",
+  LIPEMIA: "Lipemia",
+  ICTERICIA: "Ictericia",
+  COAGULO: "Coágulo",
+  INSUFICIENTE: "Volumen insuficiente",
+  CONTAMINADA: "Contaminada",
+};
+
+export const QUALITY_SEVERITY_LABEL: Record<string, string> = {
+  LEVE: "Leve",
+  MODERADA: "Moderada",
+  MARCADA: "Marcada",
 };
 
 export const CONSULTATION_STATUS: Record<

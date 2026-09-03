@@ -118,7 +118,7 @@ export const commands = {
 	sampleTypeId: number,
 	sampleTypeName: string,
 	receivedAt: string,
-	/**  RECIBIDA | EN_PROCESO | FINALIZADA | ANULADA */
+	/**  RECIBIDA | EN_PROCESO | FINALIZADA | ANULADA | RECHAZADA */
 	status: string,
 	collectedBy: string | null,
 	notes: string | null,
@@ -127,9 +127,56 @@ export const commands = {
 	/**  Nombre del equipo (para la UI y el reporte PDF). */
 	analyzerName: string | null,
 	results: LabResult[],
+	/**  Interferencia preanalítica (NORMAL | HEMOLISIS | LIPEMIA | ICTERICIA | COAGULO | INSUFICIENTE | CONTAMINADA); NULL = sin interferencia. */
+	qualityIndex: string | null,
+	/**  Severidad de la interferencia (LEVE | MODERADA | MARCADA). */
+	qualitySeverity: string | null,
+	qualityNote: string | null,
+	/**  Datos del rechazo (solo si la muestra quedó RECHAZADA). */
+	rejectedAt: string | null,
+	rejectedBy: string | null,
+	rejectionReason: string | null,
 } | null, AppError>(__TAURI_INVOKE("get_sample", { id })),
-	/**  Cambia el estado de una muestra (RECIBIDA→EN_PROCESO, →ANULADA). */
+	/**  Cambia el estado de una muestra (RECIBIDA→EN_PROCESO, →ANULADA, →RECHAZADA; RECHAZADA→RECIBIDA). */
 	setSampleStatus: (id: number, status: string) => typedError<Sample, AppError>(__TAURI_INVOKE("set_sample_status", { id, status })),
+	/**  Carga varios resultados de una misma muestra (grilla de panel o importación desde analizador) y devuelve todos los resultados. */
+	registerLabResults: (input: RegisterResultsInput) => typedError<LabResult[], AppError>(__TAURI_INVOKE("register_lab_results", { input })),
+	/**  Registra la calidad preanalítica de una muestra (interferencia HIL). */
+	setSampleQuality: (id: number, qualityIndex: string | null, qualitySeverity: string | null, qualityNote: string | null) => typedError<Sample, AppError>(__TAURI_INVOKE("set_sample_quality", { id, qualityIndex, qualitySeverity, qualityNote })),
+	/**  Rechaza una muestra (RECIBIDA/EN_PROCESO → RECHAZADA) con motivo. */
+	rejectSample: (id: number, reason: string) => typedError<Sample, AppError>(__TAURI_INVOKE("reject_sample", { id, reason })),
+	/**  Reabre una muestra rechazada (RECHAZADA → RECIBIDA). */
+	reopenSample: (id: number) => typedError<Sample, AppError>(__TAURI_INVOKE("reopen_sample", { id })),
+	/**  Vista previa de un archivo CSV de analizador: encabezados, primeras filas y sugerencia automática del mapeo columna → analito. */
+	previewAnalyzerImport: (path: string) => typedError<ImportPreview, AppError>(__TAURI_INVOKE("preview_analyzer_import", { path })),
+	/**  Importa resultados desde el CSV del analizador con el mapeo confirmado. */
+	importAnalyzerResults: (path: string, mapping: AnalyzerImportMapping) => typedError<ImportSummary, AppError>(__TAURI_INVOKE("import_analyzer_results", { path, mapping })),
+	/**  Lista los paneles de analitos configurados (para la carga por lotes). */
+	listPanels: () => typedError<Panel[], AppError>(__TAURI_INVOKE("list_panels")),
+	/**  Analitos de un panel. */
+	listPanelAnalytes: (panelId: number) => typedError<PanelAnalyte[], AppError>(__TAURI_INVOKE("list_panel_analytes", { panelId })),
+	/**  Crea o actualiza un panel (solo veterinarios/administradores). */
+	savePanel: (input: PanelInput) => typedError<Panel, AppError>(__TAURI_INVOKE("save_panel", { input })),
+	/**  Elimina un panel. */
+	deletePanel: (id: number) => typedError<null, AppError>(__TAURI_INVOKE("delete_panel", { id })),
+	/**  Lista los materiales de control activos. */
+	listQcMaterials: () => typedError<QcControlMaterial[], AppError>(__TAURI_INVOKE("list_qc_materials")),
+	/**  Objetivos (media/SD) de un material de control. */
+	listQcTargets: (controlMaterialId: number) => typedError<QcTarget[], AppError>(__TAURI_INVOKE("list_qc_targets", { controlMaterialId })),
+	/**  Crea o actualiza un material de control con sus objetivos. */
+	saveQcMaterial: (input: QcMaterialInput) => typedError<QcControlMaterial, AppError>(__TAURI_INVOKE("save_qc_material", { input })),
+	/**  Elimina un material de control (cascade sobre objetivos, corridas y mediciones). */
+	deleteQcMaterial: (id: number) => typedError<null, AppError>(__TAURI_INVOKE("delete_qc_material", { id })),
+	/**  Registra una corrida de control evaluando las reglas de Westgard. */
+	recordQcRun: (input: QcRunInput) => typedError<QcRun, AppError>(__TAURI_INVOKE("record_qc_run", { input })),
+	/**  Lista corridas de control (opcionalmente de un material). */
+	listQcRuns: (controlMaterialId: number | null) => typedError<QcRun[], AppError>(__TAURI_INVOKE("list_qc_runs", { controlMaterialId })),
+	/**  Elimina una corrida de control (con sus mediciones). */
+	deleteQcRun: (id: number) => typedError<null, AppError>(__TAURI_INVOKE("delete_qc_run", { id })),
+	/**  Datos para el gráfico Levey-Jennings de un analito. */
+	getQcChart: (controlMaterialId: number, analyteId: number) => typedError<QcChartData | null, AppError>(__TAURI_INVOKE("get_qc_chart", { controlMaterialId, analyteId })),
+	/**  Estado de la última corrida QC por analizador (badge de alerta). */
+	listQcAnalyzerStatus: () => typedError<QcAnalyzerStatus[], AppError>(__TAURI_INVOKE("list_qc_analyzer_status")),
 	/**
 	 *  Configuración de la clínica (nombre, NIT, IVA, firma de reportes…).
 	 * 
@@ -495,6 +542,10 @@ export type CreateSampleInput = {
 	notes: string | null,
 	/**  Equipo analizador (NULL = perfil GENERAL/estándar). */
 	analyzerId: number | null,
+	/**  Calidad preanalítica de la recepción (opcional). */
+	qualityIndex: string | null,
+	qualitySeverity: string | null,
+	qualityNote: string | null,
 };
 
 export type CreateSurgeryInput = {
@@ -535,6 +586,16 @@ export type DailySampleVolume = {
 	count: number,
 };
 
+/**  Tiempo promedio de respuesta (recepción → finalización) por tipo de muestra. */
+export type SampleTypeTurnaround = {
+	sampleTypeId: number,
+	sampleTypeName: string,
+	/**  Promedio en minutos. */
+	avgMinutes: number,
+	/**  Muestras finalizadas consideradas. */
+	count: number,
+};
+
 /**
  *  Métricas del panel de control (dashboard) con las próximas citas,
  *  cirugías y refuerzos de vacunación de la agenda.
@@ -549,6 +610,8 @@ export type DashboardStats = {
 	abnormalResults: number,
 	/**  Tiempo promedio recepción → finalización (en horas). */
 	avgProcessingHours: number | null,
+	/**  Tiempo promedio de respuesta (recepción → finalización) por tipo de muestra (minutos). */
+	turnaroundBySampleType: SampleTypeTurnaround[],
 	/**  Porcentaje de muestras finalizadas con al menos un valor fuera de rango (0-100). */
 	abnormalRate: number | null,
 	/**  Volumen de muestras recibidas en los últimos 7 días (tendencia). */
@@ -652,11 +715,15 @@ export type LabResult = {
 	analyteName: string,
 	unit: string | null,
 	value: number | null,
-	/**  BAJO | NORMAL | ALTO | SIN_RANGO (calculado por SP_VALIDATE_ANALYTICAL_RESULT) */
+	/**  BAJO | NORMAL | ALTO | SIN_RANGO | CRITICO_BAJO | CRITICO_ALTO (calculado por SP_VALIDATE_ANALYTICAL_RESULT) */
 	status: string,
 	refMin: number | null,
 	refMax: number | null,
 	analyzedAt: string | null,
+	/**  Variación porcentual contra el resultado previo del mismo analito (delta check). */
+	deltaVariation: number | null,
+	/**  True cuando el estado es CRITICO_BAJO o CRITICO_ALTO. */
+	isCritical: boolean,
 	/**  Evidencias adjuntas (placas, frotis, electroforesis) para soporte del diagnóstico. */
 	attachments: ResultAttachment[],
 };
@@ -783,7 +850,7 @@ export type Sample = {
 	sampleTypeId: number,
 	sampleTypeName: string,
 	receivedAt: string,
-	/**  RECIBIDA | EN_PROCESO | FINALIZADA | ANULADA */
+	/**  RECIBIDA | EN_PROCESO | FINALIZADA | ANULADA | RECHAZADA */
 	status: string,
 	collectedBy: string | null,
 	notes: string | null,
@@ -792,6 +859,15 @@ export type Sample = {
 	/**  Nombre del equipo (para la UI y el reporte PDF). */
 	analyzerName: string | null,
 	results: LabResult[],
+	/**  Interferencia preanalítica (NORMAL | HEMOLISIS | LIPEMIA | ICTERICIA | COAGULO | INSUFICIENTE | CONTAMINADA); NULL = sin interferencia. */
+	qualityIndex: string | null,
+	/**  Severidad de la interferencia (LEVE | MODERADA | MARCADA). */
+	qualitySeverity: string | null,
+	qualityNote: string | null,
+	/**  Datos del rechazo (solo si la muestra quedó RECHAZADA). */
+	rejectedAt: string | null,
+	rejectedBy: string | null,
+	rejectionReason: string | null,
 };
 
 export type SampleChangedEvent = {
@@ -803,8 +879,7 @@ export type SampleChangedEvent = {
 /**
  *  Fila de la "mesa de trabajo" del laboratorio: una muestra con los datos del
  *  paciente/propietario unidos (vista global, no por paciente).
- */
-export type SampleListItem = {
+ */export type SampleListItem = {
 	id: number,
 	/**  Código único de trazabilidad (M-YYYY-NNNN) */
 	code: string,
@@ -816,7 +891,7 @@ export type SampleListItem = {
 	sampleTypeId: number,
 	sampleTypeName: string,
 	receivedAt: string,
-	/**  RECIBIDA | EN_PROCESO | FINALIZADA | ANULADA */
+	/**  RECIBIDA | EN_PROCESO | FINALIZADA | ANULADA | RECHAZADA */
 	status: string,
 	collectedBy: string | null,
 	notes: string | null,
@@ -824,12 +899,24 @@ export type SampleListItem = {
 	resultCount: number,
 	/**  Nº de resultados fuera de rango (ALTO/BAJO) — alerta visual. */
 	abnormalCount: number,
+	/**  Nº de resultados críticos (CRITICO_ALTO/CRITICO_BAJO). */
+	criticalCount: number,
+	/**  Interferencia preanalítica (NULL = sin interferencia). */
+	qualityIndex: string | null,
+	qualitySeverity: string | null,
+	rejectionReason: string | null,
 };
 
 export type SampleType = {
 	id: number,
 	code: string,
 	name: string,
+	/**  Tubo recomendado (p. ej. "Tubo lila (EDTA)"). */
+	tubeType: string | null,
+	/**  Anticoagulante (p. ej. "EDTA K2/K3"). */
+	anticoagulant: string | null,
+	/**  Volumen mínimo recomendado en mL. */
+	minVolumeMl: number | null,
 };
 
 export type SecondaryLogo = {
@@ -860,6 +947,194 @@ export type Species = {
 export type StatusCount = {
 	status: string,
 	count: number,
+};
+
+/**  Mapeo columna CSV → analito confirmado para la importación. */
+export type ImportColumnMapping = {
+	columnIndex: number,
+	analyteId: number,
+};
+
+/**  Mapeo confirmado por el usuario para la importación. */
+export type AnalyzerImportMapping = {
+	/**  Índice (0-based) de la columna con el código de la muestra. */
+	sampleCodeColumn: number,
+	/**  Mapeos columna → analito. */
+	columns: ImportColumnMapping[],
+};
+
+/**  Vista previa de un archivo CSV de analizador: encabezados, primeras filas y la sugerencia automática de mapeo (columna → analito). */
+export type ImportPreview = {
+	fileName: string,
+	delimiter: string,
+	headers: string[],
+	/**  Primeras filas de datos (máx. 5) para que la UI muestre una previsualización. */
+	sampleRows: string[][],
+	/**  Índice de la columna que parece contener el código de muestra, o null. */
+	suggestedSampleCodeColumn: number | null,
+	/**  Sugerencia por columna: analito coincidente por nombre, o null. */
+	suggestedAnalytes: (number | null)[],
+	totalRows: number,
+};
+
+/**  Resultado de la importación: filas procesadas y omisiones con motivo. */
+export type ImportSummary = {
+	/**  Nº de muestras a las que se les cargó al menos un resultado. */
+	samplesUpdated: number,
+	/**  Nº total de resultados insertados/actualizados. */
+	resultsImported: number,
+	skipped: ImportSkip[],
+};
+
+/**  Fila omitida durante la importación con el motivo. */
+export type ImportSkip = {
+	/**  Nº de fila (1-based, sin contar encabezados) que se omitió. */
+	row: number,
+	reason: string,
+};
+
+/**  Panel de analitos que se cargan juntos en una corrida (p. ej. Hemograma completo). */
+export type Panel = {
+	id: number,
+	name: string,
+	sampleTypeId: number | null,
+	sampleTypeName: string | null,
+	sortOrder: number,
+	isActive: boolean,
+	notes: string | null,
+	analyteCount: number,
+};
+
+/**  Analito que compone un panel, con el orden de carga. */
+export type PanelAnalyte = {
+	analyteId: number,
+	analyteName: string,
+	unit: string | null,
+	seq: number,
+};
+
+/**  Crear o actualizar un panel (si `id` es Some) reemplazando sus analitos. */
+export type PanelInput = {
+	id: number | null,
+	name: string,
+	sampleTypeId: number | null,
+	sortOrder: number,
+	notes: string | null,
+	analyteIds: number[],
+};
+
+/**  Material de control (nivel/lote) evaluado en un equipo. */
+export type QcControlMaterial = {
+	id: number,
+	name: string,
+	analyzerId: number,
+	analyzerName: string,
+	lot: string | null,
+	expiresAt: string | null,
+	isActive: boolean,
+	notes: string | null,
+	targetCount: number,
+};
+
+/**  Valor objetivo (media/desviación) de un analito para un material de control. */
+export type QcTarget = {
+	id: number,
+	controlMaterialId: number,
+	analyteId: number,
+	analyteName: string,
+	unit: string | null,
+	mean: number,
+	sd: number,
+};
+
+/**  Entrada para crear/actualizar un material de control con sus objetivos. */
+export type QcMaterialInput = {
+	id: number | null,
+	name: string,
+	analyzerId: number,
+	lot: string | null,
+	expiresAt: string | null,
+	notes: string | null,
+	targets: QcTargetInput[],
+};
+
+export type QcTargetInput = {
+	analyteId: number,
+	mean: number,
+	sd: number,
+};
+
+/**  Corrida de control completa (una medición por analito objetivo). */
+export type QcRun = {
+	id: number,
+	controlMaterialId: number,
+	controlName: string,
+	analyzerId: number,
+	analyzerName: string,
+	runDate: string,
+	/**  ACEPTADO | RECHAZADO (según las reglas multirregla de Westgard) */
+	status: string,
+	notes: string | null,
+	createdBy: string | null,
+	measurements: QcRunMeasurement[],
+};
+
+/**  Medición de un analito dentro de una corrida de control. */
+export type QcRunMeasurement = {
+	id: number,
+	qcRunId: number,
+	analyteId: number,
+	analyteName: string,
+	unit: string | null,
+	value: number,
+	zScore: number | null,
+	/**  Reglas Westgard violadas (ej. "1_3s", "2_2s"), separadas por coma. */
+	violation: string | null,
+};
+
+/**  Entrada para registrar una corrida de control. */
+export type QcRunInput = {
+	controlMaterialId: number,
+	notes: string | null,
+	measurements: QcMeasurementInput[],
+};
+
+export type QcMeasurementInput = {
+	analyteId: number,
+	value: number,
+};
+
+/**  Punto del gráfico Levey-Jennings de un analito. */
+export type QcChartPoint = {
+	runId: number,
+	runDate: string,
+	value: number,
+	zScore: number,
+	violation: string | null,
+};
+
+/**  Datos para el gráfico Levey-Jennings: objetivo, bandas ±1/2/3 SD y puntos. */
+export type QcChartData = {
+	controlMaterialId: number,
+	analyteId: number,
+	analyteName: string,
+	unit: string | null,
+	mean: number,
+	sd: number,
+	points: QcChartPoint[],
+};
+
+/**  Estado QC del último corrida por analizador (badge de alerta en la UI). */
+export type QcAnalyzerStatus = {
+	analyzerId: number,
+	/**  "ACEPTADO" | "RECHAZADO" | null si no hay corridas registradas. */
+	latestStatus: string | null,
+};
+
+/**  Carga por lotes: varios resultados de una misma muestra en una sola llamada. */
+export type RegisterResultsInput = {
+	sampleId: number,
+	results: RegisterResultInput[],
 };
 
 /**  Cirugía programada con datos del paciente unidos (agenda quirúrgica). */

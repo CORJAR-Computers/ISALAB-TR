@@ -3,7 +3,9 @@ use rsfbclient::SimpleConnection;
 
 use crate::error::AppError;
 use crate::models::consultation::ConsultationListItem;
-use crate::models::dashboard::{AnalyteCount, DailySampleVolume, DashboardStats};
+use crate::models::dashboard::{
+    AnalyteCount, DailySampleVolume, DashboardStats, SampleTypeTurnaround,
+};
 use crate::repositories::{
     samples as samples_repo, surgeries as surgeries_repo, vaccines as vaccines_repo,
 };
@@ -71,6 +73,31 @@ pub fn get_stats(conn: &mut SimpleConnection) -> Result<DashboardStats, AppError
         .map_err(AppError::from)?
         .map(|(v,): (f64,)| v)
         .unwrap_or(0.0);
+
+    // Tiempo promedio de respuesta por tipo de muestra (minutos), usando la
+    // misma métrica de tiempo transcurrido que el promedio global.
+    let turnaround_by_sample_type = conn
+        .query(
+            "SELECT s.SAMPLE_TYPE_ID, st.NAME, COUNT(*),
+                    CAST(AVG(DATEDIFF(MINUTE FROM s.RECEIVED_AT TO s.UPDATED_AT)) AS DOUBLE PRECISION)
+             FROM SAMPLES s
+             JOIN SAMPLE_TYPES st ON st.ID = s.SAMPLE_TYPE_ID
+             WHERE s.STATUS = 'FINALIZADA' AND s.UPDATED_AT >= s.RECEIVED_AT
+             GROUP BY s.SAMPLE_TYPE_ID, st.NAME
+             ORDER BY 4 DESC",
+            (),
+        )
+        .map_err(AppError::from)?
+        .into_iter()
+        .map(|(sample_type_id, sample_type_name, count, avg_minutes): (i32, String, i32, f64)| {
+            SampleTypeTurnaround {
+                sample_type_id,
+                sample_type_name,
+                avg_minutes,
+                count,
+            }
+        })
+        .collect();
 
     // % de muestras finalizadas con al menos un valor fuera de rango.
     let (finished_abnormal, finished_total): (i32, i32) = {
@@ -156,6 +183,7 @@ pub fn get_stats(conn: &mut SimpleConnection) -> Result<DashboardStats, AppError
         samples_cancelled,
         abnormal_results,
         avg_processing_hours,
+        turnaround_by_sample_type,
         abnormal_rate,
         weekly_volume,
         top_analytes,
@@ -255,6 +283,7 @@ mod tests {
         assert_eq!(stats.samples_cancelled, 0);
         assert_eq!(stats.abnormal_results, 0);
         assert_eq!(stats.avg_processing_hours, 0.0);
+        assert!(stats.turnaround_by_sample_type.is_empty());
         assert_eq!(stats.abnormal_rate, 0.0);
         // La tendencia semanal siempre trae los 7 días (con 0 muestras).
         assert_eq!(stats.weekly_volume.len(), 7);
@@ -334,6 +363,62 @@ mod tests {
         assert_eq!(stats.samples_total, 3);
         assert_eq!(stats.samples_in_progress, 1);
         assert_eq!(stats.samples_finished, 1);
+
+        cleanup_test_db(&db_path);
+    }
+
+    #[test]
+    fn test_get_stats_turnaround_by_sample_type() {
+        let (mut conn, db_path) = setup();
+        let patient_id = insert_test_patient(&mut conn);
+        // Catálogo sembrado por las migraciones: id 1 = Sangre total (EDTA),
+        // id 4 = Orina (los INSERT con ID explícito colisionarían con la semilla).
+
+        // Fechas fijas: DATEDIFF determinista (60, 180 y 45 minutos).
+        conn.execute(
+            "INSERT INTO SAMPLES (ID, PATIENT_ID, SAMPLE_TYPE_ID, RECEIVED_AT, UPDATED_AT, STATUS)
+             VALUES (1, ?, 1, '2026-08-01 10:00:00', '2026-08-01 11:00:00', 'FINALIZADA')",
+            (&patient_id,),
+        )
+        .unwrap();
+        conn.execute(
+            "INSERT INTO SAMPLES (ID, PATIENT_ID, SAMPLE_TYPE_ID, RECEIVED_AT, UPDATED_AT, STATUS)
+             VALUES (2, ?, 1, '2026-08-01 10:00:00', '2026-08-01 13:00:00', 'FINALIZADA')",
+            (&patient_id,),
+        )
+        .unwrap();
+        conn.execute(
+            "INSERT INTO SAMPLES (ID, PATIENT_ID, SAMPLE_TYPE_ID, RECEIVED_AT, UPDATED_AT, STATUS)
+             VALUES (3, ?, 4, '2026-08-01 10:00:00', '2026-08-01 10:45:00', 'FINALIZADA')",
+            (&patient_id,),
+        )
+        .unwrap();
+        // No finalizada: no debe contar.
+        conn.execute(
+            "INSERT INTO SAMPLES (ID, PATIENT_ID, SAMPLE_TYPE_ID, RECEIVED_AT, STATUS)
+             VALUES (4, ?, 1, CURRENT_TIMESTAMP, 'RECIBIDA')",
+            (&patient_id,),
+        )
+        .unwrap();
+
+        let stats = get_stats(&mut conn).unwrap();
+        assert_eq!(stats.turnaround_by_sample_type.len(), 2);
+
+        let sangre = stats
+            .turnaround_by_sample_type
+            .iter()
+            .find(|t| t.sample_type_id == 1)
+            .unwrap();
+        assert_eq!(sangre.count, 2);
+        assert!((sangre.avg_minutes - 120.0).abs() < 0.01); // (60 + 180) / 2
+
+        let orina = stats
+            .turnaround_by_sample_type
+            .iter()
+            .find(|t| t.sample_type_id == 4)
+            .unwrap();
+        assert_eq!(orina.count, 1);
+        assert!((orina.avg_minutes - 45.0).abs() < 0.01);
 
         cleanup_test_db(&db_path);
     }

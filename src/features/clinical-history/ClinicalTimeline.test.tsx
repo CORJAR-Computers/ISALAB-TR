@@ -125,6 +125,12 @@ describe("ClinicalTimeline", () => {
           analyzerId: null,
           analyzerName: null,
           results: [],
+          qualityIndex: null,
+          qualitySeverity: null,
+          qualityNote: null,
+          rejectedAt: null,
+          rejectedBy: null,
+          rejectionReason: null,
         },
       ],
     });

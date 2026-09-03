@@ -21,6 +21,10 @@ pub(crate) type SampleListItemRow = (
     Option<String>,
     i32,
     i32,
+    i32,
+    Option<String>,
+    Option<String>,
+    Option<String>,
 );
 
 pub(crate) type LabResultRow = (
@@ -38,12 +42,16 @@ pub(crate) type LabResultRow = (
 
 pub(crate) type TrendPointRow = (String, f64, Option<f64>, Option<f64>, String);
 
-/// Columnas de una muestra con el tipo unido y el equipo analizador.
+/// Columnas de una muestra con el tipo unido, el equipo analizador y la
+/// calidad preanalítica / rechazo.
 const SAMPLE_SELECT: &str = "
     SELECT s.ID, s.CODE, s.PATIENT_ID, s.SAMPLE_TYPE_ID, st.NAME,
            LEFT(CAST(s.RECEIVED_AT AS VARCHAR(60)), 19),
            s.STATUS, s.COLLECTED_BY, s.NOTES,
-           s.ANALYZER_ID, az.NAME
+           s.ANALYZER_ID, az.NAME,
+           s.QUALITY_INDEX, s.QUALITY_SEVERITY, s.QUALITY_NOTE,
+           LEFT(CAST(s.REJECTED_AT AS VARCHAR(60)), 19),
+           s.REJECTED_BY, s.REJECTION_REASON
     FROM SAMPLES s
     JOIN SAMPLE_TYPES st ON st.ID = s.SAMPLE_TYPE_ID
     LEFT JOIN ANALYZERS az ON az.ID = s.ANALYZER_ID";
@@ -60,6 +68,12 @@ pub(crate) type SampleRow = (
     Option<String>, // notes
     Option<i32>,    // analyzer_id
     Option<String>, // analyzer_name
+    Option<String>, // quality_index
+    Option<String>, // quality_severity
+    Option<String>, // quality_note
+    Option<String>, // rejected_at
+    Option<String>, // rejected_by
+    Option<String>, // rejection_reason
 );
 
 pub(crate) fn map_sample(r: SampleRow) -> Sample {
@@ -76,6 +90,12 @@ pub(crate) fn map_sample(r: SampleRow) -> Sample {
         analyzer_id: r.9,
         analyzer_name: r.10,
         results: Vec::new(),
+        quality_index: r.11,
+        quality_severity: r.12,
+        quality_note: r.13,
+        rejected_at: r.14,
+        rejected_by: r.15,
+        rejection_reason: r.16,
     }
 }
 
@@ -110,7 +130,10 @@ pub fn list(
                 s.STATUS, s.COLLECTED_BY, s.NOTES,
                 (SELECT COUNT(*) FROM LAB_RESULTS lr WHERE lr.SAMPLE_ID = s.ID),
                 (SELECT COUNT(*) FROM LAB_RESULTS lr
-                  WHERE lr.SAMPLE_ID = s.ID AND lr.STATUS IN ('ALTO', 'BAJO'))
+                  WHERE lr.SAMPLE_ID = s.ID AND lr.STATUS IN ('ALTO', 'BAJO')),
+                (SELECT COUNT(*) FROM LAB_RESULTS lr
+                  WHERE lr.SAMPLE_ID = s.ID AND lr.STATUS IN ('CRITICO_ALTO', 'CRITICO_BAJO')),
+                s.QUALITY_INDEX, s.QUALITY_SEVERITY, s.REJECTION_REASON
          FROM SAMPLES s
          JOIN PATIENTS p ON p.ID = s.PATIENT_ID
          JOIN OWNERS o ON o.ID = p.OWNER_ID
@@ -145,6 +168,10 @@ pub fn list(
             notes: r.12,
             result_count: r.13,
             abnormal_count: r.14,
+            critical_count: r.15,
+            quality_index: r.16,
+            quality_severity: r.17,
+            rejection_reason: r.18,
         })
         .collect())
 }
@@ -167,7 +194,10 @@ pub fn list_by_ids(
                 s.STATUS, s.COLLECTED_BY, s.NOTES,
                 (SELECT COUNT(*) FROM LAB_RESULTS lr WHERE lr.SAMPLE_ID = s.ID),
                 (SELECT COUNT(*) FROM LAB_RESULTS lr
-                  WHERE lr.SAMPLE_ID = s.ID AND lr.STATUS IN ('ALTO', 'BAJO'))
+                  WHERE lr.SAMPLE_ID = s.ID AND lr.STATUS IN ('ALTO', 'BAJO')),
+                (SELECT COUNT(*) FROM LAB_RESULTS lr
+                  WHERE lr.SAMPLE_ID = s.ID AND lr.STATUS IN ('CRITICO_ALTO', 'CRITICO_BAJO')),
+                s.QUALITY_INDEX, s.QUALITY_SEVERITY, s.REJECTION_REASON
          FROM SAMPLES s
          JOIN PATIENTS p ON p.ID = s.PATIENT_ID
          JOIN OWNERS o ON o.ID = p.OWNER_ID
@@ -200,12 +230,18 @@ pub fn list_by_ids(
             notes: r.12,
             result_count: r.13,
             abnormal_count: r.14,
+            critical_count: r.15,
+            quality_index: r.16,
+            quality_severity: r.17,
+            rejection_reason: r.18,
         })
         .collect())
 }
 
 /// Cambia el estado de una muestra validando la transición.
 /// FINALIZADA requiere al menos un resultado cargado (cierre del analista).
+/// RECHAZADA solo puede venir de RECIBIDA/EN_PROCESO; la reapertura vuelve a
+/// RECIBIDA (los campos de rechazo se limpian en `reopen_sample`).
 pub fn set_status(conn: &mut SimpleConnection, id: i32, status: &str) -> Result<Sample, AppError> {
     let current: Option<(String,)> = conn
         .query_first("SELECT STATUS FROM SAMPLES WHERE ID = ?", (&id,))
@@ -226,18 +262,119 @@ pub fn set_status(conn: &mut SimpleConnection, id: i32, status: &str) -> Result<
             }
         }
         "ANULADA" => matches!(current.as_str(), "RECIBIDA" | "EN_PROCESO"),
+        "RECHAZADA" => matches!(current.as_str(), "RECIBIDA" | "EN_PROCESO"),
+        "RECIBIDA" => current == "RECHAZADA",
         _ => false,
     };
     if !allowed {
         return Err(AppError::Validation(format!(
             "Transición de estado no permitida: {current} → {status} \
-             (RECIBIDA→EN_PROCESO, →FINALIZADA con resultados, →ANULADA)"
+             (RECIBIDA→EN_PROCESO, →FINALIZADA con resultados, →ANULADA, →RECHAZADA; \
+              RECHAZADA→RECIBIDA)"
         )));
     }
 
     conn.execute(
         "UPDATE SAMPLES SET STATUS = ?, UPDATED_AT = CURRENT_TIMESTAMP WHERE ID = ?",
         (&status, &id),
+    )
+    .map_err(AppError::from)?;
+
+    get(conn, id)?
+        .ok_or_else(|| AppError::Internal("Muestra actualizada pero no recuperada".into()))
+}
+
+/// Registra la calidad preanalítica de una muestra (interferencia HIL,
+/// severidad y nota). Solo en estados abiertos (no FINALIZADA/ANULADA).
+pub fn set_quality(
+    conn: &mut SimpleConnection,
+    id: i32,
+    quality_index: Option<&str>,
+    quality_severity: Option<&str>,
+    quality_note: Option<&str>,
+) -> Result<Sample, AppError> {
+    let current: Option<(String,)> = conn
+        .query_first("SELECT STATUS FROM SAMPLES WHERE ID = ?", (&id,))
+        .map_err(AppError::from)?;
+    let (current,) =
+        current.ok_or_else(|| AppError::NotFound(format!("Muestra {id} no encontrada")))?;
+    if matches!(current.as_str(), "FINALIZADA" | "ANULADA") {
+        return Err(AppError::Validation(format!(
+            "No se puede modificar la calidad de una muestra {current}"
+        )));
+    }
+
+    conn.execute(
+        "UPDATE SAMPLES
+            SET QUALITY_INDEX = ?, QUALITY_SEVERITY = ?, QUALITY_NOTE = ?,
+                UPDATED_AT = CURRENT_TIMESTAMP
+          WHERE ID = ?",
+        (&quality_index, &quality_severity, &quality_note, &id),
+    )
+    .map_err(AppError::from)?;
+
+    get(conn, id)?
+        .ok_or_else(|| AppError::Internal("Muestra actualizada pero no recuperada".into()))
+}
+
+/// Rechaza una muestra (RECIBIDA/EN_PROCESO → RECHAZADA) con motivo obligatorio.
+pub fn reject_sample(
+    conn: &mut SimpleConnection,
+    id: i32,
+    reason: &str,
+    rejected_by: &str,
+) -> Result<Sample, AppError> {
+    let reason = reason.trim();
+    if reason.is_empty() {
+        return Err(AppError::Validation(
+            "Debes indicar el motivo del rechazo".into(),
+        ));
+    }
+
+    let current: Option<(String,)> = conn
+        .query_first("SELECT STATUS FROM SAMPLES WHERE ID = ?", (&id,))
+        .map_err(AppError::from)?;
+    let (current,) =
+        current.ok_or_else(|| AppError::NotFound(format!("Muestra {id} no encontrada")))?;
+    if !matches!(current.as_str(), "RECIBIDA" | "EN_PROCESO") {
+        return Err(AppError::Validation(format!(
+            "No se puede rechazar una muestra {current}"
+        )));
+    }
+
+    conn.execute(
+        "UPDATE SAMPLES
+            SET STATUS = 'RECHAZADA', REJECTED_AT = CURRENT_TIMESTAMP,
+                REJECTED_BY = ?, REJECTION_REASON = ?, UPDATED_AT = CURRENT_TIMESTAMP
+          WHERE ID = ?",
+        (&rejected_by, &reason, &id),
+    )
+    .map_err(AppError::from)?;
+
+    get(conn, id)?
+        .ok_or_else(|| AppError::Internal("Muestra actualizada pero no recuperada".into()))
+}
+
+/// Reabre una muestra rechazada (RECHAZADA → RECIBIDA), limpiando los
+/// campos de rechazo para un nuevo ciclo de recepción.
+pub fn reopen_sample(conn: &mut SimpleConnection, id: i32) -> Result<Sample, AppError> {
+    let current: Option<(String,)> = conn
+        .query_first("SELECT STATUS FROM SAMPLES WHERE ID = ?", (&id,))
+        .map_err(AppError::from)?;
+    let (current,) =
+        current.ok_or_else(|| AppError::NotFound(format!("Muestra {id} no encontrada")))?;
+    if current != "RECHAZADA" {
+        return Err(AppError::Validation(format!(
+            "Solo se puede reabrir una muestra RECHAZADA (estado actual: {current})"
+        )));
+    }
+
+    conn.execute(
+        "UPDATE SAMPLES
+            SET STATUS = 'RECIBIDA', REJECTED_AT = NULL, REJECTED_BY = NULL,
+                REJECTION_REASON = NULL, UPDATED_AT = CURRENT_TIMESTAMP
+          WHERE ID = ?",
+        (&id,),
     )
     .map_err(AppError::from)?;
 
@@ -272,10 +409,17 @@ pub fn list_results(
         r.attachments = crate::repositories::attachments::list_for_result(conn, r.id)?;
     }
 
+    // Delta check: variación contra el resultado previo del paciente.
+    for r in &mut results {
+        r.delta_variation = delta_variation(conn, sample_id, r.analyte_id, r.value)?;
+    }
+
     Ok(results)
 }
 
 pub fn map_lab_result(r: LabResultRow) -> LabResult {
+    let status = r.6;
+    let is_critical = matches!(status.as_str(), "CRITICO_ALTO" | "CRITICO_BAJO");
     LabResult {
         id: r.0,
         sample_id: r.1,
@@ -283,10 +427,12 @@ pub fn map_lab_result(r: LabResultRow) -> LabResult {
         analyte_name: r.3,
         unit: r.4,
         value: r.5,
-        status: r.6,
+        status,
         ref_min: r.7,
         ref_max: r.8,
         analyzed_at: r.9,
+        delta_variation: None,
+        is_critical,
         attachments: Vec::new(),
     }
 }
@@ -516,6 +662,36 @@ pub fn get_patient_lab_trends(
         .collect())
 }
 
+/// Valor previo del mismo analito para el paciente (delta check). Excluye la
+/// muestra actual. Devuelve la variación porcentual respecto al anterior.
+pub fn delta_variation(
+    conn: &mut SimpleConnection,
+    sample_id: i32,
+    analyte_id: i32,
+    new_value: f64,
+) -> Result<Option<f64>, AppError> {
+    let prev: Option<(f64,)> = conn
+        .query_first(
+            "SELECT FIRST 1 r.RESULT_VALUE
+             FROM LAB_RESULTS r
+             JOIN SAMPLES s ON s.ID = r.SAMPLE_ID
+             WHERE s.PATIENT_ID = (SELECT PATIENT_ID FROM SAMPLES WHERE ID = ?)
+               AND r.ANALYTE_ID = ?
+               AND r.SAMPLE_ID <> ?
+               AND s.STATUS IN ('EN_PROCESO', 'FINALIZADA')
+             ORDER BY s.RECEIVED_AT DESC, r.UPDATED_AT DESC",
+            (&sample_id, &analyte_id, &sample_id),
+        )
+        .map_err(AppError::from)?;
+
+    Ok(match prev {
+        Some((prev_value,)) if prev_value > 0.0 => {
+            Some(((new_value - prev_value) / prev_value) * 100.0)
+        }
+        _ => None,
+    })
+}
+
 #[cfg(test)]
 mod tests {
     use super::*;
@@ -523,17 +699,23 @@ mod tests {
     #[test]
     fn test_map_sample_fields() {
         let row: SampleRow = (
-            1,                                 // id
-            "M-2026-0001".into(),              // code
-            10,                                // patient_id
-            1,                                 // sample_type_id
-            "Sangre total (EDTA)".into(),      // sample_type_name
-            "2026-08-01 10:30:00".into(),      // received_at
-            "RECIBIDA".into(),                 // status
-            Some("Dr. Ramos".into()),          // collected_by
-            Some("Muestra de control".into()), // notes
-            Some(2),                           // analyzer_id
-            Some("MINDRAY B2800".into()),      // analyzer_name
+            1,                                  // id
+            "M-2026-0001".into(),               // code
+            10,                                 // patient_id
+            1,                                  // sample_type_id
+            "Sangre total (EDTA)".into(),       // sample_type_name
+            "2026-08-01 10:30:00".into(),       // received_at
+            "RECIBIDA".into(),                  // status
+            Some("Dr. Ramos".into()),           // collected_by
+            Some("Muestra de control".into()),  // notes
+            Some(2),                            // analyzer_id
+            Some("MINDRAY B2800".into()),       // analyzer_name
+            Some("LIPEMIA".into()),             // quality_index
+            Some("MODERADA".into()),            // quality_severity
+            Some("Muestra lipémica".into()),    // quality_note
+            Some("2026-08-01 10:35:00".into()), // rejected_at
+            Some("Dr. Ramos".into()),           // rejected_by
+            None,                               // rejection_reason
         );
         let sample = map_sample(row);
 
@@ -548,6 +730,9 @@ mod tests {
         assert_eq!(sample.notes.as_deref(), Some("Muestra de control"));
         assert_eq!(sample.analyzer_id, Some(2));
         assert_eq!(sample.analyzer_name.as_deref(), Some("MINDRAY B2800"));
+        assert_eq!(sample.quality_index.as_deref(), Some("LIPEMIA"));
+        assert_eq!(sample.quality_severity.as_deref(), Some("MODERADA"));
+        assert_eq!(sample.rejected_by.as_deref(), Some("Dr. Ramos"));
         assert!(sample.results.is_empty()); // map_sample siempre devuelve results vacío
     }
 
@@ -565,6 +750,12 @@ mod tests {
             None,
             None,
             None,
+            None,
+            None,
+            None,
+            None,
+            None,
+            None,
         );
         let sample = map_sample(row);
 
@@ -573,6 +764,8 @@ mod tests {
         assert_eq!(sample.notes, None);
         assert_eq!(sample.analyzer_id, None);
         assert_eq!(sample.analyzer_name, None);
+        assert_eq!(sample.quality_index, None);
+        assert_eq!(sample.rejection_reason, None);
     }
 
     #[test]
@@ -601,6 +794,8 @@ mod tests {
         assert_eq!(result.ref_min, Some(37.0));
         assert_eq!(result.ref_max, Some(55.0));
         assert_eq!(result.analyzed_at.as_deref(), Some("2026-08-01 11:00:00"));
+        assert!(!result.is_critical);
+        assert_eq!(result.delta_variation, None);
     }
 
     #[test]
@@ -641,6 +836,26 @@ mod tests {
         let result = map_lab_result(row);
         assert_eq!(result.status, "ALTO");
         assert!((result.value - 150.0).abs() < f64::EPSILON);
+        assert!(!result.is_critical);
+    }
+
+    #[test]
+    fn test_map_lab_result_critical_status() {
+        let row: LabResultRow = (
+            103,
+            1,
+            6,
+            "Glucosa".into(),
+            Some("mg/dL".into()),
+            25.0,
+            "CRITICO_BAJO".into(),
+            Some(70.0),
+            Some(110.0),
+            None,
+        );
+        let result = map_lab_result(row);
+        assert_eq!(result.status, "CRITICO_BAJO");
+        assert!(result.is_critical);
     }
 
     #[test]
@@ -748,12 +963,18 @@ mod tests {
             None,
             3,
             1,
+            0,
+            Some("HEMOLISIS".into()),
+            Some("LEVE".into()),
+            None,
         );
 
         assert_eq!(row.0, 1);
         assert_eq!(row.1, "M-2026-0001");
         assert_eq!(row.13, 3); // result_count
         assert_eq!(row.14, 1); // abnormal_count
+        assert_eq!(row.15, 0); // critical_count
+        assert_eq!(row.16.as_deref(), Some("HEMOLISIS"));
     }
 }
 
@@ -928,7 +1149,9 @@ mod integration_tests {
     }
 }
 
-/// Conteo de muestras agrupado por estado (para las pestañas de la mesa de trabajo).
+/// Conteo de muestras agrupado por estado (para las pestañas de la mesa de
+/// trabajo) más los contadores ABNORMAL y CRITICAL (muestras con al menos un
+/// resultado fuera de rango / crítico).
 pub fn count_by_status(
     conn: &mut SimpleConnection,
 ) -> Result<Vec<crate::models::status_count::StatusCount>, AppError> {
@@ -939,6 +1162,10 @@ pub fn count_by_status(
                 SELECT 'ABNORMAL' AS STATUS, COUNT(*) FROM SAMPLES s
                 WHERE EXISTS (SELECT 1 FROM LAB_RESULTS lr
                   WHERE lr.SAMPLE_ID = s.ID AND lr.STATUS IN ('ALTO', 'BAJO'))
+                UNION ALL
+                SELECT 'CRITICAL' AS STATUS, COUNT(*) FROM SAMPLES s
+                WHERE EXISTS (SELECT 1 FROM LAB_RESULTS lr
+                  WHERE lr.SAMPLE_ID = s.ID AND lr.STATUS IN ('CRITICO_ALTO', 'CRITICO_BAJO'))
                 ORDER BY 1",
             (),
         )

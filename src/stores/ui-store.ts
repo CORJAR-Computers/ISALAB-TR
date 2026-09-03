@@ -13,6 +13,7 @@ export type View =
   | "vaccines"
   | "invoices"
   | "reports"
+  | "qc"
   | "users"
   | "audit-log"
   | "settings";

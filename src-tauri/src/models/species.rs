@@ -23,6 +23,12 @@ pub struct SampleType {
     pub id: i32,
     pub code: String,
     pub name: String,
+    /// Tubo recomendado (p. ej. "Tubo lila (EDTA)").
+    pub tube_type: Option<String>,
+    /// Anticoagulante (p. ej. "EDTA K2/K3").
+    pub anticoagulant: Option<String>,
+    /// Volumen mínimo recomendado en mL.
+    pub min_volume_ml: Option<f64>,
 }
 
 #[derive(Debug, Clone, Serialize, Deserialize, Type)]

@@ -50,6 +50,22 @@ pub const MIGRATIONS: &[(&str, &str)] = &[
         "0011_widen_password_hash",
         include_str!("../../migrations/0011_widen_password_hash.sql"),
     ),
+    (
+        "0012_panels",
+        include_str!("../../migrations/0012_panels.sql"),
+    ),
+    (
+        "0013_sample_quality",
+        include_str!("../../migrations/0013_sample_quality.sql"),
+    ),
+    (
+        "0014_qc_module",
+        include_str!("../../migrations/0014_qc_module.sql"),
+    ),
+    (
+        "0015_critical_values",
+        include_str!("../../migrations/0015_critical_values.sql"),
+    ),
 ];
 
 /// Indica si una migración de datos de demostración debe aplicarse.

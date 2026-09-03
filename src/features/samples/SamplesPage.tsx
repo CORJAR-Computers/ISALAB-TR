@@ -14,6 +14,8 @@ import {
   Plus,
   Printer,
   Search,
+  Siren,
+  Upload,
 } from "lucide-react";
 import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
@@ -44,14 +46,17 @@ import { cn, formatDateTime } from "@/lib/utils";
 import { api, getErrorMessage } from "@/lib/api";
 import { usePermissions } from "@/hooks/use-permissions";
 import { useUiStore } from "@/stores/ui-store";
+import { QUALITY_INDEX_LABEL } from "@/lib/status";
 import { SampleDetailDialog } from "./SampleDetailDialog";
 import { NewSampleDialog } from "./NewSampleDialog";
+import { ImportResultsDialog } from "./ImportResultsDialog";
 
 const STATUS_TABS: Array<{ value: string | null; label: string }> = [
   { value: null, label: "Todas" },
   { value: "RECIBIDA", label: "Recibidas" },
   { value: "EN_PROCESO", label: "En proceso" },
   { value: "FINALIZADA", label: "Finalizadas" },
+  { value: "RECHAZADA", label: "Rechazadas" },
   { value: "ANULADA", label: "Anuladas" },
 ];
 
@@ -117,6 +122,7 @@ export function SamplesPage() {
   const [search, setSearch] = useState("");
   const [detailId, setDetailId] = useState<number | null>(null);
   const [newSampleOpen, setNewSampleOpen] = useState(false);
+  const [importOpen, setImportOpen] = useState(false);
   const [selected, setSelected] = useState<Set<number>>(new Set());
 
   const { data: samples, isLoading, isError } = useSamples(status, search);
@@ -241,8 +247,10 @@ export function SamplesPage() {
       RECIBIDA: 0,
       EN_PROCESO: 0,
       FINALIZADA: 0,
+      RECHAZADA: 0,
       ANULADA: 0,
       ABNORMAL: 0,
+      CRITICAL: 0,
     };
     for (const s of all ?? []) {
       c.TOTAL += s.count;
@@ -281,6 +289,15 @@ export function SamplesPage() {
           )}
           {isVetOrAdmin && (
             <>
+              <Button
+                variant="outline"
+                onClick={() => setImportOpen(true)}
+                className="shrink-0 gap-1.5"
+                title="Importar resultados desde el CSV de un analizador"
+              >
+                <Upload className="size-4" />
+                Importar CSV
+              </Button>
               <Button
                 variant="ghost"
                 onClick={() => exportCsv("samples")}
@@ -347,6 +364,15 @@ export function SamplesPage() {
           label="Con valores anormales"
           value={counts.ABNORMAL}
           tone="bg-orange-500/15 text-orange-600 dark:text-orange-400"
+          onClick={() => changeStatus(null)}
+          active={false}
+          disabled
+        />
+        <StatCard
+          icon={Siren}
+          label="Con valores críticos"
+          value={counts.CRITICAL}
+          tone="bg-destructive/10 text-destructive"
           onClick={() => changeStatus(null)}
           active={false}
           disabled
@@ -467,6 +493,7 @@ export function SamplesPage() {
                 };
                 const canLoadResult = s.status === "RECIBIDA" || s.status === "EN_PROCESO";
                 const isFinalized = s.status === "FINALIZADA";
+                const isRejected = s.status === "RECHAZADA";
 
                 return (
                   <TableRow
@@ -503,7 +530,17 @@ export function SamplesPage() {
                     <TableCell>
                       <div className="flex flex-col gap-1">
                         <Badge variant={st.variant}>{st.label}</Badge>
-                        {s.abnormalCount > 0 && (
+                        {s.criticalCount > 0 && (
+                          <Badge
+                            variant="destructive"
+                            className="animate-pulse w-fit"
+                          >
+                            <Siren className="size-3" />
+                            {s.criticalCount} crítico
+                            {s.criticalCount === 1 ? "" : "s"}
+                          </Badge>
+                        )}
+                        {s.abnormalCount > 0 && s.criticalCount === 0 && (
                           <Badge
                             variant="outline"
                             className="text-warning w-fit"
@@ -512,6 +549,22 @@ export function SamplesPage() {
                             {s.abnormalCount} anormal
                             {s.abnormalCount === 1 ? "" : "es"}
                           </Badge>
+                        )}
+                        {isRejected && s.rejectionReason && (
+                          <span className="text-destructive w-fit text-[11px]">
+                            {s.rejectionReason}
+                          </span>
+                        )}
+                        {s.qualityIndex && (
+                          <span
+                            className="text-muted-foreground w-fit text-[11px]"
+                            title={s.qualitySeverity ?? undefined}
+                          >
+                            {QUALITY_INDEX_LABEL[s.qualityIndex] ?? s.qualityIndex}
+                            {s.qualitySeverity
+                              ? ` · ${s.qualitySeverity.toLowerCase()}`
+                              : ""}
+                          </span>
                         )}
                       </div>
                     </TableCell>
@@ -567,6 +620,8 @@ export function SamplesPage() {
         onOpenChange={setNewSampleOpen}
         onCreated={(sample) => setDetailId(sample.id)}
       />
+
+      <ImportResultsDialog open={importOpen} onOpenChange={setImportOpen} />
     </div>
   );
 }

@@ -2,6 +2,7 @@ import { cn } from "@/lib/utils";
 import { useUiStore, type View } from "@/stores/ui-store";
 import { usePermissions } from "@/hooks/use-permissions";
 import {
+  Activity,
   CalendarClock,
   FlaskConical,
   HeartPulse,
@@ -32,6 +33,7 @@ const NAV_ITEMS: Array<{ view: View; label: string; icon: typeof Users; adminOnl
   { view: "vaccines", label: "Vacunación", icon: Syringe },
   { view: "invoices", label: "Facturación", icon: Receipt },
   { view: "reports", label: "Reportes PDF", icon: FileText },
+  { view: "qc", label: "Control de calidad (QC)", icon: Activity },
   { view: "users", label: "Usuarios", icon: Shield, adminOnly: true },
   { view: "audit-log", label: "Auditoría", icon: ScrollText, adminOnly: true },
   { view: "settings", label: "Configuración", icon: Settings, adminOnly: true },

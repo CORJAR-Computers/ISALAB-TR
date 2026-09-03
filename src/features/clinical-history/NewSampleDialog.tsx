@@ -94,6 +94,9 @@ export function NewSampleDialog({
         receivedAt: date,
         collectedBy: values.collectedBy?.trim() || null,
         notes: values.notes?.trim() || null,
+        qualityIndex: null,
+        qualitySeverity: null,
+        qualityNote: null,
       });
       setCreatedSample(sample);
     } catch (e) {

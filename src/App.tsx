@@ -51,6 +51,9 @@ const InvoicesPage = lazy(() =>
 const ReportsPage = lazy(() =>
   import("@/features/reports/ReportsPage").then((m) => ({ default: m.ReportsPage })),
 );
+const QcPage = lazy(() =>
+  import("@/features/qc/QcPage").then((m) => ({ default: m.QcPage })),
+);
 const SettingsPage = lazy(() =>
   import("@/features/settings/SettingsPage").then((m) => ({ default: m.SettingsPage })),
 );
@@ -219,6 +222,7 @@ export default function App() {
               {view === "vaccines" && <VaccinesPage />}
               {view === "invoices" && <InvoicesPage />}
               {view === "reports" && <ReportsPage />}
+              {view === "qc" && <QcPage />}
               {view === "settings" && <SettingsPage />}
               {view === "users" && <UsersPage />}
               {view === "audit-log" && <AuditLogPage />}</Suspense>

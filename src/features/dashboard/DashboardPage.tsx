@@ -356,6 +356,50 @@ export function DashboardPage() {
               </p>
             </div>
           </CardContent>
+          <CardContent className="border-t p-4">
+            <p className="text-muted-foreground mb-2 flex items-center gap-1.5 text-[11px] font-medium tracking-wide uppercase">
+              <Clock className="size-3" />
+              Por tipo de muestra
+            </p>
+            {stats.turnaroundBySampleType.length === 0 ? (
+              <p className="text-muted-foreground py-3 text-center text-xs">
+                Sin muestras finalizadas todavía.
+              </p>
+            ) : (
+              <div className="space-y-2">
+                {stats.turnaroundBySampleType.map((t) => {
+                  const max = Math.max(
+                    1,
+                    ...stats.turnaroundBySampleType.map((x) => x.avgMinutes),
+                  );
+                  return (
+                    <div key={t.sampleTypeId}>
+                      <div className="flex items-baseline justify-between gap-2">
+                        <p className="truncate text-xs font-medium">
+                          {t.sampleTypeName}
+                        </p>
+                        <p className="text-muted-foreground shrink-0 text-xs tabular-nums">
+                          {formatHours(t.avgMinutes / 60)}
+                          <span className="ml-1 opacity-70">
+                            ({t.count})
+                          </span>
+                        </p>
+                      </div>
+                      <div className="bg-muted mt-1 h-1.5 overflow-hidden rounded-full">
+                        <div
+                          className="bg-primary/70 h-full rounded-full transition-all duration-500"
+                          style={{
+                            width: `${(t.avgMinutes / max) * 100}%`,
+                          }}
+                          title={`${t.sampleTypeName}: ${formatHours(t.avgMinutes / 60)} · ${t.count} muestras`}
+                        />
+                      </div>
+                    </div>
+                  );
+                })}
+              </div>
+            )}
+          </CardContent>
         </Card>
 
         <Card className="gap-0 p-0">

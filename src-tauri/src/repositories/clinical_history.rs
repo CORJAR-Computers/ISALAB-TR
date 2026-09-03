@@ -4,7 +4,9 @@ use rsfbclient::SimpleConnection;
 use crate::error::AppError;
 use crate::models::clinical_history::ClinicalHistory;
 use crate::models::consultation::{Consultation, ConsultationListItem, CreateConsultationInput};
-use crate::models::sample::{CreateSampleInput, LabResult, RegisterResultInput, Sample};
+use crate::models::sample::{
+    CreateSampleInput, LabResult, RegisterResultInput, RegisterResultsInput, Sample,
+};
 use crate::repositories::{
     next_id, patient as patient_repo, samples as samples_repo, vaccines as vaccines_repo,
 };
@@ -47,6 +49,12 @@ type SampleRow = (
     Option<String>,
     Option<i32>,    // analyzer_id
     Option<String>, // analyzer_name
+    Option<String>, // quality_index
+    Option<String>, // quality_severity
+    Option<String>, // quality_note
+    Option<String>, // rejected_at
+    Option<String>, // rejected_by
+    Option<String>, // rejection_reason
 );
 
 type LabResultRow = (
@@ -327,7 +335,10 @@ fn list_samples(conn: &mut SimpleConnection, patient_id: i32) -> Result<Vec<Samp
             "SELECT s.ID, s.CODE, s.PATIENT_ID, s.SAMPLE_TYPE_ID, st.NAME,
                     LEFT(CAST(s.RECEIVED_AT AS VARCHAR(60)), 19),
                     s.STATUS, s.COLLECTED_BY, s.NOTES,
-                    s.ANALYZER_ID, az.NAME
+                    s.ANALYZER_ID, az.NAME,
+                    s.QUALITY_INDEX, s.QUALITY_SEVERITY, s.QUALITY_NOTE,
+                    LEFT(CAST(s.REJECTED_AT AS VARCHAR(60)), 19),
+                    s.REJECTED_BY, s.REJECTION_REASON
              FROM SAMPLES s
              JOIN SAMPLE_TYPES st ON st.ID = s.SAMPLE_TYPE_ID
              LEFT JOIN ANALYZERS az ON az.ID = s.ANALYZER_ID
@@ -353,6 +364,12 @@ fn list_samples(conn: &mut SimpleConnection, patient_id: i32) -> Result<Vec<Samp
             analyzer_id: r.9,
             analyzer_name: r.10,
             results,
+            quality_index: r.11,
+            quality_severity: r.12,
+            quality_note: r.13,
+            rejected_at: r.14,
+            rejected_by: r.15,
+            rejection_reason: r.16,
         });
     }
     Ok(samples)
@@ -365,8 +382,9 @@ pub fn create_sample(
     let id = next_id(conn, "GEN_SAMPLES_ID")?;
     conn.execute(
         "INSERT INTO SAMPLES
-            (ID, PATIENT_ID, SAMPLE_TYPE_ID, RECEIVED_AT, STATUS, COLLECTED_BY, NOTES, ANALYZER_ID)
-         VALUES (?, ?, ?, ?, 'RECIBIDA', ?, ?, ?)",
+            (ID, PATIENT_ID, SAMPLE_TYPE_ID, RECEIVED_AT, STATUS, COLLECTED_BY, NOTES,
+             ANALYZER_ID, QUALITY_INDEX, QUALITY_SEVERITY, QUALITY_NOTE)
+         VALUES (?, ?, ?, ?, 'RECIBIDA', ?, ?, ?, ?, ?, ?)",
         (
             &id,
             &input.patient_id,
@@ -375,6 +393,9 @@ pub fn create_sample(
             &input.collected_by,
             &input.notes,
             &input.analyzer_id,
+            &input.quality_index,
+            &input.quality_severity,
+            &input.quality_note,
         ),
     )
     .map_err(AppError::from)?;
@@ -384,7 +405,10 @@ pub fn create_sample(
             "SELECT s.ID, s.CODE, s.PATIENT_ID, s.SAMPLE_TYPE_ID, st.NAME,
                     LEFT(CAST(s.RECEIVED_AT AS VARCHAR(60)), 19),
                     s.STATUS, s.COLLECTED_BY, s.NOTES,
-                    s.ANALYZER_ID, az.NAME
+                    s.ANALYZER_ID, az.NAME,
+                    s.QUALITY_INDEX, s.QUALITY_SEVERITY, s.QUALITY_NOTE,
+                    LEFT(CAST(s.REJECTED_AT AS VARCHAR(60)), 19),
+                    s.REJECTED_BY, s.REJECTION_REASON
              FROM SAMPLES s
              JOIN SAMPLE_TYPES st ON st.ID = s.SAMPLE_TYPE_ID
              LEFT JOIN ANALYZERS az ON az.ID = s.ANALYZER_ID
@@ -406,6 +430,12 @@ pub fn create_sample(
         analyzer_id: r.9,
         analyzer_name: r.10,
         results: Vec::new(),
+        quality_index: r.11,
+        quality_severity: r.12,
+        quality_note: r.13,
+        rejected_at: r.14,
+        rejected_by: r.15,
+        rejection_reason: r.16,
     })
     .ok_or_else(|| AppError::Internal("Muestra creada pero no recuperada".into()))
 }
@@ -478,7 +508,7 @@ pub fn register_lab_result(
     )
     .map_err(AppError::from)?;
 
-    // 4. Devuelve el resultado completo con su rango.
+    // 4. Devuelve el resultado completo con su rango y el delta check.
     let row: Option<LabResultRow> = conn
         .query_first(
             "SELECT r.ID, r.SAMPLE_ID, r.ANALYTE_ID, a.NAME, a.UNIT,
@@ -493,8 +523,42 @@ pub fn register_lab_result(
         )
         .map_err(AppError::from)?;
 
-    row.map(samples_repo::map_lab_result)
-        .ok_or_else(|| AppError::Internal("Resultado creado pero no recuperado".into()))
+    let mut result = row
+        .map(samples_repo::map_lab_result)
+        .ok_or_else(|| AppError::Internal("Resultado creado pero no recuperado".into()))?;
+    result.delta_variation =
+        samples_repo::delta_variation(conn, input.sample_id, input.analyte_id, input.value)?;
+    Ok(result)
+}
+
+/// Carga varios resultados de una misma muestra en una sola llamada (grilla de
+/// panel o importación desde analizador). Cada resultado se valida contra los
+/// rangos vía SP; ante un error se detiene la operación (la conexión Firebird
+/// trabaja en autocommit, así que los resultados ya insertados permanecen).
+pub fn register_results_batch(
+    conn: &mut SimpleConnection,
+    input: &RegisterResultsInput,
+) -> Result<Vec<LabResult>, AppError> {
+    // La muestra debe existir y estar en un estado abierto.
+    let current: Option<(String,)> = conn
+        .query_first(
+            "SELECT STATUS FROM SAMPLES WHERE ID = ?",
+            (&input.sample_id,),
+        )
+        .map_err(AppError::from)?;
+    let (current,) = current
+        .ok_or_else(|| AppError::NotFound(format!("Muestra {} no encontrada", input.sample_id)))?;
+    if !matches!(current.as_str(), "RECIBIDA" | "EN_PROCESO") {
+        return Err(AppError::Validation(format!(
+            "No se pueden cargar resultados a una muestra {current}"
+        )));
+    }
+
+    let mut out = Vec::with_capacity(input.results.len());
+    for r in &input.results {
+        out.push(register_lab_result(conn, r)?);
+    }
+    Ok(out)
 }
 
 #[cfg(test)]
@@ -757,6 +821,9 @@ mod tests {
             collected_by: Some("Dr. García".to_string()),
             notes: None,
             analyzer_id: None,
+            quality_index: None,
+            quality_severity: None,
+            quality_note: None,
         };
         let sample = create_sample(&mut conn, &sample_input).unwrap();
 
@@ -817,6 +884,9 @@ mod tests {
             collected_by: Some("Enf. López".to_string()),
             notes: Some("Muestra en ayunas".to_string()),
             analyzer_id: None,
+            quality_index: None,
+            quality_severity: None,
+            quality_note: None,
         };
 
         let sample = create_sample(&mut conn, &input).unwrap();
@@ -846,6 +916,9 @@ mod tests {
             collected_by: None,
             notes: None,
             analyzer_id: None,
+            quality_index: None,
+            quality_severity: None,
+            quality_note: None,
         };
         let sample = create_sample(&mut conn, &sample_input).unwrap();
 

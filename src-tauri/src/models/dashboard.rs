@@ -23,6 +23,18 @@ pub struct DailySampleVolume {
     pub count: i32,
 }
 
+/// Tiempo promedio de respuesta (recepción → finalización) por tipo de muestra.
+#[derive(Debug, Clone, Serialize, Deserialize, Type)]
+#[serde(rename_all = "camelCase")]
+pub struct SampleTypeTurnaround {
+    pub sample_type_id: i32,
+    pub sample_type_name: String,
+    /// Promedio en minutos.
+    pub avg_minutes: f64,
+    /// Muestras finalizadas consideradas.
+    pub count: i32,
+}
+
 /// Métricas del panel de control (dashboard) con las próximas citas,
 /// cirugías y refuerzos de vacunación de la agenda.
 #[derive(Debug, Clone, Serialize, Deserialize, Type)]
@@ -39,6 +51,9 @@ pub struct DashboardStats {
     pub abnormal_results: i32,
     /// Tiempo promedio recepción → finalización (en horas).
     pub avg_processing_hours: f64,
+    /// Tiempo promedio de respuesta (recepción → finalización) por tipo de
+    /// muestra, en minutos (ordenado de mayor a menor).
+    pub turnaround_by_sample_type: Vec<SampleTypeTurnaround>,
     /// Porcentaje de muestras finalizadas con al menos un valor fuera de rango (0-100).
     pub abnormal_rate: f64,
     /// Volumen de muestras recibidas en los últimos 7 días (tendencia).

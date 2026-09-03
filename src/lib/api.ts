@@ -3,6 +3,7 @@ import type {
   Analyte,
   StatusCount,
   Analyzer,
+  AnalyzerImportMapping,
   AppError,
   AuditLogEntry,
   Breed,
@@ -22,15 +23,28 @@ import type {
   DashboardStats,
   DbHealth,
   GlobalSearchResult,
+  ImportPreview,
+  ImportSummary,
   Invoice,
   InvoiceListItem,
   LabResult,
   LoginInput,
   Owner,
+  Panel,
+  PanelAnalyte,
+  PanelInput,
   Patient,
+  QcAnalyzerStatus,
+  QcChartData,
+  QcControlMaterial,
+  QcMaterialInput,
+  QcRun,
+  QcRunInput,
+  QcTarget,
   ReferenceRange,
   ReferenceRangeInput,
   RegisterResultInput,
+  RegisterResultsInput,
   ReportFile,
   ResultAttachment,
   Sample,
@@ -97,11 +111,61 @@ export const api = {
     invoke<Sample>("create_sample", { input }),
   registerLabResult: (input: RegisterResultInput) =>
     invoke<LabResult>("register_lab_result", { input }),
+  registerLabResults: (input: RegisterResultsInput) =>
+    invoke<LabResult[]>("register_lab_results", { input }),
   listSamples: (status: string | null, search: string | null) =>
     invoke<SampleListItem[]>("list_samples", { status, search }),
   getSample: (id: number) => invoke<Sample | null>("get_sample", { id }),
   setSampleStatus: (id: number, status: string) =>
     invoke<Sample>("set_sample_status", { id, status }),
+  setSampleQuality: (
+    id: number,
+    qualityIndex: string | null,
+    qualitySeverity: string | null,
+    qualityNote: string | null,
+  ) =>
+    invoke<Sample>("set_sample_quality", {
+      id,
+      qualityIndex,
+      qualitySeverity,
+      qualityNote,
+    }),
+  rejectSample: (id: number, reason: string) =>
+    invoke<Sample>("reject_sample", { id, reason }),
+  reopenSample: (id: number) => invoke<Sample>("reopen_sample", { id }),
+
+  // ---- Importación desde analizador (CSV) ----
+  previewAnalyzerImport: (path: string) =>
+    invoke<ImportPreview>("preview_analyzer_import", { path }),
+  importAnalyzerResults: (path: string, mapping: AnalyzerImportMapping) =>
+    invoke<ImportSummary>("import_analyzer_results", { path, mapping }),
+
+  // ---- Paneles de analitos ----
+  listPanels: () => invoke<Panel[]>("list_panels"),
+  listPanelAnalytes: (panelId: number) =>
+    invoke<PanelAnalyte[]>("list_panel_analytes", { panelId }),
+  savePanel: (input: PanelInput) => invoke<Panel>("save_panel", { input }),
+  deletePanel: (id: number) => invoke<void>("delete_panel", { id }),
+
+  // ---- Control de calidad (QC) ----
+  listQcMaterials: () => invoke<QcControlMaterial[]>("list_qc_materials"),
+  listQcTargets: (controlMaterialId: number) =>
+    invoke<QcTarget[]>("list_qc_targets", { controlMaterialId }),
+  saveQcMaterial: (input: QcMaterialInput) =>
+    invoke<QcControlMaterial>("save_qc_material", { input }),
+  deleteQcMaterial: (id: number) =>
+    invoke<void>("delete_qc_material", { id }),
+  recordQcRun: (input: QcRunInput) => invoke<QcRun>("record_qc_run", { input }),
+  listQcRuns: (controlMaterialId: number | null) =>
+    invoke<QcRun[]>("list_qc_runs", { controlMaterialId }),
+  deleteQcRun: (id: number) => invoke<void>("delete_qc_run", { id }),
+  getQcChart: (controlMaterialId: number, analyteId: number) =>
+    invoke<QcChartData | null>("get_qc_chart", {
+      controlMaterialId,
+      analyteId,
+    }),
+  listQcAnalyzerStatus: () =>
+    invoke<QcAnalyzerStatus[]>("list_qc_analyzer_status"),
   attachResultFile: (resultId: number, sourcePath: string) =>
     invoke<ResultAttachment>("attach_result_file", { resultId, sourcePath }),
   deleteResultAttachment: (id: number) =>

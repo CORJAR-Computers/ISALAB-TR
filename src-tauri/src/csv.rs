@@ -164,6 +164,10 @@ mod tests {
             notes: None,
             result_count: 0,
             abnormal_count: 0,
+            critical_count: 0,
+            quality_index: None,
+            quality_severity: None,
+            rejection_reason: None,
         }
     }
 

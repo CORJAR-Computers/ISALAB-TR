@@ -7,6 +7,7 @@ import { open as openDialog } from "@tauri-apps/plugin-dialog";
 import { convertFileSrc } from "@tauri-apps/api/core";
 import { toast } from "sonner";
 import {
+  AlertTriangle,
   Ban,
   Bot,
   CheckCircle2,
@@ -21,6 +22,7 @@ import {
   PlayCircle,
   Plus,
   Printer,
+  Siren,
   Trash2,
   X,
 } from "lucide-react";
@@ -65,13 +67,24 @@ import {
   useDeleteResultAttachment,
   useGenerateReport,
   useGenerateSampleLabels,
+  usePanelAnalytes,
+  usePanels,
   usePatient,
   useRegisterLabResult,
+  useRegisterLabResults,
+  useRejectSample,
+  useReopenSample,
   useSample,
+  useSetSampleQuality,
   useSetSampleStatus,
 } from "@/hooks/use-queries";
 import type { LabResult, ResultAttachment } from "@/bindings";
-import { RESULT_STATUS, SAMPLE_STATUS } from "@/lib/status";
+import {
+  QUALITY_INDEX_LABEL,
+  QUALITY_SEVERITY_LABEL,
+  RESULT_STATUS,
+  SAMPLE_STATUS,
+} from "@/lib/status";
 import { cn, formatDateTime } from "@/lib/utils";
 import { api, getErrorMessage } from "@/lib/api";
 import { useUiStore } from "@/stores/ui-store";
@@ -109,17 +122,28 @@ export function SampleDetailDialog({
   const { data: analytes = [] } = useAnalytes();
 
   const registerResult = useRegisterLabResult();
+  const registerResults = useRegisterLabResults();
   const setStatus = useSetSampleStatus();
+  const setQuality = useSetSampleQuality();
+  const rejectSample = useRejectSample();
+  const reopenSample = useReopenSample();
   const generate = useGenerateReport();
   const generateLabels = useGenerateSampleLabels();
   const attachFile = useAttachResultFile(sampleId);
   const removeAttachment = useDeleteResultAttachment(sampleId);
+  const { data: panels = [] } = usePanels();
+  const [panelId, setPanelId] = useState<number | null>(null);
+  const { data: panelAnalytes = [] } = usePanelAnalytes(panelId);
+  const [batchValues, setBatchValues] = useState<Record<number, string>>({});
 
   const setActivePatient = useUiStore((s) => s.setActivePatient);
   const navigate = useUiStore((s) => s.navigate);
 
   const { isVetOrAdmin } = usePermissions();
   const [confirmAnular, setConfirmAnular] = useState(false);
+  const [showRejectInput, setShowRejectInput] = useState(false);
+  const [rejectReason, setRejectReason] = useState("");
+  const [criticalAlert, setCriticalAlert] = useState<LabResult[]>([]);
   const [aiInterpretation, setAiInterpretation] = useState<string | null>(null);
   const [interpreting, setInterpreting] = useState(false);
   const aiRef = useRef<HTMLDivElement | null>(null);
@@ -146,10 +170,23 @@ export function SampleDetailDialog({
   const resetForm = () => {
     resultForm.reset({ analyteId: 0, value: 0 });
     setConfirmAnular(false);
+    setShowRejectInput(false);
+    setRejectReason("");
+    setCriticalAlert([]);
     setAiInterpretation(null);
     setPreviewAttachment(null);
     setConfirmDelete(false);
   };
+
+  // Panel disponible para esta muestra: específico del tipo o genérico.
+  const availablePanels = panels.filter(
+    (p) => p.sampleTypeId == null || p.sampleTypeId === sample?.sampleTypeId,
+  );
+  useEffect(() => {
+    if (open && availablePanels.length > 0 && panelId == null) {
+      setPanelId(availablePanels[0].id);
+    }
+  }, [open, availablePanels, panelId]);
 
   const pending = registerResult.isPending || setStatus.isPending;
 
@@ -165,8 +202,113 @@ export function SampleDetailDialog({
         description: `Valor ${result.value} · estado ${RESULT_STATUS[result.status]?.label ?? result.status}.`,
       });
       resultForm.reset({ analyteId: 0, value: 0 });
+      if (result.isCritical) {
+        setCriticalAlert([result]);
+      }
     } catch (err) {
       toast.error("No se pudo registrar el resultado", {
+        description: getErrorMessage(err),
+      });
+    }
+  };
+
+  /** Carga en lote los valores de la grilla del panel (no vacíos). */
+  const submitBatch = async () => {
+    if (!sample) return;
+    const entries = Object.entries(batchValues)
+      .filter(([, v]) => v.trim() !== "")
+      .map(([analyteId, v]) => ({
+        sampleId: sample.id,
+        analyteId: Number(analyteId),
+        value: Number(v.replace(",", ".")),
+      }))
+      .filter((r) => !Number.isNaN(r.value));
+    if (entries.length === 0) {
+      toast.error("Ingresa al menos un valor en la grilla");
+      return;
+    }
+    try {
+      const results = await registerResults.mutateAsync({
+        sampleId: sample.id,
+        results: entries,
+      });
+      toast.success(`${results.length} resultado${results.length === 1 ? "" : "s"} cargados`);
+      setBatchValues({});
+      const critical = results.filter((r) => r.isCritical);
+      if (critical.length > 0) setCriticalAlert(critical);
+    } catch (err) {
+      toast.error("No se pudieron cargar los resultados", {
+        description: getErrorMessage(err),
+      });
+    }
+  };
+
+  /** Rechaza la muestra pidiendo el motivo obligatorio. */
+  const doReject = async () => {
+    if (!sample) return;
+    if (!showRejectInput) {
+      setShowRejectInput(true);
+      return;
+    }
+    if (!rejectReason.trim()) {
+      toast.error("Indica el motivo del rechazo");
+      return;
+    }
+    try {
+      const updated = await rejectSample.mutateAsync({
+        id: sample.id,
+        reason: rejectReason.trim(),
+      });
+      toast.success(`Muestra ${updated.code} rechazada`);
+      setShowRejectInput(false);
+      setRejectReason("");
+    } catch (err) {
+      toast.error("No se pudo rechazar la muestra", {
+        description: getErrorMessage(err),
+      });
+    }
+  };
+
+  const doReopen = async () => {
+    if (!sample) return;
+    try {
+      const updated = await reopenSample.mutateAsync(sample.id);
+      toast.success(`Muestra ${updated.code} reabierta (Recibida)`);
+    } catch (err) {
+      toast.error("No se pudo reabrir la muestra", {
+        description: getErrorMessage(err),
+      });
+    }
+  };
+
+  /** Guarda la calidad preanalítica editada en la ficha. */
+  const [qualityDraft, setQualityDraft] = useState<{
+    index: string | null;
+    severity: string | null;
+    note: string;
+  }>({ index: null, severity: null, note: "" });
+  const [qualityDirty, setQualityDirty] = useState(false);
+  const openQualityEditor = () => {
+    setQualityDraft({
+      index: sample?.qualityIndex ?? null,
+      severity: sample?.qualitySeverity ?? null,
+      note: sample?.qualityNote ?? "",
+    });
+    setQualityDirty(false);
+  };
+  const saveQuality = async () => {
+    if (!sample) return;
+    try {
+      await setQuality.mutateAsync({
+        id: sample.id,
+        qualityIndex: qualityDraft.index,
+        qualitySeverity: qualityDraft.severity,
+        qualityNote: qualityDraft.note.trim() || null,
+      });
+      toast.success("Calidad de la muestra actualizada");
+      setQualityDirty(false);
+    } catch (err) {
+      toast.error("No se pudo guardar la calidad", {
         description: getErrorMessage(err),
       });
     }
@@ -350,6 +492,26 @@ export function SampleDetailDialog({
     sendWhatsAppMessage(patient.ownerPhone, message);
   };
 
+  const criticalResults = sample?.results.filter((r) => r.isCritical) ?? [];
+
+  const handleWhatsAppCritical = (results: LabResult[]) => {
+    if (!patient?.ownerPhone || !patient?.ownerName || !patient?.name) {
+      toast.error("Falta información", {
+        description: "El paciente no tiene un número de teléfono del propietario registrado.",
+      });
+      return;
+    }
+    const lines = results
+      .map(
+        (r) =>
+          `- *${r.analyteName}*: ${r.value} ${r.unit ?? ""} (${RESULT_STATUS[r.status]?.label ?? r.status})`,
+      )
+      .join("\n");
+    const message = `*⚠ ALERTA: VALOR CRÍTICO DE LABORATORIO*\n\nHola ${patient.ownerName}, le informamos que el resultado de laboratorio de *${patient.name}* presenta un valor crítico que requiere atención inmediata:\n\n${lines}\n\nPor favor, contacte a su veterinario lo antes posible.\n\nISALAB`;
+    sendWhatsAppMessage(patient.ownerPhone, message);
+    setCriticalAlert([]);
+  };
+
   const handleInterpretAI = async () => {
     if (!sample) return;
     setInterpreting(true);
@@ -373,7 +535,9 @@ export function SampleDetailDialog({
   const StatusIcon = STATUS_ICON[sampleStatus] ?? FlaskConical;
   const canProcess = sampleStatus === "RECIBIDA";
   const canAnular = sampleStatus === "RECIBIDA" || sampleStatus === "EN_PROCESO";
+  const canReject = sampleStatus === "RECIBIDA" || sampleStatus === "EN_PROCESO";
   const canAddResult = sampleStatus === "RECIBIDA" || sampleStatus === "EN_PROCESO";
+  const isRejected = sampleStatus === "RECHAZADA";
   const canFinalize =
     (sampleStatus === "RECIBIDA" || sampleStatus === "EN_PROCESO") &&
     (sample?.results.length ?? 0) > 0;
@@ -475,6 +639,124 @@ export function SampleDetailDialog({
               <p className="text-muted-foreground text-sm">{sample.notes}</p>
             )}
 
+            {/* Calidad preanalítica (HIL) */}
+            {!qualityDirty && (sample.qualityIndex || isRejected) && (
+              <div
+                className={cn(
+                  "flex flex-wrap items-center gap-2 rounded-lg border px-3 py-2 text-sm",
+                  isRejected
+                    ? "bg-destructive/10 border-destructive/30"
+                    : "bg-warning/10 border-warning/30",
+                )}
+              >
+                <AlertTriangle className="size-4 shrink-0 text-warning" />
+                <span className="font-medium">
+                  {isRejected
+                    ? "Muestra rechazada"
+                    : QUALITY_INDEX_LABEL[sample.qualityIndex ?? ""] ?? sample.qualityIndex}
+                </span>
+                {sample.qualitySeverity && !isRejected && (
+                  <Badge variant="outline">
+                    {QUALITY_SEVERITY_LABEL[sample.qualitySeverity] ?? sample.qualitySeverity}
+                  </Badge>
+                )}
+                {sample.qualityNote && (
+                  <span className="text-muted-foreground text-xs">{sample.qualityNote}</span>
+                )}
+                {isRejected && sample.rejectionReason && (
+                  <span className="text-muted-foreground text-xs">
+                    Motivo: {sample.rejectionReason}
+                    {sample.rejectedBy ? ` · ${sample.rejectedBy}` : ""}
+                  </span>
+                )}
+                {!isRejected && canAddResult && (
+                  <Button
+                    variant="ghost"
+                    size="sm"
+                    className="ml-auto h-6 px-2 text-xs"
+                    onClick={openQualityEditor}
+                  >
+                    Editar calidad
+                  </Button>
+                )}
+              </div>
+            )}
+
+            {/* Editor de calidad preanalítica */}
+            {qualityDirty && (
+              <div className="space-y-3 rounded-lg border px-3 py-3">
+                <div className="grid gap-3 sm:grid-cols-2">
+                  <div>
+                    <FormLabel>Interferencia</FormLabel>
+                    <Select
+                      value={qualityDraft.index ?? ""}
+                      onValueChange={(v) => {
+                        setQualityDraft((d) => ({ ...d, index: v === "" ? null : v }));
+                        setQualityDirty(true);
+                      }}
+                    >
+                      <SelectTrigger className="mt-1">
+                        <SelectValue placeholder="Sin interferencia" />
+                      </SelectTrigger>
+                      <SelectContent>
+                        <SelectItem value="">Sin interferencia</SelectItem>
+                        {Object.entries(QUALITY_INDEX_LABEL)
+                          .filter(([k]) => k !== "NORMAL")
+                          .map(([k, v]) => (
+                            <SelectItem key={k} value={k}>
+                              {v}
+                            </SelectItem>
+                          ))}
+                      </SelectContent>
+                    </Select>
+                  </div>
+                  <div>
+                    <FormLabel>Severidad</FormLabel>
+                    <Select
+                      value={qualityDraft.severity ?? ""}
+                      onValueChange={(v) => {
+                        setQualityDraft((d) => ({ ...d, severity: v === "" ? null : v }));
+                        setQualityDirty(true);
+                      }}
+                      disabled={!qualityDraft.index}
+                    >
+                      <SelectTrigger className="mt-1">
+                        <SelectValue placeholder="Selecciona…" />
+                      </SelectTrigger>
+                      <SelectContent>
+                        {Object.entries(QUALITY_SEVERITY_LABEL).map(([k, v]) => (
+                          <SelectItem key={k} value={k}>
+                            {v}
+                          </SelectItem>
+                        ))}
+                      </SelectContent>
+                    </Select>
+                  </div>
+                </div>
+                <Input
+                  placeholder="Nota sobre la calidad (opcional)…"
+                  value={qualityDraft.note}
+                  onChange={(e) => {
+                    setQualityDraft((d) => ({ ...d, note: e.target.value }));
+                    setQualityDirty(true);
+                  }}
+                />
+                <div className="flex justify-end gap-2">
+                  <Button
+                    variant="ghost"
+                    size="sm"
+                    onClick={() => setQualityDirty(false)}
+                  >
+                    Cancelar
+                  </Button>
+                  <Button size="sm" onClick={saveQuality} disabled={setQuality.isPending}>
+                    {setQuality.isPending ? <Loader2 className="size-4 animate-spin" /> : null}
+                    Guardar calidad
+                  </Button>
+                </div>
+              </div>
+            )}
+
             {/* Resultados */}
             <div className="overflow-hidden rounded-lg border">
               <div className="bg-muted/60 flex items-center justify-between border-b px-3 py-2">
@@ -519,6 +801,7 @@ export function SampleDetailDialog({
                                 "font-mono font-semibold",
                                 r.status === "ALTO" && "text-warning",
                                 r.status === "BAJO" && "text-destructive",
+                                r.isCritical && "text-destructive animate-pulse",
                               )}
                             >
                               {r.value}
@@ -526,6 +809,20 @@ export function SampleDetailDialog({
                             {r.unit && (
                               <span className="text-muted-foreground ml-1 text-xs">
                                 {r.unit}
+                              </span>
+                            )}
+                            {r.deltaVariation != null && (
+                              <span
+                                title="Variación vs. resultado previo (delta check)"
+                                className={cn(
+                                  "ml-1 text-[11px] font-medium",
+                                  Math.abs(r.deltaVariation) >= 50
+                                    ? "text-destructive"
+                                    : "text-muted-foreground",
+                                )}
+                              >
+                                {r.deltaVariation >= 0 ? "▲" : "▼"}{" "}
+                                {Math.abs(r.deltaVariation).toFixed(1)}%
                               </span>
                             )}
                           </TableCell>
@@ -589,6 +886,82 @@ export function SampleDetailDialog({
                 </Table>
               )}
             </div>
+
+            {/* Carga rápida por panel (grilla) */}
+            {canAddResult && availablePanels.length > 0 && (
+              <div className="rounded-lg border">
+                <div className="bg-muted/60 flex flex-wrap items-center gap-2 border-b px-3 py-2">
+                  <p className="text-sm font-semibold">Carga rápida por panel</p>
+                  <Select
+                    value={panelId?.toString() ?? ""}
+                    onValueChange={(v) => setPanelId(Number(v))}
+                  >
+                    <SelectTrigger className="h-7 w-56 text-xs">
+                      <SelectValue placeholder="Selecciona panel…" />
+                    </SelectTrigger>
+                    <SelectContent>
+                      {availablePanels.map((p) => (
+                        <SelectItem key={p.id} value={p.id.toString()}>
+                          {p.name}
+                        </SelectItem>
+                      ))}
+                    </SelectContent>
+                  </Select>
+                </div>
+                {panelAnalytes.length > 0 ? (
+                  <div className="grid gap-2 p-3 sm:grid-cols-2">
+                    {panelAnalytes.map((pa) => {
+                      const existing = sample.results.find((r) => r.analyteId === pa.analyteId);
+                      return (
+                        <label key={pa.analyteId} className="flex items-center gap-2 text-sm">
+                          <span className="min-w-0 flex-1 truncate">
+                            {pa.analyteName}
+                            {pa.unit ? (
+                              <span className="text-muted-foreground text-xs"> ({pa.unit})</span>
+                            ) : null}
+                          </span>
+                          <Input
+                            type="number"
+                            step="any"
+                            inputMode="decimal"
+                            placeholder={
+                              existing != null ? `Actual: ${existing.value}` : "—"
+                            }
+                            className="h-8 w-28 font-mono text-xs"
+                            value={batchValues[pa.analyteId] ?? ""}
+                            onChange={(e) =>
+                              setBatchValues((prev) => ({
+                                ...prev,
+                                [pa.analyteId]: e.target.value,
+                              }))
+                            }
+                          />
+                        </label>
+                      );
+                    })}
+                  </div>
+                ) : (
+                  <p className="text-muted-foreground px-4 py-3 text-sm">
+                    El panel no tiene analitos configurados.
+                  </p>
+                )}
+                <div className="flex justify-end border-t px-3 py-2">
+                  <Button
+                    size="sm"
+                    onClick={submitBatch}
+                    disabled={registerResults.isPending}
+                    className="gap-1.5"
+                  >
+                    {registerResults.isPending ? (
+                      <Loader2 className="size-4 animate-spin" />
+                    ) : (
+                      <PlayCircle className="size-4" />
+                    )}
+                    Cargar valores del panel
+                  </Button>
+                </div>
+              </div>
+            )}
 
             {/* Carga de resultados */}
             {canAddResult && (
@@ -751,6 +1124,50 @@ export function SampleDetailDialog({
                 Poner en proceso
               </Button>
             )}
+            {canReject && (
+              <div className="flex items-center gap-2">
+                {showRejectInput ? (
+                  <>
+                    <Input
+                      autoFocus
+                      value={rejectReason}
+                      onChange={(e) => setRejectReason(e.target.value)}
+                      onKeyDown={(e) => e.key === "Enter" && doReject()}
+                      placeholder="Motivo del rechazo (obligatorio)…"
+                      className="h-9 w-52 text-xs"
+                    />
+                    <Button
+                      variant="destructive"
+                      onClick={doReject}
+                      disabled={rejectSample.isPending}
+                      className="h-9"
+                    >
+                      {rejectSample.isPending ? <Loader2 className="size-4 animate-spin" /> : null}
+                      Confirmar
+                    </Button>
+                  </>
+                ) : (
+                  <Button
+                    variant="outline"
+                    className="text-destructive hover:text-destructive"
+                    onClick={doReject}
+                  >
+                    <Ban className="size-4" />
+                    Rechazar
+                  </Button>
+                )}
+              </div>
+            )}
+            {isRejected && (
+              <Button
+                variant="outline"
+                onClick={doReopen}
+                disabled={reopenSample.isPending}
+              >
+                {reopenSample.isPending ? <Loader2 className="size-4 animate-spin" /> : null}
+                Reabrir (Recibida)
+              </Button>
+            )}
             {canAnular && (
               <Button
                 variant={confirmAnular ? "destructive" : "outline"}
@@ -789,6 +1206,16 @@ export function SampleDetailDialog({
                   <MessageCircle className="size-4" />
                   Enviar por WhatsApp
                 </Button>
+                {criticalResults.length > 0 && (
+                  <Button
+                    variant="destructive"
+                    className="gap-2 animate-pulse"
+                    onClick={() => setCriticalAlert(criticalResults)}
+                  >
+                    <Siren className="size-4" />
+                    Notificar valor crítico
+                  </Button>
+                )}
                 {isVetOrAdmin && (
                   <Button
                     variant="outline"
@@ -878,6 +1305,45 @@ export function SampleDetailDialog({
             }}
           >
             Cerrar
+          </Button>
+        </DialogFooter>
+      </DialogContent>
+    </Dialog>
+
+    {/* Alerta de valor crítico: requiere confirmación del analista y ofrece
+        notificación prioritaria por WhatsApp. */}
+    <Dialog open={criticalAlert.length > 0} onOpenChange={(o) => !o && setCriticalAlert([])}>
+      <DialogContent className="sm:max-w-md">
+        <DialogHeader>
+          <DialogTitle className="flex items-center gap-2 text-destructive">
+            <Siren className="size-5 animate-pulse" />
+            Valor(es) crítico(s) registrado(s)
+          </DialogTitle>
+          <DialogDescription>
+            Se registró un resultado fuera del umbral crítico. Confirma que lo
+            revisaste y, si corresponde, notifica al propietario de inmediato.
+          </DialogDescription>
+        </DialogHeader>
+        <div className="space-y-2 rounded-lg border border-destructive/30 bg-destructive/5 p-3">
+          {criticalAlert.map((r) => (
+            <div key={r.id} className="flex items-center justify-between text-sm">
+              <span className="font-medium">{r.analyteName}</span>
+              <span className="font-mono font-semibold text-destructive">
+                {r.value} {r.unit ?? ""}
+                <span className="ml-2 font-normal">
+                  {RESULT_STATUS[r.status]?.label ?? r.status}
+                </span>
+              </span>
+            </div>
+          ))}
+        </div>
+        <DialogFooter className="sm:justify-between">
+          <Button variant="ghost" onClick={() => setCriticalAlert([])}>
+            Entendido
+          </Button>
+          <Button variant="destructive" onClick={() => handleWhatsAppCritical(criticalAlert)}>
+            <MessageCircle className="size-4" />
+            Notificar por WhatsApp
           </Button>
         </DialogFooter>
       </DialogContent>

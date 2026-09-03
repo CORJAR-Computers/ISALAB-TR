@@ -18,6 +18,7 @@ describe("SAMPLE_STATUS", () => {
       "EN_PROCESO",
       "FINALIZADA",
       "ANULADA",
+      "RECHAZADA",
     ]);
   });
 
@@ -37,6 +38,11 @@ describe("SAMPLE_STATUS", () => {
   it("ANULADA has destructive variant", () => {
     expect(SAMPLE_STATUS.ANULADA.variant).toBe("destructive");
   });
+
+  it("RECHAZADA has destructive variant", () => {
+    expect(SAMPLE_STATUS.RECHAZADA.variant).toBe("destructive");
+    expect(SAMPLE_STATUS.RECHAZADA.label).toBe("Rechazada");
+  });
 });
 
 describe("RESULT_STATUS", () => {
@@ -46,6 +52,8 @@ describe("RESULT_STATUS", () => {
       "ALTO",
       "BAJO",
       "SIN_RANGO",
+      "CRITICO_ALTO",
+      "CRITICO_BAJO",
     ]);
   });
 
@@ -66,6 +74,15 @@ describe("RESULT_STATUS", () => {
 
   it("SIN_RANGO has outline variant", () => {
     expect(RESULT_STATUS.SIN_RANGO.variant).toBe("outline");
+  });
+
+  it("CRITICO_ALTO has destructive pulse variant", () => {
+    expect(RESULT_STATUS.CRITICO_ALTO.variant).toBe("destructive");
+    expect(RESULT_STATUS.CRITICO_ALTO.className).toContain("animate-pulse");
+  });
+
+  it("CRITICO_BAJO has destructive pulse variant", () => {
+    expect(RESULT_STATUS.CRITICO_BAJO.variant).toBe("destructive");
   });
 });
 

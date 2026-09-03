@@ -24,11 +24,17 @@ pub struct LabResult {
     pub analyte_name: String,
     pub unit: Option<String>,
     pub value: f64,
-    /// BAJO | NORMAL | ALTO | SIN_RANGO (calculado por SP_VALIDATE_ANALYTICAL_RESULT)
+    /// BAJO | NORMAL | ALTO | SIN_RANGO | CRITICO_BAJO | CRITICO_ALTO
+    /// (calculado por SP_VALIDATE_ANALYTICAL_RESULT)
     pub status: String,
     pub ref_min: Option<f64>,
     pub ref_max: Option<f64>,
     pub analyzed_at: Option<String>,
+    /// Variación porcentual contra el resultado previo del mismo analito en
+    /// este paciente (delta check). None = sin historial previo.
+    pub delta_variation: Option<f64>,
+    /// True cuando el estado es CRITICO_BAJO o CRITICO_ALTO.
+    pub is_critical: bool,
     /// Evidencias adjuntas (placas, frotis, electroforesis) para soporte del diagnóstico.
     pub attachments: Vec<ResultAttachment>,
 }
@@ -62,6 +68,16 @@ pub struct Sample {
     /// Nombre del equipo (para la UI y el reporte PDF).
     pub analyzer_name: Option<String>,
     pub results: Vec<LabResult>,
+    /// Interferencia preanalítica (NORMAL | HEMOLISIS | LIPEMIA | ICTERICIA |
+    /// COAGULO | INSUFICIENTE | CONTAMINADA); NULL = sin interferencia.
+    pub quality_index: Option<String>,
+    /// Severidad de la interferencia (LEVE | MODERADA | MARCADA).
+    pub quality_severity: Option<String>,
+    pub quality_note: Option<String>,
+    /// Datos del rechazo (solo si la muestra quedó RECHAZADA).
+    pub rejected_at: Option<String>,
+    pub rejected_by: Option<String>,
+    pub rejection_reason: Option<String>,
 }
 
 #[derive(Debug, Clone, Serialize, Deserialize, Type)]
@@ -74,6 +90,10 @@ pub struct CreateSampleInput {
     pub notes: Option<String>,
     /// Equipo analizador (NULL = perfil GENERAL/estándar).
     pub analyzer_id: Option<i32>,
+    /// Calidad preanalítica de la recepción (opcional).
+    pub quality_index: Option<String>,
+    pub quality_severity: Option<String>,
+    pub quality_note: Option<String>,
 }
 
 #[derive(Debug, Clone, Serialize, Deserialize, Type)]
@@ -82,6 +102,15 @@ pub struct RegisterResultInput {
     pub sample_id: i32,
     pub analyte_id: i32,
     pub value: f64,
+}
+
+/// Carga por lotes: varios resultados de una misma muestra en una sola
+/// llamada (grilla de panel o importación desde analizador).
+#[derive(Debug, Clone, Serialize, Deserialize, Type)]
+#[serde(rename_all = "camelCase")]
+pub struct RegisterResultsInput {
+    pub sample_id: i32,
+    pub results: Vec<RegisterResultInput>,
 }
 
 // ===== Payloads de los eventos Firebird → frontend =====

@@ -5,6 +5,7 @@ pub mod auth;
 pub mod commands;
 pub mod crypto;
 pub mod csv;
+pub mod csv_parse;
 pub mod db;
 pub mod error;
 pub mod models;
@@ -39,12 +40,18 @@ use crate::commands::clinical_history::{
 use crate::commands::dashboard::get_dashboard_stats;
 use crate::commands::db::{create_local_backup, db_health};
 use crate::commands::exports::{export_results_csv, export_samples_csv};
+use crate::commands::import::{import_analyzer_results, preview_analyzer_import};
 use crate::commands::invoices::{
     count_invoices, create_invoice, get_invoice, list_invoices, set_invoice_status,
 };
+use crate::commands::panels::{delete_panel, list_panel_analytes, list_panels, save_panel};
 use crate::commands::patients::{
     create_patient, get_patient, get_patient_by_code, get_patient_lab_trends, list_owners,
     list_patients,
+};
+use crate::commands::qc::{
+    delete_qc_material, delete_qc_run, get_qc_chart, list_qc_analyzer_status, list_qc_materials,
+    list_qc_runs, list_qc_targets, record_qc_run, save_qc_material,
 };
 use crate::commands::reports::{
     generate_carnet_vacunacion, generate_certificado_cirugia, generate_clinical_report,
@@ -53,7 +60,7 @@ use crate::commands::reports::{
 };
 use crate::commands::samples::{
     count_samples, create_sample, get_sample, get_worklist, list_samples, register_lab_result,
-    set_sample_status,
+    register_lab_results, reject_sample, reopen_sample, set_sample_quality, set_sample_status,
 };
 use crate::commands::search::global_search;
 use crate::commands::settings::{
@@ -89,11 +96,30 @@ fn specta_builder() -> Builder<tauri::Wry> {
             create_consultation,
             create_sample,
             register_lab_result,
+            register_lab_results,
             get_worklist,
             list_samples,
             count_samples,
             get_sample,
             set_sample_status,
+            set_sample_quality,
+            reject_sample,
+            reopen_sample,
+            preview_analyzer_import,
+            import_analyzer_results,
+            list_panels,
+            list_panel_analytes,
+            save_panel,
+            delete_panel,
+            list_qc_materials,
+            list_qc_targets,
+            save_qc_material,
+            delete_qc_material,
+            record_qc_run,
+            list_qc_runs,
+            delete_qc_run,
+            get_qc_chart,
+            list_qc_analyzer_status,
             get_clinic_settings,
             save_clinic_settings,
             import_clinic_logo,

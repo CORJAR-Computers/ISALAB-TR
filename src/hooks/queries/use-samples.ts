@@ -1,6 +1,12 @@
 import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
 import { api } from "@/lib/api";
-import type { CreateSampleInput, RegisterResultInput } from "@/bindings";
+import type {
+  AnalyzerImportMapping,
+  CreateSampleInput,
+  PanelInput,
+  RegisterResultInput,
+  RegisterResultsInput,
+} from "@/bindings";
 
 export function useSamples(status: string | null, search: string, enabled = true) {
   return useQuery({
@@ -63,6 +69,119 @@ export function useRegisterLabResult() {
       qc.invalidateQueries({ queryKey: ["sample-counts"] });
       qc.invalidateQueries({ queryKey: ["worklist"] });
       qc.invalidateQueries({ queryKey: ["sample", result.sampleId] });
+    },
+  });
+}
+
+/** Carga por lotes (grilla de panel / importación): invalida la ficha y los
+ *  contadores de la mesa de trabajo. */
+export function useRegisterLabResults() {
+  const qc = useQueryClient();
+  return useMutation({
+    mutationFn: (input: RegisterResultsInput) => api.registerLabResults(input),
+    onSuccess: (results) => {
+      const sampleId = results[0]?.sampleId;
+      qc.invalidateQueries({ queryKey: ["clinical-history"] });
+      qc.invalidateQueries({ queryKey: ["samples"] });
+      qc.invalidateQueries({ queryKey: ["sample-counts"] });
+      qc.invalidateQueries({ queryKey: ["worklist"] });
+      if (sampleId != null) qc.invalidateQueries({ queryKey: ["sample", sampleId] });
+    },
+  });
+}
+
+/** Registra la calidad preanalítica (interferencia HIL) de una muestra. */
+export function useSetSampleQuality() {
+  const qc = useQueryClient();
+  return useMutation({
+    mutationFn: (input: {
+      id: number;
+      qualityIndex: string | null;
+      qualitySeverity: string | null;
+      qualityNote: string | null;
+    }) => api.setSampleQuality(input.id, input.qualityIndex, input.qualitySeverity, input.qualityNote),
+    onSuccess: (sample) => {
+      qc.invalidateQueries({ queryKey: ["samples"] });
+      qc.invalidateQueries({ queryKey: ["sample", sample.id] });
+    },
+  });
+}
+
+/** Rechaza una muestra con motivo (RECIBIDA/EN_PROCESO → RECHAZADA). */
+export function useRejectSample() {
+  const qc = useQueryClient();
+  return useMutation({
+    mutationFn: ({ id, reason }: { id: number; reason: string }) =>
+      api.rejectSample(id, reason),
+    onSuccess: (sample) => {
+      qc.invalidateQueries({ queryKey: ["samples"] });
+      qc.invalidateQueries({ queryKey: ["sample-counts"] });
+      qc.invalidateQueries({ queryKey: ["worklist"] });
+      qc.invalidateQueries({ queryKey: ["sample", sample.id] });
+    },
+  });
+}
+
+/** Reabre una muestra rechazada (RECHAZADA → RECIBIDA). */
+export function useReopenSample() {
+  const qc = useQueryClient();
+  return useMutation({
+    mutationFn: (id: number) => api.reopenSample(id),
+    onSuccess: (sample) => {
+      qc.invalidateQueries({ queryKey: ["samples"] });
+      qc.invalidateQueries({ queryKey: ["sample-counts"] });
+      qc.invalidateQueries({ queryKey: ["worklist"] });
+      qc.invalidateQueries({ queryKey: ["sample", sample.id] });
+    },
+  });
+}
+
+// ---- Paneles de analitos ----
+
+export function usePanels() {
+  return useQuery({ queryKey: ["panels"], queryFn: api.listPanels });
+}
+
+export function usePanelAnalytes(panelId: number | null) {
+  return useQuery({
+    queryKey: ["panel-analytes", panelId],
+    queryFn: () => api.listPanelAnalytes(panelId!),
+    enabled: panelId != null,
+  });
+}
+
+export function useSavePanel() {
+  const qc = useQueryClient();
+  return useMutation({
+    mutationFn: (input: PanelInput) => api.savePanel(input),
+    onSuccess: () => qc.invalidateQueries({ queryKey: ["panels"] }),
+  });
+}
+
+export function useDeletePanel() {
+  const qc = useQueryClient();
+  return useMutation({
+    mutationFn: (id: number) => api.deletePanel(id),
+    onSuccess: () => qc.invalidateQueries({ queryKey: ["panels"] }),
+  });
+}
+
+// ---- Importación desde analizador (CSV) ----
+
+export function usePreviewAnalyzerImport() {
+  return useMutation({ mutationFn: (path: string) => api.previewAnalyzerImport(path) });
+}
+
+export function useImportAnalyzerResults() {
+  const qc = useQueryClient();
+  return useMutation({
+    mutationFn: (input: { path: string; mapping: AnalyzerImportMapping }) =>
+      api.importAnalyzerResults(input.path, input.mapping),
+    onSuccess: () => {
+      qc.invalidateQueries({ queryKey: ["samples"] });
+      qc.invalidateQueries({ queryKey: ["sample-counts"] });
+      qc.invalidateQueries({ queryKey: ["worklist"] });
+      qc.invalidateQueries({ queryKey: ["clinical-history"] });
     },
   });
 }

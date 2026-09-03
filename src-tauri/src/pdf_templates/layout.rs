@@ -213,6 +213,32 @@ pub fn draw_results_full(
         return;
     }
 
+    let criticals: Vec<&crate::models::sample::LabResult> =
+        results.iter().filter(|r| r.is_critical).collect();
+
+    // ---- Alerta visual si hay valores críticos (CRITICO_ALTO/CRITICO_BAJO) ----
+    if !criticals.is_empty() {
+        let band_h = 11.0;
+        pdf.ensure_space(band_h + 8.0);
+        let band_top = pdf.y;
+        pdf.rect(
+            MARGIN,
+            band_top,
+            CONTENT_W,
+            band_h,
+            Some((196, 22, 22)),
+            None,
+        );
+        pdf.text_centered(
+            true,
+            "! RESULTADO CRITICO - ATENCION INMEDIATA !",
+            10.5,
+            band_top - band_h + 2.2,
+            (255, 255, 255),
+        );
+        pdf.y = band_top - band_h - 4.0;
+    }
+
     // Anchos de columna en mm (Suma = 185.9 CONTENT_W)
     let w_item = 68.0;
     let w_res = 28.0;
@@ -255,20 +281,22 @@ pub fn draw_results_full(
     // Filas de datos
     for (idx, r) in results.iter().enumerate() {
         pdf.ensure_space(row_h + 1.0);
-        let bg_color = if idx % 2 == 1 {
+        // Los valores críticos se resaltan: fondo rojo claro + borde rojo intenso.
+        let is_crit = r.is_critical;
+        let bg_color = if is_crit {
+            Some((254, 226, 226)) // #FEE2E2 rojo claro
+        } else if idx % 2 == 1 {
             Some((244, 247, 250)) // #F4F7FA
         } else {
             Some((255, 255, 255))
         };
+        let border_color = if is_crit {
+            Some((196, 22, 22)) // borde rojo para el estado crítico
+        } else {
+            Some((226, 232, 240))
+        };
 
-        pdf.rect(
-            MARGIN,
-            pdf.y,
-            CONTENT_W,
-            row_h,
-            bg_color,
-            Some((226, 232, 240)),
-        );
+        pdf.rect(MARGIN, pdf.y, CONTENT_W, row_h, bg_color, border_color);
         let y_row_text = pdf.y - 4.8;
 
         // 1. Ítem (Nombre + Código corto ej: WBC#)
@@ -285,12 +313,17 @@ pub fn draw_results_full(
             pdf.text(false, code, 7.5, MARGIN + 48.0, y_row_text, C_MUTED);
         }
 
-        // 2. Resultados (Destacado en Negrita, Rojo si ALTO, Azul si BAJO, Negro si NORMAL)
+        // 2. Resultados (Destacado en Negrita; Rojo intenso si CRITICO,
+        //    Rojo si ALTO, Azul si BAJO, Negro si NORMAL)
         let val_str = format_value(r.value);
-        let val_color = match r.status.as_str() {
-            "ALTO" => (217, 56, 56), // Red #D93838
-            "BAJO" => (0, 130, 200), // Blue #0082C8
-            _ => C_TEXT,
+        let val_color = if is_crit {
+            (196, 22, 22) // Rojo intenso: valor crítico
+        } else {
+            match r.status.as_str() {
+                "ALTO" => (217, 56, 56), // Red #D93838
+                "BAJO" => (0, 130, 200), // Blue #0082C8
+                _ => C_TEXT,
+            }
         };
         pdf.text(
             true,
@@ -338,6 +371,37 @@ pub fn draw_results_full(
     };
     pdf.text(false, &técnica, 7.5, MARGIN + 12.0, pdf.y, (80, 80, 80));
     pdf.y -= 7.0;
+
+    // Valores críticos detectados: resumen destacado en rojo antes de las observaciones.
+    if !criticals.is_empty() {
+        pdf.ensure_space(6.0);
+        pdf.text(true, "Valores criticos:", 8.5, MARGIN, pdf.y, (196, 22, 22));
+        pdf.y -= 5.0;
+        for c in &criticals {
+            pdf.ensure_space(5.5);
+            let st = if c.status == "CRITICO_ALTO" {
+                "CRITICO ALTO"
+            } else {
+                "CRITICO BAJO"
+            };
+            let unit = c.unit.as_deref().unwrap_or("");
+            let unit_str = if unit.is_empty() {
+                String::new()
+            } else {
+                format!(" {unit}")
+            };
+            let line = format!(
+                "{} {}{} - {}",
+                c.analyte_name,
+                format_value(c.value),
+                unit_str,
+                st
+            );
+            pdf.text(true, &line, 8.5, MARGIN + 4.0, pdf.y, (196, 22, 22));
+            pdf.y -= 5.0;
+        }
+        pdf.y -= 1.0;
+    }
 
     // Observaciones
     pdf.ensure_space(20.0);
