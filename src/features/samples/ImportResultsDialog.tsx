@@ -164,8 +164,6 @@ export function ImportResultsDialog({
     }
   };
 
-  const analyteName = (id: number) => analytes.find((a) => a.id === id)?.name ?? `Analito ${id}`;
-
   return (
     <Dialog open={open} onOpenChange={onOpenChange}>
       <DialogContent className="sm:max-w-3xl">
