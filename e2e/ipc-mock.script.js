@@ -158,6 +158,7 @@
         abnormalResults: list.filter((s) => s.abnormalCount > 0).length,
         avgProcessingHours: null,
         abnormalRate: null,
+        turnaroundBySampleType: [],
         weeklyVolume,
         topAnalytes: [],
         consultationsPending: 0,
@@ -173,6 +174,30 @@
     },
     list_sample_types: () => sampleTypes,
     list_analytes: () => analytes,
+    // Contadores por estado (v0.5.0): filas StatusCount + ABNORMAL/CRITICAL.
+    count_samples: () => {
+      const items = samples.map(toListItem);
+      const rows = [];
+      const seen = {};
+      for (const s of items) {
+        seen[s.status] = (seen[s.status] ?? 0) + 1;
+      }
+      for (const [status, count] of Object.entries(seen)) {
+        rows.push({ status, count });
+      }
+      rows.push({
+        status: "ABNORMAL",
+        count: items.filter((i) => (i.abnormalCount ?? 0) > 0).length,
+      });
+      rows.push({
+        status: "CRITICAL",
+        count: items.filter((i) => (i.criticalCount ?? 0) > 0).length,
+      });
+      return rows;
+    },
+    list_panels: () => [],
+    list_panel_analytes: () => [],
+    list_qc_analyzer_status: () => [],
     list_analyzers: () => [
       {
         id: 1,
