@@ -66,6 +66,22 @@ pub const MIGRATIONS: &[(&str, &str)] = &[
         "0015_critical_values",
         include_str!("../../migrations/0015_critical_values.sql"),
     ),
+    (
+        "0016_sample_events",
+        include_str!("../../migrations/0016_sample_events.sql"),
+    ),
+    (
+        "0017_notifications",
+        include_str!("../../migrations/0017_notifications.sql"),
+    ),
+    (
+        "0018_lab_orders",
+        include_str!("../../migrations/0018_lab_orders.sql"),
+    ),
+    (
+        "0019_analyzer_sources",
+        include_str!("../../migrations/0019_analyzer_sources.sql"),
+    ),
 ];
 
 /// Indica si una migración de datos de demostración debe aplicarse.

@@ -1,0 +1,63 @@
+-- ============================================================================
+-- ISALAB · Migración 0018 — Órdenes de laboratorio (LAB_ORDERS)
+-- El veterinario solicita pruebas (paneles/analitos); la recepción convierte
+-- la orden en una o más muestras (accessioning) ligadas por ORDER_ID, de modo
+-- que la ficha de la muestra precarga los paneles pedidos. Las facturas
+-- pueden vincularse a la orden (INVOICE_ITEMS.ORDER_ID) para facturación.
+-- ============================================================================
+
+CREATE TABLE LAB_ORDERS (
+    ID              D_PK NOT NULL PRIMARY KEY,
+    -- Código O-YYYY-NNNN (trigger BI_LAB_ORDERS).
+    CODE            D_CODE NOT NULL UNIQUE,
+    PATIENT_ID      D_PK NOT NULL REFERENCES PATIENTS (ID) ON DELETE CASCADE,
+    CONSULTATION_ID D_PK REFERENCES CONSULTATIONS (ID) ON DELETE SET NULL,
+    -- Veterinario que solicita las pruebas.
+    REQUESTED_BY    D_NAME,
+    PRIORITY        VARCHAR(12) CHARACTER SET UTF8 DEFAULT 'NORMAL' NOT NULL
+                    CHECK (PRIORITY IN ('NORMAL', 'URGENTE')),
+    -- SOLICITADA | RECIBIDA | EN_PROCESO | COMPLETADA | ANULADA
+    STATUS          VARCHAR(20) CHARACTER SET UTF8 DEFAULT 'SOLICITADA' NOT NULL,
+    NOTES           D_NOTES,
+    REQUESTED_AT    TIMESTAMP DEFAULT CURRENT_TIMESTAMP NOT NULL,
+    CREATED_AT      TIMESTAMP DEFAULT CURRENT_TIMESTAMP NOT NULL,
+    UPDATED_AT      TIMESTAMP DEFAULT CURRENT_TIMESTAMP NOT NULL
+);
+CREATE GENERATOR GEN_LAB_ORDERS_ID;
+
+CREATE TABLE LAB_ORDER_ITEMS (
+    ID          D_PK NOT NULL PRIMARY KEY,
+    ORDER_ID    D_PK NOT NULL REFERENCES LAB_ORDERS (ID) ON DELETE CASCADE,
+    -- Prueba pedida: un panel y/o un analito suelto.
+    PANEL_ID    D_PK REFERENCES PANELS (ID) ON DELETE SET NULL,
+    ANALYTE_ID  D_PK REFERENCES ANALYTES (ID) ON DELETE SET NULL,
+    SEQ         INTEGER DEFAULT 0 NOT NULL,
+    CHECK (PANEL_ID IS NOT NULL OR ANALYTE_ID IS NOT NULL)
+);
+CREATE GENERATOR GEN_LAB_ORDER_ITEMS_ID;
+
+CREATE INDEX IX_LAB_ORDERS_PATIENT ON LAB_ORDERS (PATIENT_ID);
+CREATE INDEX IX_LAB_ORDER_ITEMS_ORDER ON LAB_ORDER_ITEMS (ORDER_ID);
+
+-- Muestra accesionada desde la orden (para precargar paneles en la ficha).
+ALTER TABLE SAMPLES ADD ORDER_ID D_PK REFERENCES LAB_ORDERS (ID) ON DELETE SET NULL;
+
+-- Vínculo opcional factura → orden de laboratorio.
+ALTER TABLE INVOICE_ITEMS ADD ORDER_ID D_PK REFERENCES LAB_ORDERS (ID) ON DELETE SET NULL;
+
+SET TERM ^ ;
+
+CREATE TRIGGER BI_LAB_ORDERS FOR LAB_ORDERS BEFORE INSERT AS
+BEGIN
+    IF (NEW.ID IS NULL) THEN NEW.ID = GEN_ID(GEN_LAB_ORDERS_ID, 1);
+    IF (NEW.CODE IS NULL) THEN
+        NEW.CODE = 'O-' || EXTRACT(YEAR FROM NEW.REQUESTED_AT) || '-' ||
+                   LPAD(NEW.ID, 4, '0');
+END^
+
+CREATE TRIGGER BI_LAB_ORDER_ITEMS FOR LAB_ORDER_ITEMS BEFORE INSERT AS
+BEGIN
+    IF (NEW.ID IS NULL) THEN NEW.ID = GEN_ID(GEN_LAB_ORDER_ITEMS_ID, 1);
+END^
+
+SET TERM ; ^

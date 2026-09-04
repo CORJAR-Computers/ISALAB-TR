@@ -3,7 +3,10 @@ import type {
   Analyte,
   StatusCount,
   Analyzer,
+  AnalyzerImportJob,
   AnalyzerImportMapping,
+  AnalyzerSource,
+  SaveAnalyzerSourceInput,
   AppError,
   AuditLogEntry,
   Breed,
@@ -28,6 +31,7 @@ import type {
   Invoice,
   InvoiceListItem,
   LabResult,
+  NotificationLogEntry,
   LoginInput,
   Owner,
   Panel,
@@ -48,6 +52,7 @@ import type {
   ReportFile,
   ResultAttachment,
   Sample,
+  SampleEvent,
   SampleListItem,
   SampleType,
   SessionUser,
@@ -133,6 +138,15 @@ export const api = {
   rejectSample: (id: number, reason: string) =>
     invoke<Sample>("reject_sample", { id, reason }),
   reopenSample: (id: number) => invoke<Sample>("reopen_sample", { id }),
+  listSampleEvents: (sampleId: number) =>
+    invoke<SampleEvent[]>("list_sample_events", { sampleId }),
+  listSampleNotifications: (sampleId: number) =>
+    invoke<NotificationLogEntry[]>("list_sample_notifications", { sampleId }),
+  acknowledgeCritical: (sampleId: number, resultIds: number[]) =>
+    invoke<NotificationLogEntry[]>("acknowledge_critical", { sampleId, resultIds }),
+  sendCriticalEmail: (sampleId: number, resultIds: number[]) =>
+    invoke<NotificationLogEntry[]>("send_critical_email", { sampleId, resultIds }),
+  testSmtpConnection: () => invoke<void>("test_smtp_connection"),
 
   // ---- Importación desde analizador (CSV) ----
   previewAnalyzerImport: (path: string) =>
@@ -188,6 +202,24 @@ export const api = {
     invoke<ReferenceRange>("update_reference_range", { id, input }),
   deleteReferenceRange: (id: number) =>
     invoke<void>("delete_reference_range", { id }),
+
+  // ---- Importación automática (carpetas vigiladas) ----
+  listAnalyzerSources: () => invoke<AnalyzerSource[]>("list_analyzer_sources"),
+  saveAnalyzerSource: (input: SaveAnalyzerSourceInput) =>
+    invoke<AnalyzerSource | null>("save_analyzer_source", { input }),
+  deleteAnalyzerSource: (id: number) =>
+    invoke<void>("delete_analyzer_source", { id }),
+  pollAnalyzerSource: (sourceId: number) =>
+    invoke<AnalyzerImportJob[]>("poll_analyzer_source", { sourceId }),
+  listAnalyzerImportJobs: (sourceId: number, limit: number) =>
+    invoke<AnalyzerImportJob[]>("list_analyzer_import_jobs", {
+      sourceId,
+      limit,
+    }),
+  listFailedAnalyzerImports: (limit: number) =>
+    invoke<AnalyzerImportJob[]>("list_failed_analyzer_imports", { limit }),
+  deleteAnalyzerImportJob: (jobId: number) =>
+    invoke<void>("delete_analyzer_import_job", { jobId }),
 
   // ---- Configuración ----
   getClinicSettings: () => invoke<ClinicSettings>("get_clinic_settings"),

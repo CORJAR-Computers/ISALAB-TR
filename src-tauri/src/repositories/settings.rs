@@ -5,7 +5,7 @@ use crate::error::AppError;
 use crate::models::settings::ClinicSettings;
 
 /// Mapa de clave → valor de la tabla CLINIC_SETTINGS.
-const SETTING_KEYS: [(&str, &str); 13] = [
+const SETTING_KEYS: [(&str, &str); 19] = [
     ("clinic.name", "clinic_name"),
     ("clinic.nit", "clinic_nit"),
     ("clinic.address", "address"),
@@ -19,6 +19,12 @@ const SETTING_KEYS: [(&str, &str); 13] = [
     ("report.vet_license", "vet_license"),
     ("ai.groq_api_key", "groq_api_key"),
     ("report.pkcs12_path", "pkcs12_path"),
+    ("smtp.host", "smtp_host"),
+    ("smtp.port", "smtp_port"),
+    ("smtp.tls", "smtp_tls"),
+    ("smtp.username", "smtp_username"),
+    ("smtp.password", "smtp_password"),
+    ("smtp.from", "smtp_from"),
     // pkcs12_password NUNCA se persiste en base de datos
 ];
 
@@ -109,6 +115,24 @@ pub fn get(conn: &mut SimpleConnection) -> Result<ClinicSettings, AppError> {
                 }
             }
             "pkcs12_path" => s.pkcs12_path = v.filter(|x| !x.is_empty()),
+            "smtp_host" => s.smtp_host = v.filter(|x| !x.is_empty()),
+            "smtp_port" => {
+                if let Some(val) = v {
+                    s.smtp_port = val.parse().ok();
+                }
+            }
+            "smtp_tls" => s.smtp_tls = v.filter(|x| !x.is_empty()),
+            "smtp_username" => s.smtp_username = v.filter(|x| !x.is_empty()),
+            "smtp_password" => {
+                if let Some(stored) = v {
+                    match crate::crypto::decrypt_from_db(&stored) {
+                        Ok(Some(plain)) => s.smtp_password = Some(plain),
+                        Ok(None) => s.smtp_password = Some(stored),
+                        Err(_) => s.smtp_password = None,
+                    }
+                }
+            }
+            "smtp_from" => s.smtp_from = v.filter(|x| !x.is_empty()),
             _ => {}
         }
     }
@@ -130,6 +154,12 @@ pub fn save(
         _ => None,
     };
 
+    // Igual para la contraseña SMTP (DPAPI antes de persistir).
+    let smtp_encrypted: Option<String> = match input.smtp_password.as_deref() {
+        Some(p) if !p.trim().is_empty() => Some(crate::crypto::encrypt_to_db(p)?),
+        _ => None,
+    };
+
     // Reutiliza SETTING_KEYS: el listado de claves vive en un solo lugar.
     for (key, field) in SETTING_KEYS {
         let v: Option<String> = match field {
@@ -146,6 +176,12 @@ pub fn save(
             "vet_license" => input.vet_license.clone(),
             "groq_api_key" => groq_encrypted.clone(),
             "pkcs12_path" => input.pkcs12_path.clone(),
+            "smtp_host" => input.smtp_host.clone(),
+            "smtp_port" => input.smtp_port.map(|p| p.to_string()),
+            "smtp_tls" => input.smtp_tls.clone(),
+            "smtp_username" => input.smtp_username.clone(),
+            "smtp_password" => smtp_encrypted.clone(),
+            "smtp_from" => input.smtp_from.clone(),
             _ => None,
         };
 
@@ -215,10 +251,20 @@ mod tests {
             groq_api_key: Some("gsk_test_key".to_string()),
             pkcs12_path: None,
             pkcs12_password: None,
+            smtp_host: Some("smtp.gmail.com".to_string()),
+            smtp_port: Some(587),
+            smtp_tls: Some("STARTTLS".to_string()),
+            smtp_username: Some("lab@pethealth.com".to_string()),
+            smtp_password: Some("smtp_secret".to_string()),
+            smtp_from: Some("ISALAB <lab@pethealth.com>".to_string()),
         };
 
         let saved = save(&mut conn, &input).unwrap();
         assert_eq!(saved.clinic_name, "Pet Health Clinic");
+        assert_eq!(saved.smtp_host.as_deref(), Some("smtp.gmail.com"));
+        assert_eq!(saved.smtp_port, Some(587));
+        assert_eq!(saved.smtp_username.as_deref(), Some("lab@pethealth.com"));
+        assert_eq!(saved.smtp_password.as_deref(), Some("smtp_secret"));
         assert_eq!(saved.clinic_nit, "800123456-7");
         assert_eq!(saved.address, Some("Calle 10 # 5-20".to_string()));
         assert_eq!(saved.phone, Some("300 555 1234".to_string()));
@@ -287,6 +333,12 @@ mod tests {
             groq_api_key: None,
             pkcs12_path: None,
             pkcs12_password: None,
+            smtp_host: None,
+            smtp_port: None,
+            smtp_tls: None,
+            smtp_username: None,
+            smtp_password: None,
+            smtp_from: None,
         };
 
         let saved = save(&mut conn, &input).unwrap();

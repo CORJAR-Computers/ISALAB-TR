@@ -3,7 +3,7 @@ use tauri::State;
 use crate::auth::{require_session, require_vet_or_admin};
 use crate::error::AppError;
 use crate::models::sample::{
-    CreateSampleInput, LabResult, RegisterResultInput, RegisterResultsInput, Sample,
+    CreateSampleInput, LabResult, RegisterResultInput, RegisterResultsInput, Sample, SampleEvent,
 };
 use crate::models::sample_list_item::SampleListItem;
 use crate::models::worklist::WorklistData;
@@ -202,7 +202,7 @@ pub fn reject_sample(
 pub fn reopen_sample(state: State<'_, AppState>, id: i32) -> Result<Sample, AppError> {
     let user = require_vet_or_admin(&state)?;
     let mut pooled = state.pool.acquire()?;
-    let sample = samples_repo::reopen_sample(pooled.conn(), id)?;
+    let sample = samples_repo::reopen_sample(pooled.conn(), id, &user.username)?;
 
     if let Ok(mut audit_conn) = state.pool.acquire() {
         crate::repositories::auth::log_audit(
@@ -216,4 +216,16 @@ pub fn reopen_sample(state: State<'_, AppState>, id: i32) -> Result<Sample, AppE
     }
 
     Ok(sample)
+}
+
+/// Historial de rechazos y reaperturas de una muestra (quién, cuándo, motivo).
+#[tauri::command]
+#[specta::specta]
+pub fn list_sample_events(
+    state: State<'_, AppState>,
+    sample_id: i32,
+) -> Result<Vec<SampleEvent>, AppError> {
+    require_session(&state)?;
+    let mut pooled = state.pool.acquire()?;
+    samples_repo::list_sample_events(pooled.conn(), sample_id)
 }

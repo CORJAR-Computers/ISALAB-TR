@@ -15,8 +15,10 @@ import {
   FileText,
   FlaskConical,
   HeartPulse,
+  History,
   ImagePlus,
   Loader2,
+  Mail,
   MessageCircle,
   Paperclip,
   PlayCircle,
@@ -72,13 +74,22 @@ import {
   usePatient,
   useRegisterLabResult,
   useRegisterLabResults,
+  useAcknowledgeCritical,
   useRejectSample,
   useReopenSample,
   useSample,
+  useSampleEvents,
+  useSampleNotifications,
+  useSendCriticalEmail,
   useSetSampleQuality,
   useSetSampleStatus,
 } from "@/hooks/use-queries";
-import type { LabResult, ResultAttachment } from "@/bindings";
+import type {
+  LabResult,
+  NotificationLogEntry,
+  ResultAttachment,
+  SampleEvent,
+} from "@/bindings";
 import {
   QUALITY_INDEX_LABEL,
   QUALITY_SEVERITY_LABEL,
@@ -127,6 +138,8 @@ export function SampleDetailDialog({
   const setQuality = useSetSampleQuality();
   const rejectSample = useRejectSample();
   const reopenSample = useReopenSample();
+  const acknowledgeCritical = useAcknowledgeCritical();
+  const sendCriticalEmail = useSendCriticalEmail();
   const generate = useGenerateReport();
   const generateLabels = useGenerateSampleLabels();
   const attachFile = useAttachResultFile(sampleId);
@@ -143,6 +156,14 @@ export function SampleDetailDialog({
   const [confirmAnular, setConfirmAnular] = useState(false);
   const [showRejectInput, setShowRejectInput] = useState(false);
   const [rejectReason, setRejectReason] = useState("");
+  const [showEvents, setShowEvents] = useState(false);
+  // El historial se consulta solo cuando el usuario abre la vista.
+  const { data: events = [], isLoading: loadingEvents } = useSampleEvents(
+    showEvents ? sampleId : null,
+  );
+  const [showNotifications, setShowNotifications] = useState(false);
+  const { data: notifications = [], isLoading: loadingNotifications } =
+    useSampleNotifications(showNotifications ? sampleId : null);
   const [criticalAlert, setCriticalAlert] = useState<LabResult[]>([]);
   const [aiInterpretation, setAiInterpretation] = useState<string | null>(null);
   const [interpreting, setInterpreting] = useState(false);
@@ -172,6 +193,8 @@ export function SampleDetailDialog({
     setConfirmAnular(false);
     setShowRejectInput(false);
     setRejectReason("");
+    setShowEvents(false);
+    setShowNotifications(false);
     setCriticalAlert([]);
     setAiInterpretation(null);
     setPreviewAttachment(null);
@@ -510,6 +533,48 @@ export function SampleDetailDialog({
     const message = `*⚠ ALERTA: VALOR CRÍTICO DE LABORATORIO*\n\nHola ${patient.ownerName}, le informamos que el resultado de laboratorio de *${patient.name}* presenta un valor crítico que requiere atención inmediata:\n\n${lines}\n\nPor favor, contacte a su veterinario lo antes posible.\n\nISALAB`;
     sendWhatsAppMessage(patient.ownerPhone, message);
     setCriticalAlert([]);
+  };
+
+  /** Confirma la revisión de los valores críticos (quedan auditados). */
+  const doAcknowledgeCritical = async () => {
+    if (!sample) return;
+    try {
+      await acknowledgeCritical.mutateAsync({
+        sampleId: sample.id,
+        resultIds: criticalAlert.map((r) => r.id),
+      });
+      toast.success("Confirmación registrada", {
+        description: "La revisión de los valores críticos quedó auditada.",
+      });
+      setCriticalAlert([]);
+    } catch (err) {
+      toast.error("No se pudo registrar la confirmación", {
+        description: getErrorMessage(err),
+      });
+    }
+  };
+
+  /** Envía el aviso de valor crítico por email al propietario. */
+  const doSendCriticalEmail = async () => {
+    if (!sample) return;
+    try {
+      const entries = await sendCriticalEmail.mutateAsync({
+        sampleId: sample.id,
+        resultIds: criticalAlert.map((r) => r.id),
+      });
+      const sent = entries.filter((e) => e.status === "SENT").length;
+      toast.success("Aviso enviado por email", {
+        description:
+          sent > 0
+            ? `${sent} notificación(es) registrada(s). El envío quedó auditado.`
+            : "El envío se registró en el historial.",
+      });
+      setCriticalAlert([]);
+    } catch (err) {
+      toast.error("No se pudo enviar el correo", {
+        description: getErrorMessage(err),
+      });
+    }
   };
 
   const handleInterpretAI = async () => {
@@ -1118,6 +1183,18 @@ export function SampleDetailDialog({
                 Etiqueta
               </Button>
             )}
+            {sample && (
+              <Button variant="outline" onClick={() => setShowEvents(true)}>
+                <History className="size-4" />
+                Historial
+              </Button>
+            )}
+            {sample && (
+              <Button variant="outline" onClick={() => setShowNotifications(true)}>
+                <Mail className="size-4" />
+                Notificaciones
+              </Button>
+            )}
             {canProcess && (
               <Button variant="outline" onClick={markEnProceso} disabled={pending}>
                 <PlayCircle className="size-4" />
@@ -1337,17 +1414,206 @@ export function SampleDetailDialog({
             </div>
           ))}
         </div>
-        <DialogFooter className="sm:justify-between">
-          <Button variant="ghost" onClick={() => setCriticalAlert([])}>
-            Entendido
+        <DialogFooter className="flex-col gap-2 sm:flex-row sm:justify-between">
+          <Button
+            variant="outline"
+            onClick={doAcknowledgeCritical}
+            disabled={acknowledgeCritical.isPending}
+          >
+            {acknowledgeCritical.isPending ? (
+              <Loader2 className="size-4 animate-spin" />
+            ) : (
+              <CheckCircle2 className="size-4" />
+            )}
+            Confirmar revisión
           </Button>
-          <Button variant="destructive" onClick={() => handleWhatsAppCritical(criticalAlert)}>
-            <MessageCircle className="size-4" />
-            Notificar por WhatsApp
+          <div className="flex flex-wrap gap-2">
+            <Button
+              variant="outline"
+              onClick={doSendCriticalEmail}
+              disabled={sendCriticalEmail.isPending}
+            >
+              {sendCriticalEmail.isPending ? (
+                <Loader2 className="size-4 animate-spin" />
+              ) : (
+                <Mail className="size-4" />
+              )}
+              Enviar por email
+            </Button>
+            <Button
+              variant="destructive"
+              onClick={() => handleWhatsAppCritical(criticalAlert)}
+            >
+              <MessageCircle className="size-4" />
+              WhatsApp
+            </Button>
+          </div>
+        </DialogFooter>
+      </DialogContent>
+    </Dialog>
+
+    {/* Historial de la muestra: rechazos y reaperturas (quién, cuándo, motivo). */}
+    <Dialog open={showEvents} onOpenChange={(o) => !o && setShowEvents(false)}>
+      <DialogContent className="sm:max-w-lg">
+        <DialogHeader>
+          <DialogTitle className="flex items-center gap-2">
+            <History className="size-4" />
+            Historial de la muestra
+          </DialogTitle>
+          <DialogDescription>
+            Rechazos y reaperturas registrados para {sample?.code ?? "esta muestra"}
+            (quién, cuándo y motivo de cada evento).
+          </DialogDescription>
+        </DialogHeader>
+        <div className="max-h-72 space-y-2 overflow-y-auto pr-1">
+          {loadingEvents ? (
+            <div className="flex items-center justify-center py-6">
+              <Loader2 className="size-5 animate-spin text-muted-foreground" />
+            </div>
+          ) : events.length === 0 ? (
+            <p className="text-muted-foreground py-6 text-center text-sm">
+              Sin eventos registrados para esta muestra.
+            </p>
+          ) : (
+            events.map((ev) => <EventRow key={ev.id} ev={ev} />)
+          )}
+        </div>
+        <DialogFooter>
+          <Button variant="ghost" onClick={() => setShowEvents(false)}>
+            Cerrar
+          </Button>
+        </DialogFooter>
+      </DialogContent>
+    </Dialog>
+
+    {/* Notificaciones de la muestra: envíos y confirmaciones de valores críticos. */}
+    <Dialog
+      open={showNotifications}
+      onOpenChange={(o) => !o && setShowNotifications(false)}
+    >
+      <DialogContent className="sm:max-w-lg">
+        <DialogHeader>
+          <DialogTitle className="flex items-center gap-2">
+            <Mail className="size-4" />
+            Notificaciones de la muestra
+          </DialogTitle>
+          <DialogDescription>
+            Envíos por email y confirmaciones de valores críticos registrados
+            para {sample?.code ?? "esta muestra"}.
+          </DialogDescription>
+        </DialogHeader>
+        <div className="max-h-72 space-y-2 overflow-y-auto pr-1">
+          {loadingNotifications ? (
+            <div className="flex items-center justify-center py-6">
+              <Loader2 className="size-5 animate-spin text-muted-foreground" />
+            </div>
+          ) : notifications.length === 0 ? (
+            <p className="text-muted-foreground py-6 text-center text-sm">
+              Sin notificaciones registradas para esta muestra.
+            </p>
+          ) : (
+            notifications.map((n) => <NotificationRow key={n.id} n={n} />)
+          )}
+        </div>
+        <DialogFooter>
+          <Button variant="ghost" onClick={() => setShowNotifications(false)}>
+            Cerrar
           </Button>
         </DialogFooter>
       </DialogContent>
     </Dialog>
     </>
+  );
+}
+
+function NotificationRow({ n }: { n: NotificationLogEntry }) {
+  const isAck = n.channel === "MANUAL";
+  const isSent = n.status === "SENT";
+  const label = isAck
+    ? "Confirmación"
+    : n.channel === "EMAIL"
+      ? "Email"
+      : n.channel;
+  return (
+    <div
+      className={cn(
+        "flex items-start gap-3 rounded-lg border px-3 py-2.5",
+        isAck
+          ? "border-border bg-muted/30"
+          : isSent
+            ? "border-emerald-500/30 bg-emerald-500/5"
+            : "border-destructive/30 bg-destructive/5",
+      )}
+    >
+      <Badge
+        variant={
+          isAck ? "outline" : isSent ? "default" : "destructive"
+        }
+        className="mt-0.5 shrink-0"
+      >
+        {label}
+      </Badge>
+      <div className="min-w-0 flex-1">
+        <div className="flex flex-wrap items-center gap-x-2 text-sm">
+          <span className="font-medium">
+            {isAck ? (n.ackedBy ?? "—") : (n.recipientName ?? "—")}
+          </span>
+          <span className="text-muted-foreground text-xs">
+            {isAck
+              ? formatDateTime(n.ackedAt ?? n.createdAt)
+              : formatDateTime(n.sentAt ?? n.createdAt)}
+          </span>
+        </div>
+        {!isAck && n.recipientAddress && (
+          <p className="text-muted-foreground mt-0.5 font-mono text-xs">
+            {n.recipientAddress}
+          </p>
+        )}
+        {isAck ? (
+          <p className="text-muted-foreground mt-0.5 text-xs">
+            Valor crítico revisado
+          </p>
+        ) : n.status === "FAILED" ? (
+          <p className="text-muted-foreground mt-0.5 text-xs">
+            Fallo en el envío
+          </p>
+        ) : (
+          <p className="text-muted-foreground mt-0.5 text-xs">
+            Enviado correctamente
+          </p>
+        )}
+      </div>
+    </div>
+  );
+}
+
+function EventRow({ ev }: { ev: SampleEvent }) {
+  const isRejected = ev.eventType === "REJECTED";
+  return (
+    <div
+      className={cn(
+        "flex items-start gap-3 rounded-lg border px-3 py-2.5",
+        isRejected
+          ? "border-destructive/30 bg-destructive/5"
+          : "border-border bg-muted/30",
+      )}
+    >
+      <Badge variant={isRejected ? "destructive" : "outline"} className="mt-0.5 shrink-0">
+        {isRejected ? "Rechazo" : "Reapertura"}
+      </Badge>
+      <div className="min-w-0 flex-1">
+        <div className="flex flex-wrap items-center gap-x-2 text-sm">
+          <span className="font-medium">{ev.username}</span>
+          <span className="text-muted-foreground text-xs">
+            {formatDateTime(ev.createdAt)}
+          </span>
+        </div>
+        {isRejected && ev.reason && (
+          <p className="text-muted-foreground mt-0.5 text-xs">
+            Motivo: {ev.reason}
+          </p>
+        )}
+      </div>
+    </div>
   );
 }

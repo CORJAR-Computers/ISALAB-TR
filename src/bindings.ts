@@ -147,6 +147,16 @@ export const commands = {
 	rejectSample: (id: number, reason: string) => typedError<Sample, AppError>(__TAURI_INVOKE("reject_sample", { id, reason })),
 	/**  Reabre una muestra rechazada (RECHAZADA → RECIBIDA). */
 	reopenSample: (id: number) => typedError<Sample, AppError>(__TAURI_INVOKE("reopen_sample", { id })),
+	/**  Historial de rechazos y reaperturas de una muestra (quién, cuándo, motivo). */
+	listSampleEvents: (sampleId: number) => typedError<SampleEvent[], AppError>(__TAURI_INVOKE("list_sample_events", { sampleId })),
+	/**  Historial de notificaciones de una muestra (quién, cuándo, canal, estado). */
+	listSampleNotifications: (sampleId: number) => typedError<NotificationLogEntry[], AppError>(__TAURI_INVOKE("list_sample_notifications", { sampleId })),
+	/**  Confirma (acknowledgment) los valores críticos recién registrados: persiste una fila ACKNOWLEDGED por resultado, con usuario y fecha (CLSI GP47). */
+	acknowledgeCritical: (sampleId: number, resultIds: number[]) => typedError<NotificationLogEntry[], AppError>(__TAURI_INVOKE("acknowledge_critical", { sampleId, resultIds })),
+	/**  Envía por email al propietario un aviso de valor(es) crítico(s) y lo registra en NOTIFICATION_LOG (SENT o FAILED según el resultado del envío). */
+	sendCriticalEmail: (sampleId: number, resultIds: number[]) => typedError<NotificationLogEntry[], AppError>(__TAURI_INVOKE("send_critical_email", { sampleId, resultIds })),
+	/**  Prueba la conexión SMTP configurada sin enviar correos (solo ADMIN). */
+	testSmtpConnection: () => typedError<null, AppError>(__TAURI_INVOKE("test_smtp_connection")),
 	/**  Vista previa de un archivo CSV de analizador: encabezados, primeras filas y sugerencia automática del mapeo columna → analito. */
 	previewAnalyzerImport: (path: string) => typedError<ImportPreview, AppError>(__TAURI_INVOKE("preview_analyzer_import", { path })),
 	/**  Importa resultados desde el CSV del analizador con el mapeo confirmado. */
@@ -358,6 +368,20 @@ export const commands = {
 	updateReferenceRange: (id: number, input: ReferenceRangeInput) => typedError<ReferenceRange, AppError>(__TAURI_INVOKE("update_reference_range", { id, input })),
 	/**  Elimina un rango de referencia. */
 	deleteReferenceRange: (id: number) => typedError<null, AppError>(__TAURI_INVOKE("delete_reference_range", { id })),
+	/**  Fuentes automáticas configuradas (carpeta vigilada por analizador). */
+	listAnalyzerSources: () => typedError<AnalyzerSource[], AppError>(__TAURI_INVOKE("list_analyzer_sources")),
+	/**  Guarda (crea o reemplaza) la fuente de un analizador. Con `folder_path` None elimina la fuente. */
+	saveAnalyzerSource: (input: SaveAnalyzerSourceInput) => typedError<AnalyzerSource | null, AppError>(__TAURI_INVOKE("save_analyzer_source", { input })),
+	/**  Elimina la fuente de un analizador (y su cola de trabajos). */
+	deleteAnalyzerSource: (id: number) => typedError<null, AppError>(__TAURI_INVOKE("delete_analyzer_source", { id })),
+	/**  Sondea una fuente ahora (sin esperar el ciclo del supervisor) y devuelve los trabajos resultantes. */
+	pollAnalyzerSource: (sourceId: number) => typedError<AnalyzerImportJob[], AppError>(__TAURI_INVOKE("poll_analyzer_source", { sourceId })),
+	/**  Cola de importación de una fuente (más recientes primero). */
+	listAnalyzerImportJobs: (sourceId: number, limit: number) => typedError<AnalyzerImportJob[], AppError>(__TAURI_INVOKE("list_analyzer_import_jobs", { sourceId, limit })),
+	/**  Vista global de trabajos fallidos de todas las fuentes. */
+	listFailedAnalyzerImports: (limit: number) => typedError<AnalyzerImportJob[], AppError>(__TAURI_INVOKE("list_failed_analyzer_imports", { limit })),
+	/**  Elimina un trabajo de la cola para reintentar el archivo en el próximo sondeo. */
+	deleteAnalyzerImportJob: (jobId: number) => typedError<null, AppError>(__TAURI_INVOKE("delete_analyzer_import_job", { jobId })),
 };
 
 /* Types */
@@ -389,6 +413,48 @@ export type Analyzer = {
 	notes: string | null,
 	/**  Nº de rangos de referencia configurados para este equipo. */
 	rangeCount: number,
+};
+
+/**  Fuente automática de resultados configurada para un analizador. */
+export type AnalyzerSource = {
+	id: number,
+	analyzerId: number,
+	analyzerName: string,
+	sourceType: string,
+	folderPath: string | null,
+	enabled: boolean,
+	/**  Última vez que el supervisor sondeó esta fuente (YYYY-MM-DD HH:MM:SS). */
+	lastPollAt: string | null,
+	/**  Mapeo CSV guardado (columna del código de muestra + columnas analito). */
+	mapping: AnalyzerImportMapping | null,
+	/**  Nº de analitos mapeados (atajo para la lista). */
+	mappedColumns: number,
+};
+
+/**  Entrada de la cola de importación automática (un archivo detectado). */
+export type AnalyzerImportJob = {
+	id: number,
+	sourceId: number,
+	analyzerId: number,
+	analyzerName: string,
+	fileName: string,
+	/**  IMPORTADO | FALLIDO */
+	status: string,
+	samplesUpdated: number,
+	resultsImported: number,
+	skippedRows: number,
+	errorMsg: string | null,
+	/**  YYYY-MM-DD HH:MM:SS */
+	processedAt: string,
+};
+
+/**  Guarda (crea o reemplaza) la fuente automática de un analizador. */
+export type SaveAnalyzerSourceInput = {
+	analyzerId: number,
+	sourceType: string | null,
+	folderPath: string | null,
+	enabled: boolean,
+	mapping: AnalyzerImportMapping | null,
 };
 
 /**  Error tipado de la app. Se serializa como `{ type, data }` para el frontend. */
@@ -435,6 +501,35 @@ export type ClinicSettings = {
 	pkcs12Path: string | null,
 	/**  Contraseña del certificado PKCS#12 (solo en memoria, nunca se persiste). */
 	pkcs12Password: string | null,
+	/**  Servidor SMTP para notificaciones por email (NULL = sin configurar). */
+	smtpHost: string | null,
+	/**  Puerto SMTP (587 STARTTLS, 465 TLS implícito). */
+	smtpPort: number | null,
+	/**  NONE | STARTTLS | TLS */
+	smtpTls: string | null,
+	smtpUsername: string | null,
+	/**  Contraseña SMTP (cifrada en BD con DPAPI; nunca se devuelve en claro). */
+	smtpPassword: string | null,
+	/**  Remitente (dirección "de" de los correos). */
+	smtpFrom: string | null,
+};
+
+/**  Fila del registro de notificaciones de valores críticos (NOTIFICATION_LOG). */
+export type NotificationLogEntry = {
+	id: number,
+	resultId: number | null,
+	sampleId: number,
+	/**  WHATSAPP | EMAIL | MANUAL (confirmación del analista) */
+	channel: string,
+	recipientName: string | null,
+	recipientAddress: string | null,
+	/**  SENT | FAILED | ACKNOWLEDGED */
+	status: string,
+	sentAt: string | null,
+	ackedAt: string | null,
+	ackedBy: string | null,
+	note: string | null,
+	createdAt: string,
 };
 
 /**  Agregado del historial clínico completo de un paciente. */
@@ -874,6 +969,18 @@ export type SampleChangedEvent = {
 	sampleId: number,
 	patientId: number,
 	status: string,
+};
+
+/**  Evento del historial de una muestra (rechazo o reapertura): quién, cuándo y motivo. Se conserva aunque la muestra haya sido reabierta. */
+export type SampleEvent = {
+	id: number,
+	sampleId: number,
+	/**  REJECTED | REOPENED */
+	eventType: string,
+	username: string,
+	/**  Motivo del rechazo (None en REOPENED). */
+	reason: string | null,
+	createdAt: string,
 };
 
 /**

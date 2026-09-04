@@ -39,6 +39,21 @@ pub struct LabResult {
     pub attachments: Vec<ResultAttachment>,
 }
 
+/// Evento del historial de una muestra (rechazo o reapertura): quién,
+/// cuándo y motivo. Se conserva aunque la muestra haya sido reabierta.
+#[derive(Debug, Clone, Serialize, Deserialize, Type)]
+#[serde(rename_all = "camelCase")]
+pub struct SampleEvent {
+    pub id: i32,
+    pub sample_id: i32,
+    /// REJECTED | REOPENED
+    pub event_type: String,
+    pub username: String,
+    /// Motivo del rechazo (None en REOPENED).
+    pub reason: Option<String>,
+    pub created_at: String,
+}
+
 #[derive(Debug, Clone, Serialize, Deserialize, Type)]
 #[serde(rename_all = "camelCase")]
 pub struct TrendPoint {

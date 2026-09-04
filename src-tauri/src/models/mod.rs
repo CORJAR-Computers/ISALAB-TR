@@ -1,11 +1,14 @@
 pub mod analyzer;
+pub mod analyzer_source;
 pub mod auth;
 pub mod clinical_history;
 pub mod consultation;
 pub mod dashboard;
 pub mod import;
 pub mod invoice;
+pub mod lab_order;
 pub mod logo;
+pub mod notification;
 pub mod owner;
 pub mod panel;
 pub mod patient;

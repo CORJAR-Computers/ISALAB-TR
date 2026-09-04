@@ -11,6 +11,7 @@ pub mod error;
 pub mod models;
 pub mod pdf_templates;
 pub mod repositories;
+pub mod sources;
 pub mod state;
 
 #[cfg(test)]
@@ -22,7 +23,14 @@ use specta_typescript::Typescript;
 use tauri::Manager;
 use tauri_specta::{collect_commands, Builder};
 
+mod mail;
+
 use crate::commands::ai::{interpret_lab_results, test_groq_connection};
+use crate::commands::analyzer_sources::{
+    delete_analyzer_import_job, delete_analyzer_source, list_analyzer_import_jobs,
+    list_analyzer_sources, list_failed_analyzer_imports, poll_analyzer_source,
+    save_analyzer_source,
+};
 use crate::commands::analyzers::{
     create_analyzer, create_reference_range, delete_analyzer, delete_reference_range,
     list_analyzers, list_reference_ranges, set_analyzer_active, update_analyzer,
@@ -44,6 +52,13 @@ use crate::commands::import::{import_analyzer_results, preview_analyzer_import};
 use crate::commands::invoices::{
     count_invoices, create_invoice, get_invoice, list_invoices, set_invoice_status,
 };
+use crate::commands::lab_orders::{
+    accession_lab_order, count_lab_orders, create_lab_order, get_lab_order, get_order_for_sample,
+    list_lab_orders, list_patient_lab_orders, set_lab_order_status,
+};
+use crate::commands::notifications::{
+    acknowledge_critical, list_sample_notifications, send_critical_email, test_smtp_connection,
+};
 use crate::commands::panels::{delete_panel, list_panel_analytes, list_panels, save_panel};
 use crate::commands::patients::{
     create_patient, get_patient, get_patient_by_code, get_patient_lab_trends, list_owners,
@@ -59,8 +74,9 @@ use crate::commands::reports::{
     generate_sample_labels, list_reports, open_report_file,
 };
 use crate::commands::samples::{
-    count_samples, create_sample, get_sample, get_worklist, list_samples, register_lab_result,
-    register_lab_results, reject_sample, reopen_sample, set_sample_quality, set_sample_status,
+    count_samples, create_sample, get_sample, get_worklist, list_sample_events, list_samples,
+    register_lab_result, register_lab_results, reject_sample, reopen_sample, set_sample_quality,
+    set_sample_status,
 };
 use crate::commands::search::global_search;
 use crate::commands::settings::{
@@ -105,6 +121,19 @@ fn specta_builder() -> Builder<tauri::Wry> {
             set_sample_quality,
             reject_sample,
             reopen_sample,
+            list_sample_events,
+            list_sample_notifications,
+            acknowledge_critical,
+            send_critical_email,
+            test_smtp_connection,
+            create_lab_order,
+            list_lab_orders,
+            list_patient_lab_orders,
+            get_lab_order,
+            count_lab_orders,
+            set_lab_order_status,
+            accession_lab_order,
+            get_order_for_sample,
             preview_analyzer_import,
             import_analyzer_results,
             list_panels,
@@ -172,11 +201,30 @@ fn specta_builder() -> Builder<tauri::Wry> {
             create_reference_range,
             update_reference_range,
             delete_reference_range,
+            list_analyzer_sources,
+            save_analyzer_source,
+            delete_analyzer_source,
+            poll_analyzer_source,
+            list_analyzer_import_jobs,
+            list_failed_analyzer_imports,
+            delete_analyzer_import_job,
         ])
         // Tipos expuestos para la UI (eventos Firebird → Tauri, auditoría).
         .typ::<crate::models::sample::SampleChangedEvent>()
         .typ::<crate::models::sample::LabResultChangedEvent>()
+        .typ::<crate::models::sample::SampleEvent>()
+        .typ::<crate::models::notification::NotificationLogEntry>()
+        .typ::<crate::models::lab_order::LabOrder>()
+        .typ::<crate::models::lab_order::LabOrderItem>()
+        .typ::<crate::models::lab_order::LabOrderListItem>()
+        .typ::<crate::models::lab_order::OrderSampleRef>()
+        .typ::<crate::models::lab_order::CreateLabOrderInput>()
+        .typ::<crate::models::lab_order::CreateLabOrderItemInput>()
+        .typ::<crate::models::lab_order::AccessionOrderInput>()
         .typ::<crate::models::auth::AuditLogEntry>()
+        .typ::<crate::models::analyzer_source::AnalyzerSource>()
+        .typ::<crate::models::analyzer_source::SaveAnalyzerSourceInput>()
+        .typ::<crate::models::analyzer_source::AnalyzerImportJob>()
 }
 
 #[cfg_attr(mobile, tauri::mobile_entry_point)]
@@ -196,6 +244,9 @@ pub fn run() {
         .plugin(tauri_plugin_process::init())
         .setup(|app| {
             let state = AppState::init(app.handle());
+            // Supervisor de fuentes de analizadores (carpetas vigiladas) en
+            // segundo plano; sondea las fuentes habilitadas cada 3 s.
+            crate::sources::start_supervisor(state.pool.clone());
             app.manage(state);
 
             // Splash screen: la ventana principal arranca oculta; la UI avisa

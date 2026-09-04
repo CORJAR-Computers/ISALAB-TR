@@ -49,6 +49,9 @@ pdf_signer = "0.2"
 p12-keystore = "0.2.1"
 x509-cert = "0.2.5"
 
+# ---- Notificaciones por email (SMTP) ----
+lettre = { version = "0.11", default-features = false, features = ["smtp-transport", "builder", "hostname", "pool", "native-tls"] }
+
 # ---- Cifrado de secretos en repositorio (DPAPI de Windows) ----
 base64 = "0.22"
 barcoders = "2.0.0"

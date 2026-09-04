@@ -43,6 +43,15 @@ export function useSample(id: number | null) {
   });
 }
 
+/** Historial de rechazos y reaperturas de una muestra (quién, cuándo, motivo). */
+export function useSampleEvents(sampleId: number | null) {
+  return useQuery({
+    queryKey: ["sample-events", sampleId],
+    queryFn: () => api.listSampleEvents(sampleId!),
+    enabled: sampleId != null,
+  });
+}
+
 export function useCreateSample() {
   const qc = useQueryClient();
   return useMutation({
@@ -118,6 +127,7 @@ export function useRejectSample() {
       qc.invalidateQueries({ queryKey: ["sample-counts"] });
       qc.invalidateQueries({ queryKey: ["worklist"] });
       qc.invalidateQueries({ queryKey: ["sample", sample.id] });
+      qc.invalidateQueries({ queryKey: ["sample-events", sample.id] });
     },
   });
 }
@@ -132,6 +142,7 @@ export function useReopenSample() {
       qc.invalidateQueries({ queryKey: ["sample-counts"] });
       qc.invalidateQueries({ queryKey: ["worklist"] });
       qc.invalidateQueries({ queryKey: ["sample", sample.id] });
+      qc.invalidateQueries({ queryKey: ["sample-events", sample.id] });
     },
   });
 }

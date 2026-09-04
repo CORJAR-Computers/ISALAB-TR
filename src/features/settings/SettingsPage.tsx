@@ -5,7 +5,7 @@ import { z } from "zod";
 import { toast } from "sonner";
 import { convertFileSrc } from "@tauri-apps/api/core";
 import { open, save as saveDialog } from "@tauri-apps/plugin-dialog";
-import { Building2, CreditCard, FileKey2, ImageUp, Loader2, PenLine, Save, X, Bot, DatabaseBackup, Wifi, ShieldAlert } from "lucide-react";
+import { Building2, CreditCard, FileKey2, ImageUp, Loader2, PenLine, Save, X, Bot, DatabaseBackup, Wifi, ShieldAlert, Mail } from "lucide-react";
 import { invoke } from "@tauri-apps/api/core";
 import { usePermissions } from "@/hooks/use-permissions";
 import { Button } from "@/components/ui/button";
@@ -42,6 +42,7 @@ import {
   useSecondaryLogos,
   useImportSecondaryLogo,
   useDeleteSecondaryLogo,
+  useTestSmtpConnection,
 } from "@/hooks/use-queries";
 import { AnalyzerManagementCard } from "@/features/settings/AnalyzerManagementCard";
 import { api, getErrorMessage } from "@/lib/api";
@@ -63,6 +64,12 @@ const schema = z.object({
   groqApiKey: z.string().optional(),
   pkcs12Path: z.string().optional(),
   pkcs12Password: z.string().optional(),
+  smtpHost: z.string().optional(),
+  smtpPort: z.coerce.number().int().min(1).max(65535).optional(),
+  smtpTls: z.enum(["NONE", "STARTTLS", "TLS"]),
+  smtpUsername: z.string().optional(),
+  smtpPassword: z.string().optional(),
+  smtpFrom: z.string().optional(),
 });
 
 type Values = z.infer<typeof schema>;
@@ -81,7 +88,9 @@ export function SettingsPage() {
 
   const [backingUp, setBackingUp] = useState(false);
   const [testingGroq, setTestingGroq] = useState(false);
+  const [testingSmtp, setTestingSmtp] = useState(false);
   const [importingPkcs12, setImportingPkcs12] = useState(false);
+  const testSmtpMutation = useTestSmtpConnection();
 
   const form = useForm<z.input<typeof schema>, unknown, z.output<typeof schema>>({
     resolver: zodResolver(schema),
@@ -100,6 +109,12 @@ export function SettingsPage() {
       groqApiKey: "",
       pkcs12Path: "",
       pkcs12Password: "",
+      smtpHost: "",
+      smtpPort: undefined,
+      smtpTls: "STARTTLS",
+      smtpUsername: "",
+      smtpPassword: "",
+      smtpFrom: "",
     },
   });
 
@@ -122,6 +137,12 @@ export function SettingsPage() {
         groqApiKey: settings.groqApiKey ?? "",
         pkcs12Path: settings.pkcs12Path ?? "",
         pkcs12Password: "",
+        smtpHost: settings.smtpHost ?? "",
+        smtpPort: settings.smtpPort ?? undefined,
+        smtpTls: settings.smtpTls === "TLS" ? "TLS" : settings.smtpTls === "NONE" ? "NONE" : "STARTTLS",
+        smtpUsername: settings.smtpUsername ?? "",
+        smtpPassword: settings.smtpPassword ?? "",
+        smtpFrom: settings.smtpFrom ?? "",
       });
     }
   }, [settings, form]);
@@ -208,6 +229,17 @@ export function SettingsPage() {
       // La contraseña solo viaja al backend para validarla y guardarla en
       // memoria; nunca se persiste. Se limpia tras guardar.
       pkcs12Password: toNullable(values.pkcs12Password),
+      smtpHost: toNullable(values.smtpHost),
+      smtpPort: values.smtpPort ?? null,
+      smtpTls: values.smtpTls,
+      smtpUsername: toNullable(values.smtpUsername),
+      // El marcador de secreto redactado se reenvía tal cual para que el
+      // backend conserve la contraseña almacenada si no se editó.
+      smtpPassword:
+        values.smtpPassword && values.smtpPassword !== ""
+          ? values.smtpPassword.trim()
+          : null,
+      smtpFrom: toNullable(values.smtpFrom),
     };
     try {
       await save.mutateAsync(input);
@@ -276,6 +308,23 @@ export function SettingsPage() {
       });
     } finally {
       setTestingGroq(false);
+    }
+  };
+
+  /** Prueba el SMTP guardado (NOOP) — primero guarda la configuración. */
+  const testSmtp = async () => {
+    setTestingSmtp(true);
+    try {
+      await testSmtpMutation.mutateAsync();
+      toast.success("Conexión SMTP exitosa", {
+        description: "El servidor de correo respondió correctamente.",
+        duration: 6000,
+      });
+    } catch (e) {
+      // El mensaje de error ya lo muestra el hook (toast).
+      getErrorMessage(e);
+    } finally {
+      setTestingSmtp(false);
     }
   };
 
@@ -769,6 +818,152 @@ export function SettingsPage() {
                 </Button>
                 <p className="text-muted-foreground text-xs">
                   Envía una solicitud mínima a Groq para validar la clave guardada.
+                </p>
+              </div>
+            </CardContent>
+          </Card>
+
+          {/* Notificaciones por email (SMTP) */}
+          <Card>
+            <CardHeader>
+              <CardTitle className="flex items-center gap-2 text-base">
+                <Mail className="size-4 text-primary" />
+                Notificaciones por email
+              </CardTitle>
+              <CardDescription>
+                Servidor SMTP para enviar avisos de valores críticos de
+                laboratorio al propietario. La contraseña se guarda cifrada.
+              </CardDescription>
+            </CardHeader>
+            <CardContent className="grid gap-4 sm:grid-cols-2">
+              <FormField
+                control={form.control}
+                name="smtpHost"
+                render={({ field }) => (
+                  <FormItem>
+                    <FormLabel>Servidor SMTP</FormLabel>
+                    <FormControl>
+                      <Input placeholder="smtp.gmail.com" {...field} />
+                    </FormControl>
+                    <FormMessage />
+                  </FormItem>
+                )}
+              />
+              <div className="grid grid-cols-2 gap-3">
+                <FormField
+                  control={form.control}
+                  name="smtpPort"
+                  render={({ field }) => (
+                    <FormItem>
+                      <FormLabel>Puerto</FormLabel>
+                      <FormControl>
+                        <Input
+                          type="number"
+                          placeholder="587"
+                          {...field}
+                          value={(field.value as number | undefined) ?? ""}
+                        />
+                      </FormControl>
+                      <FormMessage />
+                    </FormItem>
+                  )}
+                />
+                <FormField
+                  control={form.control}
+                  name="smtpTls"
+                  render={({ field }) => (
+                    <FormItem>
+                      <FormLabel>Seguridad</FormLabel>
+                      <Select value={field.value} onValueChange={field.onChange}>
+                        <FormControl>
+                          <SelectTrigger className="w-full">
+                            <SelectValue />
+                          </SelectTrigger>
+                        </FormControl>
+                        <SelectContent>
+                          <SelectItem value="STARTTLS">STARTTLS (587)</SelectItem>
+                          <SelectItem value="TLS">TLS implícito (465)</SelectItem>
+                          <SelectItem value="NONE">Sin cifrado (local)</SelectItem>
+                        </SelectContent>
+                      </Select>
+                      <FormMessage />
+                    </FormItem>
+                  )}
+                />
+              </div>
+              <FormField
+                control={form.control}
+                name="smtpUsername"
+                render={({ field }) => (
+                  <FormItem>
+                    <FormLabel>Usuario</FormLabel>
+                    <FormControl>
+                      <Input placeholder="lab@clinica.com" {...field} />
+                    </FormControl>
+                    <FormMessage />
+                  </FormItem>
+                )}
+              />
+              <FormField
+                control={form.control}
+                name="smtpPassword"
+                render={({ field }) => (
+                  <FormItem>
+                    <FormLabel>Contraseña</FormLabel>
+                    <FormControl>
+                      <Input
+                        type="password"
+                        placeholder="••••••••"
+                        autoComplete="off"
+                        {...field}
+                      />
+                    </FormControl>
+                    <FormDescription>
+                      Se guarda cifrada. Si ya existe una contraseña, deja el
+                      campo sin tocar para conservarla.
+                    </FormDescription>
+                    <FormMessage />
+                  </FormItem>
+                )}
+              />
+              <FormField
+                control={form.control}
+                name="smtpFrom"
+                render={({ field }) => (
+                  <FormItem className="sm:col-span-2">
+                    <FormLabel>Remitente</FormLabel>
+                    <FormControl>
+                      <Input
+                        placeholder="ISALAB <no-responder@clinica.com>"
+                        {...field}
+                      />
+                    </FormControl>
+                    <FormDescription>
+                      Nombre y dirección que aparecerán como remitente de los
+                      correos. Guarda la configuración antes de probar.
+                    </FormDescription>
+                    <FormMessage />
+                  </FormItem>
+                )}
+              />
+              <div className="sm:col-span-2 flex flex-wrap items-center gap-2">
+                <Button
+                  type="button"
+                  variant="outline"
+                  size="sm"
+                  onClick={testSmtp}
+                  disabled={testingSmtp}
+                >
+                  {testingSmtp ? (
+                    <Loader2 className="size-4 animate-spin" />
+                  ) : (
+                    <Wifi className="size-4" />
+                  )}
+                  Probar conexión
+                </Button>
+                <p className="text-muted-foreground text-xs">
+                  Conecta con el servidor guardado (NOOP) para validar la
+                  configuración SMTP.
                 </p>
               </div>
             </CardContent>

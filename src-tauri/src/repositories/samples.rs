@@ -2,7 +2,7 @@ use rsfbclient::prelude::*;
 use rsfbclient::SimpleConnection;
 
 use crate::error::AppError;
-use crate::models::sample::{LabResult, Sample};
+use crate::models::sample::{LabResult, Sample, SampleEvent};
 use crate::models::sample_list_item::SampleListItem;
 
 pub(crate) type SampleListItemRow = (
@@ -41,6 +41,8 @@ pub(crate) type LabResultRow = (
 );
 
 pub(crate) type TrendPointRow = (String, f64, Option<f64>, Option<f64>, String);
+
+pub(crate) type SampleEventRow = (i32, i32, String, String, Option<String>, String);
 
 /// Columnas de una muestra con el tipo unido, el equipo analizador y la
 /// calidad preanalítica / rechazo.
@@ -351,13 +353,20 @@ pub fn reject_sample(
     )
     .map_err(AppError::from)?;
 
+    log_sample_event(conn, id, "REJECTED", rejected_by, Some(reason))?;
+
     get(conn, id)?
         .ok_or_else(|| AppError::Internal("Muestra actualizada pero no recuperada".into()))
 }
 
 /// Reabre una muestra rechazada (RECHAZADA → RECIBIDA), limpiando los
-/// campos de rechazo para un nuevo ciclo de recepción.
-pub fn reopen_sample(conn: &mut SimpleConnection, id: i32) -> Result<Sample, AppError> {
+/// campos de rechazo para un nuevo ciclo de recepción. Registra la
+/// reapertura en el historial de eventos de la muestra.
+pub fn reopen_sample(
+    conn: &mut SimpleConnection,
+    id: i32,
+    reopened_by: &str,
+) -> Result<Sample, AppError> {
     let current: Option<(String,)> = conn
         .query_first("SELECT STATUS FROM SAMPLES WHERE ID = ?", (&id,))
         .map_err(AppError::from)?;
@@ -378,8 +387,57 @@ pub fn reopen_sample(conn: &mut SimpleConnection, id: i32) -> Result<Sample, App
     )
     .map_err(AppError::from)?;
 
+    log_sample_event(conn, id, "REOPENED", reopened_by, None)?;
+
     get(conn, id)?
         .ok_or_else(|| AppError::Internal("Muestra actualizada pero no recuperada".into()))
+}
+
+/// Registra un evento en el historial de la muestra (REJECTED | REOPENED).
+pub fn log_sample_event(
+    conn: &mut SimpleConnection,
+    sample_id: i32,
+    event_type: &str,
+    username: &str,
+    reason: Option<&str>,
+) -> Result<(), AppError> {
+    conn.execute(
+        "INSERT INTO SAMPLE_EVENTS (SAMPLE_ID, EVENT_TYPE, USERNAME, REASON)
+         VALUES (?, ?, ?, ?)",
+        (&sample_id, &event_type, &username, &reason),
+    )
+    .map_err(AppError::from)?;
+    Ok(())
+}
+
+/// Historial completo de rechazos y reaperturas de una muestra, del más
+/// reciente al más antiguo (quién, cuándo y motivo de cada evento).
+pub fn list_sample_events(
+    conn: &mut SimpleConnection,
+    sample_id: i32,
+) -> Result<Vec<SampleEvent>, AppError> {
+    let rows: Vec<SampleEventRow> = conn
+        .query(
+            "SELECT ID, SAMPLE_ID, EVENT_TYPE, USERNAME, REASON,
+                    LEFT(CAST(CREATED_AT AS VARCHAR(60)), 19)
+             FROM SAMPLE_EVENTS
+             WHERE SAMPLE_ID = ?
+             ORDER BY CREATED_AT DESC, ID DESC",
+            (&sample_id,),
+        )
+        .map_err(AppError::from)?;
+
+    Ok(rows
+        .into_iter()
+        .map(|r| SampleEvent {
+            id: r.0,
+            sample_id: r.1,
+            event_type: r.2,
+            username: r.3,
+            reason: r.4,
+            created_at: r.5,
+        })
+        .collect())
 }
 
 /// Resultados de una muestra (para la ficha completa y el informe PDF).
@@ -1139,11 +1197,53 @@ mod integration_tests {
              VALUES (1, 'M-2026-0001', ?, 1, '2026-08-01 10:00:00', 'RECIBIDA')",
             (&patient_id,),
         )
-        .unwrap();
-
-        // RECIBIDA -> FINALIZADA sin resultados (debe fallar)
+        .unwrap(); // RECIBIDA -> FINALIZADA sin resultados (debe fallar)
         let result = set_status(&mut conn, 1, "FINALIZADA");
         assert!(result.is_err());
+
+        test_helpers::cleanup_test_db(&db_path);
+    }
+
+    #[test]
+    fn test_reject_reopen_records_event_trail() {
+        let (mut conn, db_path) = setup();
+        let patient_id = test_helpers::insert_test_patient(&mut conn);
+        test_helpers::insert_test_sample_type(&mut conn);
+
+        conn.execute(
+            "INSERT INTO SAMPLES (ID, CODE, PATIENT_ID, SAMPLE_TYPE_ID, RECEIVED_AT, STATUS)
+             VALUES (1, 'M-2026-0001', ?, 1, '2026-08-01 10:00:00', 'RECIBIDA')",
+            (&patient_id,),
+        )
+        .unwrap();
+
+        // Rechazo con motivo → evento REJECTED registrado.
+        let rejected = reject_sample(&mut conn, 1, "Hemólisis marcada", "vet_ana").unwrap();
+        assert_eq!(rejected.status, "RECHAZADA");
+        assert_eq!(
+            rejected.rejection_reason.as_deref(),
+            Some("Hemólisis marcada")
+        );
+
+        let events = list_sample_events(&mut conn, 1).unwrap();
+        assert_eq!(events.len(), 1);
+        assert_eq!(events[0].event_type, "REJECTED");
+        assert_eq!(events[0].username, "vet_ana");
+        assert_eq!(events[0].reason.as_deref(), Some("Hemólisis marcada"));
+
+        // Reapertura → evento REOPENED registrado (los campos se limpian).
+        let reopened = reopen_sample(&mut conn, 1, "vet_ana").unwrap();
+        assert_eq!(reopened.status, "RECIBIDA");
+        assert!(reopened.rejection_reason.is_none());
+
+        let events = list_sample_events(&mut conn, 1).unwrap();
+        assert_eq!(events.len(), 2);
+        assert_eq!(events[0].event_type, "REOPENED");
+        assert!(events[0].reason.is_none());
+        assert_eq!(events[1].event_type, "REJECTED");
+
+        // Sin eventos para otra muestra.
+        assert!(list_sample_events(&mut conn, 999).unwrap().is_empty());
 
         test_helpers::cleanup_test_db(&db_path);
     }

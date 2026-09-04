@@ -1,4 +1,5 @@
 pub mod ai;
+pub mod analyzer_sources;
 pub mod analyzers;
 pub mod attachments;
 pub mod auth;
@@ -9,6 +10,8 @@ pub mod db;
 pub mod exports;
 pub mod import;
 pub mod invoices;
+pub mod lab_orders;
+pub mod notifications;
 pub mod panels;
 pub mod patients;
 pub mod qc;

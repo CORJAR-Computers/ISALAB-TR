@@ -240,9 +240,10 @@ pub fn draw_results_full(
     }
 
     // Anchos de columna en mm (Suma = 185.9 CONTENT_W)
-    let w_item = 68.0;
-    let w_res = 28.0;
-    let w_unit = 44.0;
+    let w_item = 58.0;
+    let w_res = 26.0;
+    let w_delta = 22.0;
+    let w_unit = 34.0;
     let row_h = 6.8;
 
     // Encabezado con barra azul cian (#2B78C2)
@@ -261,9 +262,17 @@ pub fn draw_results_full(
     );
     pdf.text(
         true,
+        "Delta %",
+        8.5,
+        MARGIN + w_item + w_res + 2.0,
+        y_text,
+        (255, 255, 255),
+    );
+    pdf.text(
+        true,
         "Unidades",
         8.5,
-        MARGIN + w_item + w_res + 12.0,
+        MARGIN + w_item + w_res + w_delta + 2.0,
         y_text,
         (255, 255, 255),
     );
@@ -271,7 +280,7 @@ pub fn draw_results_full(
         true,
         "Referencias",
         8.5,
-        MARGIN + w_item + w_res + w_unit + 10.0,
+        MARGIN + w_item + w_res + w_delta + w_unit + 10.0,
         y_text,
         (255, 255, 255),
     );
@@ -310,7 +319,7 @@ pub fn draw_results_full(
         );
         let code = get_analyte_code(&r.analyte_name);
         if !code.is_empty() {
-            pdf.text(false, code, 7.5, MARGIN + 48.0, y_row_text, C_MUTED);
+            pdf.text(false, code, 7.5, MARGIN + 40.0, y_row_text, C_MUTED);
         }
 
         // 2. Resultados (Destacado en Negrita; Rojo intenso si CRITICO,
@@ -334,18 +343,36 @@ pub fn draw_results_full(
             val_color,
         );
 
-        // 3. Unidades
+        // 3. Delta % (variación vs. resultado previo del paciente; rojo si ≥ 50%)
+        let delta_str = match r.delta_variation {
+            Some(d) => format!("{} {:.1}%", if d >= 0.0 { "▲" } else { "▼" }, d.abs()),
+            None => "—".to_string(),
+        };
+        let delta_color = match r.delta_variation {
+            Some(d) if d.abs() >= 50.0 => (196, 22, 22),
+            _ => (60, 60, 60),
+        };
+        pdf.text(
+            false,
+            &delta_str,
+            8.0,
+            MARGIN + w_item + w_res + 4.0,
+            y_row_text,
+            delta_color,
+        );
+
+        // 4. Unidades
         let unit_str = r.unit.as_deref().unwrap_or("—");
         pdf.text(
             false,
             unit_str,
             8.5,
-            MARGIN + w_item + w_res + 12.0,
+            MARGIN + w_item + w_res + w_delta + 4.0,
             y_row_text,
             (60, 60, 60),
         );
 
-        // 4. Referencias (Min - Max)
+        // 5. Referencias (Min - Max)
         let ref_str = match (r.ref_min, r.ref_max) {
             (Some(min), Some(max)) => format!("{min:.1} – {max:.1}"),
             _ => "—".to_string(),
@@ -354,7 +381,7 @@ pub fn draw_results_full(
             false,
             &ref_str,
             8.5,
-            MARGIN + w_item + w_res + w_unit + 10.0,
+            MARGIN + w_item + w_res + w_delta + w_unit + 10.0,
             y_row_text,
             (60, 60, 60),
         );

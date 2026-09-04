@@ -69,6 +69,10 @@ pub fn get_clinic_settings(state: State<'_, AppState>) -> Result<ClinicSettings,
         .groq_api_key
         .as_ref()
         .map(|_| REDACTED_SECRET.to_string());
+    settings.smtp_password = settings
+        .smtp_password
+        .as_ref()
+        .map(|_| REDACTED_SECRET.to_string());
     settings.pkcs12_password = None;
 
     if session.role != "ADMIN" {
@@ -93,6 +97,13 @@ pub fn save_clinic_settings(
     if input.groq_api_key.as_deref() == Some(REDACTED_SECRET) {
         let current = settings_repo::get(pooled.conn())?;
         input.groq_api_key = current.groq_api_key;
+    }
+
+    // Igual para la contraseña SMTP: el marcador significa "no la edité",
+    // así que se conserva el valor cifrado ya almacenado.
+    if input.smtp_password.as_deref() == Some(REDACTED_SECRET) {
+        let current = settings_repo::get(pooled.conn())?;
+        input.smtp_password = current.smtp_password;
     }
 
     // Si llega una contraseña PKCS#12, se valida contra el certificado

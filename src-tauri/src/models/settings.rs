@@ -23,6 +23,17 @@ pub struct ClinicSettings {
     pub pkcs12_path: Option<String>,
     /// Contraseña del certificado PKCS#12 (solo en memoria, nunca se persiste).
     pub pkcs12_password: Option<String>,
+    /// Servidor SMTP para notificaciones por email (NULL = sin configurar).
+    pub smtp_host: Option<String>,
+    /// Puerto SMTP (587 STARTTLS, 465 TLS implícito).
+    pub smtp_port: Option<i32>,
+    /// NONE | STARTTLS | TLS
+    pub smtp_tls: Option<String>,
+    pub smtp_username: Option<String>,
+    /// Contraseña SMTP (cifrada en BD con DPAPI; nunca se devuelve en claro).
+    pub smtp_password: Option<String>,
+    /// Remitente (dirección "de" de los correos).
+    pub smtp_from: Option<String>,
 }
 
 impl Default for ClinicSettings {
@@ -42,6 +53,12 @@ impl Default for ClinicSettings {
             groq_api_key: None,
             pkcs12_path: None,
             pkcs12_password: None,
+            smtp_host: None,
+            smtp_port: None,
+            smtp_tls: None,
+            smtp_username: None,
+            smtp_password: None,
+            smtp_from: None,
         }
     }
 }

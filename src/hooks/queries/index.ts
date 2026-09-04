@@ -19,6 +19,7 @@ export {
   useSampleCounts,
   useWorklist,
   useSample,
+  useSampleEvents,
   useCreateSample,
   useRegisterLabResult,
   useRegisterLabResults,
@@ -58,6 +59,15 @@ export {
   useDeleteReferenceRange,
 } from "./use-analyzers";
 export {
+  useAnalyzerSources,
+  useSaveAnalyzerSource,
+  useDeleteAnalyzerSource,
+  usePollAnalyzerSource,
+  useAnalyzerImportJobs,
+  useFailedAnalyzerImports,
+  useDeleteAnalyzerImportJob,
+} from "./use-analyzer-sources";
+export {
   useClinicSettings,
   useSaveClinicSettings,
   useImportClinicLogo,
@@ -88,6 +98,12 @@ export {
   useSetInvoiceStatus,
 } from "./use-invoices";
 export { useGlobalSearch } from "./use-search";
+export {
+  useSampleNotifications,
+  useAcknowledgeCritical,
+  useSendCriticalEmail,
+  useTestSmtpConnection,
+} from "./use-notifications";
 export { useDashboardStats } from "./use-dashboard";
 export {
   useReports,
