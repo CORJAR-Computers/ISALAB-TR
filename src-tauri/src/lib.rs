@@ -292,14 +292,10 @@ pub fn run() {
                     if let Some(monitor) = monitor {
                         let scale = monitor.scale_factor();
                         let wa = monitor.work_area();
-                        let (wa_x, wa_y) = (
-                            wa.position.x as f64 / scale,
-                            wa.position.y as f64 / scale,
-                        );
-                        let (wa_w, wa_h) = (
-                            wa.size.width as f64 / scale,
-                            wa.size.height as f64 / scale,
-                        );
+                        let (wa_x, wa_y) =
+                            (wa.position.x as f64 / scale, wa.position.y as f64 / scale);
+                        let (wa_w, wa_h) =
+                            (wa.size.width as f64 / scale, wa.size.height as f64 / scale);
                         // Mínimos del config (1024x640) recortados al área de
                         // trabajo, con piso absoluto para no ser inusables.
                         let min_w = 1024.0_f64.min(wa_w).max(560.0);
