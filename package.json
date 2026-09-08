@@ -15,6 +15,7 @@
     "setup:target": "node scripts/setup-local-target.mjs",
     "icons": "node scripts/gen-icons.mjs",
     "lint": "eslint .",
+    "check:bindings": "node scripts/check-bindings.mjs",
     "lint:fix": "eslint . --fix",
     "test": "vitest run",
     "test:watch": "vitest",

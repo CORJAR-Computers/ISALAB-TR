@@ -28,6 +28,13 @@ jobs:
           cache: 'npm'
       - name: Install dependencies
         run: npm ci
+      # Guarda de bindings: verifica que cada comando registrado en
+      # collect_commands! (lib.rs) exista en src/bindings.ts y viceversa.
+      # Falla si se cambió Rust sin regenerar los bindings (históricamente
+      # el drift pasó desapercibido porque la UI aún no invocaba los
+      # comandos nuevos).
+      - name: Check bindings.ts is up to date
+        run: npm run check:bindings
       - name: Run ESLint
         run: npm run lint
       - name: Run Vitest
