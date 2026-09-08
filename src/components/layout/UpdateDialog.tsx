@@ -48,7 +48,15 @@ export function UpdateDialog({
         if (!open && !downloading) onDismiss();
       }}
     >
-      <DialogContent className="sm:max-w-md" showCloseButton={!downloading}>
+      <DialogContent
+        className="sm:max-w-md"
+        showCloseButton={!downloading}
+        // Durante la descarga no se puede cerrar: ni X (oculta), ni Esc.
+        // La actualización interrumpida dejaría la app en estado inconsistente.
+        onEscapeKeyDown={(e) => {
+          if (downloading) e.preventDefault();
+        }}
+      >
         <DialogHeader>
           <DialogTitle>Nueva versión disponible</DialogTitle>
           <DialogDescription>

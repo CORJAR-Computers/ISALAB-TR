@@ -173,3 +173,6 @@ export {
   DialogTitle,
   DialogTrigger,
 };
+
+// Exportados para las pruebas unitarias de la red de seguridad.
+export { fixBodyPointerEvents, useRestoreBodyPointerEvents };
