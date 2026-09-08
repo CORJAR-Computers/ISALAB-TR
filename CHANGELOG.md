@@ -6,8 +6,15 @@ The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.1.0/).
 
 ## [Unreleased]
 
+## [0.6.0] - 2026-09-08
+
 ### Added
 
+- **Órdenes de laboratorio**: la UI ya cubre los 8 comandos que el backend
+  registraba sin superficie (crear orden con paneles/analitos y prioridad,
+  accesionar muestras desde la orden, transiciones de estado, listado con
+  contadores y búsqueda, órdenes pendientes del paciente en el historial
+  clínico y enlace orden ⇄ muestra).
 - **Comprobación manual de actualizaciones** en el diálogo "Acerca de"
   (botón "Buscar actualizaciones"): vuelve a consultar GitHub Releases bajo
   demanda con feedback (hay novedad → diálogo de actualización; al día →
@@ -19,6 +26,22 @@ The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.1.0/).
 - **Versión instalada visible** en el diálogo "Acerca de": badge de cabecera
   y pie con `vX.Y.Z` real de la app instalada (antes aparecía un valor fijo
   incorrecto), leída del runtime Tauri con respaldo de `package.json`.
+
+### Changed
+
+- **Splash instantáneo**: la ventana de splash ya no arranca el bundle de
+  React; usa un HTML estático con CSS inline que se pinta en cuanto carga el
+  webview, eliminando el rectángulo vacío de ~1 s del arranque.
+
+### Fixed
+
+- **Bindings IPC sincronizados**: `src/bindings.ts` venía desactualizado
+  (faltaban `register_lab_results`, `delete_lab_result` y los 8 comandos de
+  lab orders); se regeneró y el nuevo paso de CI `check:bindings` falla si
+  Rust registra comandos que la copia comprometida no conoce.
+- **Paneles Dashboard/QC con valores nulos**: el turnaround por tipo de
+  muestra y los z-scores/SD del control de calidad pueden ser `null` en los
+  bindings regenerados; las vistas ahora lo manejan en vez de no compilar.
 
 ## [0.3.4] - 2026-08-07
 
