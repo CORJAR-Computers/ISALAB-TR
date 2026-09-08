@@ -194,7 +194,7 @@ export function SampleDetailDialog({
       setBatchValues(initial);
       setExtraAnalyteIds([]);
     }
-  }, [open, sample?.id]);
+  }, [open, sample]);
 
   // Paneles disponibles para esta muestra: específicos del tipo o genéricos
   const availablePanels = useMemo(() => {

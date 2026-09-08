@@ -61,3 +61,13 @@ updates:
         update-types:
           - "minor"
           - "patch"
+    ignore:
+      # Las dependencias de Tauri v2 frontend están acopladas 1:1 en major/minor
+      # con los crates en src-tauri/Cargo.toml. Si Dependabot actualiza solo el
+      # frontend, `tauri build` falla por version mismatch. Se actualizan
+      # coordinadamente con el backend Rust.
+      - dependency-name: "@tauri-apps/*"
+      # TypeScript no debe actualizarse a versiones superiores a las soportadas
+      # por @typescript-eslint (peer typescript@">=4.8.4 <6.1.0").
+      - dependency-name: "typescript"
+        update-types: ["version-update:semver-major"]

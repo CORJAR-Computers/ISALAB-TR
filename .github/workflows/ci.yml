@@ -202,7 +202,23 @@ jobs:
       - name: Prune Firebird to embedded subset
         run: node scripts/prune-firebird.mjs
       - name: Build Tauri app
-        run: npx tauri build
+        shell: pwsh
+        run: |
+          # En Pull Requests (como los de Dependabot o forks), los secrets de firma
+          # del repo no están disponibles por seguridad de GitHub Actions. Si la clave
+          # está ausente o vacía, se eliminan las variables vacías del entorno y se
+          # desactiva temporalmente createUpdaterArtifacts en tauri.conf.json para que
+          # el empaquetado NSIS se construya y valide sin requerir firma de release.
+          if (-not $env:TAURI_SIGNING_PRIVATE_KEY -or $env:TAURI_SIGNING_PRIVATE_KEY.Trim() -eq "") {
+            Write-Host "TAURI_SIGNING_PRIVATE_KEY no disponible; desactivando temporalmente firma de updater para CI..."
+            Remove-Item Env:TAURI_SIGNING_PRIVATE_KEY -ErrorAction SilentlyContinue
+            Remove-Item Env:TAURI_SIGNING_PRIVATE_KEY_PASSWORD -ErrorAction SilentlyContinue
+            $cfgPath = "src-tauri/tauri.conf.json"
+            $cfg = Get-Content $cfgPath -Raw | ConvertFrom-Json
+            $cfg.bundle.createUpdaterArtifacts = $false
+            $cfg | ConvertTo-Json -Depth 10 | Set-Content $cfgPath -Encoding UTF8
+          }
+          npx tauri build
       - name: Upload artifacts
         uses: actions/upload-artifact@v7
         with:
