@@ -89,6 +89,18 @@
   let nextSampleId = 1;
   let nextResultId = 1;
 
+  // Historial y notificaciones sembrados para la primera muestra del flujo
+  // (la que crea el smoke test recibe id 1). Ejercitan los EventRow y
+  // NotificationRow de los diálogos apilados del detalle.
+  const sampleEvents = [
+    { id: 1, sampleId: 1, eventType: "REJECTED", username: "admin", reason: "Tubo sin etiquetar", createdAt: "2026-09-07 10:15:00" },
+    { id: 2, sampleId: 1, eventType: "REOPENED", username: "admin", reason: null, createdAt: "2026-09-07 11:40:00" },
+  ];
+  const notificationsLog = [
+    { id: 1, resultId: null, sampleId: 1, channel: "EMAIL", recipientName: "Juan Pérez", recipientAddress: "juan.perez@example.com", status: "SENT", sentAt: "2026-09-07 12:05:00", ackedAt: null, ackedBy: null, note: null, createdAt: "2026-09-07 12:05:00" },
+    { id: 2, resultId: null, sampleId: 1, channel: "MANUAL", recipientName: null, recipientAddress: null, status: "ACKNOWLEDGED", sentAt: null, ackedAt: "2026-09-07 12:20:00", ackedBy: "Dra. Ana Pérez", note: null, createdAt: "2026-09-07 12:20:00" },
+  ];
+
   const pad4 = (n) => String(n).padStart(4, "0");
   const sampleCode = () => `M-2026-${pad4(nextSampleId)}`;
   const patientById = (id) => patients.find((p) => p.id === id);
@@ -269,6 +281,10 @@
       return list;
     },
     get_sample: (args) => sampleById(args.id) ?? null,
+    list_sample_events: (args) =>
+      sampleEvents.filter((e) => e.sampleId === args.sampleId),
+    list_sample_notifications: (args) =>
+      notificationsLog.filter((n) => n.sampleId === args.sampleId),
     create_sample: (args) => {
       const input = args.input;
       const p = patientById(input.patientId);

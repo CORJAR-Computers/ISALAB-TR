@@ -154,10 +154,66 @@ test("login → dashboard → flujo completo de muestra", async ({ page }) => {
   ).toBeVisible();
   await expect(detail.getByText("Finalizada", { exact: true })).toBeVisible();
 
+  // ---------- Historial y notificaciones (diálogos apilados) ----------
+  // Se abren sobre el detalle y se cierran con su propio botón Cerrar; así se
+  // ejercita la red de seguridad de pointer-events con modales apilados.
+  // exact: true → "Historial" también coincide con "Ver historial" (tarjeta
+  // del paciente) y "Notificaciones" con otros textos del detalle.
+  await detail
+    .getByRole("button", { name: "Historial", exact: true })
+    .click();
+  const eventsDialog = page.getByRole("dialog").filter({
+    hasText: "Historial de la muestra",
+  });
+  await expect(
+    eventsDialog.getByText("Tubo sin etiquetar"),
+  ).toBeVisible();
+  // .first() → el botón del footer (la X del diálogo también se llama "Cerrar").
+  await eventsDialog
+    .getByRole("button", { name: "Cerrar" })
+    .first()
+    .click();
+
+  await detail
+    .getByRole("button", { name: "Notificaciones", exact: true })
+    .click();
+  const notifDialog = page.getByRole("dialog").filter({
+    hasText: "Notificaciones de la muestra",
+  });
+  await expect(notifDialog.getByText("juan.perez@example.com")).toBeVisible();
+  await expect(notifDialog.getByText("Dra. Ana Pérez")).toBeVisible();
+  await notifDialog
+    .getByRole("button", { name: "Cerrar" })
+    .first()
+    .click();
+  // Los diálogos permanecen montados durante la animación de salida; esperar
+  // a que se desmonten evita que el Cerrar del detalle resuelva contra ellos.
+  await expect(
+    page
+      .getByRole("dialog")
+      .filter({ hasText: "Notificaciones de la muestra" }),
+  ).toHaveCount(0);
+
   // ---------- Cerrar y verificar la trazabilidad en la tabla ----------
-  // .last() → el botón del footer (la X del diálogo también se llama "Cerrar").
-  await detail.getByRole("button", { name: "Cerrar" }).last().click();
+  // .first() → el botón del footer (la X del diálogo también se llama "Cerrar").
+  await detail
+    .getByRole("button", { name: "Cerrar" })
+    .first()
+    .click();
+  await expect(
+    detail.getByRole("heading", { name: /Muestra M-2026-0001/ }),
+  ).toBeHidden();
   // exact: true → evita los toasts de sonner ("Muestra M-2026-0001 finalizada"…).
   await expect(page.getByText("M-2026-0001", { exact: true })).toBeVisible();
   await expect(page.getByText("Finalizada", { exact: true }).first()).toBeVisible();
+
+  // Tras apilar y cerrar tres diálogos, la app sigue respondiendo (el body no
+  // queda con pointer-events: none atrapado).
+  await page.getByRole("button", { name: "Nueva toma de muestra" }).click();
+  await expect(
+    page.getByRole("dialog").getByRole("heading", {
+      name: "Nueva toma de muestra",
+    }),
+  ).toBeVisible();
+  await page.keyboard.press("Escape");
 });
