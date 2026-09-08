@@ -21,6 +21,23 @@ END^
 SET TERM ; ^
 
 -- ==================== ANALITOS DE URIANÁLISIS ===============================
+-- Avanza el generador de analitos por encima de los IDs sembrados por 0002
+-- (IDs 1-18) **solo si** todavía está por debajo. En una DB nueva el generador
+-- está en 0 y el primer GEN_ID(...) devolvería 1, colisionando con la PK de
+-- 'HCT'. Un SET GENERATOR incondicional regresaría el generador en clínicas
+-- que ya crearon analitos propios (mismo patrón idempotente que la 0010).
+SET TERM ^ ;
+
+EXECUTE BLOCK AS
+    DECLARE VARIABLE CURR INTEGER;
+BEGIN
+    CURR = GEN_ID(GEN_ANALYTES_ID, 0);
+    IF (CURR < 18) THEN
+        CURR = GEN_ID(GEN_ANALYTES_ID, 18 - CURR);
+END^
+
+SET TERM ; ^
+
 INSERT INTO ANALYTES (ID, CODE, NAME, UNIT, METHOD, DESCRIPTION) VALUES
 (GEN_ID(GEN_ANALYTES_ID, 1), 'DENS', 'Densidad urinaria (USG)', 'g/mL', 'Refractometría', 'Gravedad específica de la orina');
 
