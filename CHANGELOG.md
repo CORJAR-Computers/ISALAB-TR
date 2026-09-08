@@ -29,6 +29,12 @@ The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.1.0/).
 
 ### Changed
 
+- **Adaptación a portátiles pequeños (14")**: la ventana principal se recorta
+  al área de trabajo del monitor donde arranca (p. ej. 1366×768 con escalado
+  125 % ≈ 1093×576 px lógicos tras la barra de tareas), tamaño y posición, sin
+  tocar nada en pantallas grandes. El mínimo configurable baja de
+  1024×640 a 560×480 px para que la ventana siempre pueda caber en la
+  pantalla (el recorte de arranque respeta un piso de 560×480).
 - **Splash instantáneo**: la ventana de splash ya no arranca el bundle de
   React; usa un HTML estático con CSS inline que se pinta en cuanto carga el
   webview, eliminando el rectángulo vacío de ~1 s del arranque.

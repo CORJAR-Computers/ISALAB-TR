@@ -16,8 +16,8 @@
         "title": "ISALAB · Laboratorio Veterinario",
         "width": 1280,
         "height": 820,
-        "minWidth": 1024,
-        "minHeight": 640,
+        "minWidth": 560,
+        "minHeight": 480,
         "resizable": true,
         "center": true,
         "visible": false

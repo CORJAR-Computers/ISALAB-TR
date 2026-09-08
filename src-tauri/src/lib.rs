@@ -90,6 +90,20 @@ use crate::commands::users::{change_password, create_user, list_users};
 use crate::commands::vaccines::{create_vaccine, list_vaccines};
 use crate::state::AppState;
 
+/// Dimensiones (lógicas) de la ventana tras recortarlas al área de trabajo
+/// del monitor donde se encuentra. Devuelve `None` si la ventana ya cabe:
+/// en ese caso no se redimensiona y las pantallas grandes quedan intactas.
+///
+/// `min` son los mínimos del config ya recortados al área de trabajo (el
+/// llamador aplica el piso absoluto 560x480).
+fn fitted_size(cur: (f64, f64), wa: (f64, f64), min: (f64, f64)) -> Option<(f64, f64)> {
+    // Tolerancia de medio px lógico: no redimensionar por redondeos de DPI.
+    if cur.0 <= wa.0 + 0.5 && cur.1 <= wa.1 + 0.5 {
+        return None;
+    }
+    Some((cur.0.min(wa.0).max(min.0), cur.1.min(wa.1).max(min.1)))
+}
+
 fn specta_builder() -> Builder<tauri::Wry> {
     Builder::<tauri::Wry>::new()
         .commands(collect_commands![
@@ -256,10 +270,58 @@ pub fn run() {
             #[cfg(desktop)]
             {
                 use std::time::Duration;
-                use tauri::Listener;
+                use tauri::{Listener, LogicalPosition, LogicalSize};
 
                 let splash = app.get_webview_window("splash");
                 let main = app.get_webview_window("main");
+
+                // Portátiles pequeños (p. ej. 14" con 1366x768 a 125 % de
+                // escala): el área de trabajo (~1093x576 px lógicos con barra
+                // de tareas) es menor que el alto inicial (820) y que el
+                // mínimo de 640 del config, y la ventana quedaría parcialmente
+                // fuera de la pantalla e inaccesible. Se recorta tamaño y
+                // posición al área de trabajo del monitor donde esté la
+                // ventana. Si ya cabe, no se toca nada (pantallas grandes
+                // quedan exactamente igual).
+                if let Some(win) = main.as_ref() {
+                    let monitor = win
+                        .current_monitor()
+                        .ok()
+                        .flatten()
+                        .or_else(|| win.monitor_from_point(0.0, 0.0).ok().flatten());
+                    if let Some(monitor) = monitor {
+                        let scale = monitor.scale_factor();
+                        let wa = monitor.work_area();
+                        let (wa_x, wa_y) = (
+                            wa.position.x as f64 / scale,
+                            wa.position.y as f64 / scale,
+                        );
+                        let (wa_w, wa_h) = (
+                            wa.size.width as f64 / scale,
+                            wa.size.height as f64 / scale,
+                        );
+                        // Mínimos del config (1024x640) recortados al área de
+                        // trabajo, con piso absoluto para no ser inusables.
+                        let min_w = 1024.0_f64.min(wa_w).max(560.0);
+                        let min_h = 640.0_f64.min(wa_h).max(480.0);
+                        let cur = win
+                            .inner_size()
+                            .unwrap_or_default()
+                            .to_logical::<f64>(scale);
+                        if let Some((new_w, new_h)) =
+                            fitted_size((cur.width, cur.height), (wa_w, wa_h), (min_w, min_h))
+                        {
+                            // Primero relajar el mínimo, luego el tamaño y por
+                            // último recentrar dentro del área de trabajo.
+                            let _ = win.set_min_size(Some(LogicalSize::new(min_w, min_h)));
+                            let _ = win.set_size(LogicalSize::new(new_w, new_h));
+                            let _ = win.set_position(LogicalPosition::new(
+                                wa_x + (wa_w - new_w) / 2.0,
+                                wa_y + (wa_h - new_h) / 2.0,
+                            ));
+                        }
+                    }
+                }
 
                 if let (Some(splash), Some(main)) = (splash, main) {
                     let main_handle = main.clone();
@@ -286,4 +348,42 @@ pub fn run() {
         .invoke_handler(specta_builder().invoke_handler())
         .run(tauri::generate_context!())
         .expect("error while running tauri application");
+}
+
+#[cfg(test)]
+mod window_fit_tests {
+    use super::fitted_size;
+
+    #[test]
+    fn keeps_size_when_the_window_already_fits() {
+        assert_eq!(
+            fitted_size((1280.0, 820.0), (1600.0, 900.0), (1024.0, 640.0)),
+            None
+        );
+    }
+
+    #[test]
+    fn shrinks_to_the_work_area_on_a_small_laptop() {
+        // 1366x768 físicos a 125 %: ~1092.8x576 lógicos de área de trabajo.
+        assert_eq!(
+            fitted_size((1280.0, 820.0), (1092.8, 576.0), (1024.0, 480.0)),
+            Some((1092.8, 576.0))
+        );
+    }
+
+    #[test]
+    fn respects_the_absolute_floor_on_tiny_monitors() {
+        assert_eq!(
+            fitted_size((1280.0, 820.0), (500.0, 400.0), (560.0, 480.0)),
+            Some((560.0, 480.0))
+        );
+    }
+
+    #[test]
+    fn shrinks_only_the_offending_axis() {
+        assert_eq!(
+            fitted_size((900.0, 820.0), (1024.0, 600.0), (560.0, 480.0)),
+            Some((900.0, 600.0))
+        );
+    }
 }
