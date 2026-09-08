@@ -370,8 +370,9 @@ export function DashboardPage() {
                 {stats.turnaroundBySampleType.map((t) => {
                   const max = Math.max(
                     1,
-                    ...stats.turnaroundBySampleType.map((x) => x.avgMinutes),
+                    ...stats.turnaroundBySampleType.map((x) => x.avgMinutes ?? 0),
                   );
+                  if (t.avgMinutes == null) return null;
                   return (
                     <div key={t.sampleTypeId}>
                       <div className="flex items-baseline justify-between gap-2">

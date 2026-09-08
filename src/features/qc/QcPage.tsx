@@ -116,6 +116,7 @@ function LeveyJenningsChart({ data }: { data: QcChartData }) {
       <line x1={PAD.left} x2={W - PAD.right} y1={yFor(0)} y2={yFor(0)} stroke="#71717a" strokeWidth={1.4} />
 
       {points.map((p, i) => {
+        if (p.zScore == null) return null;
         const cx = xFor(i, n);
         const cy = yFor(p.zScore);
         const isViolated = p.violation != null;
@@ -154,7 +155,7 @@ function LeveyJenningsChart({ data }: { data: QcChartData }) {
         {analyteName} ({points.length} corridas)
       </text>
       <text x={W - PAD.right} y={H - 6} textAnchor="end" fontSize={10} fill="#71717a">
-        Media {mean} {unit ?? ""} · SD {sd.toFixed(2)}
+        Media {mean ?? "—"} {unit ?? ""} · SD {sd != null ? sd.toFixed(2) : "—"}
       </text>
     </svg>
   );
@@ -244,7 +245,7 @@ export function QcPage() {
       return;
     }
     const validTargets = materialDraft.targets.filter(
-      (t) => t.analyteId > 0 && t.sd > 0,
+      (t) => t.analyteId > 0 && t.sd != null && t.sd > 0,
     );
     if (validTargets.length === 0) {
       toast.error("Agrega al menos un analito objetivo con media y SD > 0");
