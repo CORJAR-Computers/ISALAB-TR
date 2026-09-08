@@ -39,6 +39,9 @@ const SamplesPage = lazy(() =>
 const WorklistPage = lazy(() =>
   import("@/features/worklist/WorklistPage").then((m) => ({ default: m.WorklistPage })),
 );
+const LabOrdersPage = lazy(() =>
+  import("@/features/lab-orders/LabOrdersPage").then((m) => ({ default: m.LabOrdersPage })),
+);
 const SurgeriesPage = lazy(() =>
   import("@/features/surgeries/SurgeriesPage").then((m) => ({ default: m.SurgeriesPage })),
 );
@@ -221,6 +224,7 @@ export default function App() {
               {view === "clinical-history" && <ClinicalHistoryPage />}
               {view === "samples" && <SamplesPage />}
               {view === "worklist" && <WorklistPage />}
+              {view === "lab-orders" && <LabOrdersPage />}
               {view === "surgeries" && <SurgeriesPage />}
               {view === "vaccines" && <VaccinesPage />}
               {view === "invoices" && <InvoicesPage />}

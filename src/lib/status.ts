@@ -99,6 +99,35 @@ export const PAYMENT_METHOD_LABEL: Record<string, string> = {
   TARJETA_DEBITO: "Tarjeta débito",
 };
 
+export const LAB_ORDER_STATUS: Record<
+  string,
+  { label: string; variant: BadgeVariant }
+> = {
+  RECIBIDA: { label: "Recibida", variant: "secondary" },
+  EN_PROCESO: { label: "En proceso", variant: "warning" },
+  COMPLETADA: { label: "Completada", variant: "success" },
+  ANULADA: { label: "Anulada", variant: "destructive" },
+};
+
+export const LAB_ORDER_PRIORITY: Record<
+  string,
+  { label: string; variant: BadgeVariant }
+> = {
+  NORMAL: { label: "Normal", variant: "outline" },
+  URGENTE: { label: "Urgente", variant: "destructive" },
+};
+
+/**
+ * Transiciones de estado permitidas para una orden de laboratorio
+ * (validadas por el backend; aqui solo se usan para habilitar acciones).
+ */
+export const LAB_ORDER_STATUS_TRANSITIONS: Record<string, string[]> = {
+  RECIBIDA: ["EN_PROCESO", "COMPLETADA", "ANULADA"],
+  EN_PROCESO: ["COMPLETADA", "ANULADA"],
+  COMPLETADA: [],
+  ANULADA: [],
+};
+
 export const ANESTHESIA_OPTIONS = [
   "General inhalatoria",
   "General inyectable",

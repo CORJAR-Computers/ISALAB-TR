@@ -8,6 +8,7 @@ import {
   Ban,
   Bot,
   CheckCircle2,
+  ClipboardList,
   ExternalLink,
   FileText,
   FlaskConical,
@@ -59,6 +60,7 @@ import {
   useAttachResultFile,
   useDeleteLabResult,
   useDeleteResultAttachment,
+  useOrderForSample,
   useGenerateReport,
   useGenerateSampleLabels,
   usePanelAnalytes,
@@ -136,6 +138,10 @@ export function SampleDetailDialog({
 
   const setActivePatient = useUiStore((s) => s.setActivePatient);
   const navigate = useUiStore((s) => s.navigate);
+  const requestEntity = useUiStore((s) => s.requestEntity);
+
+  // Orden de laboratorio de la que proviene la muestra (null si es espontánea).
+  const { data: originOrder } = useOrderForSample(open ? sampleId : null);
 
   const { isVetOrAdmin } = usePermissions();
   const [confirmAnular, setConfirmAnular] = useState(false);
@@ -743,6 +749,22 @@ export function SampleDetailDialog({
             {sample
               ? `${sample.sampleTypeName} · recibida ${formatDateTime(sample.receivedAt)}`
               : "Cargando muestra…"}
+            {originOrder && (
+              <button
+                type="button"
+                onClick={(e) => {
+                  e.stopPropagation();
+                  onOpenChange(false);
+                  navigate("lab-orders");
+                  requestEntity("lab-order", originOrder.id);
+                }}
+                className="ml-2 inline-flex cursor-pointer items-center gap-1 rounded-md bg-primary/10 px-1.5 py-0.5 text-xs font-medium text-primary transition-colors hover:bg-primary/20"
+                title="Ver la orden de laboratorio de origen"
+              >
+                <ClipboardList className="size-3" />
+                Orden {originOrder.code}
+              </button>
+            )}
           </DialogDescription>
         </DialogHeader>
 

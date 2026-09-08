@@ -100,6 +100,16 @@ export {
 } from "./use-invoices";
 export { useGlobalSearch } from "./use-search";
 export {
+  useLabOrders,
+  useLabOrderCounts,
+  useLabOrder,
+  usePatientLabOrders,
+  useOrderForSample,
+  useCreateLabOrder,
+  useSetLabOrderStatus,
+  useAccessionLabOrder,
+} from "./use-lab-orders";
+export {
   useSampleNotifications,
   useAcknowledgeCritical,
   useSendCriticalEmail,

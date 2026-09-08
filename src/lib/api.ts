@@ -1,6 +1,7 @@
 import { invoke } from "@tauri-apps/api/core";
 import type {
   Analyte,
+  AccessionOrderInput,
   StatusCount,
   Analyzer,
   AnalyzerImportJob,
@@ -18,6 +19,7 @@ import type {
   CreateAnalyzerInput,
   CreateConsultationInput,
   CreateInvoiceInput,
+  CreateLabOrderInput,
   CreatePatientInput,
   CreateSampleInput,
   CreateSurgeryInput,
@@ -30,7 +32,9 @@ import type {
   ImportSummary,
   Invoice,
   InvoiceListItem,
+  LabOrder,
   LabResult,
+  LabOrderListItem,
   NotificationLogEntry,
   LoginInput,
   Owner,
@@ -325,6 +329,23 @@ export const api = {
   getInvoice: (id: number) => invoke<Invoice | null>("get_invoice", { id }),
   setInvoiceStatus: (id: number, status: string) =>
     invoke<Invoice>("set_invoice_status", { id, status }),
+
+  // ---- Órdenes de laboratorio ----
+  createLabOrder: (input: CreateLabOrderInput) =>
+    invoke<LabOrder>("create_lab_order", { input }),
+  listLabOrders: (status: string | null, search: string | null) =>
+    invoke<LabOrderListItem[]>("list_lab_orders", { status, search }),
+  listPatientLabOrders: (patientId: number) =>
+    invoke<LabOrderListItem[]>("list_patient_lab_orders", { patientId }),
+  getLabOrder: (id: number) =>
+    invoke<LabOrder | null>("get_lab_order", { id }),
+  countLabOrders: () => invoke<StatusCount[]>("count_lab_orders"),
+  setLabOrderStatus: (id: number, status: string) =>
+    invoke<LabOrder>("set_lab_order_status", { id, status }),
+  accessionLabOrder: (input: AccessionOrderInput) =>
+    invoke<Sample>("accession_lab_order", { input }),
+  getOrderForSample: (sampleId: number) =>
+    invoke<LabOrder | null>("get_order_for_sample", { sampleId }),
 
   // ---- Búsqueda global (paleta Ctrl+K) ----
   globalSearch: (query: string) =>

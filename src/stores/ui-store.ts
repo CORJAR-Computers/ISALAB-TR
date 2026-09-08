@@ -9,6 +9,7 @@ export type View =
   | "clinical-history"
   | "samples"
   | "worklist"
+  | "lab-orders"
   | "surgeries"
   | "vaccines"
   | "invoices"
@@ -19,7 +20,7 @@ export type View =
   | "settings";
 
 /** Entidad externa que una página debe abrir/enfocar (p. ej. desde la paleta Ctrl+K). */
-export type EntityKind = "sample" | "invoice" | "surgery";
+export type EntityKind = "sample" | "invoice" | "surgery" | "lab-order";
 
 type UiState = {
   theme: Theme;
