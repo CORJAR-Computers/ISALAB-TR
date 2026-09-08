@@ -3,7 +3,37 @@ import * as DialogPrimitive from "@radix-ui/react-dialog";
 import { XIcon } from "lucide-react";
 import { cn } from "@/lib/utils";
 
+/**
+ * Radix (react-dismissable-layer) pone `body { pointer-events: none }` mientras
+ * un modal está abierto y lo restaura al cerrar. Con diálogos apilados de
+ * distintos `Dialog.Root` (p. ej. detalle de muestra → importar resultados),
+ * la variable de módulo que guarda el valor original puede capturar "none" y,
+ * al cerrar todos los modales, el body queda con `pointer-events: none`
+ * atrapado: los botones del siguiente modal dejan de responder aunque el resto
+ * de la app funcione. Esta red de seguridad restaura el body al cerrar (y poco
+ * después, por la animación de salida) siempre que no quede ningún diálogo abierto.
+ */
+function fixBodyPointerEvents() {
+  if (document.body.style.pointerEvents !== "none") return;
+  const anyOpenDialog = document.querySelector(
+    '[data-slot="dialog-content"][data-state="open"]',
+  );
+  if (!anyOpenDialog) document.body.style.pointerEvents = "";
+}
+
+function useRestoreBodyPointerEvents(isOpen: boolean) {
+  React.useEffect(() => {
+    if (!isOpen) fixBodyPointerEvents();
+  }, [isOpen]);
+  React.useEffect(() => {
+    // Sin cleanup a propósito: el temporizador debe sobrevivir al desmontaje
+    // para cubrir el caso de un diálogo que se desmonta estando abierto.
+    window.setTimeout(fixBodyPointerEvents, 350);
+  }, []);
+}
+
 function Dialog(props: React.ComponentProps<typeof DialogPrimitive.Root>) {
+  useRestoreBodyPointerEvents(props.open ?? false);
   return <DialogPrimitive.Root data-slot="dialog" {...props} />;
 }
 
@@ -58,6 +88,13 @@ function DialogContent({
           "bg-background data-[state=open]:animate-in data-[state=closed]:animate-out data-[state=closed]:fade-out-0 data-[state=open]:fade-in-0 data-[state=closed]:zoom-out-95 data-[state=open]:zoom-in-95 fixed top-[50%] left-[50%] z-50 grid w-full max-w-[calc(100%-2rem)] translate-x-[-50%] translate-y-[-50%] gap-4 rounded-xl border p-6 shadow-xl duration-200 sm:max-w-lg",
           className,
         )}
+        // Evita que un clic fuera del modal lo cierre: en producción, al hacer
+        // clic en el overlay Radix dejaba `pointer-events: none` atrapado en el
+        // body, inhabilitando los botones del modal (Guardar/Cancelar) hasta
+        // reabrir el diálogo. El usuario cierra explícitamente con la X, Esc o
+        // los botones de acción.
+        onPointerDownOutside={(e) => e.preventDefault()}
+        onInteractOutside={(e) => e.preventDefault()}
         {...props}
       >
         {children}

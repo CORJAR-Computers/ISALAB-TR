@@ -23,6 +23,40 @@ async function login(page: Page) {
   await page.getByRole("button", { name: "Entrar" }).click();
 }
 
+// Regression: hacer clic fuera de un modal no debe inhabilitar sus botones.
+// El overlay captura el clic, el modal se queda abierto y Guardar/Cancelar
+// siguen respondiendo (bug de pointer-events atrapado en el body con Radix).
+test("clic fuera del modal no inhabilita sus botones", async ({ page }) => {
+  await login(page);
+
+  await page.getByRole("button", { name: "Muestras & Laboratorio" }).click();
+  await page.getByRole("button", { name: "Nueva toma de muestra" }).click();
+
+  const dialog = page.getByRole("dialog");
+  await expect(
+    dialog.getByRole("heading", { name: "Nueva toma de muestra" }),
+  ).toBeVisible();
+
+  // Clic fuera del modal (sobre el overlay, no sobre un control del diálogo).
+  await page.mouse.click(20, 400);
+
+  // El modal sigue abierto…
+  await expect(
+    dialog.getByRole("heading", { name: "Nueva toma de muestra" }),
+  ).toBeVisible();
+  // …y sus controles siguen respondiendo (el input recibe texto).
+  const patientInput = dialog.getByPlaceholder(/Buscar paciente/);
+  await patientInput.fill("Rocky");
+  await expect(patientInput).toHaveValue("Rocky");
+
+  // Cerrar con Escape (la X queda fuera del viewport por la altura del modal)
+  // y verificar que la app sigue usable.
+  await page.keyboard.press("Escape");
+  await expect(
+    page.getByRole("button", { name: "Nueva toma de muestra" }),
+  ).toBeVisible();
+});
+
 test("login → dashboard → flujo completo de muestra", async ({ page }) => {
   // ---------- Login ----------
   await login(page);

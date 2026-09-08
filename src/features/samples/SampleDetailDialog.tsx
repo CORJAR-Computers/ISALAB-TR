@@ -732,11 +732,7 @@ export function SampleDetailDialog({
         onOpenChange(o);
       }}
     >
-      <DialogContent
-        className="flex max-h-[92vh] flex-col gap-4 sm:max-w-4xl"
-        onPointerDownOutside={(e) => e.preventDefault()}
-        onInteractOutside={(e) => e.preventDefault()}
-      >
+      <DialogContent className="flex max-h-[92vh] flex-col gap-4 sm:max-w-4xl">
         <DialogHeader>
           <DialogTitle className="flex items-center gap-2">
             <StatusIcon className="size-4" />
