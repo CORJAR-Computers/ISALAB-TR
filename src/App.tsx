@@ -136,7 +136,10 @@ export default function App() {
     <ErrorBoundary FallbackComponent={GlobalErrorFallback}>
       <div className="min-h-svh">
         <Sidebar />
-        <AboutDialog />
+        <AboutDialog
+          checking={updater.checking}
+          onCheckUpdate={updater.checkNow}
+        />
         <GlobalSearchPalette />
         <ChangePasswordDialog
           open={mustChangePassword || changePasswordOpen}

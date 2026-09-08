@@ -10,19 +10,40 @@ import { Button } from "@/components/ui/button";
 import { Badge } from "@/components/ui/badge";
 import { useUiStore } from "@/stores/ui-store";
 import logoSidebar from "@/assets/logo_sidebar.png";
+import { useEffect, useState } from "react";
 import {
   Cpu,
   Database,
   FileCheck2,
   Globe,
   HeartPulse,
+  RefreshCw,
   ShieldCheck,
   Sparkles,
 } from "lucide-react";
+import { getAppVersion } from "@/lib/app-version";
 
-export function AboutDialog() {
+interface AboutDialogProps {
+  /** true mientras la comprobación manual de actualizaciones está en curso. */
+  checking?: boolean;
+  /** Dispara una comprobación manual de actualizaciones bajo demanda. */
+  onCheckUpdate?: () => void;
+}
+
+export function AboutDialog({ checking = false, onCheckUpdate }: AboutDialogProps) {
   const aboutOpen = useUiStore((s) => s.aboutOpen);
   const setAboutOpen = useUiStore((s) => s.setAboutOpen);
+  const [appVersion, setAppVersion] = useState<string | null>(null);
+
+  useEffect(() => {
+    let cancelled = false;
+    void getAppVersion().then((v) => {
+      if (!cancelled) setAppVersion(v);
+    });
+    return () => {
+      cancelled = true;
+    };
+  }, []);
 
   return (
     <Dialog open={aboutOpen} onOpenChange={setAboutOpen}>
@@ -52,8 +73,12 @@ export function AboutDialog() {
                 <Badge variant="secondary" className="bg-emerald-500/20 text-emerald-300 border-emerald-500/30 text-[10px] uppercase font-bold tracking-wider">
                   Tauri v2 + Rust
                 </Badge>
-                <Badge variant="outline" className="text-white/80 border-white/20 text-[10px]">
-                  v2.0.0
+                <Badge
+                  variant="outline"
+                  className="text-white/80 border-white/20 text-[10px] font-mono"
+                  title="Versión instalada de ISALAB"
+                >
+                  v{appVersion ?? "…"}
                 </Badge>
               </div>
               <h2 className="text-xl font-bold tracking-tight mt-1 text-white">
@@ -142,9 +167,29 @@ export function AboutDialog() {
           <p className="text-[11px] text-muted-foreground text-center sm:text-left">
             © 2026 <strong className="text-foreground font-semibold">CORJAR Computers Solutions</strong>. Todos los derechos reservados.
           </p>
-          <Button size="sm" onClick={() => setAboutOpen(false)}>
-            Cerrar
-          </Button>
+          <div className="flex items-center gap-2">
+            {appVersion && (
+              <span className="text-muted-foreground mr-1 hidden text-[11px] font-mono sm:inline">
+                v{appVersion}
+              </span>
+            )}
+            {onCheckUpdate && (
+              <Button
+                size="sm"
+                variant="outline"
+                onClick={onCheckUpdate}
+                disabled={checking}
+              >
+                <RefreshCw
+                  className={`size-3.5 ${checking ? "animate-spin" : ""}`}
+                />
+                {checking ? "Comprobando…" : "Buscar actualizaciones"}
+              </Button>
+            )}
+            <Button size="sm" onClick={() => setAboutOpen(false)}>
+              Cerrar
+            </Button>
+          </div>
         </DialogFooter>
       </DialogContent>
     </Dialog>

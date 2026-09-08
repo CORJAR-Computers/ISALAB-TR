@@ -70,6 +70,7 @@ import {
 } from "@/hooks/use-queries";
 import { getErrorMessage } from "@/lib/api";
 import type { Analyzer, ReferenceRange } from "@/bindings";
+import { AnalyzerWatcherSection } from "@/features/settings/AnalyzerWatcherSection";
 
 // ============================ Formularios ===================================
 
@@ -910,6 +911,10 @@ export function AnalyzerManagementCard() {
               </Table>
             </div>
           )}
+        </div>
+        {/* Importación automática: carpeta vigilada por analizador */}
+        <div className="border-t pt-6">
+          <AnalyzerWatcherSection />
         </div>
       </CardContent>
 

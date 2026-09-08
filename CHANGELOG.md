@@ -6,6 +6,20 @@ The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.1.0/).
 
 ## [Unreleased]
 
+### Added
+
+- **Comprobación manual de actualizaciones** en el diálogo "Acerca de"
+  (botón "Buscar actualizaciones"): vuelve a consultar GitHub Releases bajo
+  demanda con feedback (hay novedad → diálogo de actualización; al día →
+  aviso; error de red → error).
+- **Re-chequeo periódico de actualizaciones** mientras la app permanece
+  abierta: cada 4 horas se vuelve a consultar silenciosamente el endpoint del
+  updater (además del chequeo inicial al arrancar), de modo que una versión
+  nueva publicada se detecta sin reiniciar la aplicación.
+- **Versión instalada visible** en el diálogo "Acerca de": badge de cabecera
+  y pie con `vX.Y.Z` real de la app instalada (antes aparecía un valor fijo
+  incorrecto), leída del runtime Tauri con respaldo de `package.json`.
+
 ## [0.3.4] - 2026-08-07
 
 ### Added
