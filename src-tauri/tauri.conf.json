@@ -32,7 +32,9 @@
         "alwaysOnTop": true,
         "skipTaskbar": true,
         "center": true,
-        "visible": true
+        "visible": true,
+        "url": "src/splash.html",
+        "backgroundColor": "#006F5B"
       }
     ],
     "security": {

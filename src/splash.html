@@ -1,0 +1,168 @@
+<!doctype html>
+<html lang="es">
+  <head>
+    <meta charset="UTF-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+    <title>ISALAB</title>
+    <style>
+      /*
+        Splash estático de ISALAB (ventana "splash" de Tauri).
+
+        ¿Por qué HTML puro sin JS ni CSS de build? La ventana splash comparte
+        el bundle de React con la app: hasta que Vite parsea el JS y React
+        monta el árbol, el webview muestra un rectángulo vacío (~1 s). Este
+        documento se pinta en cuanto el webview lo carga, sin esperar nada.
+
+        El color base replica --primary del tema claro (oklch(0.47 0.12 178)
+        ≈ #006f5b) para que la transición splash → Login no tenga salto de
+        color. El logo y el spinner usan solo CSS/SVG inline: cero requests.
+      */
+      html,
+      body {
+        margin: 0;
+        height: 100%;
+        background: #006f5b;
+      }
+      .wrap {
+        position: relative;
+        display: flex;
+        height: 100%;
+        align-items: center;
+        justify-content: center;
+        overflow: hidden;
+        /* Degradado equivalente a bg-gradient-to-br from-primary via-primary/95 to-emerald-700 */
+        background: linear-gradient(
+          to bottom right,
+          #006f5b,
+          #0a7a64 55%,
+          #047857
+        );
+        color: #fff;
+        font-family:
+          ui-sans-serif, system-ui, -apple-system, "Segoe UI", Roboto,
+          "Helvetica Neue", Arial, sans-serif;
+        user-select: none;
+      }
+      /* Halos decorativos (animate-glow-pulse del tema) */
+      .glow {
+        position: absolute;
+        width: 18rem;
+        height: 18rem;
+        border-radius: 9999px;
+        background: rgba(255, 255, 255, 0.1);
+        filter: blur(40px);
+        animation: glow-pulse 3.5s ease-in-out infinite;
+      }
+      .glow.tl {
+        top: -6rem;
+        left: -6rem;
+      }
+      .glow.br {
+        right: -6rem;
+        bottom: -6rem;
+        animation-delay: 1.5s;
+      }
+      @keyframes glow-pulse {
+        0%,
+        100% {
+          opacity: 0.55;
+          transform: scale(1);
+        }
+        50% {
+          opacity: 0.9;
+          transform: scale(1.06);
+        }
+      }
+      .card {
+        position: relative;
+        display: flex;
+        flex-direction: column;
+        align-items: center;
+        gap: 1.5rem;
+        animation: fade-in-up 0.45s cubic-bezier(0.22, 1, 0.36, 1) both;
+      }
+      .logo-box {
+        display: flex;
+        height: 7rem;
+        width: 16rem;
+        align-items: center;
+        justify-content: center;
+        border-radius: 1.5rem;
+        padding: 1rem;
+        background: rgba(255, 255, 255, 0.15);
+        box-shadow: 0 25px 50px -12px rgba(0, 0, 0, 0.25);
+        outline: 1px solid rgba(255, 255, 255, 0.2);
+        outline-offset: -1px;
+      }
+      .logo-box img {
+        max-height: 100%;
+        width: 100%;
+        object-fit: contain;
+      }
+      .name {
+        margin: 0;
+        font-size: 1.25rem;
+        font-weight: 700;
+        letter-spacing: 0.025em;
+        text-align: center;
+      }
+      .tagline {
+        margin: 0;
+        font-size: 0.75rem;
+        color: rgba(255, 255, 255, 0.7);
+        text-align: center;
+      }
+      .loading {
+        display: flex;
+        align-items: center;
+        gap: 0.5rem;
+        color: rgba(255, 255, 255, 0.8);
+      }
+      .spinner {
+        width: 1rem;
+        height: 1rem;
+        border: 2px solid rgba(255, 255, 255, 0.25);
+        border-top-color: #fff;
+        border-radius: 9999px;
+        animation: spin 0.8s linear infinite;
+      }
+      .loading span {
+        font-size: 0.75rem;
+      }
+      @keyframes spin {
+        to {
+          transform: rotate(360deg);
+        }
+      }
+      @keyframes fade-in-up {
+        from {
+          opacity: 0;
+          transform: translateY(10px);
+        }
+        to {
+          opacity: 1;
+          transform: translateY(0);
+        }
+      }
+    </style>
+  </head>
+  <body>
+    <main class="wrap">
+      <div class="glow tl"></div>
+      <div class="glow br"></div>
+      <div class="card">
+        <div class="logo-box">
+          <img src="/icon.png" alt="ISALAB" draggable="false" />
+        </div>
+        <div>
+          <p class="name">ISALAB</p>
+          <p class="tagline">Laboratorio Veterinario</p>
+        </div>
+        <div class="loading">
+          <div class="spinner"></div>
+          <span>Iniciando…</span>
+        </div>
+      </div>
+    </main>
+  </body>
+</html>

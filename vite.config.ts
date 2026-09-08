@@ -2,6 +2,7 @@ import { defineConfig } from "vite";
 import react from "@vitejs/plugin-react";
 import tailwindcss from "@tailwindcss/vite";
 import path from "node:path";
+import { resolve } from "node:path";
 import { readFileSync } from "node:fs";
 
 const host = process.env.TAURI_DEV_HOST;
@@ -54,6 +55,12 @@ export default defineConfig({
     minify: !process.env.TAURI_ENV_DEBUG ? "oxc" : false,
     sourcemap: !!process.env.TAURI_ENV_DEBUG,
     rollupOptions: {
+      // Entrada principal de la app y splash estático de la ventana "splash"
+      // de Tauri (HTML puro sin JS; ver src/splash.html).
+      input: {
+        main: resolve(import.meta.dirname, "index.html"),
+        splash: resolve(import.meta.dirname, "src/splash.html"),
+      },
       output: {
         // Code-splitting: separa las dependencias pesadas (gráficas, markdown,
         // React, iconos) en chunks con caché propia para arranques más rápidos
