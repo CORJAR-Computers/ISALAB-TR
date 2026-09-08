@@ -99,6 +99,22 @@ export function useRegisterLabResults() {
   });
 }
 
+/** Elimina un analito registrado de una muestra. */
+export function useDeleteLabResult() {
+  const qc = useQueryClient();
+  return useMutation({
+    mutationFn: ({ sampleId, analyteId }: { sampleId: number; analyteId: number }) =>
+      api.deleteLabResult(sampleId, analyteId),
+    onSuccess: (_, { sampleId }) => {
+      qc.invalidateQueries({ queryKey: ["clinical-history"] });
+      qc.invalidateQueries({ queryKey: ["samples"] });
+      qc.invalidateQueries({ queryKey: ["sample-counts"] });
+      qc.invalidateQueries({ queryKey: ["worklist"] });
+      qc.invalidateQueries({ queryKey: ["sample", sampleId] });
+    },
+  });
+}
+
 /** Registra la calidad preanalítica (interferencia HIL) de una muestra. */
 export function useSetSampleQuality() {
   const qc = useQueryClient();

@@ -82,6 +82,10 @@ pub const MIGRATIONS: &[(&str, &str)] = &[
         "0019_analyzer_sources",
         include_str!("../../migrations/0019_analyzer_sources.sql"),
     ),
+    (
+        "0020_urine_and_biochem_panels",
+        include_str!("../../migrations/0020_urine_and_biochem_panels.sql"),
+    ),
 ];
 
 /// Indica si una migración de datos de demostración debe aplicarse.

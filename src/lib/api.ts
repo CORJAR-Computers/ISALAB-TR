@@ -118,6 +118,8 @@ export const api = {
     invoke<LabResult>("register_lab_result", { input }),
   registerLabResults: (input: RegisterResultsInput) =>
     invoke<LabResult[]>("register_lab_results", { input }),
+  deleteLabResult: (sampleId: number, analyteId: number) =>
+    invoke<void>("delete_lab_result", { sampleId, analyteId }),
   listSamples: (status: string | null, search: string | null) =>
     invoke<SampleListItem[]>("list_samples", { status, search }),
   getSample: (id: number) => invoke<Sample | null>("get_sample", { id }),

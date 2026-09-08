@@ -141,6 +141,8 @@ export const commands = {
 	setSampleStatus: (id: number, status: string) => typedError<Sample, AppError>(__TAURI_INVOKE("set_sample_status", { id, status })),
 	/**  Carga varios resultados de una misma muestra (grilla de panel o importación desde analizador) y devuelve todos los resultados. */
 	registerLabResults: (input: RegisterResultsInput) => typedError<LabResult[], AppError>(__TAURI_INVOKE("register_lab_results", { input })),
+	/** Elimina un resultado analítico de una muestra (por ID de muestra y analito). */
+	deleteLabResult: (sampleId: number, analyteId: number) => typedError<null, AppError>(__TAURI_INVOKE("delete_lab_result", { sampleId, analyteId })),
 	/**  Registra la calidad preanalítica de una muestra (interferencia HIL). */
 	setSampleQuality: (id: number, qualityIndex: string | null, qualitySeverity: string | null, qualityNote: string | null) => typedError<Sample, AppError>(__TAURI_INVOKE("set_sample_quality", { id, qualityIndex, qualitySeverity, qualityNote })),
 	/**  Rechaza una muestra (RECIBIDA/EN_PROCESO → RECHAZADA) con motivo. */

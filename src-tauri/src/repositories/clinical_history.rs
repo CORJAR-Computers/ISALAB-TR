@@ -561,6 +561,20 @@ pub fn register_results_batch(
     Ok(out)
 }
 
+/// Elimina el resultado de un analito específico de una muestra.
+pub fn delete_lab_result(
+    conn: &mut SimpleConnection,
+    sample_id: i32,
+    analyte_id: i32,
+) -> Result<(), AppError> {
+    conn.execute(
+        "DELETE FROM LAB_RESULTS WHERE SAMPLE_ID = ? AND ANALYTE_ID = ?",
+        (&sample_id, &analyte_id),
+    )
+    .map_err(AppError::from)?;
+    Ok(())
+}
+
 #[cfg(test)]
 mod tests {
     use super::*;

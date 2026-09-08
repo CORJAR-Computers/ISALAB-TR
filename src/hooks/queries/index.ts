@@ -23,6 +23,7 @@ export {
   useCreateSample,
   useRegisterLabResult,
   useRegisterLabResults,
+  useDeleteLabResult,
   useSetSampleQuality,
   useRejectSample,
   useReopenSample,

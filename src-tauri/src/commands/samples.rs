@@ -132,6 +132,21 @@ pub fn register_lab_results(
     Ok(results)
 }
 
+/// Elimina un resultado analítico de una muestra (por ID de muestra y analito).
+#[tauri::command]
+#[specta::specta]
+pub fn delete_lab_result(
+    state: State<'_, AppState>,
+    sample_id: i32,
+    analyte_id: i32,
+) -> Result<(), AppError> {
+    require_vet_or_admin(&state)?;
+    let mut pooled = state.pool.acquire()?;
+    history_repo::delete_lab_result(pooled.conn(), sample_id, analyte_id)?;
+    state.ai_cache.invalidate(sample_id);
+    Ok(())
+}
+
 /// Registra la calidad preanalítica de una muestra (interferencia HIL).
 #[tauri::command]
 #[specta::specta]

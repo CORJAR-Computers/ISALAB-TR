@@ -1,7 +1,4 @@
-import { useEffect, useRef, useState } from "react";
-import { useForm } from "react-hook-form";
-import { zodResolver } from "@hookform/resolvers/zod";
-import { z } from "zod";
+import { useEffect, useMemo, useRef, useState } from "react";
 import { openPath } from "@tauri-apps/plugin-opener";
 import { open as openDialog } from "@tauri-apps/plugin-dialog";
 import { convertFileSrc } from "@tauri-apps/api/core";
@@ -24,6 +21,7 @@ import {
   PlayCircle,
   Plus,
   Printer,
+  Save,
   Siren,
   Trash2,
   X,
@@ -31,14 +29,7 @@ import {
 import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
-import {
-  Form,
-  FormControl,
-  FormField,
-  FormItem,
-  FormLabel,
-  FormMessage,
-} from "@/components/ui/form";
+import { Label } from "@/components/ui/label";
 import {
   Dialog,
   DialogContent,
@@ -66,13 +57,14 @@ import { Skeleton } from "@/components/ui/skeleton";
 import {
   useAnalytes,
   useAttachResultFile,
+  useDeleteLabResult,
   useDeleteResultAttachment,
   useGenerateReport,
   useGenerateSampleLabels,
   usePanelAnalytes,
   usePanels,
   usePatient,
-  useRegisterLabResult,
+  useReferenceRanges,
   useRegisterLabResults,
   useAcknowledgeCritical,
   useRejectSample,
@@ -104,15 +96,6 @@ import { sendWhatsAppMessage } from "@/lib/whatsapp";
 import ReactMarkdown from "react-markdown";
 import remarkGfm from "remark-gfm";
 
-const resultSchema = z.object({
-  analyteId: z.coerce.number().min(1, "Selecciona el analito"),
-  value: z.coerce
-    .number({ error: "Ingresa un número válido" })
-    .min(0, "El valor no puede ser negativo"),
-});
-
-type ResultValues = z.infer<typeof resultSchema>;
-
 const STATUS_ICON: Record<string, typeof FlaskConical> = {
   RECIBIDA: FlaskConical,
   EN_PROCESO: PlayCircle,
@@ -132,7 +115,6 @@ export function SampleDetailDialog({
   const { data: patient } = usePatient(sample?.patientId ?? null);
   const { data: analytes = [] } = useAnalytes();
 
-  const registerResult = useRegisterLabResult();
   const registerResults = useRegisterLabResults();
   const setStatus = useSetSampleStatus();
   const setQuality = useSetSampleQuality();
@@ -144,10 +126,13 @@ export function SampleDetailDialog({
   const generateLabels = useGenerateSampleLabels();
   const attachFile = useAttachResultFile(sampleId);
   const removeAttachment = useDeleteResultAttachment(sampleId);
+  const deleteResult = useDeleteLabResult();
+  const { data: referenceRanges = [] } = useReferenceRanges(sample?.analyzerId ?? 1);
   const { data: panels = [] } = usePanels();
   const [panelId, setPanelId] = useState<number | null>(null);
   const { data: panelAnalytes = [] } = usePanelAnalytes(panelId);
   const [batchValues, setBatchValues] = useState<Record<number, string>>({});
+  const [extraAnalyteIds, setExtraAnalyteIds] = useState<number[]>([]);
 
   const setActivePatient = useUiStore((s) => s.setActivePatient);
   const navigate = useUiStore((s) => s.navigate);
@@ -180,16 +165,7 @@ export function SampleDetailDialog({
     }
   }, [aiInterpretation]);
 
-  const resultForm = useForm<z.input<typeof resultSchema>, unknown, z.output<typeof resultSchema>>({
-    resolver: zodResolver(resultSchema),
-    defaultValues: {
-      analyteId: 0,
-      value: 0,
-    },
-  });
-
   const resetForm = () => {
-    resultForm.reset({ analyteId: 0, value: 0 });
     setConfirmAnular(false);
     setShowRejectInput(false);
     setRejectReason("");
@@ -199,68 +175,204 @@ export function SampleDetailDialog({
     setAiInterpretation(null);
     setPreviewAttachment(null);
     setConfirmDelete(false);
+    setExtraAnalyteIds([]);
   };
 
-  // Panel disponible para esta muestra: específico del tipo o genérico.
-  const availablePanels = panels.filter(
-    (p) => p.sampleTypeId == null || p.sampleTypeId === sample?.sampleTypeId,
-  );
+  // Inicializar valores de la grilla con los resultados existentes al abrir la muestra
   useEffect(() => {
-    if (open && availablePanels.length > 0 && panelId == null) {
-      setPanelId(availablePanels[0].id);
-    }
-  }, [open, availablePanels, panelId]);
-
-  const pending = registerResult.isPending || setStatus.isPending;
-
-  const onSubmitResult = async (values: ResultValues) => {
-    if (!sample) return;
-    try {
-      const result = await registerResult.mutateAsync({
-        sampleId: sample.id,
-        analyteId: values.analyteId,
-        value: values.value,
-      });
-      toast.success(`Resultado de ${result.analyteName} cargado`, {
-        description: `Valor ${result.value} · estado ${RESULT_STATUS[result.status]?.label ?? result.status}.`,
-      });
-      resultForm.reset({ analyteId: 0, value: 0 });
-      if (result.isCritical) {
-        setCriticalAlert([result]);
+    if (open && sample) {
+      const initial: Record<number, string> = {};
+      for (const r of sample.results) {
+        initial[r.analyteId] = r.value != null ? r.value.toString() : "";
       }
-    } catch (err) {
-      toast.error("No se pudo registrar el resultado", {
-        description: getErrorMessage(err),
-      });
+      setBatchValues(initial);
+      setExtraAnalyteIds([]);
     }
+  }, [open, sample?.id]);
+
+  // Paneles disponibles para esta muestra: específicos del tipo o genéricos
+  const availablePanels = useMemo(() => {
+    return panels.filter(
+      (p) => p.sampleTypeId == null || p.sampleTypeId === sample?.sampleTypeId,
+    );
+  }, [panels, sample?.sampleTypeId]);
+
+  // Selección automática del panel prioritario para la muestra
+  useEffect(() => {
+    if (open && availablePanels.length > 0) {
+      const specific = availablePanels.find((p) => p.sampleTypeId === sample?.sampleTypeId);
+      const target = specific ?? availablePanels[0];
+      if (panelId == null || !availablePanels.some((p) => p.id === panelId)) {
+        setPanelId(target.id);
+      }
+    }
+  }, [open, availablePanels, sample?.sampleTypeId, panelId]);
+
+  // Lista combinada de analitos a mostrar en la tabla interactiva
+  const displayedAnalytes = useMemo(() => {
+    const list: { id: number; name: string; unit: string | null }[] = [];
+    const seen = new Set<number>();
+
+    // 1. Analitos del panel seleccionado
+    for (const pa of panelAnalytes) {
+      if (!seen.has(pa.analyteId)) {
+        seen.add(pa.analyteId);
+        list.push({ id: pa.analyteId, name: pa.analyteName, unit: pa.unit });
+      }
+    }
+
+    // 2. Analitos con resultado ya registrado en la muestra
+    if (sample?.results) {
+      for (const r of sample.results) {
+        if (!seen.has(r.analyteId)) {
+          seen.add(r.analyteId);
+          list.push({ id: r.analyteId, name: r.analyteName, unit: r.unit });
+        }
+      }
+    }
+
+    // 3. Analitos adicionales agregados manualmente
+    for (const id of extraAnalyteIds) {
+      if (!seen.has(id)) {
+        const found = analytes.find((a) => a.id === id);
+        if (found) {
+          seen.add(id);
+          list.push({ id: found.id, name: found.name, unit: found.unit });
+        }
+      }
+    }
+
+    return list;
+  }, [panelAnalytes, sample?.results, extraAnalyteIds, analytes]);
+
+  // Analitos del catálogo no incluidos actualmente en la tabla
+  const unusedAnalytes = useMemo(() => {
+    const displayedIds = new Set(displayedAnalytes.map((a) => a.id));
+    return analytes.filter((a) => !displayedIds.has(a.id));
+  }, [analytes, displayedAnalytes]);
+
+  // Rango de referencia específico para el analito y la especie del paciente
+  const getAnalyteRefRange = (analyteId: number) => {
+    const existing = sample?.results.find((r) => r.analyteId === analyteId);
+    if (existing?.refMin != null && existing?.refMax != null) {
+      return {
+        min: existing.refMin,
+        max: existing.refMax,
+        criticalMin: null,
+        criticalMax: null,
+      };
+    }
+
+    const spId = patient?.speciesId;
+    const sex = patient?.sex;
+    const match =
+      referenceRanges.find(
+        (rr) =>
+          rr.analyteId === analyteId &&
+          (spId == null || rr.speciesId === spId) &&
+          (rr.sex == null || sex == null || rr.sex === sex),
+      ) ??
+      referenceRanges.find(
+        (rr) =>
+          rr.analyteId === analyteId &&
+          (spId == null || rr.speciesId === spId),
+      ) ??
+      referenceRanges.find((rr) => rr.analyteId === analyteId);
+
+    if (match && match.minValue != null && match.maxValue != null) {
+      return {
+        min: match.minValue,
+        max: match.maxValue,
+        criticalMin: match.criticalMin,
+        criticalMax: match.criticalMax,
+      };
+    }
+
+    return null;
   };
 
-  /** Carga en lote los valores de la grilla del panel (no vacíos). */
-  const submitBatch = async () => {
+  // Evaluación en tiempo real del valor ingresado contra el rango de la especie
+  const evaluateLiveStatus = (
+    valStr: string | undefined,
+    refRange: ReturnType<typeof getAnalyteRefRange>,
+  ) => {
+    if (!valStr || valStr.trim() === "") return null;
+    const val = Number(valStr.replace(",", "."));
+    if (Number.isNaN(val)) return null;
+
+    if (!refRange) {
+      return { label: "Cargado", variant: "secondary" as const, isCritical: false };
+    }
+
+    if (refRange.criticalMin != null && val <= refRange.criticalMin) {
+      return { label: "Crítico Bajo", variant: "destructive" as const, isCritical: true };
+    }
+    if (refRange.criticalMax != null && val >= refRange.criticalMax) {
+      return { label: "Crítico Alto", variant: "destructive" as const, isCritical: true };
+    }
+    if (val < refRange.min) {
+      return { label: "Bajo", variant: "destructive" as const, isCritical: false };
+    }
+    if (val > refRange.max) {
+      return { label: "Alto", variant: "warning" as const, isCritical: false };
+    }
+    return { label: "Normal", variant: "success" as const, isCritical: false };
+  };
+
+  const pending = registerResults.isPending || deleteResult.isPending || setStatus.isPending;
+
+  /** Guarda todos los resultados ingresados en la grilla y elimina los vaciados. */
+  const handleSaveAllResults = async () => {
     if (!sample) return;
-    const entries = Object.entries(batchValues)
-      .filter(([, v]) => v.trim() !== "")
+
+    // 1. Analitos con valor ingresado
+    const toSaveEntries = Object.entries(batchValues)
+      .filter(([, v]) => v != null && v.trim() !== "")
       .map(([analyteId, v]) => ({
         sampleId: sample.id,
         analyteId: Number(analyteId),
         value: Number(v.replace(",", ".")),
       }))
       .filter((r) => !Number.isNaN(r.value));
-    if (entries.length === 0) {
-      toast.error("Ingresa al menos un valor en la grilla");
+
+    // 2. Analitos previamente guardados que ahora están en blanco (se eliminan)
+    const toDeleteAnalyteIds = sample.results
+      .filter((r) => {
+        const currentVal = batchValues[r.analyteId];
+        return currentVal == null || currentVal.trim() === "";
+      })
+      .map((r) => r.analyteId);
+
+    if (toSaveEntries.length === 0 && toDeleteAnalyteIds.length === 0) {
+      toast.error("Ingresa al menos un valor en la grilla para guardar");
       return;
     }
+
     try {
-      const results = await registerResults.mutateAsync({
-        sampleId: sample.id,
-        results: entries,
-      });
-      toast.success(`${results.length} resultado${results.length === 1 ? "" : "s"} cargados`);
-      setBatchValues({});
-      const critical = results.filter((r) => r.isCritical);
+      for (const analyteId of toDeleteAnalyteIds) {
+        await deleteResult.mutateAsync({ sampleId: sample.id, analyteId });
+      }
+
+      let savedResults: LabResult[] = [];
+      if (toSaveEntries.length > 0) {
+        savedResults = await registerResults.mutateAsync({
+          sampleId: sample.id,
+          results: toSaveEntries,
+        });
+      }
+
+      const totalActive = toSaveEntries.length;
+      toast.success(
+        `${totalActive} resultado${totalActive === 1 ? "" : "s"} guardado${totalActive === 1 ? "" : "s"} correctamente`,
+        {
+          description: "Solo los analitos con valor ingresado aparecerán en el informe PDF.",
+        },
+      );
+
+      const critical = savedResults.filter((r) => r.isCritical);
       if (critical.length > 0) setCriticalAlert(critical);
     } catch (err) {
-      toast.error("No se pudieron cargar los resultados", {
+      toast.error("No se pudieron guardar los resultados", {
         description: getErrorMessage(err),
       });
     }
@@ -607,12 +719,6 @@ export function SampleDetailDialog({
     (sampleStatus === "RECIBIDA" || sampleStatus === "EN_PROCESO") &&
     (sample?.results.length ?? 0) > 0;
   const canReport = sampleStatus === "FINALIZADA";
-  const analyzed = analytes.filter((a) =>
-    sample?.results.some((r) => r.analyteId === a.id),
-  );
-  const availableAnalytes = analytes.filter(
-    (a) => !sample?.results.some((r) => r.analyteId === a.id),
-  );
 
   const canDeleteAttachments =
     isVetOrAdmin && sampleStatus !== "ANULADA";
@@ -626,7 +732,11 @@ export function SampleDetailDialog({
         onOpenChange(o);
       }}
     >
-      <DialogContent className="flex max-h-[90vh] flex-col gap-4 sm:max-w-2xl">
+      <DialogContent
+        className="flex max-h-[92vh] flex-col gap-4 sm:max-w-4xl"
+        onPointerDownOutside={(e) => e.preventDefault()}
+        onInteractOutside={(e) => e.preventDefault()}
+      >
         <DialogHeader>
           <DialogTitle className="flex items-center gap-2">
             <StatusIcon className="size-4" />
@@ -752,7 +862,7 @@ export function SampleDetailDialog({
               <div className="space-y-3 rounded-lg border px-3 py-3">
                 <div className="grid gap-3 sm:grid-cols-2">
                   <div>
-                    <FormLabel>Interferencia</FormLabel>
+                    <Label>Interferencia</Label>
                     <Select
                       value={qualityDraft.index ?? ""}
                       onValueChange={(v) => {
@@ -776,7 +886,7 @@ export function SampleDetailDialog({
                     </Select>
                   </div>
                   <div>
-                    <FormLabel>Severidad</FormLabel>
+                    <Label>Severidad</Label>
                     <Select
                       value={qualityDraft.severity ?? ""}
                       onValueChange={(v) => {
@@ -822,308 +932,385 @@ export function SampleDetailDialog({
               </div>
             )}
 
-            {/* Resultados */}
-            <div className="overflow-hidden rounded-lg border">
-              <div className="bg-muted/60 flex items-center justify-between border-b px-3 py-2">
-                <p className="text-sm font-semibold">
-                  Resultados ({sample.results.length})
-                </p>
-              </div>
-              {sample.results.length === 0 ? (
-                <p className="text-muted-foreground px-4 py-6 text-center text-sm">
-                  Sin resultados cargados.
-                </p>
-              ) : (
+            {/* Tabla de Resultados Analíticos */}
+            {canAddResult ? (
+              <div className="overflow-hidden rounded-lg border shadow-xs">
+                {/* Cabecera de la grilla */}
+                <div className="bg-muted/60 flex flex-wrap items-center justify-between gap-3 border-b px-4 py-3">
+                  <div>
+                    <div className="flex items-center gap-2">
+                      <p className="text-sm font-semibold">
+                        Resultados Analíticos
+                      </p>
+                      <Badge variant="outline" className="text-xs font-normal">
+                        {displayedAnalytes.filter((a) => batchValues[a.id]?.trim()).length} con valor / {displayedAnalytes.length} analitos
+                      </Badge>
+                    </div>
+                    <p className="text-muted-foreground text-xs mt-0.5">
+                      Especie: <span className="font-medium text-foreground">{patient?.speciesName ?? "—"}</span> · Tipo de muestra: <span className="font-medium text-foreground">{sample.sampleTypeName}</span>
+                    </p>
+                  </div>
+
+                  <div className="flex flex-wrap items-center gap-2">
+                    {/* Selector de panel para esta muestra */}
+                    {availablePanels.length > 0 && (
+                      <div className="flex items-center gap-1.5 text-xs">
+                        <span className="text-muted-foreground font-medium">Panel:</span>
+                        <Select
+                          value={panelId?.toString() ?? ""}
+                          onValueChange={(v) => setPanelId(Number(v))}
+                        >
+                          <SelectTrigger className="h-8 w-52 text-xs">
+                            <SelectValue placeholder="Selecciona panel…" />
+                          </SelectTrigger>
+                          <SelectContent>
+                            {availablePanels.map((p) => (
+                              <SelectItem key={p.id} value={p.id.toString()}>
+                                {p.name}
+                              </SelectItem>
+                            ))}
+                          </SelectContent>
+                        </Select>
+                      </div>
+                    )}
+
+                    {/* Selector para añadir un analito adicional a la tabla */}
+                    {unusedAnalytes.length > 0 && (
+                      <Select
+                        value=""
+                        onValueChange={(v) => {
+                          if (v) {
+                            const id = Number(v);
+                            setExtraAnalyteIds((prev) => (prev.includes(id) ? prev : [...prev, id]));
+                          }
+                        }}
+                      >
+                        <SelectTrigger className="h-8 text-xs gap-1 w-44">
+                          <Plus className="size-3.5" />
+                          <span>+ Agregar analito…</span>
+                        </SelectTrigger>
+                        <SelectContent>
+                          {unusedAnalytes.map((a) => (
+                            <SelectItem key={a.id} value={a.id.toString()}>
+                              {a.name} {a.unit ? `(${a.unit})` : ""}
+                            </SelectItem>
+                          ))}
+                        </SelectContent>
+                      </Select>
+                    )}
+                  </div>
+                </div>
+
+                {/* Tabla de analitos */}
                 <Table>
                   <TableHeader>
-                    <TableRow className="hover:bg-transparent">
-                      <TableHead>Analito</TableHead>
-                      <TableHead>Resultado</TableHead>
-                      <TableHead>Rango de referencia</TableHead>
-                      <TableHead className="text-right">Estado</TableHead>
-                      <TableHead className="text-right">Adjuntos</TableHead>
+                    <TableRow className="hover:bg-transparent text-xs">
+                      <TableHead className="w-[30%]">Analito</TableHead>
+                      <TableHead className="w-[25%]">
+                        Rango de Referencia ({patient?.speciesName ?? "Especie"})
+                      </TableHead>
+                      <TableHead className="w-[22%]">Resultado (Valor)</TableHead>
+                      <TableHead className="w-[13%] text-center">Estado</TableHead>
+                      <TableHead className="w-[10%] text-right">Acciones</TableHead>
                     </TableRow>
                   </TableHeader>
                   <TableBody>
-                    {sample.results.map((r) => {
-                      const rs =
-                        RESULT_STATUS[r.status] ?? RESULT_STATUS.SIN_RANGO;
-                      const range = r.refMin != null && r.refMax != null;
-                      return (
-                        <TableRow
-                          key={r.id}
-                          className={cn(
-                            r.status === "ALTO" && "bg-warning/10",
-                            r.status === "BAJO" && "bg-destructive/10",
-                          )}
-                        >
-                          <TableCell>
-                            <span className="font-medium">{r.analyteName}</span>
-                          </TableCell>
-                          <TableCell>
-                            <span
-                              className={cn(
-                                "font-mono font-semibold",
-                                r.status === "ALTO" && "text-warning",
-                                r.status === "BAJO" && "text-destructive",
-                                r.isCritical && "text-destructive animate-pulse",
-                              )}
-                            >
-                              {r.value}
-                            </span>
-                            {r.unit && (
-                              <span className="text-muted-foreground ml-1 text-xs">
-                                {r.unit}
-                              </span>
+                    {displayedAnalytes.length === 0 ? (
+                      <TableRow>
+                        <TableCell colSpan={5} className="text-center text-sm text-muted-foreground py-6">
+                          No hay analitos configurados para este tipo de muestra. Usa "+ Agregar analito…" para comenzar.
+                        </TableCell>
+                      </TableRow>
+                    ) : (
+                      displayedAnalytes.map((a) => {
+                        const existing = sample.results.find((r) => r.analyteId === a.id);
+                        const refRange = getAnalyteRefRange(a.id);
+                        const currentVal = batchValues[a.id] ?? "";
+                        const status = evaluateLiveStatus(currentVal, refRange);
+                        const isFilled = currentVal.trim() !== "";
+
+                        return (
+                          <TableRow
+                            key={a.id}
+                            className={cn(
+                              status?.label === "Alto" && "bg-amber-500/5 dark:bg-amber-500/10",
+                              status?.label === "Bajo" && "bg-destructive/5 dark:bg-destructive/10",
+                              status?.isCritical && "bg-destructive/10 dark:bg-destructive/20",
                             )}
-                            {r.deltaVariation != null && (
-                              <span
-                                title="Variación vs. resultado previo (delta check)"
-                                className={cn(
-                                  "ml-1 text-[11px] font-medium",
-                                  Math.abs(r.deltaVariation) >= 50
-                                    ? "text-destructive"
-                                    : "text-muted-foreground",
+                          >
+                            <TableCell>
+                              <div className="flex flex-col">
+                                <span className="font-medium text-sm leading-snug">{a.name}</span>
+                                {a.unit && (
+                                  <span className="text-muted-foreground text-xs">
+                                    Unidad: {a.unit}
+                                  </span>
                                 )}
-                              >
-                                {r.deltaVariation >= 0 ? "▲" : "▼"}{" "}
-                                {Math.abs(r.deltaVariation).toFixed(1)}%
-                              </span>
-                            )}
-                          </TableCell>
-                          <TableCell className="text-muted-foreground font-mono text-xs">
-                            {range ? `${r.refMin} – ${r.refMax}` : "—"}
-                          </TableCell>
-                          <TableCell className="text-right">
-                            <Badge variant={rs.variant}>{rs.label}</Badge>
-                          </TableCell>
-                          <TableCell className="text-right">
-                            {r.attachments.length > 0 && (
-                              <div className="mb-1 flex flex-wrap justify-end gap-1">
-                                {r.attachments.map((att) => (
+                              </div>
+                            </TableCell>
+
+                            <TableCell className="font-mono text-xs">
+                              {refRange ? (
+                                <span className="text-foreground font-medium">
+                                  {refRange.min} – {refRange.max} {a.unit ?? ""}
+                                </span>
+                              ) : (
+                                <span className="text-muted-foreground/60 italic">— Sin rango</span>
+                              )}
+                            </TableCell>
+
+                            <TableCell>
+                              <div className="flex items-center gap-2">
+                                <Input
+                                  type="number"
+                                  step="any"
+                                  inputMode="decimal"
+                                  placeholder={existing != null ? `Actual: ${existing.value}` : "—"}
+                                  className={cn(
+                                    "h-8 w-32 font-mono text-sm",
+                                    isFilled && "font-semibold",
+                                    status?.label === "Alto" &&
+                                      "border-amber-500/50 text-amber-700 dark:text-amber-400 focus-visible:ring-amber-500",
+                                    status?.label === "Bajo" &&
+                                      "border-destructive/50 text-destructive focus-visible:ring-destructive",
+                                  )}
+                                  value={currentVal}
+                                  onChange={(e) =>
+                                    setBatchValues((prev) => ({
+                                      ...prev,
+                                      [a.id]: e.target.value,
+                                    }))
+                                  }
+                                />
+                                {existing?.deltaVariation != null && (
+                                  <span
+                                    title="Variación vs. resultado previo (delta check)"
+                                    className={cn(
+                                      "text-[11px] font-medium shrink-0",
+                                      Math.abs(existing.deltaVariation) >= 50
+                                        ? "text-destructive font-bold"
+                                        : "text-muted-foreground",
+                                    )}
+                                  >
+                                    {existing.deltaVariation >= 0 ? "▲" : "▼"}{" "}
+                                    {Math.abs(existing.deltaVariation).toFixed(0)}%
+                                  </span>
+                                )}
+                              </div>
+                            </TableCell>
+
+                            <TableCell className="text-center">
+                              {status ? (
+                                <Badge
+                                  variant={status.variant}
+                                  className={cn(
+                                    "text-xs font-medium",
+                                    status.label === "Alto" &&
+                                      "bg-amber-500/15 text-amber-700 border-amber-500/30 dark:text-amber-300",
+                                    status.label === "Normal" &&
+                                      "bg-emerald-500/15 text-emerald-700 border-emerald-500/30 dark:text-emerald-300",
+                                    status.isCritical && "animate-pulse font-bold",
+                                  )}
+                                >
+                                  {status.label}
+                                </Badge>
+                              ) : (
+                                <span className="text-muted-foreground/40 text-xs">—</span>
+                              )}
+                            </TableCell>
+
+                            <TableCell className="text-right">
+                              <div className="flex items-center justify-end gap-1">
+                                {existing && existing.attachments.length > 0 && (
                                   <button
-                                    key={att.id}
                                     type="button"
                                     onClick={() => {
                                       setConfirmDelete(false);
-                                      setPreviewAttachment(att);
+                                      setPreviewAttachment(existing.attachments[0]);
                                     }}
-                                    title={`${att.fileName} · abrir vista previa`}
-                                    className="group relative overflow-hidden rounded-md border shadow-sm"
+                                    title={`${existing.attachments.length} foto(s) adjunta(s)`}
+                                    className="p-1 text-primary hover:text-primary/80"
                                   >
-                                    <img
-                                      src={convertFileSrc(att.filePath)}
-                                      alt={att.fileName}
-                                      className="size-9 object-cover transition-transform group-hover:scale-110"
-                                    />
+                                    <Paperclip className="size-4" />
                                   </button>
-                                ))}
-                              </div>
-                            )}
-                            {canAddResult && isVetOrAdmin ? (
-                              <Button
-                                variant="ghost"
-                                size="sm"
-                                className="text-muted-foreground h-6 gap-1 px-1.5 text-xs hover:text-foreground"
-                                onClick={() => pickAndAttach(r)}
-                                disabled={attachFile.isPending}
-                                title="Adjuntar foto de placa, frotis o electroforesis"
-                              >
-                                {attachFile.isPending ? (
-                                  <Loader2 className="size-3.5 animate-spin" />
-                                ) : (
-                                  <ImagePlus className="size-3.5" />
                                 )}
-                                Adjuntar
-                              </Button>
-                            ) : (
-                              r.attachments.length === 0 && (
-                                <span className="text-muted-foreground/40 text-xs">
-                                  —
-                                </span>
-                              )
-                            )}
-                          </TableCell>
-                        </TableRow>
-                      );
-                    })}
+                                {existing && isVetOrAdmin && (
+                                  <Button
+                                    variant="ghost"
+                                    size="sm"
+                                    className="text-muted-foreground h-7 w-7 p-0 hover:text-foreground"
+                                    onClick={() => pickAndAttach(existing)}
+                                    disabled={attachFile.isPending}
+                                    title="Adjuntar foto de placa/frotis"
+                                  >
+                                    {attachFile.isPending ? (
+                                      <Loader2 className="size-3.5 animate-spin" />
+                                    ) : (
+                                      <ImagePlus className="size-3.5" />
+                                    )}
+                                  </Button>
+                                )}
+                                {isFilled && (
+                                  <Button
+                                    variant="ghost"
+                                    size="sm"
+                                    className="text-muted-foreground h-7 w-7 p-0 hover:text-destructive"
+                                    onClick={() => {
+                                      setBatchValues((prev) => {
+                                        const copy = { ...prev };
+                                        delete copy[a.id];
+                                        return copy;
+                                      });
+                                      if (extraAnalyteIds.includes(a.id)) {
+                                        setExtraAnalyteIds((prev) => prev.filter((id) => id !== a.id));
+                                      }
+                                    }}
+                                    title="Limpiar valor (no se incluirá en el informe PDF)"
+                                  >
+                                    <X className="size-3.5" />
+                                  </Button>
+                                )}
+                              </div>
+                            </TableCell>
+                          </TableRow>
+                        );
+                      })
+                    )}
                   </TableBody>
                 </Table>
-              )}
-            </div>
 
-            {/* Carga rápida por panel (grilla) */}
-            {canAddResult && availablePanels.length > 0 && (
-              <div className="rounded-lg border">
-                <div className="bg-muted/60 flex flex-wrap items-center gap-2 border-b px-3 py-2">
-                  <p className="text-sm font-semibold">Carga rápida por panel</p>
-                  <Select
-                    value={panelId?.toString() ?? ""}
-                    onValueChange={(v) => setPanelId(Number(v))}
-                  >
-                    <SelectTrigger className="h-7 w-56 text-xs">
-                      <SelectValue placeholder="Selecciona panel…" />
-                    </SelectTrigger>
-                    <SelectContent>
-                      {availablePanels.map((p) => (
-                        <SelectItem key={p.id} value={p.id.toString()}>
-                          {p.name}
-                        </SelectItem>
-                      ))}
-                    </SelectContent>
-                  </Select>
-                </div>
-                {panelAnalytes.length > 0 ? (
-                  <div className="grid gap-2 p-3 sm:grid-cols-2">
-                    {panelAnalytes.map((pa) => {
-                      const existing = sample.results.find((r) => r.analyteId === pa.analyteId);
-                      return (
-                        <label key={pa.analyteId} className="flex items-center gap-2 text-sm">
-                          <span className="min-w-0 flex-1 truncate">
-                            {pa.analyteName}
-                            {pa.unit ? (
-                              <span className="text-muted-foreground text-xs"> ({pa.unit})</span>
-                            ) : null}
-                          </span>
-                          <Input
-                            type="number"
-                            step="any"
-                            inputMode="decimal"
-                            placeholder={
-                              existing != null ? `Actual: ${existing.value}` : "—"
-                            }
-                            className="h-8 w-28 font-mono text-xs"
-                            value={batchValues[pa.analyteId] ?? ""}
-                            onChange={(e) =>
-                              setBatchValues((prev) => ({
-                                ...prev,
-                                [pa.analyteId]: e.target.value,
-                              }))
-                            }
-                          />
-                        </label>
-                      );
-                    })}
+                {/* Barra de guardado de la tabla */}
+                <div className="bg-muted/40 flex flex-wrap items-center justify-between gap-3 border-t px-4 py-3">
+                  <div className="text-xs text-muted-foreground">
+                    <p className="font-medium text-foreground">
+                      {displayedAnalytes.filter((a) => batchValues[a.id]?.trim()).length} analitos con valor ingresado
+                    </p>
+                    <p>
+                      Solo los analitos con valor se guardarán y saldrán en el informe PDF. Los analitos vacíos no saldrán.
+                    </p>
                   </div>
-                ) : (
-                  <p className="text-muted-foreground px-4 py-3 text-sm">
-                    El panel no tiene analitos configurados.
-                  </p>
-                )}
-                <div className="flex justify-end border-t px-3 py-2">
+
                   <Button
-                    size="sm"
-                    onClick={submitBatch}
-                    disabled={registerResults.isPending}
-                    className="gap-1.5"
+                    onClick={handleSaveAllResults}
+                    disabled={registerResults.isPending || deleteResult.isPending}
+                    className="gap-2 shadow-xs font-semibold"
                   >
-                    {registerResults.isPending ? (
+                    {registerResults.isPending || deleteResult.isPending ? (
                       <Loader2 className="size-4 animate-spin" />
                     ) : (
-                      <PlayCircle className="size-4" />
+                      <Save className="size-4" />
                     )}
-                    Cargar valores del panel
+                    Guardar resultados
                   </Button>
                 </div>
               </div>
-            )}
-
-            {/* Carga de resultados */}
-            {canAddResult && (
-              <Form {...resultForm}>
-                <form onSubmit={resultForm.handleSubmit(onSubmitResult)} className="space-y-3">
-                  <div className="grid gap-3 sm:grid-cols-[1fr_120px_auto]">
-                    <FormField
-                      control={resultForm.control}
-                      name="analyteId"
-                      render={({ field }) => (
-                        <FormItem>
-                          <FormLabel>Analito</FormLabel>
-                          <Select
-                            value={field.value?.toString() ?? ""}
-                            onValueChange={(v) => field.onChange(Number(v))}
-                          >
-                            <FormControl>
-                              <SelectTrigger className="w-full">
-                                <SelectValue
-                                  placeholder={
-                                    availableAnalytes.length === 0
-                                      ? "Todos los analitos ya tienen valor (puedes actualizarlo)"
-                                      : "Selecciona analito…"
-                                  }
-                                />
-                              </SelectTrigger>
-                            </FormControl>
-                            <SelectContent>
-                              {availableAnalytes.map((a) => (
-                                <SelectItem key={a.id} value={a.id.toString()}>
-                                  {a.name}
-                                  {a.unit ? ` (${a.unit})` : ""}
-                                </SelectItem>
-                              ))}
-                              {analyzed.length > 0 && (
-                                <>
-                                  <SelectItem value="__sep__" disabled>
-                                    ── Actualizar ──
-                                  </SelectItem>
-                                  {analyzed.map((a) => (
-                                    <SelectItem key={a.id} value={a.id.toString()}>
-                                      {a.name}
-                                      {a.unit ? ` (${a.unit})` : ""}
-                                    </SelectItem>
-                                  ))}
-                                </>
-                              )}
-                            </SelectContent>
-                          </Select>
-                          <FormMessage />
-                        </FormItem>
-                      )}
-                    />
-                    <FormField
-                      control={resultForm.control}
-                      name="value"
-                      render={({ field }) => (
-                        <FormItem>
-                          <FormLabel>Valor</FormLabel>
-                          <FormControl>
-                            <Input
-                              type="number"
-                              step="any"
-                              inputMode="decimal"
-                              placeholder="0.0"
-                              className="font-mono"
-                              {...field}
-                              value={(field.value as number | undefined) ?? ""}
-                            />
-                          </FormControl>
-                          <FormMessage />
-                        </FormItem>
-                      )}
-                    />
-                    <div className="flex items-end">
-                      <Button
-                        type="submit"
-                        disabled={pending}
-                      >
-                        {registerResult.isPending ? (
-                          <Loader2 className="animate-spin" />
-                        ) : (
-                          <Plus className="size-4" />
-                        )}
-                        Cargar
-                      </Button>
-                    </div>
-                  </div>
-                  <p className="text-muted-foreground text-xs">
-                    El estado clínico (normal/alto/bajo) se calcula contra los
-                    rangos de referencia de la especie, sexo y edad del paciente.
-                    Al cargar resultados la muestra pasa a{" "}
-                    <span className="font-medium">EN PROCESO</span>; al terminar,
-                    finalízala para habilitar el informe PDF.
+            ) : (
+              /* Vista de resultados sólo lectura (muestra FINALIZADA o ANULADA) */
+              <div className="overflow-hidden rounded-lg border">
+                <div className="bg-muted/60 flex items-center justify-between border-b px-3 py-2">
+                  <p className="text-sm font-semibold">
+                    Resultados ({sample.results.length})
                   </p>
-                </form>
-              </Form>
+                </div>
+                {sample.results.length === 0 ? (
+                  <p className="text-muted-foreground px-4 py-6 text-center text-sm">
+                    Sin resultados cargados.
+                  </p>
+                ) : (
+                  <Table>
+                    <TableHeader>
+                      <TableRow className="hover:bg-transparent">
+                        <TableHead>Analito</TableHead>
+                        <TableHead>Resultado</TableHead>
+                        <TableHead>Rango de referencia</TableHead>
+                        <TableHead className="text-right">Estado</TableHead>
+                        <TableHead className="text-right">Adjuntos</TableHead>
+                      </TableRow>
+                    </TableHeader>
+                    <TableBody>
+                      {sample.results.map((r) => {
+                        const rs =
+                          RESULT_STATUS[r.status] ?? RESULT_STATUS.SIN_RANGO;
+                        const range = r.refMin != null && r.refMax != null;
+                        return (
+                          <TableRow
+                            key={r.id}
+                            className={cn(
+                              r.status === "ALTO" && "bg-warning/10",
+                              r.status === "BAJO" && "bg-destructive/10",
+                            )}
+                          >
+                            <TableCell>
+                              <span className="font-medium">{r.analyteName}</span>
+                            </TableCell>
+                            <TableCell>
+                              <span
+                                className={cn(
+                                  "font-mono font-semibold",
+                                  r.status === "ALTO" && "text-warning",
+                                  r.status === "BAJO" && "text-destructive",
+                                  r.isCritical && "text-destructive animate-pulse",
+                                )}
+                              >
+                                {r.value}
+                              </span>
+                              {r.unit && (
+                                <span className="text-muted-foreground ml-1 text-xs">
+                                  {r.unit}
+                                </span>
+                              )}
+                              {r.deltaVariation != null && (
+                                <span
+                                  title="Variación vs. resultado previo (delta check)"
+                                  className={cn(
+                                    "ml-1 text-[11px] font-medium",
+                                    Math.abs(r.deltaVariation) >= 50
+                                      ? "text-destructive"
+                                      : "text-muted-foreground",
+                                  )}
+                                >
+                                  {r.deltaVariation >= 0 ? "▲" : "▼"}{" "}
+                                  {Math.abs(r.deltaVariation).toFixed(1)}%
+                                </span>
+                              )}
+                            </TableCell>
+                            <TableCell className="text-muted-foreground font-mono text-xs">
+                              {range ? `${r.refMin} – ${r.refMax}` : "—"}
+                            </TableCell>
+                            <TableCell className="text-right">
+                              <Badge variant={rs.variant}>{rs.label}</Badge>
+                            </TableCell>
+                            <TableCell className="text-right">
+                              {r.attachments.length > 0 && (
+                                <div className="mb-1 flex flex-wrap justify-end gap-1">
+                                  {r.attachments.map((att) => (
+                                    <button
+                                      key={att.id}
+                                      type="button"
+                                      onClick={() => {
+                                        setConfirmDelete(false);
+                                        setPreviewAttachment(att);
+                                      }}
+                                      title={`${att.fileName} · abrir vista previa`}
+                                      className="group relative overflow-hidden rounded-md border shadow-xs"
+                                    >
+                                      <img
+                                        src={convertFileSrc(att.filePath)}
+                                        alt={att.fileName}
+                                        className="size-9 object-cover transition-transform group-hover:scale-110"
+                                      />
+                                    </button>
+                                  ))}
+                                </div>
+                              )}
+                            </TableCell>
+                          </TableRow>
+                        );
+                      })}
+                    </TableBody>
+                  </Table>
+                )}
+              </div>
             )}
 
             {sampleStatus === "FINALIZADA" && sample.results.length > 0 && (

@@ -74,9 +74,9 @@ use crate::commands::reports::{
     generate_sample_labels, list_reports, open_report_file,
 };
 use crate::commands::samples::{
-    count_samples, create_sample, get_sample, get_worklist, list_sample_events, list_samples,
-    register_lab_result, register_lab_results, reject_sample, reopen_sample, set_sample_quality,
-    set_sample_status,
+    count_samples, create_sample, delete_lab_result, get_sample, get_worklist, list_sample_events,
+    list_samples, register_lab_result, register_lab_results, reject_sample, reopen_sample,
+    set_sample_quality, set_sample_status,
 };
 use crate::commands::search::global_search;
 use crate::commands::settings::{
@@ -113,6 +113,7 @@ fn specta_builder() -> Builder<tauri::Wry> {
             create_sample,
             register_lab_result,
             register_lab_results,
+            delete_lab_result,
             get_worklist,
             list_samples,
             count_samples,
@@ -286,3 +287,4 @@ pub fn run() {
         .run(tauri::generate_context!())
         .expect("error while running tauri application");
 }
+
