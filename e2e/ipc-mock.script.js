@@ -67,6 +67,24 @@
     { id: 3, code: "UREA", name: "Urea", unit: "mg/dL", method: null },
   ];
 
+  // Panel por defecto ("Química básica") con los 3 analitos del catálogo.
+  // La grilla de resultados del detalle usa list_panels/list_panel_analytes.
+  const panels = [
+    { id: 1, name: "Química básica", sampleTypeId: null, sampleTypeName: null, sortOrder: 0, isActive: true, notes: null, analyteCount: 3 },
+  ];
+  const panelAnalytes = [
+    { analyteId: 1, analyteName: "Glucosa", unit: "mg/dL", seq: 1 },
+    { analyteId: 2, analyteName: "Hematocrito", unit: "%", seq: 2 },
+    { analyteId: 3, analyteName: "Urea", unit: "mg/dL", seq: 3 },
+  ];
+
+  // Rangos de referencia del analizador GENERAL (id 1) para Canino (speciesId 1).
+  // Sin ellos, la grilla del detalle evalúa "Cargado" en vez de Normal/Alto/Bajo.
+  const referenceRanges = [
+    { id: 1, analyzerId: 1, analyzerName: "GENERAL", analyteId: 1, analyteName: "Glucosa", unit: "mg/dL", speciesId: 1, speciesName: "Canino", sex: null, ageMinMonths: 0, ageMaxMonths: 0, minValue: 70, maxValue: 126, criticalMin: 40, criticalMax: 300, notes: null },
+    { id: 2, analyzerId: 1, analyzerName: "GENERAL", analyteId: 2, analyteName: "Hematocrito", unit: "%", speciesId: 1, speciesName: "Canino", sex: null, ageMinMonths: 0, ageMaxMonths: 0, minValue: 37, maxValue: 55, criticalMin: 20, criticalMax: 65, notes: null },
+  ];
+
   let samples = []; // { ...Sample, results: LabResult[] }
   let nextSampleId = 1;
   let nextResultId = 1;
@@ -195,9 +213,14 @@
       });
       return rows;
     },
-    list_panels: () => [],
-    list_panel_analytes: () => [],
+    list_panels: () => panels,
+    // Un solo panel (id 1) con los tres analitos del catálogo.
+    list_panel_analytes: (args) => (args.panelId === 1 ? panelAnalytes : []),
     list_qc_analyzer_status: () => [],
+    list_reference_ranges: (args) =>
+      args.analyzerId != null
+        ? referenceRanges.filter((r) => r.analyzerId === args.analyzerId)
+        : referenceRanges,
     list_analyzers: () => [
       {
         id: 1,
@@ -287,6 +310,8 @@
         refMin,
         refMax,
         analyzedAt: new Date().toISOString().slice(0, 19).replace("T", " "),
+        deltaVariation: null,
+        isCritical: false,
         attachments: [],
       };
       nextResultId += 1;
@@ -294,6 +319,45 @@
       // Como el SP real: al cargar un resultado la muestra pasa a EN_PROCESO.
       if (s.status === "RECIBIDA") s.status = "EN_PROCESO";
       return result;
+    },
+    // Carga por lotes (grilla del detalle): reemplaza valores y elimina vaciados.
+    register_lab_results: (args) => {
+      const s = sampleById(args.input.sampleId);
+      if (!s) throw { type: "NotFound", data: "Muestra no encontrada" };
+      const saved = [];
+      for (const item of args.input.results ?? []) {
+        const a = analytes.find((x) => x.id === item.analyteId);
+        if (!a) throw { type: "Validation", data: `Analito inválido: ${item.analyteId}` };
+        // Reemplaza el valor previo del analito (upsert).
+        s.results = s.results.filter((r) => r.analyteId !== a.id);
+        const { status, refMin, refMax } = resultMeta(a.id, item.value);
+        const result = {
+          id: nextResultId,
+          sampleId: s.id,
+          analyteId: a.id,
+          analyteName: a.name,
+          unit: a.unit,
+          value: item.value,
+          status,
+          refMin,
+          refMax,
+          analyzedAt: new Date().toISOString().slice(0, 19).replace("T", " "),
+          deltaVariation: null,
+          isCritical: status === "CRITICO_BAJO" || status === "CRITICO_ALTO",
+          attachments: [],
+        };
+        nextResultId += 1;
+        s.results.push(result);
+        saved.push(result);
+      }
+      if (saved.length > 0 && s.status === "RECIBIDA") s.status = "EN_PROCESO";
+      return saved;
+    },
+    delete_lab_result: (args) => {
+      const s = sampleById(args.sampleId);
+      if (!s) throw { type: "NotFound", data: "Muestra no encontrada" };
+      s.results = s.results.filter((r) => r.analyteId !== args.analyteId);
+      return null;
     },
     set_sample_status: (args) => {
       const s = sampleById(args.id);

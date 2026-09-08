@@ -122,18 +122,33 @@ test("login → dashboard → flujo completo de muestra", async ({ page }) => {
   await detail.getByRole("button", { name: "Poner en proceso" }).click();
   await expect(detail.getByText("En proceso", { exact: true })).toBeVisible();
 
-  // ---------- Cargar un resultado analítico ----------
-  await detail.getByRole("combobox").click();
-  await page.getByRole("option", { name: "Glucosa (mg/dL)" }).click();
-  await detail.getByRole("spinbutton").fill("95");
-  await detail.getByRole("button", { name: "Cargar" }).click();
-  await expect(detail.getByText("Resultados (1)")).toBeVisible();
+  // ---------- Cargar un resultado analítico (grilla de panel) ----------
+  // La grilla trae los analitos del panel "Química básica" (Glucosa,
+  // Hematocrito, Urea); se llena solo la fila de Glucosa.
+  await expect(
+    detail.getByText("Resultados Analíticos"),
+  ).toBeVisible();
+  const glucoseInput = detail.getByRole("spinbutton").first();
+  await glucoseInput.fill("95");
+  // El estado se evalúa en vivo contra el rango de referencia (70–126 → Normal).
+  await expect(detail.getByText("Normal", { exact: true })).toBeVisible();
+  await detail
+    .getByRole("button", { name: "Guardar resultados" })
+    .click();
+  // El toast de sonner vive fuera del diálogo (region "Notifications").
+  await expect(
+    page.getByText(/1 resultado guardado correctamente/),
+  ).toBeVisible();
+  // Badge de la grilla: 1 de 3 analitos con valor.
+  await expect(detail.getByText(/1 con valor \/ 3 analitos/)).toBeVisible();
 
   // ---------- Finalizar la muestra ----------
   await detail.getByRole("button", { name: "Finalizar muestra" }).click();
   await expect(
     detail.getByText(/Muestra finalizada con 1 resultado/),
   ).toBeVisible();
+  // Al finalizar, la grilla editable pasa a la vista de solo lectura.
+  await expect(detail.getByText("Resultados (1)")).toBeVisible();
   await expect(
     detail.getByRole("button", { name: "Generar PDF" }),
   ).toBeVisible();
