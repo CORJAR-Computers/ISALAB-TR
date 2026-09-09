@@ -4,6 +4,9 @@
   "version": "0.6.0",
   "type": "module",
   "description": "ISALAB — Sistema de gestión para laboratorios veterinarios (Tauri v2 + Rust + Firebird 5 Embedded + React 19)",
+  "engines": {
+    "node": ">=20"
+  },
   "scripts": {
     "dev": "vite",
     "build": "tsc -b && vite build",

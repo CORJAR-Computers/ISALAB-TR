@@ -1,0 +1,138 @@
+name: "Reporte de bug"
+description: Reporta un problema reproducible de la app ISALAB para que podamos investigarlo.
+title: "[bug]: "
+labels: ["bug", "triage"]
+body:
+  - type: markdown
+    attributes:
+      value: |
+        ¡Gracias por reportar! Antes de continuar:
+
+        - **Si es un fallo de seguridad, NO uses este issue.** Sigue
+          [SECURITY.md](https://github.com/CORJAR-Computers/ISALAB-TR/blob/master/SECURITY.md)
+          y repórtalo de forma privada.
+        - Busca en los issues existentes para no duplicar.
+
+  - type: input
+    id: version
+    attributes:
+      label: "Versión de ISALAB"
+      description: "Visible en *Acerca de* dentro de la app, o en `tauri.conf.json`/`package.json`."
+      placeholder: "0.6.0"
+    validations:
+      required: true
+
+  - type: dropdown
+    id: os
+    attributes:
+      label: "Sistema operativo"
+      options:
+        - Windows 11
+        - Windows 10
+        - Otro (especifica en pasos)
+    validations:
+      required: true
+
+  - type: input
+    id: arch
+    attributes:
+      label: "Arquitectura"
+      placeholder: "x64"
+    validations:
+      required: false
+
+  - type: dropdown
+    id: role
+    attributes:
+      label: "Rol con el que reproduciste el problema"
+      options:
+        - ADMIN
+        - VETERINARIO
+        - AUXILIAR
+        - Sin sesión / pantalla de login
+        - No aplica
+    validations:
+      required: true
+
+  - type: dropdown
+    id: module
+    attributes:
+      label: "Módulo afectado"
+      options:
+        - Login / Sesión
+        - Pacientes
+        - Historial clínico
+        - Muestras / Mesa de trabajo
+        - Órdenes de laboratorio
+        - Importación desde analizador
+        - Control de calidad (QC)
+        - Equipos analizadores / rangos
+        - Agenda (consultas/cirugías)
+        - Vacunación
+        - Facturación
+        - Reportes PDF
+        - Configuración / Logos / Certificado
+        - Usuarios / Auditoría
+        - Dashboard / Búsqueda global
+        - Auto-actualización
+        - Otro
+    validations:
+      required: true
+
+  - type: textarea
+    id: steps
+    attributes:
+      label: "Pasos para reproducir"
+      description: "Lista numerada. Cuanto más reproducible, más rápido lo abordamos."
+      placeholder: |
+        1. Iniciar sesión como ADMIN
+        2. Ir a Muestras
+        3. ...
+        4. ...
+      value: |
+        1.
+        2.
+        3.
+    validations:
+      required: true
+
+  - type: textarea
+    id: expected
+    attributes:
+      label: "Resultado esperado"
+    validations:
+      required: true
+
+  - type: textarea
+    id: actual
+    attributes:
+      label: "Resultado actual"
+    validations:
+      required: true
+
+  - type: textarea
+    id: logs
+    attributes:
+      label: "Logs / mensaje de error"
+      description: "Pega el mensaje exacto. Si hay stack trace de Rust, inclúyela. Omite datos sensibles de pacientes."
+      render: shell
+    validations:
+      required: false
+
+  - type: textarea
+    id: notes
+    attributes:
+      label: "Notas adicionales / contexto"
+      description: "Workarounds probados, si ocurre siempre o solo a veces, si empezó tras una actualización, etc."
+    validations:
+      required: false
+
+  - type: checkboxes
+    id: terms
+    attributes:
+      label: "Checklist"
+      options:
+        - label: "Confirmo que NO es un problema de seguridad (para eso existe SECURITY.md)."
+          required: true
+        - label: "Busqué issues existentes y no encontré un duplicado."
+          required: true

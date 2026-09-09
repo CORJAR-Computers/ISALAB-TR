@@ -1,0 +1,35 @@
+# EditorConfig ayuda a mantener un estilo consistente entre editores/IDEs.
+# https://editorconfig.org
+
+root = true
+
+[*]
+charset = utf-8
+end_of_line = lf
+insert_final_newline = true
+trim_trailing_whitespace = true
+indent_style = space
+indent_size = 2
+
+# Markdown: preserva una línea en blanco final (convención de render).
+[*.md]
+trim_trailing_whitespace = false
+indent_size = 2
+
+# Frontend (TS/TSX/JS/CSS/HTML/JSON) y scripts de build: 2 espacios.
+[*.{ts,tsx,js,mjs,cjs,jsx,css,html,json,jsonc,yml,yaml}]
+indent_size = 2
+
+# Rust: el formato lo impone `cargo fmt` (4 espacios), pero fijamos aquí el
+# comportamiento por defecto del editor para quien no tenga rustfmt activo.
+[*.rs]
+indent_size = 4
+max_line_length = 100
+
+# SQL de migraciones: 2 espacios (igual que las migraciones existentes).
+[*.{sql,ps1}]
+indent_size = 2
+
+# Makefile requiere TABs reales (no spaces).
+[Makefile]
+indent_style = tab
