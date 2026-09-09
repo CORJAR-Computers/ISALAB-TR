@@ -15,6 +15,11 @@ permissions:
 env:
   CARGO_TERM_COLOR: always
 
+# Los pasos que tocan la red externa (npm ci, descarga de Firebird,
+# instalación de Playwright, cargo fetch) van envueltos en nick-fields/retry:
+# fallos transitorios de mirrors/CDN (p. ej. "Hash Sum mismatch" de apt en
+# CI #113) no deben tumbar el build. Cada intento tiene timeout propio.
+
 jobs:
   frontend:
     name: Frontend (React)
@@ -27,7 +32,11 @@ jobs:
           node-version: 24
           cache: 'npm'
       - name: Install dependencies
-        run: npm ci
+        uses: nick-fields/retry@v3
+        with:
+          timeout_minutes: 10
+          max_attempts: 3
+          command: npm ci
       # Guarda de bindings: verifica que cada comando registrado en
       # collect_commands! (lib.rs) exista en src/bindings.ts y viceversa.
       # Falla si se cambió Rust sin regenerar los bindings (históricamente
@@ -60,23 +69,27 @@ jobs:
 
       - name: Download Firebird 5 Embedded (if not cached)
         if: steps.cache-firebird.outputs.cache-hit != 'true'
-        shell: pwsh
-        run: |
-          $url = "https://github.com/FirebirdSQL/firebird/releases/download/v5.0.3/Firebird-5.0.3.1683-0-windows-x64.zip"
-          $zip = "$env:TEMP\firebird5.zip"
-          Write-Host "Downloading Firebird 5 from $url ..."
-          Invoke-WebRequest -Uri $url -OutFile $zip -UseBasicParsing
-          Expand-Archive -Path $zip -DestinationPath "$env:GITHUB_WORKSPACE\firebird5_tmp" -Force
-          # El ZIP no tiene carpeta envolvente única: se localiza fbclient.dll
-          # (raíz o subcarpeta) y se copia su árbol completo a FIREBIRD_DIR.
-          $dll = Get-ChildItem "$env:GITHUB_WORKSPACE\firebird5_tmp" -Recurse -Filter fbclient.dll | Select-Object -First 1
-          if (-not $dll) { throw "fbclient.dll no se encontró en el ZIP de Firebird" }
-          $src = Split-Path $dll.FullName -Parent
-          New-Item -ItemType Directory -Force -Path "$env:GITHUB_WORKSPACE\firebird5" | Out-Null
-          Copy-Item "$src\*" -Destination "$env:GITHUB_WORKSPACE\firebird5" -Recurse -Force
-          Remove-Item "$env:GITHUB_WORKSPACE\firebird5_tmp" -Recurse -Force -ErrorAction SilentlyContinue
-          Remove-Item $zip -Force
-          Write-Host "fbclient.dll: $(Test-Path "$env:GITHUB_WORKSPACE\firebird5\fbclient.dll")"
+        uses: nick-fields/retry@v3
+        with:
+          timeout_minutes: 10
+          max_attempts: 3
+          shell: pwsh
+          command: |
+            $url = "https://github.com/FirebirdSQL/firebird/releases/download/v5.0.3/Firebird-5.0.3.1683-0-windows-x64.zip"
+            $zip = "$env:TEMP\firebird5.zip"
+            Write-Host "Downloading Firebird 5 from $url ..."
+            Invoke-WebRequest -Uri $url -OutFile $zip -UseBasicParsing
+            Expand-Archive -Path $zip -DestinationPath "$env:GITHUB_WORKSPACE\firebird5_tmp" -Force
+            # El ZIP no tiene carpeta envolvente única: se localiza fbclient.dll
+            # (raíz o subcarpeta) y se copia su árbol completo a FIREBIRD_DIR.
+            $dll = Get-ChildItem "$env:GITHUB_WORKSPACE\firebird5_tmp" -Recurse -Filter fbclient.dll | Select-Object -First 1
+            if (-not $dll) { throw "fbclient.dll no se encontró en el ZIP de Firebird" }
+            $src = Split-Path $dll.FullName -Parent
+            New-Item -ItemType Directory -Force -Path "$env:GITHUB_WORKSPACE\firebird5" | Out-Null
+            Copy-Item "$src\*" -Destination "$env:GITHUB_WORKSPACE\firebird5" -Recurse -Force
+            Remove-Item "$env:GITHUB_WORKSPACE\firebird5_tmp" -Recurse -Force -ErrorAction SilentlyContinue
+            Remove-Item $zip -Force
+            Write-Host "fbclient.dll: $(Test-Path "$env:GITHUB_WORKSPACE\firebird5\fbclient.dll")"
 
       - name: Add Firebird to PATH
         shell: pwsh
@@ -102,6 +115,16 @@ jobs:
             ~/.cargo/git
             src-tauri/target
           key: ${{ runner.os }}-cargo-${{ hashFiles('**/Cargo.lock') }}
+
+      # Descarga los crates exactos del lockfile para que fmt/clippy/test
+      # corran sin red. Con cache caliente es un no-op; con cache frío o
+      # parcial rellena huecos con retry.
+      - name: Fetch cargo dependencies (locked, with retry)
+        uses: nick-fields/retry@v3
+        with:
+          timeout_minutes: 15
+          max_attempts: 3
+          command: cargo fetch --locked --manifest-path src-tauri/Cargo.toml
 
       - name: Check format
         run: cargo fmt --all -- --check
@@ -136,25 +159,29 @@ jobs:
           node-version: 24
           cache: 'npm'
       - name: Install dependencies
-        run: npm ci
-      - name: Install Playwright browsers
-        # `--with-deps` ejecuta `apt-get update`, y los mirrors apt de la
-        # imagen (p. ej. el de Google Chrome) a veces sirven índices que
-        # cambian a mitad del fetch → "Hash Sum mismatch" (CI #113).
-        # Estrategia:
-        #   1. quitar el source apt de Google Chrome (no lo usamos);
-        #   2. apt-get update con retry (el mismatch es transitorio);
-        #   3. deps del SO aparte del navegador;
-        #   4. descargar el navegador de Playwright SIN tocar apt.
-        run: |
-          sudo rm -f /etc/apt/sources.list.d/google-chrome.list
-          for i in 1 2 3; do
-            sudo apt-get update && break
-            echo "apt-get update failed (intento $i), reintentando en 10s..."
-            sleep 10
-          done
-          npx playwright install-deps chromium
-          npx playwright install chromium
+        uses: nick-fields/retry@v3
+        with:
+          timeout_minutes: 10
+          max_attempts: 3
+          command: npm ci
+      - name: Remove unused Google Chrome apt source
+        # El mirror de Chrome (preinstalado en la imagen) publica índices
+        # continuamente y provoca "Hash Sum mismatch" intermitente en
+        # apt-get update; no lo usamos, así que lo quitamos.
+        run: sudo rm -f /etc/apt/sources.list.d/google-chrome.list
+      - name: Install Playwright browsers and OS deps
+        # Reintento a nivel de bloque: si apt falla en un intento (índices
+        # que cambian a mitad del fetch), el siguiente re-descarga índices
+        # frescos y sigue. `playwright install` (navegador) no toca apt.
+        uses: nick-fields/retry@v3
+        with:
+          timeout_minutes: 15
+          max_attempts: 3
+          retry_wait_seconds: 15
+          command: |
+            sudo apt-get update
+            npx playwright install-deps chromium
+            npx playwright install chromium
       - name: Run E2E smoke tests
         # La UI corre en el dev server de Vite con el IPC de Tauri mockeado
         # (e2e/ipc-mock.script.js): valida login, dashboard y el flujo
@@ -193,28 +220,42 @@ jobs:
             ~/.cargo/git
             src-tauri/target
           key: ${{ runner.os }}-cargo-${{ hashFiles('**/Cargo.lock') }}
+      - name: Fetch cargo dependencies (locked, with retry)
+        uses: nick-fields/retry@v3
+        with:
+          timeout_minutes: 15
+          max_attempts: 3
+          command: cargo fetch --locked --manifest-path src-tauri/Cargo.toml
       - name: Install frontend dependencies
-        run: npm ci
+        uses: nick-fields/retry@v3
+        with:
+          timeout_minutes: 10
+          max_attempts: 3
+          command: npm ci
       - name: Download Firebird 5 Embedded (bundled runtime)
-        shell: pwsh
-        run: |
-          # El motor embedded está gitignored; se descarga aquí para que el
-          # instalador lo incluya vía "resources": ["binaries/firebird/**/*"].
-          # El ZIP no tiene carpeta envolvente única: se localiza fbclient.dll
-          # (raíz o subcarpeta) y se copia su árbol completo.
-          $url = "https://github.com/FirebirdSQL/firebird/releases/download/v5.0.3/Firebird-5.0.3.1683-0-windows-x64.zip"
-          $zip = "$env:TEMP\firebird5.zip"
-          Invoke-WebRequest -Uri $url -OutFile $zip -UseBasicParsing
-          Expand-Archive -Path $zip -DestinationPath "$env:GITHUB_WORKSPACE\firebird5_tmp" -Force
-          $dll = Get-ChildItem "$env:GITHUB_WORKSPACE\firebird5_tmp" -Recurse -Filter fbclient.dll | Select-Object -First 1
-          if (-not $dll) { throw "fbclient.dll no se encontró en el ZIP de Firebird" }
-          $src = Split-Path $dll.FullName -Parent
-          $dest = "$env:GITHUB_WORKSPACE\src-tauri\binaries\firebird"
-          New-Item -ItemType Directory -Force -Path $dest | Out-Null
-          Copy-Item "$src\*" -Destination $dest -Recurse -Force
-          Remove-Item $zip -Force
-          if (-not (Test-Path "$dest\fbclient.dll")) { throw "fbclient.dll no se copió al bundle" }
-          Write-Host "fbclient.dll bundled: $(Test-Path "$dest\fbclient.dll")"
+        uses: nick-fields/retry@v3
+        with:
+          timeout_minutes: 10
+          max_attempts: 3
+          shell: pwsh
+          command: |
+            # El motor embedded está gitignored; se descarga aquí para que el
+            # instalador lo incluya vía "resources": ["binaries/firebird/**/*"].
+            # El ZIP no tiene carpeta envolvente única: se localiza fbclient.dll
+            # (raíz o subcarpeta) y se copia su árbol completo.
+            $url = "https://github.com/FirebirdSQL/firebird/releases/download/v5.0.3/Firebird-5.0.3.1683-0-windows-x64.zip"
+            $zip = "$env:TEMP\firebird5.zip"
+            Invoke-WebRequest -Uri $url -OutFile $zip -UseBasicParsing
+            Expand-Archive -Path $zip -DestinationPath "$env:GITHUB_WORKSPACE\firebird5_tmp" -Force
+            $dll = Get-ChildItem "$env:GITHUB_WORKSPACE\firebird5_tmp" -Recurse -Filter fbclient.dll | Select-Object -First 1
+            if (-not $dll) { throw "fbclient.dll no se encontró en el ZIP de Firebird" }
+            $src = Split-Path $dll.FullName -Parent
+            $dest = "$env:GITHUB_WORKSPACE\src-tauri\binaries\firebird"
+            New-Item -ItemType Directory -Force -Path $dest | Out-Null
+            Copy-Item "$src\*" -Destination $dest -Recurse -Force
+            Remove-Item $zip -Force
+            if (-not (Test-Path "$dest\fbclient.dll")) { throw "fbclient.dll no se copió al bundle" }
+            Write-Host "fbclient.dll bundled: $(Test-Path "$dest\fbclient.dll")"
       - name: Prune Firebird to embedded subset
         run: node scripts/prune-firebird.mjs
       - name: Build Tauri app
