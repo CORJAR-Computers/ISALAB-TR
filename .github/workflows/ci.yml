@@ -138,7 +138,23 @@ jobs:
       - name: Install dependencies
         run: npm ci
       - name: Install Playwright browsers
-        run: npx playwright install --with-deps chromium
+        # `--with-deps` ejecuta `apt-get update`, y los mirrors apt de la
+        # imagen (p. ej. el de Google Chrome) a veces sirven índices que
+        # cambian a mitad del fetch → "Hash Sum mismatch" (CI #113).
+        # Estrategia:
+        #   1. quitar el source apt de Google Chrome (no lo usamos);
+        #   2. apt-get update con retry (el mismatch es transitorio);
+        #   3. deps del SO aparte del navegador;
+        #   4. descargar el navegador de Playwright SIN tocar apt.
+        run: |
+          sudo rm -f /etc/apt/sources.list.d/google-chrome.list
+          for i in 1 2 3; do
+            sudo apt-get update && break
+            echo "apt-get update failed (intento $i), reintentando en 10s..."
+            sleep 10
+          done
+          npx playwright install-deps chromium
+          npx playwright install chromium
       - name: Run E2E smoke tests
         # La UI corre en el dev server de Vite con el IPC de Tauri mockeado
         # (e2e/ipc-mock.script.js): valida login, dashboard y el flujo
