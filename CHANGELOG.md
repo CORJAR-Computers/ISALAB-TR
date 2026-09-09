@@ -4,7 +4,15 @@ All notable changes to ISALAB will be documented in this file.
 
 The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.1.0/).
 
-## [Unreleased]
+## [1.0.0] - 2026-09-09
+
+**Primer release estable de producción.** ISALAB cubre el flujo completo del
+laboratorio veterinario: recepción de muestras con órdenes de laboratorio,
+resultados validados contra el catálogo de valores de referencia (44 analitos
+sembrados, con alta de analitos desde la UI), reportes PDF por correo,
+historia clínica, RBAC con auditoría y actualizador automático firmado.
+Madurez verificada: 294 tests Rust sobre Firebird real, 120 tests frontend,
+14 E2E Playwright, CI en 4 jobs y adaptación a portátiles de 14 pulgadas.
 
 ### Added
 
