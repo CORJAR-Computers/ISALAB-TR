@@ -58,6 +58,7 @@ import { Skeleton } from "@/components/ui/skeleton";
 import {
   useAnalytes,
   useAnalyzers,
+  useCreateAnalyte,
   useCreateAnalyzer,
   useCreateReferenceRange,
   useDeleteAnalyzer,
@@ -312,6 +313,15 @@ function RangeDialog({
   const { data: species = [] } = useSpecies();
   const createRange = useCreateReferenceRange();
   const updateRange = useUpdateReferenceRange();
+  const createAnalyte = useCreateAnalyte();
+  const [newAnalyteMode, setNewAnalyteMode] = useState(false);
+  const [analyteSelectOpen, setAnalyteSelectOpen] = useState(false);
+  const [newAnalyte, setNewAnalyte] = useState({
+    code: "",
+    name: "",
+    unit: "",
+    method: "",
+  });
   const isEdit = range != null;
 
   const form = useForm<
@@ -395,7 +405,9 @@ function RangeDialog({
           </DialogTitle>
           <DialogDescription>
             Rango para {analyzer.name}. Si el equipo no tiene rango propio, la
-            validación respalda con el perfil General.
+            validación respalda con el perfil General. Usa «Nuevo analito» si
+            el parámetro aún no existe en el catálogo (los precargados provienen
+            de la guía de valores de referencia veterinarios).
           </DialogDescription>
         </DialogHeader>
         <Form {...form}>
@@ -406,8 +418,113 @@ function RangeDialog({
                 name="analyteId"
                 render={({ field }) => (
                   <FormItem>
-                    <FormLabel>Analito</FormLabel>
+                    <div className="flex items-center justify-between">
+                      <FormLabel>Analito</FormLabel>
+                      <Button
+                        type="button"
+                        variant="ghost"
+                        size="sm"
+                        className="h-6 px-2 text-xs"
+                        onClick={() => setNewAnalyteMode((v) => !v)}
+                      >
+                        {newAnalyteMode ? (
+                          "Cancelar"
+                        ) : (
+                          <>
+                            <Plus className="size-3" />
+                            Nuevo analito
+                          </>
+                        )}
+                      </Button>
+                    </div>
+                    {newAnalyteMode && (
+                      <div className="space-y-2 rounded-md border bg-muted/40 p-3">
+                        <div className="grid grid-cols-2 gap-2">
+                          <Input
+                            placeholder="Código (p. ej. LACT)"
+                            value={newAnalyte.code}
+                            onChange={(e) =>
+                              setNewAnalyte({
+                                ...newAnalyte,
+                                code: e.target.value.toUpperCase(),
+                              })
+                            }
+                          />
+                          <Input
+                            placeholder="Nombre (p. ej. Lactato)"
+                            value={newAnalyte.name}
+                            onChange={(e) =>
+                              setNewAnalyte({ ...newAnalyte, name: e.target.value })
+                            }
+                          />
+                          <Input
+                            placeholder="Unidad (p. ej. mmol/L)"
+                            value={newAnalyte.unit}
+                            onChange={(e) =>
+                              setNewAnalyte({ ...newAnalyte, unit: e.target.value })
+                            }
+                          />
+                          <Input
+                            placeholder="Método (opcional)"
+                            value={newAnalyte.method}
+                            onChange={(e) =>
+                              setNewAnalyte({ ...newAnalyte, method: e.target.value })
+                            }
+                          />
+                        </div>
+                        <Button
+                          type="button"
+                          size="sm"
+                          disabled={
+                            createAnalyte.isPending ||
+                            !newAnalyte.code.trim() ||
+                            !newAnalyte.name.trim()
+                          }
+                          onClick={async () => {
+                            try {
+                              const created = await createAnalyte.mutateAsync({
+                                code: newAnalyte.code.trim(),
+                                name: newAnalyte.name.trim(),
+                                unit: newAnalyte.unit.trim() || null,
+                                method: newAnalyte.method.trim() || null,
+                                description: null,
+                              });
+                              // Radix Select resetea un valor fijado por código si el
+                              // listado está cerrado: su <select> nativo oculto (bubble
+                              // input) no encuentra la option y emite onValueChange(""),
+                              // pisando la selección. Se abre el listado y se hace clic
+                              // real en el ítem recién creado (el mismo camino que la
+                              // selección manual, que sí funciona); Radix lo cierra solo.
+                              field.onChange(created.id);
+                              setAnalyteSelectOpen(true);
+                              requestAnimationFrame(() => {
+                                const items = document.querySelectorAll(
+                                  '[data-slot="select-item"]',
+                                );
+                                const target = Array.from(items).find((el) =>
+                                  el.textContent?.includes(created.name),
+                                );
+                                (target as HTMLElement | undefined)?.click();
+                              });
+                              setNewAnalyte({ code: "", name: "", unit: "", method: "" });
+                              setNewAnalyteMode(false);
+                            } catch {
+                              // El toast lo muestra el hook.
+                            }
+                          }}
+                        >
+                          {createAnalyte.isPending ? (
+                            <Loader2 className="size-4 animate-spin" />
+                          ) : (
+                            <Plus className="size-4" />
+                          )}
+                          Crear y seleccionar
+                        </Button>
+                      </div>
+                    )}
                     <Select
+                      open={analyteSelectOpen}
+                      onOpenChange={setAnalyteSelectOpen}
                       value={field.value ? field.value.toString() : ""}
                       onValueChange={(v) => field.onChange(Number(v))}
                     >

@@ -39,7 +39,7 @@ use crate::commands::analyzers::{
 use crate::commands::attachments::{attach_result_file, delete_result_attachment};
 use crate::commands::auth::{get_session, list_audit_log, login, logout};
 use crate::commands::catalog::{
-    list_analytes, list_breeds, list_sample_types, list_species, list_vaccine_types,
+    create_analyte, list_analytes, list_breeds, list_sample_types, list_species, list_vaccine_types,
 };
 use crate::commands::clinical_history::{
     count_consultations, create_consultation, get_clinical_history, list_consultations,
@@ -116,6 +116,7 @@ fn specta_builder() -> Builder<tauri::Wry> {
             list_breeds,
             list_sample_types,
             list_analytes,
+            create_analyte,
             list_vaccine_types,
             list_owners,
             list_patients,

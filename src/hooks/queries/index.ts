@@ -4,6 +4,7 @@ export {
   useBreeds,
   useSampleTypes,
   useAnalytes,
+  useCreateAnalyte,
   useVaccineTypes,
   useOwners,
 } from "./use-catalogs";

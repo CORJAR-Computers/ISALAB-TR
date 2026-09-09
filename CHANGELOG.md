@@ -6,6 +6,35 @@ The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.1.0/).
 
 ## [Unreleased]
 
+### Added
+
+- **Valores de referencia veterinarios desde la guía del laboratorio**: la
+  migración `0021` siembra **44 analitos y 124 rangos** del archivo
+  `Valores_Referencia_Veterinarios.md` (unidades de laboratorio US) en el
+  perfil General, por especie (canino/felino/equino). Al recibir muestras, la
+  validación Normal/Alto/Bajo ya tiene datos desde el primer día, sin cargar
+  rangos a mano.
+- **Alta de analitos desde la UI**: nuevo comando `create_analyte` (RBAC
+  `require_admin`) y flujo «Nuevo analito» en Settings → Equipos de
+  laboratorio → Nuevo rango: se crea el analito (código, nombre, unidad y
+  método) y queda seleccionado en el formulario del rango para guardarlo de
+  inmediato. Los analitos que la guía no cubre se ingresan sin tocar la base
+  de datos.
+- **Test E2E del catálogo de referencia** (`e2e/reference-values.spec.ts`):
+  verifica que los rangos sembrados del `.md` son visibles y editables en el
+  perfil GENERAL (canino/felino/equino) y que el flujo completo
+  crear-analito → seleccionar → guardar-rango funciona desde la UI.
+
+### Fixed
+
+- **El selector de analito se reiniciaba al crear un analito nuevo**: Radix
+  Select resetea a `""` un valor fijado por código cuando el listado está
+  cerrado (su `<select>` nativo oculto no encuentra la opción y emite
+  `onValueChange`). El catálogo ahora se actualiza de forma optimista
+  (`setQueryData`) y la selección se confirma abriendo el listado y haciendo
+  clic en el ítem recién creado — el mismo camino que la selección manual —,
+  de modo que «Crear y seleccionar» funciona de verdad.
+
 ## [0.6.0] - 2026-09-08
 
 ### Added

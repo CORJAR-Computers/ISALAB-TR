@@ -1,9 +1,12 @@
 use rsfbclient::prelude::*;
 use tauri::State;
 
-use crate::auth::require_session;
+use crate::auth::{require_session, require_vet_or_admin};
 use crate::error::AppError;
-use crate::models::species::{Analyte, Breed, SampleType, Species, VaccineType};
+use crate::models::species::{
+    Analyte, Breed, CreateAnalyteInput, SampleType, Species, VaccineType,
+};
+use crate::repositories::catalog as catalog_repo;
 use crate::state::AppState;
 
 type SpeciesRow = (i32, String, String);
@@ -112,6 +115,19 @@ pub fn list_analytes(state: State<'_, AppState>) -> Result<Vec<Analyte>, AppErro
             method: r.4,
         })
         .collect())
+}
+
+/// Crea un analito nuevo en el catálogo de laboratorio (p. ej. desde
+/// Ajustes → Equipos y rangos → "nuevo analito"). Requiere rol VET o ADMIN.
+#[tauri::command]
+#[specta::specta]
+pub fn create_analyte(
+    state: State<'_, AppState>,
+    input: CreateAnalyteInput,
+) -> Result<Analyte, AppError> {
+    require_vet_or_admin(&state)?;
+    let mut pooled = state.pool.acquire()?;
+    catalog_repo::create_analyte(pooled.conn(), &input)
 }
 
 /// Catálogo de vacunas del esquema (Rabia, Polivalente, FeLV…).

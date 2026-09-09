@@ -61,11 +61,17 @@
     { id: 3, code: "URINE", name: "Orina" },
   ];
 
+  // Catálogo de analitos: los 3 históricos + los que siembra la migración
+  // 0021 desde Valores_Referencia_Veterinarios.md (ALP/ALT/CREA).
   const analytes = [
     { id: 1, code: "GLU", name: "Glucosa", unit: "mg/dL", method: null },
     { id: 2, code: "HCT", name: "Hematocrito", unit: "%", method: null },
     { id: 3, code: "UREA", name: "Urea", unit: "mg/dL", method: null },
+    { id: 4, code: "ALP", name: "Fosfatasa alcalina (ALP)", unit: "U/L", method: "Cinético IFCC" },
+    { id: 5, code: "ALT", name: "Alanina aminotransferasa (ALT)", unit: "U/L", method: "Cinético IFCC" },
+    { id: 6, code: "CREA", name: "Creatinina", unit: "mg/dL", method: null },
   ];
+  let nextAnalyteId = 7;
 
   // Panel por defecto ("Química básica") con los 3 analitos del catálogo.
   // La grilla de resultados del detalle usa list_panels/list_panel_analytes.
@@ -78,12 +84,20 @@
     { analyteId: 3, analyteName: "Urea", unit: "mg/dL", seq: 3 },
   ];
 
-  // Rangos de referencia del analizador GENERAL (id 1) para Canino (speciesId 1).
-  // Sin ellos, la grilla del detalle evalúa "Cargado" en vez de Normal/Alto/Bajo.
+  // Rangos del perfil GENERAL (id 1): los históricos + los sembrados de la
+  // migración 0021 desde Valores_Referencia_Veterinarios.md (mismos valores
+  // por especie: canino/felino/equino). La grilla del detalle los usa para
+  // evaluar Normal/Alto/Bajo.
   const referenceRanges = [
     { id: 1, analyzerId: 1, analyzerName: "GENERAL", analyteId: 1, analyteName: "Glucosa", unit: "mg/dL", speciesId: 1, speciesName: "Canino", sex: null, ageMinMonths: 0, ageMaxMonths: 0, minValue: 70, maxValue: 126, criticalMin: 40, criticalMax: 300, notes: null },
     { id: 2, analyzerId: 1, analyzerName: "GENERAL", analyteId: 2, analyteName: "Hematocrito", unit: "%", speciesId: 1, speciesName: "Canino", sex: null, ageMinMonths: 0, ageMaxMonths: 0, minValue: 37, maxValue: 55, criticalMin: 20, criticalMax: 65, notes: null },
+    { id: 3, analyzerId: 1, analyzerName: "GENERAL", analyteId: 1, analyteName: "Glucosa", unit: "mg/dL", speciesId: 2, speciesName: "Felino", sex: null, ageMinMonths: 0, ageMaxMonths: 0, minValue: 74, maxValue: 159, criticalMin: null, criticalMax: null, notes: null },
+    { id: 4, analyzerId: 1, analyzerName: "GENERAL", analyteId: 1, analyteName: "Glucosa", unit: "mg/dL", speciesId: 3, speciesName: "Equino", sex: null, ageMinMonths: 0, ageMaxMonths: 0, minValue: 62, maxValue: 117, criticalMin: null, criticalMax: null, notes: null },
+    { id: 5, analyzerId: 1, analyzerName: "GENERAL", analyteId: 4, analyteName: "Fosfatasa alcalina (ALP)", unit: "U/L", speciesId: 1, speciesName: "Canino", sex: null, ageMinMonths: 0, ageMaxMonths: 0, minValue: 7, maxValue: 115, criticalMin: null, criticalMax: null, notes: null },
+    { id: 6, analyzerId: 1, analyzerName: "GENERAL", analyteId: 4, analyteName: "Fosfatasa alcalina (ALP)", unit: "U/L", speciesId: 2, speciesName: "Felino", sex: null, ageMinMonths: 0, ageMaxMonths: 0, minValue: 11, maxValue: 49, criticalMin: null, criticalMax: null, notes: null },
+    { id: 7, analyzerId: 1, analyzerName: "GENERAL", analyteId: 4, analyteName: "Fosfatasa alcalina (ALP)", unit: "U/L", speciesId: 3, speciesName: "Equino", sex: null, ageMinMonths: 0, ageMaxMonths: 0, minValue: 88, maxValue: 261, criticalMin: null, criticalMax: null, notes: null },
   ];
+  let nextRangeId = 8;
 
   let samples = []; // { ...Sample, results: LabResult[] }
   let nextSampleId = 1;
@@ -101,11 +115,27 @@
     { id: 2, resultId: null, sampleId: 1, channel: "MANUAL", recipientName: null, recipientAddress: null, status: "ACKNOWLEDGED", sentAt: null, ackedAt: "2026-09-07 12:20:00", ackedBy: "Dra. Ana Pérez", note: null, createdAt: "2026-09-07 12:20:00" },
   ];
 
+  // Especies del catálogo (ids 1/2/3 = canino/felino/equino, como el seed).
+  const species = [
+    { id: 1, code: "CAN", name: "Canino" },
+    { id: 2, code: "FEL", name: "Felino" },
+    { id: 3, code: "EQU", name: "Equino" },
+  ];
+
+  // Equipos del catálogo (id 1 = perfil GENERAL). rangeCount se calcula de
+  // referenceRanges para reflejar los rangos sembrados en la UI.
+  const analyzers = [
+    { id: 1, code: "GENERAL", name: "Perfil GENERAL (lectura manual)", manufacturer: null, model: null, isActive: true, notes: null },
+    { id: 2, code: "MB2800", name: "MINDRAY B2800", manufacturer: "Mindray", model: "B2800", isActive: true, notes: null },
+  ];
+
   const pad4 = (n) => String(n).padStart(4, "0");
   const sampleCode = () => `M-2026-${pad4(nextSampleId)}`;
   const patientById = (id) => patients.find((p) => p.id === id);
   const sampleTypeById = (id) => sampleTypes.find((t) => t.id === id);
   const sampleById = (id) => samples.find((s) => s.id === id);
+  const analyzerById = (id) => analyzers.find((a) => a.id === id);
+  const speciesById = (id) => species.find((s) => s.id === id);
 
   const toListItem = (s) => {
     const p = patientById(s.patientId);
@@ -233,28 +263,78 @@
       args.analyzerId != null
         ? referenceRanges.filter((r) => r.analyzerId === args.analyzerId)
         : referenceRanges,
-    list_analyzers: () => [
-      {
-        id: 1,
-        code: "GENERAL",
-        name: "Perfil GENERAL (lectura manual)",
-        manufacturer: null,
-        model: null,
-        isActive: true,
-        notes: null,
-        rangeCount: 0,
-      },
-      {
-        id: 2,
-        code: "MB2800",
-        name: "MINDRAY B2800",
-        manufacturer: "Mindray",
-        model: "B2800",
-        isActive: true,
-        notes: null,
-        rangeCount: 0,
-      },
-    ],
+    create_analyte: (args) => {
+      const { code, name, unit, method, description } = args.input ?? {};
+      if (!code || !name)
+        throw { type: "Validation", data: "Código y nombre son obligatorios" };
+      const normalized = code.toUpperCase();
+      if (analytes.some((a) => a.code === normalized))
+        throw { type: "Conflict", data: `Ya existe el analito ${normalized}` };
+      const analyte = {
+        id: nextAnalyteId,
+        code: normalized,
+        name,
+        unit: unit ?? null,
+        method: method ?? null,
+      };
+      nextAnalyteId += 1;
+      analytes.push(analyte);
+      return analyte;
+    },
+    create_reference_range: (args) => {
+      const input = args.input ?? {};
+      const a = analytes.find((x) => x.id === input.analyteId);
+      const s = speciesById(input.speciesId);
+      if (!a || !s) throw { type: "Validation", data: "Analito o especie inválidos" };
+      const range = {
+        id: nextRangeId,
+        analyzerId: input.analyzerId,
+        analyzerName: analyzerById(input.analyzerId)?.name ?? "?",
+        analyteId: a.id,
+        analyteName: a.name,
+        unit: a.unit,
+        speciesId: s.id,
+        speciesName: s.name,
+        sex: input.sex ?? null,
+        ageMinMonths: input.ageMinMonths,
+        ageMaxMonths: input.ageMaxMonths,
+        minValue: input.minValue,
+        maxValue: input.maxValue,
+        criticalMin: input.criticalMin ?? null,
+        criticalMax: input.criticalMax ?? null,
+        notes: input.notes ?? null,
+      };
+      nextRangeId += 1;
+      referenceRanges.push(range);
+      return range;
+    },
+    update_reference_range: (args) => {
+      const r = referenceRanges.find((x) => x.id === args.id);
+      if (!r) throw { type: "NotFound", data: "Rango no encontrado" };
+      const input = args.input ?? {};
+      const a = analytes.find((x) => x.id === input.analyteId);
+      const s = speciesById(input.speciesId);
+      if (!a || !s) throw { type: "Validation", data: "Analito o especie inválidos" };
+      r.analyteId = input.analyteId;
+      r.analyteName = a.name;
+      r.unit = a.unit;
+      r.speciesId = input.speciesId;
+      r.speciesName = s.name;
+      r.sex = input.sex ?? null;
+      r.ageMinMonths = input.ageMinMonths;
+      r.ageMaxMonths = input.ageMaxMonths;
+      r.minValue = input.minValue;
+      r.maxValue = input.maxValue;
+      r.criticalMin = input.criticalMin ?? null;
+      r.criticalMax = input.criticalMax ?? null;
+      r.notes = input.notes ?? null;
+      return { ...r };
+    },
+    list_analyzers: () =>
+      analyzers.map((a) => ({
+        ...a,
+        rangeCount: referenceRanges.filter((r) => r.analyzerId === a.id).length,
+      })),
     list_patients: (args) => {
       const q = (args.search ?? "").toLowerCase();
       if (!q) return patients;
@@ -544,7 +624,7 @@
     // ----- Catálogos y páginas del resto de la app (estados vacíos) -------
     // Necesarios para el test de viewport 1366x768, que navega por TODAS las
     // vistas: cada página debe montar sin datos y sin excepciones.
-    list_species: () => [{ id: 1, code: "CAN", name: "Canino" }],
+    list_species: () => species,
     list_breeds: () => [
       { id: 1, speciesId: 1, name: "Labrador" },
       { id: 2, speciesId: 1, name: "Criollo" },

@@ -12,6 +12,7 @@ export {
   useBreeds,
   useSampleTypes,
   useAnalytes,
+  useCreateAnalyte,
   useVaccineTypes,
   useOwners,
   usePatients,

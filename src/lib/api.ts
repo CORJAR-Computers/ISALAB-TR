@@ -1,6 +1,7 @@
 import { invoke } from "@tauri-apps/api/core";
 import type {
   Analyte,
+  CreateAnalyteInput,
   AccessionOrderInput,
   StatusCount,
   Analyzer,
@@ -95,6 +96,8 @@ export const api = {
     invoke<Breed[]>("list_breeds", { speciesId }),
   listSampleTypes: () => invoke<SampleType[]>("list_sample_types"),
   listAnalytes: () => invoke<Analyte[]>("list_analytes"),
+  createAnalyte: (input: CreateAnalyteInput) =>
+    invoke<Analyte>("create_analyte", { input }),
   listVaccineTypes: () => invoke<VaccineType[]>("list_vaccine_types"),
   listOwners: (search: string | null) =>
     invoke<Owner[]>("list_owners", { search }),

@@ -2,6 +2,7 @@ pub mod analyzer_sources;
 pub mod analyzers;
 pub mod attachments;
 pub mod auth;
+pub mod catalog;
 pub mod clinical_history;
 pub mod dashboard;
 pub mod import;

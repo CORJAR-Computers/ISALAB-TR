@@ -26,6 +26,8 @@ export const commands = {
 	listBreeds: (speciesId: number) => typedError<Breed[], AppError>(__TAURI_INVOKE("list_breeds", { speciesId })),
 	listSampleTypes: () => typedError<SampleType[], AppError>(__TAURI_INVOKE("list_sample_types")),
 	listAnalytes: () => typedError<Analyte[], AppError>(__TAURI_INVOKE("list_analytes")),
+	/**  Crea un analito nuevo en el catálogo de laboratorio (p. ej. desde Ajustes → Equipos y rangos → "nuevo analito"). Requiere rol VET o ADMIN. */
+	createAnalyte: (input: CreateAnalyteInput) => typedError<Analyte, AppError>(__TAURI_INVOKE("create_analyte", { input })),
 	/**  Catálogo de vacunas del esquema (Rabia, Polivalente, FeLV…). */
 	listVaccineTypes: () => typedError<VaccineType[], AppError>(__TAURI_INVOKE("list_vaccine_types")),
 	/**  Listado de propietarios (para facturación y búsquedas). */
@@ -501,6 +503,16 @@ export type Analyte = {
 	name: string,
 	unit: string | null,
 	method: string | null,
+};
+
+/**  Entrada para crear un analito nuevo (catálogo de laboratorio). */
+export type CreateAnalyteInput = {
+	/**  Código corto único (p. ej. "LACT"). Se normaliza a mayúsculas. */
+	code: string,
+	name: string,
+	unit: string | null,
+	method: string | null,
+	description: string | null,
 };
 
 /**  Conteo de un analito (para el ranking de los más solicitados). */

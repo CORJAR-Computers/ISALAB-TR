@@ -41,6 +41,18 @@ pub struct Analyte {
     pub method: Option<String>,
 }
 
+/// Entrada para crear un analito nuevo (catálogo de laboratorio).
+#[derive(Debug, Clone, Serialize, Deserialize, Type)]
+#[serde(rename_all = "camelCase")]
+pub struct CreateAnalyteInput {
+    /// Código corto único (p. ej. "LACT"). Se normaliza a mayúsculas.
+    pub code: String,
+    pub name: String,
+    pub unit: Option<String>,
+    pub method: Option<String>,
+    pub description: Option<String>,
+}
+
 #[derive(Debug, Clone, Serialize, Deserialize, Type)]
 #[serde(rename_all = "camelCase")]
 pub struct VaccineType {
