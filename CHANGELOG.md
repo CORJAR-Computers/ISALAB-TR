@@ -10,6 +10,14 @@ The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.1.0/).
 
 ### Added
 
+- **Persistencia de la geometría de la ventana**: tamaño, posición y estado
+  maximizado de la ventana principal se recuerdan entre sesiones
+  (`window-state.json` en app_data). Al restaurar se recorta al área de
+  trabajo del monitor donde caiga, de modo que es seguro si el usuario cambia
+  de monitor o lo desconecta; el maximizado se reaplica cuando la ventana ya
+  es visible para no interferir con el splash. En el primer arranque (sin
+  estado guardado) se mantiene el recorte al área de trabajo de portátiles
+  pequeños.
 - **Órdenes de laboratorio**: la UI ya cubre los 8 comandos que el backend
   registraba sin superficie (crear orden con paneles/analitos y prioridad,
   accesionar muestras desde la orden, transiciones de estado, listado con

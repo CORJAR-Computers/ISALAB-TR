@@ -13,14 +13,14 @@ pub mod pdf_templates;
 pub mod repositories;
 pub mod sources;
 pub mod state;
-
 #[cfg(test)]
 pub mod test_helpers;
+pub mod window_state;
 
 // Solo se usa para regenerar src/bindings.ts en builds de desarrollo.
 #[cfg(debug_assertions)]
 use specta_typescript::Typescript;
-use tauri::Manager;
+use tauri::{Manager, WindowEvent};
 use tauri_specta::{collect_commands, Builder};
 
 mod mail;
@@ -253,6 +253,16 @@ pub fn run() {
     }
 
     tauri::Builder::default()
+        // Persistencia: la geometría final de la ventana principal (tamaño,
+        // posición y maximizado) se guarda justo antes de cerrarse, para
+        // restaurarla en la próxima sesión.
+        .on_window_event(|window, event| {
+            if let WindowEvent::CloseRequested { .. } = event {
+                if window.label() == "main" {
+                    window_state::save_current(window.app_handle());
+                }
+            }
+        })
         .plugin(tauri_plugin_opener::init())
         .plugin(tauri_plugin_dialog::init())
         .plugin(tauri_plugin_updater::Builder::new().build())
@@ -283,7 +293,19 @@ pub fn run() {
                 // posición al área de trabajo del monitor donde esté la
                 // ventana. Si ya cabe, no se toca nada (pantallas grandes
                 // quedan exactamente igual).
-                if let Some(win) = main.as_ref() {
+                //
+                // Antes se intenta restaurar la geometría persistida de la
+                // sesión anterior (window-state.json en app_data): tamaño y
+                // posición en px físicos, recortados al área de trabajo del
+                // monitor que contenga el centro guardado. Solo si no hay
+                // estado (primer arranque) o no se pudo aplicar, se ejecuta el
+                // recorte por defecto de arriba.
+                let restored = main.as_ref().is_some_and(|win| {
+                    window_state::state_path(app.handle())
+                        .and_then(|path| window_state::load(&path))
+                        .is_some_and(|state| window_state::apply(win, &state))
+                });
+                if let Some(win) = main.as_ref().filter(|_| !restored) {
                     let monitor = win
                         .current_monitor()
                         .ok()
@@ -322,11 +344,16 @@ pub fn run() {
                 if let (Some(splash), Some(main)) = (splash, main) {
                     let main_handle = main.clone();
                     let splash_handle = splash.clone();
+                    let app_handle = app.handle().clone();
+                    let fallback_app = app_handle.clone();
 
                     app.listen_any("app-ready", move |_| {
                         let _ = main_handle.show();
                         let _ = main_handle.set_focus();
                         let _ = splash_handle.close();
+                        // Con la ventana ya visible se puede restaurar el
+                        // maximizado guardado (ver window_state.rs).
+                        window_state::apply_maximized_if_needed(&app_handle);
                     });
 
                     // Red de seguridad: si la UI nunca emite "app-ready",
@@ -335,6 +362,7 @@ pub fn run() {
                         std::thread::sleep(Duration::from_secs(10));
                         let _ = main.show();
                         let _ = splash.close();
+                        window_state::apply_maximized_if_needed(&fallback_app);
                     });
                 }
             }
