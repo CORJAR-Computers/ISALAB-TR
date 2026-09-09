@@ -81,20 +81,38 @@ diálogo para descargarla, instalarla y reiniciar la aplicación.
 
 #### Claves de firma y CI
 
-La clave privada se guarda como secreto del repositorio (necesaria para que
-`tauri build` genere los artefactos del updater):
+La clave privada de firma **no se guarda en el repositorio**: la copia maestra
+vive en el equipo del mantenedor, en `%USERPROFILE%\.tauri\isalab.key`
+(pública: `isalab.key.pub`). El repo solo recibe el secreto que `tauri build`
+necesita para generar los artefactos del updater. Como la clave se generó
+**sin frase de paso** (`-p ""`), basta un secreto:
 
 | Secreto | Valor |
 | --- | --- |
-| `TAURI_SIGNING_PRIVATE_KEY` | contenido de `isalab.key` (cifrado) |
-| `TAURI_SIGNING_PRIVATE_KEY_PASSWORD` | frase de paso (vacía si se generó con `-p ""`) |
+| `TAURI_SIGNING_PRIVATE_KEY` | contenido de `isalab.key` |
+
+> `TAURI_SIGNING_PRIVATE_KEY_PASSWORD` fue **eliminado** de los secretos del
+> repo: al no tener frase de paso la clave, el valor correcto es vacío — justo
+> lo que recibe el workflow cuando el secreto no existe. Volver a definirlo
+> con un valor no vacío rompería el firmado en CI.
+
+Reglas de manejo:
+
+- Las claves **nunca se guardan dentro del repo**: `.gitignore` excluye
+  `*.key` y `~/.tauri/`.
+- No rotar la clave sin actualizar `plugins.updater.pubkey` en
+  `tauri.conf.json`: una clave privada que no empareje con la pública embebida
+  deja a **todas** las instalaciones existentes sin auto-actualización.
+- Para firmar en local, `scripts/build-and-sign.ps1` apunta a
+  `%USERPROFILE%\.tauri\isalab.key` y asume frase de paso vacía.
 
 Regeneración (solo si se pierde la clave; invalidaría las instalaciones
 anteriores):
 
 ```bash
 npx tauri signer generate -w ~/.tauri/isalab.key --ci -p ""
-# copia isalab.key a los secretos y isalab.key.pub a tauri.conf.json > plugins.updater.pubkey
+# copia isalab.key al secreto TAURI_SIGNING_PRIVATE_KEY y isalab.key.pub a
+# tauri.conf.json > plugins.updater.pubkey
 ```
 
 ### Compilación local del instalador
