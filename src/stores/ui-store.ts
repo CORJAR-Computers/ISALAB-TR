@@ -59,9 +59,17 @@ const storedTheme = (): Theme => {
   }
 };
 
+/** Breakpoint `lg` de Tailwind: por debajo la sidebar es un drawer off-canvas. */
+const LG_PX = 1024;
+const isDesktopWidth = () =>
+  typeof window !== "undefined" && window.innerWidth >= LG_PX;
+
 export const useUiStore = create<UiState>((set) => ({
   theme: storedTheme(),
-  sidebarOpen: true,
+  // En ventanas menores que `lg` (p. ej. portátiles 14" con escalado alto) la
+  // sidebar arranca cerrada: expandida taparía el contenido y bloquearía el
+  // botón hamburguesa del TopBar.
+  sidebarOpen: isDesktopWidth(),
   view: "dashboard",
   activePatientId: null,
   newPatientRequest: 0,
@@ -92,7 +100,13 @@ export const useUiStore = create<UiState>((set) => ({
     }),
 
   setSidebarOpen: (open) => set({ sidebarOpen: open }),
-  navigate: (view) => set({ view }),
+  // En pantallas < lg la sidebar es un drawer: navegar la cierra (patrón
+  // móvil). En escritorio (> lg) permanece como esté.
+  navigate: (view) =>
+    set((s) => ({
+      view,
+      sidebarOpen: isDesktopWidth() ? s.sidebarOpen : false,
+    })),
   setActivePatient: (id) => set({ activePatientId: id }),
   requestNewPatient: () => set((s) => ({ newPatientRequest: s.newPatientRequest + 1 })),
   consumeNewPatientRequest: () => set({ newPatientRequest: 0 }),

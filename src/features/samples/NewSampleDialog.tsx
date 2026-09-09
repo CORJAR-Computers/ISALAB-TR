@@ -200,7 +200,9 @@ export function NewSampleDialog({
 
   return (
     <Dialog open={open} onOpenChange={handleOpenChange}>
-      <DialogContent className="sm:max-w-xl">
+      {/* Scroll interno como el resto de diálogos: el formulario es más alto
+          que el viewport en portátiles de 14" (p. ej. 614 px útiles). */}
+      <DialogContent className="max-h-[90vh] overflow-y-auto sm:max-w-xl">
         {createdSample ? (
           <>
             <DialogHeader>

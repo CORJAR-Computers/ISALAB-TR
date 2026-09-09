@@ -541,6 +541,83 @@
       createdAt: "2026-08-03 12:00:00",
     }),
     delete_secondary_logo: () => null,
+    // ----- Catálogos y páginas del resto de la app (estados vacíos) -------
+    // Necesarios para el test de viewport 1366x768, que navega por TODAS las
+    // vistas: cada página debe montar sin datos y sin excepciones.
+    list_species: () => [{ id: 1, code: "CAN", name: "Canino" }],
+    list_breeds: () => [
+      { id: 1, speciesId: 1, name: "Labrador" },
+      { id: 2, speciesId: 1, name: "Criollo" },
+    ],
+    list_owners: () => [
+      {
+        id: 10,
+        documentType: "CC",
+        documentNumber: "1020304050",
+        fullName: "Juan Pérez",
+        phone: "3001234567",
+        email: null,
+        address: null,
+        city: "Bogotá",
+      },
+    ],
+    list_users: () => [
+      {
+        id: 1,
+        username: "admin",
+        fullName: "Administrador",
+        role: "ADMIN",
+        active: true,
+        mustChangePassword: false,
+        createdAt: "2026-08-01 08:00:00",
+      },
+      {
+        id: 2,
+        username: "mv.perez",
+        fullName: "Dra. Ana Pérez",
+        role: "VETERINARIO",
+        active: true,
+        mustChangePassword: false,
+        createdAt: "2026-08-02 09:30:00",
+      },
+    ],
+    list_audit_log: () => [
+      {
+        id: 1,
+        userId: 1,
+        username: "admin",
+        action: "LOGIN",
+        details: null,
+        createdAt: "2026-09-08 08:00:00",
+      },
+      {
+        id: 2,
+        userId: 1,
+        username: "admin",
+        action: "SETTINGS_CHANGED",
+        details: "Datos de la clínica actualizados",
+        createdAt: "2026-09-08 08:15:00",
+      },
+    ],
+    list_consultations: () => [],
+    count_consultations: () => [],
+    list_surgeries: () => [],
+    count_surgeries: () => [],
+    list_vaccines: () => [],
+    list_invoices: () => [],
+    count_invoices: () => [],
+    list_lab_orders: () => [],
+    count_lab_orders: () => [],
+    list_qc_materials: () => [],
+    list_qc_runs: () => [],
+    list_qc_targets: () => [],
+    list_qc_analyzer_status: () => [],
+    get_qc_chart: () => null,
+    list_reports: () => [],
+    list_analyzer_sources: () => [],
+    list_analyzer_import_jobs: () => [],
+    list_failed_analyzer_imports: () => [],
+    poll_analyzer_source: () => null,
     // Listeners/emits del runtime Tauri (Firebird events, app-ready, …)
     "plugin:event|listen": () => () => {},
     "plugin:event|unlisten": () => null,
@@ -561,6 +638,19 @@
   };
 
   let callbackId = 0;
+  // La API de eventos (@tauri-apps/api/event._unlisten) usa este global para
+  // dar de baja listeners al desmontarse (p. ej. use-firebird-events al
+  // navegar entre páginas). En el navegador real lo inyecta el runtime de
+  // Tauri; sin él, cada navegación lanza "Cannot read properties of
+  // undefined (reading 'unregisterListener')" (igual que hace mockIPC de
+  // @tauri-apps/api/mocks).
+  window.__TAURI_EVENT_PLUGIN_INTERNALS__ = {
+    unregisterListener: (_event, eventId) => {
+      if (eventId && typeof window[eventId] !== "undefined") {
+        delete window[eventId];
+      }
+    },
+  };
   window.__TAURI_INTERNALS__ = {
     invoke,
     // La UI usa convertFileSrc (p. ej. para previsualizar logos). En el
