@@ -47,3 +47,7 @@ test-results/
 ISALAB-TR-improvements/
 isalab-tr-improvements.patch
 isalab-tr-revision-fullstack.md
+
+# Llaves privadas de firma (nunca deben vivir en el repo)
+*.key
+~/.tauri/
