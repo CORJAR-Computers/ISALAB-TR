@@ -4,7 +4,22 @@ All notable changes to ISALAB will be documented in this file.
 
 The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.1.0/).
 
-## [Unreleased]
+## [1.1.0] - 2026-09-10
+
+### 🎯 Release Summary
+
+Primera release post-1.0: el veterinario puede definir rangos de referencia
+manuales por resultado (la función más pedida desde el arranque), y la
+aplicación queda lista para crecer con los datos: caché de IA acotada,
+telemetría con poda, índices en las rutas calientes, consultas por muestra
+en lote y refresco de UI dirigido por eventos sin polling redundante.
+
+| Métrica | v1.0.0 | v1.1.0 |
+|--------|-------|-------|
+| Tests Rust (Firebird real) | 294 | 304 |
+| Tests frontend | 120 | 125 |
+| E2E Playwright | 14 | 17 |
+| Consultas al abrir un panel de 30 analitos | ~61 | 3 |
 
 ### Added
 
