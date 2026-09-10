@@ -16,7 +16,10 @@ The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.1.0/).
   verificación minisign con la pubkey embebida (algoritmo exacto de
   `minisign-verify`: Ed25519 sobre blake2b-512 del instalador + firma
   global sobre la firma del archivo y el trusted comment). Pensado para
-  correrlo antes de publicar el draft de cada release.
+  correrlo justo después de publicar el draft (ver docs/release-process.md).
+- **`docs/release-process.md`**: checklist completo del proceso de release:
+  bump en los 6 sitios, CHANGELOG y popup, tag, draft y auditoría del feed,
+  publicación y verificación en caliente con `verify-updater`.
 
 ## [1.1.0] - 2026-09-10
 

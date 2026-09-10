@@ -14,12 +14,18 @@
  *
  * Uso:  npm run verify-updater
  * Sale 0 si la cadena completa funciona (feed coherente + firma válida) y
- * 1 en cualquier fallo. Pensado para correrlo antes de publicar el draft.
+ * 1 en cualquier fallo.
  *
  * Sin secretos: la pubkey sale de src-tauri/tauri.conf.json, igual que en
  * producción. Compara el feed contra la versión de package.json, de modo
  * que en una versión ya publicada el paso 2 concluye "sin actualización"
  * (y aun así valida feed, descarga y firma).
+ *
+ * IMPORTANTE: el endpoint `/releases/latest/download/...` solo sirve
+ * releases **publicadas** — mientras el draft exista, este script sigue
+ * viendo la versión anterior. Flujo correcto: publicar y correrlo
+ * inmediatamente después (si algo falla, volver a borrador con
+ * `gh release edit vX.Y.Z --draft=true`). Ver docs/release-process.md.
  */
 import { readFileSync } from "node:fs";
 import crypto from "node:crypto";
@@ -64,7 +70,7 @@ console.log(
     ? "   → hay actualización: el plugin devolvería Update y abriría el diálogo"
     : same
       ? "   → misma versión: el plugin devolvería null (silencio); se valida el resto igual"
-      : "   → la versión del feed es MENOR que la del repo: ¡el feed está desactualizado!",
+      : "   → la versión del feed es MENOR que la del repo: ¡el feed está desactualizado! (¿se publicó la release? ¿o el build tomó updater-notes.md viejo?)",
 );
 if (cmp(feed.version, REPO_VERSION) < 0) failures += 1;
 
