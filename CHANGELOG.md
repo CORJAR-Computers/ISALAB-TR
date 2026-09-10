@@ -4,6 +4,62 @@ All notable changes to ISALAB will be documented in this file.
 
 The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.1.0/).
 
+## [Unreleased]
+
+### Added
+
+- **Rangos de referencia definidos por el veterinario** (migración `0022`):
+  en la grilla de resultados, la columna «Rango de Referencia» es editable
+  (`min,max`, o solo un límite para rango abierto). Cuando el analito no
+  tiene rango en el catálogo —o se quiere otro— el veterinario captura el
+  suyo, la validación Normal/Alto/Bajo lo usa con precedencia sobre el
+  catálogo y queda persistido en el propio resultado. El informe PDF imprime
+  el rango con asterisco y la nota «Rango de referencia definido por el
+  veterinario»; el prompt de IA y el CSV exportado también lo respetan.
+- **Mantenimiento de la base de datos** (migración `0023` + poda en cada
+  arranque): borrado de la telemetría `EVENT_LOG` con más de 30 días (la
+  tabla crecía sin límite y eclipsaba los backups locales) e índices para
+  las rutas de consulta principales (`LAB_RESULTS.ANALYTE_ID`,
+  `LAB_RESULTS.ANALYZED_AT`, `SAMPLES.PATIENT_ID`, `EVENT_LOG.CREATED_AT`),
+  que en Firebird no existían pese a ser las FK más consultadas.
+- **Cache de IA acotada**: `AiCache` limpia entradas expiradas en cada
+  `set()` y expulsa las más antiguas al superar 500 entradas, de modo que la
+  memoria queda acotada en sesiones largas (antes el mapa solo crecía).
+- **Adjuntos y delta check de una muestra en una sola query**: `list_results`
+  cargaba los adjuntos y calculaba la variación contra el resultado previo
+  con una consulta por resultado (N+1: ~61 queries en un panel de 30
+  analitos). Ahora `list_for_results_of_sample` trae los adjuntos juntos y
+  `delta_variations` calcula todos los delta checks con una única query
+  `ROW_NUMBER()` (partición por analito, mismo criterio de desempate); la
+  ficha de un panel de 30 analitos baja de ~61 a 3 queries, y la historia
+  clínica de un paciente con 40 muestras de ~2.400 a ~122. `delta_variation`
+  individual queda como envoltorio sobre la versión en lote.
+- **Invalidaciones de eventos agrupadas**: los eventos Firebird
+  (muestra/resultados) ahora se acumulan 150 ms y se invalidan una vez por
+  query y por paciente/muestra. Guardar un panel de 30 analitos refresca la
+  UI con un flush en lugar de 30 invalidaciones en ráfaga. El dashboard se
+  suma a las queries invalidadas por eventos (cubre la importación por
+  carpeta vigilada, que no pasa por mutations del frontend), y su
+  `refetchInterval` de 30 s se eliminó. La bandeja de trabajo conserva el
+  suyo de 60 s: el tiempo transcurrido desde la recepción avanza con el
+  reloj aunque no cambie nada en la base de datos.
+- **Cobertura E2E y de PDF del rango manual**: nuevo spec Playwright
+  (`e2e/custom-reference-ranges.spec.ts`) que recorre el flujo completo con
+  un analito sin rango en el catálogo (captura `min,max`, estado en vivo,
+  guardado, persistencia tras reabrir, edición del borde y aislamiento de
+  los analitos con rango de catálogo) y 3 tests Rust sobre los ops reales
+  del PDF que comprueban el rango manual con asterisco, la nota
+  «definido por el veterinario» y los rangos abiertos (`>=`/`<=`).
+
+### Fixed
+
+- **Rangos abiertos mal interpretados en la grilla**: al capturar solo el
+  límite superior (`,40`) el parser descartaba los segmentos vacíos, de modo
+  que `40` se aplicaba como límite *inferior* — el estado en vivo y la
+  validación marcaban «Bajo» todo lo que superara 40. El parseo ahora es
+  posicional (segmento vacío = límite sin definir) tanto al guardar como en
+  la evaluación en vivo.
+
 ## [1.0.0] - 2026-09-09
 
 **Primer release estable de producción.** ISALAB cubre el flujo completo del
