@@ -758,6 +758,8 @@ mod tests {
                 sample_id: sample.id,
                 analyte_id: 1,
                 value: 58.0,
+                custom_ref_min: None,
+                custom_ref_max: None,
             },
         )
         .unwrap();
@@ -772,6 +774,8 @@ mod tests {
                 sample_id: sample.id,
                 analyte_id: 1,
                 value: 62.0,
+                custom_ref_min: None,
+                custom_ref_max: None,
             },
         )
         .unwrap();
@@ -813,6 +817,8 @@ mod tests {
                 sample_id: sample.id,
                 analyte_id: 1,
                 value: 58.0,
+                custom_ref_min: None,
+                custom_ref_max: None,
             },
         )
         .unwrap();

@@ -428,7 +428,20 @@
         if (!a) throw { type: "Validation", data: `Analito inválido: ${item.analyteId}` };
         // Reemplaza el valor previo del analito (upsert).
         s.results = s.results.filter((r) => r.analyteId !== a.id);
-        const { status, refMin, refMax } = resultMeta(a.id, item.value);
+        // Rango definido por el veterinario: precedencia sobre el catálogo.
+        const hasCustom = item.customRefMin != null || item.customRefMax != null;
+        let status;
+        let refMin;
+        let refMax;
+        if (hasCustom) {
+          refMin = item.customRefMin ?? null;
+          refMax = item.customRefMax ?? null;
+          if (refMax != null && item.value > refMax) status = "ALTO";
+          else if (refMin != null && item.value < refMin) status = "BAJO";
+          else status = "NORMAL";
+        } else {
+          ({ status, refMin, refMax } = resultMeta(a.id, item.value));
+        }
         const result = {
           id: nextResultId,
           sampleId: s.id,
@@ -439,6 +452,8 @@
           status,
           refMin,
           refMax,
+          customRefMin: hasCustom ? refMin : null,
+          customRefMax: hasCustom ? refMax : null,
           analyzedAt: new Date().toISOString().slice(0, 19).replace("T", " "),
           deltaVariation: null,
           isCritical: status === "CRITICO_BAJO" || status === "CRITICO_ALTO",

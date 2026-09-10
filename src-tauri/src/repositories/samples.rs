@@ -37,10 +37,20 @@ pub(crate) type LabResultRow = (
     String,
     Option<f64>,
     Option<f64>,
+    Option<f64>,
+    Option<f64>,
     Option<String>,
 );
 
-pub(crate) type TrendPointRow = (String, f64, Option<f64>, Option<f64>, String);
+pub(crate) type TrendPointRow = (
+    String,
+    f64,
+    Option<f64>,
+    Option<f64>,
+    String,
+    Option<f64>,
+    Option<f64>,
+);
 
 pub(crate) type SampleEventRow = (i32, i32, String, String, Option<String>, String);
 
@@ -450,6 +460,7 @@ pub fn list_results(
             "SELECT r.ID, r.SAMPLE_ID, r.ANALYTE_ID, a.NAME, a.UNIT,
                     r.RESULT_VALUE, r.STATUS,
                     rr.MIN_VALUE, rr.MAX_VALUE,
+                    r.CUSTOM_REF_MIN, r.CUSTOM_REF_MAX,
                     LEFT(CAST(r.ANALYZED_AT AS VARCHAR(60)), 19)
              FROM LAB_RESULTS r
              JOIN ANALYTES a ON a.ID = r.ANALYTE_ID
@@ -488,7 +499,9 @@ pub fn map_lab_result(r: LabResultRow) -> LabResult {
         status,
         ref_min: r.7,
         ref_max: r.8,
-        analyzed_at: r.9,
+        custom_ref_min: r.9,
+        custom_ref_max: r.10,
+        analyzed_at: r.11,
         delta_variation: None,
         is_critical,
         attachments: Vec::new(),
@@ -511,6 +524,7 @@ pub fn list_results_for_export(
                LEFT(CAST(s.RECEIVED_AT AS VARCHAR(60)), 19),
                a.NAME, a.UNIT, r.RESULT_VALUE, r.STATUS,
                rr.MIN_VALUE, rr.MAX_VALUE,
+               r.CUSTOM_REF_MIN, r.CUSTOM_REF_MAX,
                LEFT(CAST(r.ANALYZED_AT AS VARCHAR(60)), 19)
         FROM LAB_RESULTS r
         JOIN SAMPLES s ON s.ID = r.SAMPLE_ID
@@ -540,6 +554,8 @@ pub fn list_results_for_export(
         String,
         Option<f64>,
         Option<f64>,
+        Option<f64>,
+        Option<f64>,
         Option<String>,
     );
 
@@ -562,7 +578,9 @@ pub fn list_results_for_export(
             status: r.9,
             ref_min: r.10,
             ref_max: r.11,
-            analyzed_at: r.12,
+            custom_ref_min: r.12,
+            custom_ref_max: r.13,
+            analyzed_at: r.14,
         })
         .collect())
 }
@@ -697,7 +715,8 @@ pub fn get_patient_lab_trends(
 ) -> Result<Vec<crate::models::sample::TrendPoint>, AppError> {
     let sql = "
         SELECT LEFT(CAST(s.RECEIVED_AT AS VARCHAR(60)), 10),
-               r.RESULT_VALUE, rr.MIN_VALUE, rr.MAX_VALUE, r.STATUS
+               r.RESULT_VALUE, rr.MIN_VALUE, rr.MAX_VALUE, r.STATUS,
+               r.CUSTOM_REF_MIN, r.CUSTOM_REF_MAX
         FROM LAB_RESULTS r
         JOIN SAMPLES s ON s.ID = r.SAMPLE_ID
         LEFT JOIN REFERENCE_RANGES rr ON rr.ID = r.REFERENCE_RANGE_ID
@@ -838,6 +857,8 @@ mod tests {
             "NORMAL".into(),                    // status
             Some(37.0),                         // ref_min
             Some(55.0),                         // ref_max
+            None,                               // custom_ref_min
+            None,                               // custom_ref_max
             Some("2026-08-01 11:00:00".into()), // analyzed_at
         );
         let result = map_lab_result(row);
@@ -869,6 +890,8 @@ mod tests {
             None,
             None,
             None,
+            None,
+            None,
         );
         let result = map_lab_result(row);
 
@@ -890,6 +913,8 @@ mod tests {
             Some(10.0),
             Some(100.0),
             None,
+            None,
+            None,
         );
         let result = map_lab_result(row);
         assert_eq!(result.status, "ALTO");
@@ -909,6 +934,8 @@ mod tests {
             "CRITICO_BAJO".into(),
             Some(70.0),
             Some(110.0),
+            None,
+            None,
             None,
         );
         let result = map_lab_result(row);

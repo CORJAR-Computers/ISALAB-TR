@@ -178,6 +178,8 @@ pub fn import(
                     sample_id,
                     analyte_id: col.analyte_id,
                     value,
+                    custom_ref_min: None,
+                    custom_ref_max: None,
                 },
             )?;
             row_imported += 1;

@@ -90,6 +90,10 @@ pub const MIGRATIONS: &[(&str, &str)] = &[
         "0021_reference_values_catalog",
         include_str!("../../migrations/0021_reference_values_catalog.sql"),
     ),
+    (
+        "0022_custom_reference_ranges",
+        include_str!("../../migrations/0022_custom_reference_ranges.sql"),
+    ),
 ];
 
 /// Indica si una migración de datos de demostración debe aplicarse.

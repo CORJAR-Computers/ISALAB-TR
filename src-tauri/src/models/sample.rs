@@ -29,6 +29,11 @@ pub struct LabResult {
     pub status: String,
     pub ref_min: Option<f64>,
     pub ref_max: Option<f64>,
+    /// Rango de referencia capturado por el veterinario para este resultado
+    /// (usado cuando el analito no tiene rango en el catálogo o se quiere
+    /// otro). `None`/`None` = no hay rango manual y se usó el catálogo.
+    pub custom_ref_min: Option<f64>,
+    pub custom_ref_max: Option<f64>,
     pub analyzed_at: Option<String>,
     /// Variación porcentual contra el resultado previo del mismo analito en
     /// este paciente (delta check). None = sin historial previo.
@@ -117,6 +122,11 @@ pub struct RegisterResultInput {
     pub sample_id: i32,
     pub analyte_id: i32,
     pub value: f64,
+    /// Rango de referencia definido por el veterinario para este resultado
+    /// (límites abiertos: solo uno de los dos). Ambos `None` = validar contra
+    /// el catálogo de la especie/equipo como siempre.
+    pub custom_ref_min: Option<f64>,
+    pub custom_ref_max: Option<f64>,
 }
 
 /// Carga por lotes: varios resultados de una misma muestra en una sola

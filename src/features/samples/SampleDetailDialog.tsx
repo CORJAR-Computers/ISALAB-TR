@@ -149,6 +149,10 @@ export function SampleDetailDialog({
   const { data: panelAnalytes = [] } = usePanelAnalytes(panelId);
   const [batchValues, setBatchValues] = useState<Record<number, string>>({});
   const [extraAnalyteIds, setExtraAnalyteIds] = useState<number[]>([]);
+  // Rangos de referencia capturados por el veterinario en la grilla
+  // ("min,max"; cadena vacía = usar el rango del catálogo). Permiten validar
+  // un analito aunque no exista rango para su especie/equipo.
+  const [customRanges, setCustomRanges] = useState<Record<number, string>>({});
 
   const setActivePatient = useUiStore((s) => s.setActivePatient);
   const navigate = useUiStore((s) => s.navigate);
@@ -196,6 +200,7 @@ export function SampleDetailDialog({
     setPreviewAttachment(null);
     setConfirmDelete(false);
     setExtraAnalyteIds([]);
+    setCustomRanges({});
   };
 
   // Inicializar valores de la grilla con los resultados existentes al abrir la muestra
@@ -207,6 +212,23 @@ export function SampleDetailDialog({
       }
       setBatchValues(initial);
       setExtraAnalyteIds([]);
+      // Rangos guardados como manuales: se restauran como texto "min,max"
+      // (los límites abiertos guardan solo el que exista). Así re-guardar
+      // la grilla no borra el rango del veterinario y el placeholder
+      // refleja que el rango ya es manual.
+      setCustomRanges(
+        Object.fromEntries(
+          sample.results
+            .filter((r) => r.customRefMin != null || r.customRefMax != null)
+            .map((r) => [
+              r.analyteId,
+              [
+                r.customRefMin != null ? String(r.customRefMin) : "",
+                r.customRefMax != null ? String(r.customRefMax) : "",
+              ].join(","),
+            ]),
+        ),
+      );
     }
   }, [open, sample]);
 
@@ -273,11 +295,40 @@ export function SampleDetailDialog({
 
   // Rango de referencia específico para el analito y la especie del paciente
   const getAnalyteRefRange = (analyteId: number) => {
+    // 0. Rango escrito a mano en la grilla (aún sin guardar): la evaluación en
+    //    vivo reacciona mientras el veterinario lo captura.
+    const manualRaw = customRanges[analyteId]?.trim() ?? "";
+    if (manualRaw !== "") {
+      // Split posicional (sin filtrar vacíos): ",40" = solo máximo,
+      // "30," = solo mínimo. Mismo criterio que el guardado.
+      const parts = manualRaw
+        .split(",")
+        .map((p) => p.trim().replace(",", "."));
+      const min =
+        parts[0] != null && parts[0] !== "" && !Number.isNaN(Number(parts[0]))
+          ? Number(parts[0])
+          : null;
+      const max =
+        parts[1] != null && parts[1] !== "" && !Number.isNaN(Number(parts[1]))
+          ? Number(parts[1])
+          : null;
+      if (min != null || max != null) {
+        return { min, max, criticalMin: null, criticalMax: null };
+      }
+    }
+
     const existing = sample?.results.find((r) => r.analyteId === analyteId);
-    if (existing?.refMin != null && existing?.refMax != null) {
+    // El rango capturado por el veterinario manda sobre el catálogo (mismo
+    // criterio que SP_VALIDATE_ANALYTICAL_RESULT en la base de datos).
+    if (
+      existing?.customRefMin != null ||
+      existing?.customRefMax != null ||
+      existing?.refMin != null ||
+      existing?.refMax != null
+    ) {
       return {
-        min: existing.refMin,
-        max: existing.refMax,
+        min: existing.customRefMin ?? existing.refMin,
+        max: existing.customRefMax ?? existing.refMax,
         criticalMin: null,
         criticalMax: null,
       };
@@ -320,7 +371,10 @@ export function SampleDetailDialog({
     const val = Number(valStr.replace(",", "."));
     if (Number.isNaN(val)) return null;
 
-    if (!refRange) {
+    if (
+      !refRange ||
+      (refRange.min == null && refRange.max == null)
+    ) {
       return { label: "Cargado", variant: "secondary" as const, isCritical: false };
     }
 
@@ -330,10 +384,11 @@ export function SampleDetailDialog({
     if (refRange.criticalMax != null && val >= refRange.criticalMax) {
       return { label: "Crítico Alto", variant: "destructive" as const, isCritical: true };
     }
-    if (val < refRange.min) {
+    // Rango abierto (definido por el veterinario): un límite puede ser null.
+    if (refRange.min != null && val < refRange.min) {
       return { label: "Bajo", variant: "destructive" as const, isCritical: false };
     }
-    if (val > refRange.max) {
+    if (refRange.max != null && val > refRange.max) {
       return { label: "Alto", variant: "warning" as const, isCritical: false };
     }
     return { label: "Normal", variant: "success" as const, isCritical: false };
@@ -348,11 +403,34 @@ export function SampleDetailDialog({
     // 1. Analitos con valor ingresado
     const toSaveEntries = Object.entries(batchValues)
       .filter(([, v]) => v != null && v.trim() !== "")
-      .map(([analyteId, v]) => ({
-        sampleId: sample.id,
-        analyteId: Number(analyteId),
-        value: Number(v.replace(",", ".")),
-      }))
+      .map(([analyteId, v]) => {
+        const id = Number(analyteId);
+        // Rango capturado por el veterinario ("min,max"); si no hay rango
+        // completo, se respeta un límite abierto (solo min o solo max).
+        const raw = customRanges[id]?.trim() ?? "";
+        // Split posicional: "min,max". Los segmentos vacíos se mantienen
+        // (",40" = solo máximo, "30," = solo mínimo) para soportar límites
+        // abiertos; un número inválido deja su límite en null.
+        const parts = raw
+          .split(",")
+          .map((p) => p.trim().replace(",", "."));
+        const min =
+          parts[0] != null && parts[0] !== "" && !Number.isNaN(Number(parts[0]))
+            ? Number(parts[0])
+            : null;
+        const max =
+          parts[1] != null && parts[1] !== "" && !Number.isNaN(Number(parts[1]))
+            ? Number(parts[1])
+            : null;
+        const hasCustom = min != null || max != null;
+        return {
+          sampleId: sample.id,
+          analyteId: id,
+          value: Number(v.replace(",", ".")),
+          customRefMin: hasCustom ? min : null,
+          customRefMax: hasCustom ? max : null,
+        };
+      })
       .filter((r) => !Number.isNaN(r.value));
 
     // 2. Analitos previamente guardados que ahora están en blanco (se eliminan)
@@ -1040,6 +1118,7 @@ export function SampleDetailDialog({
                       <TableHead className="w-[30%]">Analito</TableHead>
                       <TableHead className="w-[25%]">
                         Rango de Referencia ({patient?.speciesName ?? "Especie"})
+                        <span className="text-muted-foreground font-normal"> · editable</span>
                       </TableHead>
                       <TableHead className="w-[22%]">Resultado (Valor)</TableHead>
                       <TableHead className="w-[13%] text-center">Estado</TableHead>
@@ -1081,14 +1160,63 @@ export function SampleDetailDialog({
                               </div>
                             </TableCell>
 
-                            <TableCell className="font-mono text-xs">
-                              {refRange ? (
-                                <span className="text-foreground font-medium">
-                                  {refRange.min} – {refRange.max} {a.unit ?? ""}
-                                </span>
-                              ) : (
-                                <span className="text-muted-foreground/60 italic">— Sin rango</span>
-                              )}
+                            <TableCell>
+                              {(() => {
+                                const savedResult = sample.results.find(
+                                  (r) => r.analyteId === a.id,
+                                );
+                                const savedCustom =
+                                  savedResult?.customRefMin != null ||
+                                  savedResult?.customRefMax != null;
+                                const manual = customRanges[a.id]?.trim() ?? "";
+                                // Placeholder: rango guardado del resultado, el del
+                                // catálogo de la especie, o vacío si no hay ninguno.
+                                const ph = manual
+                                  ? ""
+                                  : savedCustom
+                                    ? "Manual"
+                                    : refRange
+                                      ? `${refRange.min} – ${refRange.max}${a.unit ? ` ${a.unit}` : ""}`
+                                      : "Sin rango";
+                                return (
+                                  <div className="flex flex-col gap-0.5">
+                                    <Input
+                                      type="text"
+                                      inputMode="decimal"
+                                      aria-label={`Rango de referencia de ${a.name}`}
+                                      placeholder={ph}
+                                      className={cn(
+                                        "h-7 w-28 font-mono text-xs",
+                                        manual && "border-primary/60 font-semibold",
+                                      )}
+                                      value={manual}
+                                      onChange={(e) =>
+                                        setCustomRanges((prev) => ({
+                                          ...prev,
+                                          [a.id]: e.target.value,
+                                        }))
+                                      }
+                                      title={
+                                        refRange
+                                          ? `Rango de referencia para ${patient?.speciesName ?? "la especie"}: ${refRange.min} – ${refRange.max}. Escribe min,max para sobrescribirlo.`
+                                          : "No hay rango en el catálogo. Escribe min,max (o solo min, o solo max) para definirlo."
+                                      }
+                                    />
+                                    <span
+                                      className={cn(
+                                        "text-[10px] leading-none",
+                                        manual || savedCustom
+                                          ? "text-primary font-medium"
+                                          : "text-muted-foreground/60",
+                                      )}
+                                    >
+                                      {manual || savedCustom
+                                        ? "Rango definido por el veterinario"
+                                        : "min,max (editable)"}
+                                    </span>
+                                  </div>
+                                );
+                              })()}
                             </TableCell>
 
                             <TableCell>
@@ -1193,6 +1321,11 @@ export function SampleDetailDialog({
                                         delete copy[a.id];
                                         return copy;
                                       });
+                                      setCustomRanges((prev) => {
+                                        const copy = { ...prev };
+                                        delete copy[a.id];
+                                        return copy;
+                                      });
                                       if (extraAnalyteIds.includes(a.id)) {
                                         setExtraAnalyteIds((prev) => prev.filter((id) => id !== a.id));
                                       }
@@ -1263,7 +1396,10 @@ export function SampleDetailDialog({
                       {sample.results.map((r) => {
                         const rs =
                           RESULT_STATUS[r.status] ?? RESULT_STATUS.SIN_RANGO;
-                        const range = r.refMin != null && r.refMax != null;
+                        const effMin = r.customRefMin ?? r.refMin;
+                        const effMax = r.customRefMax ?? r.refMax;
+                        const hasCustom = r.customRefMin != null || r.customRefMax != null;
+                        const range = effMin != null && effMax != null;
                         return (
                           <TableRow
                             key={r.id}
@@ -1307,7 +1443,13 @@ export function SampleDetailDialog({
                               )}
                             </TableCell>
                             <TableCell className="text-muted-foreground font-mono text-xs">
-                              {range ? `${r.refMin} – ${r.refMax}` : "—"}
+                              {range
+                                ? `${effMin} – ${effMax}${hasCustom ? " *" : ""}`
+                                : effMin != null
+                                  ? `>= ${effMin}`
+                                  : effMax != null
+                                    ? `<= ${effMax}`
+                                    : "—"}
                             </TableCell>
                             <TableCell className="text-right">
                               <Badge variant={rs.variant}>{rs.label}</Badge>

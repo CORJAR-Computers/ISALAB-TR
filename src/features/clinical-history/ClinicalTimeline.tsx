@@ -383,7 +383,10 @@ function SampleEntry({
               <TableBody>
                 {s.results.map((r) => {
                   const rs = RESULT_STATUS[r.status] ?? RESULT_STATUS.SIN_RANGO;
-                  const range = r.refMin != null && r.refMax != null;
+                  const effMin = r.customRefMin ?? r.refMin;
+                  const effMax = r.customRefMax ?? r.refMax;
+                  const hasCustom = r.customRefMin != null || r.customRefMax != null;
+                  const range = effMin != null && effMax != null;
                   return (
                     <TableRow
                       key={r.id}
@@ -418,7 +421,13 @@ function SampleEntry({
                         )}
                       </TableCell>
                       <TableCell className="text-muted-foreground font-mono text-xs">
-                        {range ? `${r.refMin} – ${r.refMax}` : "—"}
+                        {range
+                          ? `${effMin} – ${effMax}${hasCustom ? " *" : ""}`
+                          : effMin != null
+                            ? `>= ${effMin}`
+                            : effMax != null
+                              ? `<= ${effMax}`
+                              : "—"}
                       </TableCell>
                       <TableCell className="text-right">
                         <Badge variant={rs.variant}>{rs.label}</Badge>

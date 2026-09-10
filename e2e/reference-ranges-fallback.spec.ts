@@ -76,13 +76,18 @@ test("muestra en MINDRAY muestra los rangos del catálogo GENERAL", async ({
   await expect(detail.getByText("MINDRAY B2800")).toBeVisible();
 
   // Glucosa (canino) cae del catálogo GENERAL aunque la muestra sea del
-  // MINDRAY: 70–126 mg/dL en la columna "Rango de Referencia".
+  // MINDRAY: 70–126 mg/dL como placeholder del rango editable (columna
+  // "Rango de Referencia", editable por el veterinario desde 0022).
   await expect(detail.getByText("Resultados Analíticos")).toBeVisible();
-  await expect(detail.getByText("70 – 126 mg/dL")).toBeVisible();
+  await expect(
+    detail.getByLabel("Rango de referencia de Glucosa"),
+  ).toHaveAttribute("placeholder", "70 – 126 mg/dL");
 
-  // Urea no tiene rango en ninguna parte del mock: sigue "Sin rango"
-  // (única fila sin gama), probando que el fallback no inventa datos.
-  await expect(detail.getByText("— Sin rango")).toHaveCount(1);
+  // Urea no tiene rango en ninguna parte del mock: su rango editable sugiere
+  // "Sin rango" (única fila sin gama), probando que el fallback no inventa datos.
+  await expect(
+    detail.getByLabel("Rango de referencia de Urea"),
+  ).toHaveAttribute("placeholder", "Sin rango");
 
   // El estado en vivo también usa la gama caída del GENERAL (95 → Normal).
   const glucoseInput = detail.getByRole("spinbutton").first();

@@ -90,6 +90,8 @@ pub struct ResultExportRow {
     pub status: String,
     pub ref_min: Option<f64>,
     pub ref_max: Option<f64>,
+    pub custom_ref_min: Option<f64>,
+    pub custom_ref_max: Option<f64>,
     pub analyzed_at: Option<String>,
 }
 
@@ -124,9 +126,19 @@ pub fn results_to_csv(rows: &[ResultExportRow]) -> String {
         out.push(';');
         out.push_str(&esc(&r.status));
         out.push(';');
-        out.push_str(&r.ref_min.map(format_value_csv).unwrap_or_default());
+        out.push_str(
+            &r.custom_ref_min
+                .or(r.ref_min)
+                .map(format_value_csv)
+                .unwrap_or_default(),
+        );
         out.push(';');
-        out.push_str(&r.ref_max.map(format_value_csv).unwrap_or_default());
+        out.push_str(
+            &r.custom_ref_max
+                .or(r.ref_max)
+                .map(format_value_csv)
+                .unwrap_or_default(),
+        );
         out.push(';');
         out.push_str(&esc(r.analyzed_at.as_deref().unwrap_or("")));
         out.push('\n');
@@ -209,6 +221,8 @@ mod tests {
             status: "NORMAL".into(),
             ref_min: Some(37.0),
             ref_max: Some(55.0),
+            custom_ref_min: None,
+            custom_ref_max: None,
             analyzed_at: Some("2026-08-01 11:00:00".into()),
         };
         let csv = results_to_csv(&[row]);

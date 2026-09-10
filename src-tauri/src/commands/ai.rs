@@ -201,8 +201,17 @@ pub(crate) fn build_interpretation_prompt(
     prompt.push_str("| Analito | Resultado | Rango de referencia | Estado | Desviación |\n");
     prompt.push_str("|---------|-----------|---------------------|--------|------------|\n");
     for r in results {
-        let range = match (r.ref_min, r.ref_max) {
-            (Some(min), Some(max)) => format!("{} - {}", min, max),
+        // Rango efectivo: el capturado por el veterinario tiene precedencia
+        // sobre el rango del catálogo vinculado al resultado.
+        let eff_min = r.custom_ref_min.or(r.ref_min);
+        let eff_max = r.custom_ref_max.or(r.ref_max);
+        let custom_note = if r.custom_ref_min.is_some() || r.custom_ref_max.is_some() {
+            " (definido por el veterinario)"
+        } else {
+            ""
+        };
+        let range = match (eff_min, eff_max) {
+            (Some(min), Some(max)) => format!("{} - {}{}", min, max, custom_note),
             _ => "Sin rango".to_string(),
         };
         let status_emoji = match r.status.as_str() {
@@ -251,7 +260,7 @@ pub(crate) fn build_interpretation_prompt(
 fn deviation_label(r: &LabResult) -> String {
     match r.status.as_str() {
         "ALTO" => {
-            if let Some(max) = r.ref_max {
+            if let Some(max) = r.custom_ref_max.or(r.ref_max) {
                 if max > 0.0 {
                     let pct = ((r.value - max) / max) * 100.0;
                     return format!("🔺 +{:.1}% sobre máx", pct.abs());
@@ -260,7 +269,7 @@ fn deviation_label(r: &LabResult) -> String {
             "🔺 Fuera de rango".to_string()
         }
         "BAJO" => {
-            if let Some(min) = r.ref_min {
+            if let Some(min) = r.custom_ref_min.or(r.ref_min) {
                 if min > 0.0 {
                     let pct = ((min - r.value) / min) * 100.0;
                     return format!("🔻 -{:.1}% bajo mín", pct.abs());
@@ -438,6 +447,8 @@ type PrevResultRow = (
     String,
     Option<f64>,
     Option<f64>,
+    Option<f64>,
+    Option<f64>,
     Option<String>,
 );
 
@@ -453,6 +464,7 @@ fn get_previous_results(
         .query(
             "SELECT r.ID, r.SAMPLE_ID, r.ANALYTE_ID, a.NAME, a.UNIT,
                     r.RESULT_VALUE, r.STATUS, rr.MIN_VALUE, rr.MAX_VALUE,
+                    r.CUSTOM_REF_MIN, r.CUSTOM_REF_MAX,
                     LEFT(CAST(r.ANALYZED_AT AS VARCHAR(60)), 19)
              FROM LAB_RESULTS r
              JOIN ANALYTES a ON a.ID = r.ANALYTE_ID
@@ -477,9 +489,11 @@ fn get_previous_results(
                 unit: r.4,
                 value: r.5,
                 status: status.clone(),
-                ref_min: r.7,
-                ref_max: r.8,
-                analyzed_at: r.9,
+                ref_min: r.7.or(r.9),
+                ref_max: r.8.or(r.10),
+                custom_ref_min: r.9,
+                custom_ref_max: r.10,
+                analyzed_at: r.11,
                 delta_variation: None,
                 is_critical: matches!(status.as_str(), "CRITICO_ALTO" | "CRITICO_BAJO"),
                 attachments: Vec::new(),
@@ -601,6 +615,8 @@ mod tests {
             status: status.to_string(),
             ref_min: Some(37.0),
             ref_max: Some(55.0),
+            custom_ref_min: None,
+            custom_ref_max: None,
             analyzed_at: Some("2026-08-04 10:30:00".to_string()),
             delta_variation: None,
             is_critical: false,
@@ -786,6 +802,8 @@ mod tests {
                 status: "NORMAL".to_string(),
                 ref_min: Some(37.0),
                 ref_max: Some(55.0),
+                custom_ref_min: None,
+                custom_ref_max: None,
                 analyzed_at: Some("2026-06-01 10:00:00".to_string()),
                 delta_variation: None,
                 is_critical: false,

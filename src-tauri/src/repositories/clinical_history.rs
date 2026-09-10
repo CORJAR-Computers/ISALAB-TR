@@ -67,6 +67,8 @@ type LabResultRow = (
     String,
     Option<f64>,
     Option<f64>,
+    Option<f64>,
+    Option<f64>,
     Option<String>,
 );
 
@@ -453,14 +455,29 @@ pub fn register_lab_result(
     conn: &mut SimpleConnection,
     input: &RegisterResultInput,
 ) -> Result<LabResult, AppError> {
-    // 1. Validación clínica en el servidor de base de datos.
+    // 1. Validación clínica en el servidor de base de datos. Si el
+    // veterinario capturó un rango manual, el SP lo usa con precedencia sobre
+    // el catálogo; si no, se valida contra el rango de la especie/equipo.
     let validation: Option<(Option<i32>, String)> = conn
         .query_first(
-            "SELECT RR_ID, STATUS FROM SP_VALIDATE_ANALYTICAL_RESULT(?, ?, ?)",
-            (&input.sample_id, &input.analyte_id, &input.value),
+            "SELECT RR_ID, STATUS FROM SP_VALIDATE_ANALYTICAL_RESULT(?, ?, ?, ?, ?)",
+            (
+                &input.sample_id,
+                &input.analyte_id,
+                &input.value,
+                &input.custom_ref_min,
+                &input.custom_ref_max,
+            ),
         )
         .map_err(AppError::from)?;
     let (rr_id, status) = validation.unwrap_or((None, "SIN_RANGO".to_string()));
+
+    // Con rango manual el resultado no se vincula a REFERENCE_RANGES.
+    let rr_id = if input.custom_ref_min.is_some() || input.custom_ref_max.is_some() {
+        None
+    } else {
+        rr_id
+    };
 
     // 2. Upsert del resultado (uno por analito y muestra).
     let existing: Option<(i32,)> = conn
@@ -473,10 +490,17 @@ pub fn register_lab_result(
     let id = if let Some((rid,)) = existing {
         conn.execute(
             "UPDATE LAB_RESULTS
-                SET RESULT_VALUE = ?, REFERENCE_RANGE_ID = ?, STATUS = ?,
+                SET RESULT_VALUE = ?, REFERENCE_RANGE_ID = ?, CUSTOM_REF_MIN = ?, CUSTOM_REF_MAX = ?, STATUS = ?,
                     ANALYZED_AT = CURRENT_TIMESTAMP, UPDATED_AT = CURRENT_TIMESTAMP
               WHERE ID = ?",
-            (&input.value, &rr_id, &status, &rid),
+            (
+                &input.value,
+                &rr_id,
+                &input.custom_ref_min,
+                &input.custom_ref_max,
+                &status,
+                &rid,
+            ),
         )
         .map_err(AppError::from)?;
         rid
@@ -484,13 +508,15 @@ pub fn register_lab_result(
         let nid = next_id(conn, "GEN_LAB_RESULTS_ID")?;
         conn.execute(
             "INSERT INTO LAB_RESULTS
-                (ID, SAMPLE_ID, ANALYTE_ID, REFERENCE_RANGE_ID, RESULT_VALUE, STATUS, ANALYZED_AT)
-             VALUES (?, ?, ?, ?, ?, ?, CURRENT_TIMESTAMP)",
+                (ID, SAMPLE_ID, ANALYTE_ID, REFERENCE_RANGE_ID, CUSTOM_REF_MIN, CUSTOM_REF_MAX, RESULT_VALUE, STATUS, ANALYZED_AT)
+             VALUES (?, ?, ?, ?, ?, ?, ?, ?, CURRENT_TIMESTAMP)",
             (
                 &nid,
                 &input.sample_id,
                 &input.analyte_id,
                 &rr_id,
+                &input.custom_ref_min,
+                &input.custom_ref_max,
                 &input.value,
                 &status,
             ),
@@ -514,6 +540,7 @@ pub fn register_lab_result(
             "SELECT r.ID, r.SAMPLE_ID, r.ANALYTE_ID, a.NAME, a.UNIT,
                     r.RESULT_VALUE, r.STATUS,
                     rr.MIN_VALUE, rr.MAX_VALUE,
+                    r.CUSTOM_REF_MIN, r.CUSTOM_REF_MAX,
                     LEFT(CAST(r.ANALYZED_AT AS VARCHAR(60)), 19)
              FROM LAB_RESULTS r
              JOIN ANALYTES a ON a.ID = r.ANALYTE_ID
@@ -845,6 +872,8 @@ mod tests {
             sample_id: sample.id,
             analyte_id: 1,
             value: 45.0,
+            custom_ref_min: None,
+            custom_ref_max: None,
         };
         register_lab_result(&mut conn, &result_input).unwrap();
 
@@ -941,6 +970,8 @@ mod tests {
             sample_id: sample.id,
             analyte_id: 1,
             value: 45.0,
+            custom_ref_min: None,
+            custom_ref_max: None,
         };
         let result = register_lab_result(&mut conn, &input).unwrap();
         assert_eq!(result.value, 45.0);
@@ -958,10 +989,99 @@ mod tests {
             sample_id: sample.id,
             analyte_id: 1,
             value: 48.0,
+            custom_ref_min: None,
+            custom_ref_max: None,
         };
         let result2 = register_lab_result(&mut conn, &input2).unwrap();
         assert_eq!(result2.value, 48.0);
         assert_eq!(result2.id, result.id); // Mismo ID
+
+        cleanup_test_db(&db_path);
+    }
+
+    /// Rango definido por el veterinario: cuando el analito no tiene rango en
+    /// el catálogo, el rango capturado define el estado, queda persistido en
+    /// el propio resultado y no se vincula a REFERENCE_RANGES.
+    #[test]
+    fn test_register_result_with_custom_reference_range() {
+        let (mut conn, db_path) = setup();
+        let patient_id = insert_test_patient(&mut conn);
+        insert_test_sample_type(&mut conn);
+        insert_test_analyte(&mut conn);
+        // Analito SIN rango en el catálogo (p. ej. un marcador nuevo). Se usa
+        // un ID alto para no chocar con los 44 analitos sembrados por 0021.
+        conn.execute(
+            "INSERT INTO ANALYTES (ID, CODE, NAME, UNIT) VALUES (9001, 'MARC', 'Marcador nuevo', 'U/L')",
+            (),
+        )
+        .unwrap();
+
+        let sample_input = CreateSampleInput {
+            patient_id,
+            sample_type_id: 1,
+            received_at: "2026-09-10 08:00:00".to_string(),
+            collected_by: None,
+            notes: None,
+            analyzer_id: None,
+            quality_index: None,
+            quality_severity: None,
+            quality_note: None,
+        };
+        let sample = create_sample(&mut conn, &sample_input).unwrap();
+
+        // 80 está dentro del rango manual (70-90) → NORMAL (no SIN_RANGO).
+        let input = RegisterResultInput {
+            sample_id: sample.id,
+            analyte_id: 9001,
+            value: 80.0,
+            custom_ref_min: Some(70.0),
+            custom_ref_max: Some(90.0),
+        };
+        let result = register_lab_result(&mut conn, &input).unwrap();
+        assert_eq!(result.status, "NORMAL");
+        assert_eq!(result.ref_min, None); // sin rango de catálogo
+        assert_eq!(result.ref_max, None);
+        assert_eq!(result.custom_ref_min, Some(70.0));
+        assert_eq!(result.custom_ref_max, Some(90.0));
+
+        // Re-registrar (upsert) fuera del rango manual → BAJO.
+        let input2 = RegisterResultInput {
+            sample_id: sample.id,
+            analyte_id: 9001,
+            value: 65.0,
+            custom_ref_min: Some(70.0),
+            custom_ref_max: Some(90.0),
+        };
+        let result2 = register_lab_result(&mut conn, &input2).unwrap();
+        assert_eq!(result2.status, "BAJO");
+        assert_eq!(result2.id, result.id); // Mismo ID (upsert)
+
+        // Rango abierto: solo máximo (60) → 65 queda por encima → ALTO.
+        let input3 = RegisterResultInput {
+            sample_id: sample.id,
+            analyte_id: 9001,
+            value: 65.0,
+            custom_ref_min: None,
+            custom_ref_max: Some(60.0),
+        };
+        let result3 = register_lab_result(&mut conn, &input3).unwrap();
+        assert_eq!(result3.status, "ALTO");
+        assert_eq!(result3.custom_ref_min, None);
+        assert_eq!(result3.custom_ref_max, Some(60.0));
+
+        // Al vaciar el rango manual (sin catálogo) vuelve a SIN_RANGO y se
+        // limpian las columnas del rango capturado.
+        let input4 = RegisterResultInput {
+            sample_id: sample.id,
+            analyte_id: 9001,
+            value: 65.0,
+            custom_ref_min: None,
+            custom_ref_max: None,
+        };
+        let result4 = register_lab_result(&mut conn, &input4).unwrap();
+        assert_eq!(result4.status, "SIN_RANGO");
+        assert_eq!(result4.custom_ref_min, None);
+        assert_eq!(result4.custom_ref_max, None);
 
         cleanup_test_db(&db_path);
     }

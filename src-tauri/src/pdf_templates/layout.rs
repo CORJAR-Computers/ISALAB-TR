@@ -372,10 +372,21 @@ pub fn draw_results_full(
             (60, 60, 60),
         );
 
-        // 5. Referencias (Min - Max)
-        let ref_str = match (r.ref_min, r.ref_max) {
+        // 5. Referencias (Min - Max). El rango capturado por el veterinario
+        // (custom) tiene precedencia sobre el rango del catálogo vinculado.
+        let eff_min = r.custom_ref_min.or(r.ref_min);
+        let eff_max = r.custom_ref_max.or(r.ref_max);
+        let is_custom = r.custom_ref_min.is_some() || r.custom_ref_max.is_some();
+        let ref_str = match (eff_min, eff_max) {
             (Some(min), Some(max)) => format!("{min:.1} – {max:.1}"),
+            (Some(min), None) => format!(">= {min:.1}"),
+            (None, Some(max)) => format!("<= {max:.1}"),
             _ => "—".to_string(),
+        };
+        let ref_str = if is_custom {
+            format!("{ref_str} *")
+        } else {
+            ref_str
         };
         pdf.text(
             false,
@@ -398,6 +409,24 @@ pub fn draw_results_full(
     };
     pdf.text(false, &técnica, 7.5, MARGIN + 12.0, pdf.y, (80, 80, 80));
     pdf.y -= 7.0;
+
+    // Nota de transparencia: algún rango fue definido por el veterinario
+    // (el analito no tiene rango en el catálogo o se usó el del laboratorio).
+    if results
+        .iter()
+        .any(|r| r.custom_ref_min.is_some() || r.custom_ref_max.is_some())
+    {
+        pdf.ensure_space(5.5);
+        pdf.text(
+            false,
+            "* Rango de referencia definido por el veterinario para este paciente.",
+            7.0,
+            MARGIN,
+            pdf.y,
+            (110, 110, 110),
+        );
+        pdf.y -= 6.0;
+    }
 
     // Valores críticos detectados: resumen destacado en rojo antes de las observaciones.
     if !criticals.is_empty() {
@@ -684,5 +713,114 @@ mod tests {
         assert_eq!(bits.last(), Some(&1), "debe terminar con barra");
         // 13 caracteres en set B: start 11 + 13*11 + check 11 + stop 11 + term 2 = 178.
         assert_eq!(bits.len(), 178);
+    }
+
+    /// Extrae los textos dibujados en los ops del PDF (Op::ShowText).
+    fn pdf_texts(ops: &[printpdf::Op]) -> Vec<String> {
+        let mut out = Vec::new();
+        for op in ops {
+            if let printpdf::Op::ShowText { items } = op {
+                for item in items {
+                    if let printpdf::TextItem::Text(t) = item {
+                        out.push(t.clone());
+                    }
+                }
+            }
+        }
+        out
+    }
+
+    fn sample_result(
+        status: &str,
+        custom_min: Option<f64>,
+        custom_max: Option<f64>,
+    ) -> crate::models::sample::LabResult {
+        // Con rango manual los límites del catálogo quedan en None (mismo
+        // criterio que la BD: REFERENCE_RANGE_ID va a NULL).
+        let has_custom = custom_min.is_some() || custom_max.is_some();
+        let (value, ref_min, ref_max) = match (status, has_custom) {
+            ("ALTO", true) => (custom_max.unwrap_or(0.0) + 10.0, None, None),
+            ("ALTO", false) => (62.0, Some(37.0), Some(55.0)),
+            ("BAJO", _) => (30.0, None, None),
+            (_, true) => (45.0, None, None),
+            _ => (45.0, Some(37.0), Some(55.0)),
+        };
+        let (custom_ref_min, custom_ref_max) = (custom_min, custom_max);
+        crate::models::sample::LabResult {
+            id: 1,
+            sample_id: 1,
+            analyte_id: 1,
+            analyte_name: "Marcador nuevo".to_string(),
+            unit: Some("U/L".to_string()),
+            value,
+            status: status.to_string(),
+            ref_min,
+            ref_max,
+            custom_ref_min,
+            custom_ref_max,
+            analyzed_at: None,
+            delta_variation: None,
+            is_critical: false,
+            attachments: Vec::new(),
+        }
+    }
+
+    /// El informe con un rango definido por el veterinario imprime el rango
+    /// con asterisco y la nota al pie de transparencia.
+    #[test]
+    fn test_pdf_footnote_with_custom_reference_range() {
+        let mut pdf = PdfBuilder::new();
+        let results = vec![sample_result("NORMAL", Some(70.0), Some(90.0))];
+        draw_results_full(&mut pdf, "HEMATOLOGÍA", &results, None, None);
+
+        let texts = pdf_texts(&pdf.ops);
+        assert!(
+            texts.iter().any(|t| t.contains("70.0 - 90.0 *")),
+            "la columna Referencias debe mostrar el rango manual con asterisco: {texts:?}"
+        );
+        assert!(
+            texts.iter()
+                .any(|t| t.contains("definido por el veterinario")),
+            "debe aparecer la nota al pie: {texts:?}"
+        );
+    }
+
+    /// Rango abierto (solo máximo) imprime <= max con asterisco, y la nota
+    /// al pie también aparece.
+    #[test]
+    fn test_pdf_footnote_with_open_custom_range() {
+        let mut pdf = PdfBuilder::new();
+        let results = vec![sample_result("ALTO", None, Some(60.0))];
+        draw_results_full(&mut pdf, "HEMATOLOGÍA", &results, None, None);
+
+        let texts = pdf_texts(&pdf.ops);
+        assert!(
+            texts.iter().any(|t| t.contains("<= 60.0 *")),
+            "rango abierto solo-máximo: {texts:?}"
+        );
+        assert!(
+            texts.iter()
+                .any(|t| t.contains("definido por el veterinario")),
+        );
+    }
+
+    /// Sin rango manual, la nota al pie NO aparece (no hay que confundir
+    /// rangos del catálogo con rangos del veterinario).
+    #[test]
+    fn test_pdf_no_footnote_without_custom_range() {
+        let mut pdf = PdfBuilder::new();
+        let results = vec![sample_result("NORMAL", None, None)];
+        draw_results_full(&mut pdf, "HEMATOLOGÍA", &results, None, None);
+
+        let texts = pdf_texts(&pdf.ops);
+        assert!(
+            !texts.iter().any(|t| t.contains("definido por el veterinario")),
+            "sin rango manual no debe haber nota: {texts:?}"
+        );
+        // El rango del catálogo se imprime SIN asterisco.
+        assert!(
+            texts.iter().any(|t| t.contains("37.0 - 55.0") && !t.contains('*')),
+            "rango de catálogo sin asterisco: {texts:?}"
+        );
     }
 }

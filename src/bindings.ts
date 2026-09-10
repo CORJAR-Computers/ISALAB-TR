@@ -1024,6 +1024,13 @@ export type LabResult = {
 	status: string,
 	refMin: number | null,
 	refMax: number | null,
+	/**
+	 *  Rango de referencia capturado por el veterinario para este resultado
+	 *  (usado cuando el analito no tiene rango en el catálogo o se quiere
+	 *  otro). `None`/`None` = no hay rango manual y se usó el catálogo.
+	 */
+	customRefMin: number | null,
+	customRefMax: number | null,
 	analyzedAt: string | null,
 	/**
 	 *  Variación porcentual contra el resultado previo del mismo analito en
@@ -1292,6 +1299,13 @@ export type RegisterResultInput = {
 	sampleId: number,
 	analyteId: number,
 	value: number | null,
+	/**
+	 *  Rango de referencia definido por el veterinario para este resultado
+	 *  (límites abiertos: solo uno de los dos). Ambos `None` = validar contra
+	 *  el catálogo de la especie/equipo como siempre.
+	 */
+	customRefMin: number | null,
+	customRefMax: number | null,
 };
 
 /**
