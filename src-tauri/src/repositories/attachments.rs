@@ -1,3 +1,5 @@
+use std::collections::HashMap;
+
 use rsfbclient::prelude::*;
 use rsfbclient::SimpleConnection;
 
@@ -40,6 +42,32 @@ pub fn list_for_result(
         )
         .map_err(AppError::from)?;
     Ok(rows.into_iter().map(map_attachment).collect())
+}
+
+/// Adjuntos de TODOS los resultados de una muestra, agrupados por result_id
+/// en una sola query (evita el N+1 de `list_for_result` por resultado).
+/// Los resultados sin adjuntos no aparecen en el mapa: el llamante usa
+/// `remove(&result_id).unwrap_or_default()`.
+pub(crate) fn list_for_results_of_sample(
+    conn: &mut SimpleConnection,
+    sample_id: i32,
+) -> Result<HashMap<i32, Vec<ResultAttachment>>, AppError> {
+    let rows: Vec<ResultAttachmentRow> = conn
+        .query(
+            &format!(
+                "{SELECT} ra WHERE ra.RESULT_ID IN
+                  (SELECT r.ID FROM LAB_RESULTS r WHERE r.SAMPLE_ID = ?)
+                 ORDER BY ra.CREATED_AT, ra.ID"
+            ),
+            (&sample_id,),
+        )
+        .map_err(AppError::from)?;
+
+    let mut grouped: HashMap<i32, Vec<ResultAttachment>> = HashMap::new();
+    for row in rows {
+        grouped.entry(row.1).or_default().push(map_attachment(row));
+    }
+    Ok(grouped)
 }
 
 pub fn get(conn: &mut SimpleConnection, id: i32) -> Result<Option<ResultAttachment>, AppError> {
@@ -136,6 +164,8 @@ mod integration_tests {
                 sample_id: 1,
                 analyte_id: 1,
                 value: 45.0,
+                custom_ref_min: None,
+                custom_ref_max: None,
             },
         )
         .unwrap();
@@ -197,6 +227,72 @@ mod integration_tests {
             .unwrap();
         assert!(list_for_result(&mut conn, result_id).unwrap().is_empty());
 
+        test_helpers::cleanup_test_db(&db_path);
+    }
+
+    /// Carga agrupada de adjuntos de una muestra completa en UNA query
+    /// (reemplaza el N+1 de list_for_result por resultado en list_results).
+    #[test]
+    fn test_list_for_results_of_sample_groups_by_result() {
+        let (mut conn, db_path, result_a) = setup();
+
+        // Segundo resultado de la misma muestra (analito 2 = seeded).
+        let result_b = history_repo::register_lab_result(
+            &mut conn,
+            &RegisterResultInput {
+                sample_id: 1,
+                analyte_id: 2,
+                value: 95.0,
+                custom_ref_min: None,
+                custom_ref_max: None,
+            },
+        )
+        .unwrap()
+        .id;
+
+        insert(
+            &mut conn,
+            result_a,
+            "placa_a1.png",
+            "/data/att/a1.png",
+            Some("image/png".into()),
+        )
+        .unwrap();
+        insert(&mut conn, result_a, "placa_a2.png", "/data/att/a2.png", None).unwrap();
+        insert(
+            &mut conn,
+            result_b,
+            "frotis_b.png",
+            "/data/att/b.png",
+            Some("image/jpeg".into()),
+        )
+        .unwrap();
+
+        let grouped = list_for_results_of_sample(&mut conn, 1).unwrap();
+
+        // Dos resultados con adjuntos, agrupados correctamente.
+        assert_eq!(grouped.len(), 2);
+        let atts_a = grouped.get(&result_a).unwrap();
+        assert_eq!(atts_a.len(), 2);
+        assert_eq!(atts_a[0].file_name, "placa_a1.png");
+        assert_eq!(atts_a[1].file_name, "placa_a2.png");
+        assert_eq!(grouped.get(&result_b).unwrap()[0].file_name, "frotis_b.png");
+
+        // Todos pertenecen a resultados de la muestra 1.
+        assert!(grouped
+            .values()
+            .flatten()
+            .all(|att| att.result_id == result_a || att.result_id == result_b));
+
+        test_helpers::cleanup_test_db(&db_path);
+    }
+
+    /// Una muestra sin adjuntos devuelve mapa vacío (sin filas leídas).
+    #[test]
+    fn test_list_for_results_of_sample_empty() {
+        let (mut conn, db_path, _result_id) = setup();
+        let grouped = list_for_results_of_sample(&mut conn, 1).unwrap();
+        assert!(grouped.is_empty());
         test_helpers::cleanup_test_db(&db_path);
     }
 }

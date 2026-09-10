@@ -473,14 +473,22 @@ pub fn list_results(
 
     let mut results: Vec<LabResult> = rows.into_iter().map(map_lab_result).collect();
 
-    // Evidencias adjuntas (placas, frotis, electroforesis) por resultado.
+    // Evidencias adjuntas (placas, frotis, electroforesis) de TODOS los
+    // resultados de la muestra en UNA sola query, agrupadas por resultado en
+    // memoria (antes: una query por resultado — N+1).
+    let attachments_by_result =
+        crate::repositories::attachments::list_for_results_of_sample(conn, sample_id)?;
     for r in &mut results {
-        r.attachments = crate::repositories::attachments::list_for_result(conn, r.id)?;
+        r.attachments = attachments_by_result.get(&r.id).cloned().unwrap_or_default();
     }
 
-    // Delta check: variación contra el resultado previo del paciente.
+    // Delta check: variación contra el resultado previo del paciente para
+    // TODOS los analites de la muestra en UNA sola query (antes: una query
+    // FIRST 1 por analito — N+1).
+    let pairs: Vec<(i32, f64)> = results.iter().map(|r| (r.analyte_id, r.value)).collect();
+    let deltas = delta_variations(conn, sample_id, &pairs)?;
     for r in &mut results {
-        r.delta_variation = delta_variation(conn, sample_id, r.analyte_id, r.value)?;
+        r.delta_variation = deltas.get(&r.analyte_id).copied().flatten();
     }
 
     Ok(results)
@@ -732,41 +740,83 @@ pub fn get_patient_lab_trends(
         .map(|r| crate::models::sample::TrendPoint {
             date: r.0,
             value: r.1,
-            ref_min: r.2,
-            ref_max: r.3,
+            ref_min: r.2.or(r.5),
+            ref_max: r.3.or(r.6),
             status: r.4,
+        })
+        .collect())
+}
+
+/// Delta check para varios (analito, valor) de una misma muestra en UNA
+/// sola query.
+///
+/// Con ROW_NUMBER() elige, por cada analito pedido, el resultado previo más
+/// reciente del mismo paciente (excluyendo la muestra actual; estados
+/// EN_PROCESO/FINALIZADA; desempate por UPDATED_AT DESC, ID DESC). La
+/// variación porcentual se aplica en memoria con la misma fórmula que
+/// `delta_variation`. Los analitos sin resultado previo (o con previo ≤ 0)
+/// no aparecen en el mapa.
+pub fn delta_variations(
+    conn: &mut SimpleConnection,
+    sample_id: i32,
+    values: &[(i32, f64)],
+) -> Result<std::collections::HashMap<i32, Option<f64>>, AppError> {
+    if values.is_empty() {
+        return Ok(std::collections::HashMap::new());
+    }
+
+    let analyte_ids: Vec<i32> = values.iter().map(|(aid, _)| *aid).collect();
+    let placeholders = analyte_ids.iter().map(|_| "?").collect::<Vec<_>>().join(", ");
+    let sql = format!(
+        "WITH ranked AS (
+             SELECT r.ANALYTE_ID, r.RESULT_VALUE,
+                    ROW_NUMBER() OVER (
+                        PARTITION BY r.ANALYTE_ID
+                        ORDER BY s.RECEIVED_AT DESC, r.UPDATED_AT DESC, r.ID DESC
+                    ) AS rn
+             FROM LAB_RESULTS r
+             JOIN SAMPLES s ON s.ID = r.SAMPLE_ID
+             WHERE s.PATIENT_ID = (SELECT PATIENT_ID FROM SAMPLES WHERE ID = {sample_id})
+               AND r.ANALYTE_ID IN ({placeholders})
+               AND r.SAMPLE_ID <> {sample_id}
+               AND s.STATUS IN ('EN_PROCESO', 'FINALIZADA')
+         )
+         SELECT ANALYTE_ID, RESULT_VALUE FROM ranked WHERE rn = 1"
+    );
+
+    let params: Vec<rsfbclient::SqlType> = analyte_ids
+        .iter()
+        .map(|&id| rsfbclient::SqlType::Integer(id as i64))
+        .collect();
+    let rows: Vec<(i32, f64)> = conn.query(&sql, params).map_err(AppError::from)?;
+
+    let prev_by_analyte: std::collections::HashMap<i32, f64> = rows.into_iter().collect();
+    Ok(values
+        .iter()
+        .map(|&(analyte_id, value)| {
+            let variation = prev_by_analyte.get(&analyte_id).and_then(|&prev| {
+                if prev > 0.0 {
+                    Some(((value - prev) / prev) * 100.0)
+                } else {
+                    None
+                }
+            });
+            (analyte_id, variation)
         })
         .collect())
 }
 
 /// Valor previo del mismo analito para el paciente (delta check). Excluye la
 /// muestra actual. Devuelve la variación porcentual respecto al anterior.
+/// Envoltorio de un solo analito sobre `delta_variations` (misma query).
 pub fn delta_variation(
     conn: &mut SimpleConnection,
     sample_id: i32,
     analyte_id: i32,
     new_value: f64,
 ) -> Result<Option<f64>, AppError> {
-    let prev: Option<(f64,)> = conn
-        .query_first(
-            "SELECT FIRST 1 r.RESULT_VALUE
-             FROM LAB_RESULTS r
-             JOIN SAMPLES s ON s.ID = r.SAMPLE_ID
-             WHERE s.PATIENT_ID = (SELECT PATIENT_ID FROM SAMPLES WHERE ID = ?)
-               AND r.ANALYTE_ID = ?
-               AND r.SAMPLE_ID <> ?
-               AND s.STATUS IN ('EN_PROCESO', 'FINALIZADA')
-             ORDER BY s.RECEIVED_AT DESC, r.UPDATED_AT DESC",
-            (&sample_id, &analyte_id, &sample_id),
-        )
-        .map_err(AppError::from)?;
-
-    Ok(match prev {
-        Some((prev_value,)) if prev_value > 0.0 => {
-            Some(((new_value - prev_value) / prev_value) * 100.0)
-        }
-        _ => None,
-    })
+    let deltas = delta_variations(conn, sample_id, &[(analyte_id, new_value)])?;
+    Ok(deltas.get(&analyte_id).copied().flatten())
 }
 
 #[cfg(test)]
@@ -1271,6 +1321,98 @@ mod integration_tests {
 
         // Sin eventos para otra muestra.
         assert!(list_sample_events(&mut conn, 999).unwrap().is_empty());
+
+        test_helpers::cleanup_test_db(&db_path);
+    }
+
+    /// El delta check de TODOS los analites de una muestra se calcula con una
+    /// sola query agrupada (antes: una query FIRST 1 por analito). Verifica
+    /// que el resultado es idéntico al criterio de `delta_variation`:
+    /// previo más reciente por RECEIVED_AT, exclusiones y guard de división.
+    #[test]
+    fn test_list_results_batched_delta_variation() {
+        let (mut conn, db_path) = setup();
+        let patient_id = test_helpers::insert_test_patient(&mut conn);
+        test_helpers::insert_test_analyte(&mut conn); // analito 1: Hematocrito
+
+        // Analitos extra (IDs altos: el catálogo sembrado usa 1–44):
+        // 500 Hematocrito T (con historia), 501 Glucosa T, 502 Urea T
+        // (sin historial) y 503 Creatinina T (previo 0.0).
+        for (id, code, name, unit) in [
+            (500, "HCT_T", "Hematocrito T", "%"),
+            (501, "GLU_T", "Glucosa T", "mg/dL"),
+            (502, "URE_T", "Urea T", "mg/dL"),
+            (503, "CRE_T", "Creatinina T", "mg/dL"),
+        ] {
+            conn.execute(
+                "INSERT INTO ANALYTES (ID, CODE, NAME, UNIT) VALUES (?, ?, ?, ?)",
+                (&id, &code, &name, &unit),
+            )
+            .unwrap();
+        }
+
+        // Historia previa del mismo paciente (dos muestras) + muestra actual.
+        // RECEIVED_AT determina cuál previo gana: 2026-08-01 (muestra 3).
+        let sample_insert =
+            "INSERT INTO SAMPLES (ID, CODE, PATIENT_ID, SAMPLE_TYPE_ID, RECEIVED_AT, STATUS)
+             VALUES (?, ?, ?, 1, ?, ?)";
+        for (id, received, status) in [
+            (1, "2026-07-01 10:00:00", "FINALIZADA"),
+            (3, "2026-08-01 10:00:00", "FINALIZADA"),
+            (2, "2026-08-02 10:00:00", "EN_PROCESO"),
+        ] {
+            conn.execute(
+                sample_insert,
+                (&id, &format!("M-2026-{id:04}"), &patient_id, &received, &status),
+            )
+            .unwrap();
+        }
+
+        // (id, sample_id, analyte_id, value) — previos. IDs altos para no
+        // chocar con las filas de demo de la migración 0005 (el cleanup
+        // inicial es best-effort).
+        for (id, sid, aid, val) in [
+            (9001, 1, 500, 50.0),  // analito 500: previo viejo (NO gana)
+            (9002, 3, 500, 40.0),  // analito 500: previo más reciente → gana
+            (9003, 3, 501, 100.0), // analito 501
+            (9004, 3, 503, 0.0),   // analito 503: previo 0.0 → guard de división
+        ] {
+            conn.execute(
+                "INSERT INTO LAB_RESULTS (ID, SAMPLE_ID, ANALYTE_ID, RESULT_VALUE, STATUS)
+                 VALUES (?, ?, ?, ?, 'NORMAL')",
+                (&id, &sid, &aid, &val),
+            )
+            .unwrap();
+        }
+        // (id, analyte_id, value) — resultados actuales de la muestra 2
+        // (se excluyen a sí mismos del delta check).
+        for (id, aid, val) in [(9101, 500, 44.0), (9102, 501, 80.0), (9103, 502, 9.9), (9104, 503, 1.0)] {
+            conn.execute(
+                "INSERT INTO LAB_RESULTS (ID, SAMPLE_ID, ANALYTE_ID, RESULT_VALUE, STATUS)
+                 VALUES (?, 2, ?, ?, 'NORMAL')",
+                (&id, &aid, &val),
+            )
+            .unwrap();
+        }
+
+        let results = list_results(&mut conn, 2).unwrap();
+        assert_eq!(results.len(), 4);
+        let delta_of = |aid: i32| {
+            results
+                .iter()
+                .find(|r| r.analyte_id == aid)
+                .unwrap()
+                .delta_variation
+        };
+
+        // (44 − 40) / 40 → +10 %; (80 − 100) / 100 → −20 %.
+        let d1 = delta_of(500).expect("delta analito 500");
+        assert!((d1 - 10.0).abs() < 1e-9, "delta analito 500 = {d1}");
+        let d2 = delta_of(501).expect("delta analito 501");
+        assert!((d2 + 20.0).abs() < 1e-9, "delta analito 501 = {d2}");
+        // Sin historia previa y previo 0.0 → sin delta.
+        assert_eq!(delta_of(502), None);
+        assert_eq!(delta_of(503), None);
 
         test_helpers::cleanup_test_db(&db_path);
     }
