@@ -181,6 +181,7 @@ propias conexiones dedicadas, fuera del pool — correcto. No tocar.
 | H3 | Eliminar N+1 en `list_results` (adjuntos y delta en 1 query c/u) | M | historial grande | ✅ hecho (`list_for_results_of_sample` + `delta_variations` con `ROW_NUMBER`) |
 | H5 | Debounce de invalidaciones de eventos Firebird | M | UI bajo ráfagas | ✅ hecho (`use-firebird-events.ts`, ventana 150 ms + dedupe) |
 | H6 | Quitar polling redundante si events bastan | S | CPU de fondo | ✅ hecho (dashboard 30 s eliminado; worklist 60 s se conserva: tiempo transcurrido) |
+| H9 | Corregir premisa FB4 de la 0023: FK sí auto-indexan en FB5 | S | escritura más ligera | ✅ hecho (0024, ver §5) |
 
 H1 + H2 + H4 quedaron implementados (migración `0023_maintenance_indexes`,
 `db/maintenance.rs` y el tope en `AiCache::set`). H3, H5 y H6 también
@@ -189,3 +190,50 @@ el upsert en `register_results_batch` (inherentes: cada resultado necesita
 su propia llamada al SP y su fila), y el único intervalo que queda en la UI
 es el del worklist (60 s, justificado: el tiempo transcurrido avanza con el
 reloj). **Todos los hallazgos de la revisión quedan resueltos.**
+
+---
+
+## 5. Perfilado con EXPLAIN PLAN sobre ~100k resultados (2026-09-10)
+
+Fixture: base temporal generada con `src-tauri/src/bin/profile_seed.rs` —
+2 000 pacientes, 3 400 muestras en ~3 años, **102 000 LAB_RESULTS** (30
+analitos por muestra, catálogo real de 0021), 105 400 EVENT_LOG, estadísticas
+frescas. Firebird **5.0.3** embebido, planes capturados con `SET PLAN ON` +
+`SET STATS ON` en isql. Tres queries de producción, verbatim:
+
+| Query | Plan elegido | Tiempo | Fetches |
+|---|---|---|---|
+| `list_results` (30 filas) | `R INDEX (RDB$39)` — UNIQUE(SAMPLE_ID, ANALYTE_ID) | **0.010 s** | 1 409 |
+| delta en lote (`ROW_NUMBER`, 30 analitos) | `R INDEX (RDB$FOREIGN36)`, `S INDEX (RDB$FOREIGN28)` | 0.20–0.24 s | ~103 000 |
+| worklist (680 pendientes de 3 400) | subqueries `LR INDEX (RDB$FOREIGN35)`, hash join | 0.31 s | 110 028 |
+
+La suposición "las FK de Firebird no crean índice" (base de H4) es cierta en
+FB≤4 pero **falsa en Firebird 5**: el optimizador usó exclusivamente los
+índices de sistema de las FK (`RDB$FOREIGN36` = LAB_RESULTS.ANALYTE_ID,
+`RDB$FOREIGN28` = SAMPLES.PATIENT_ID, `RDB$FOREIGN35` =
+LAB_RESULTS.SAMPLE_ID). El A/B quitando los cuatro índices de la 0023 dio
+**planes y tiempos idénticos** (0.010/0.20/0.31 s en ambas copias): nunca
+eligió `IX_LAB_RESULTS_ANALYTE` ni `IX_SAMPLES_PATIENT`. Tampoco eligió
+`IX_LAB_RESULTS_ANALYZED_AT` para el `ORDER BY r.ANALYZED_AT DESC ROWS 20`
+del prompt de IA (prefiere R NATURAL + SORT: el índice de una sola columna
+no cubre el filtro por paciente). Y una variante del delta que sondea por
+SAMPLE_ID fue peor (0.81 s, 515k fetches): el forma original con índice de
+FK por ANALYTE_ID es la correcta.
+
+**Corrección aplicada (migración 0024):** se eliminan
+`IX_LAB_RESULTS_ANALYTE` e `IX_SAMPLES_PATIENT` (duplicados exactos de los
+índices de sistema de sus FK: solo coste de escritura sin ningún plan que
+los use). Se conservan `IX_EVENT_LOG_CREATED_AT` (soporta la poda/consultas
+por fecha; el prune sobre 102k filas corre en ~1.3 s con o sin índice porque
+toca el 90 % de la tabla, pero el índice evita el scan cuando el retenedor
+sea menor) e `IX_LAB_RESULTS_ANALYZED_AT` (único orden por fecha de
+análisis disponible para volúmenes mayores). La corrección del review:
+H4 no era "falta índices" sino "FB5 ya los trae"; el hallazgo real de
+escritura es que la 0023 añadió dos de más.
+
+**Lectura de capacidad:** con 3 años de datos en una laptop, la ficha de
+una muestra abre en ~10 ms, la historia clínica de un paciente pesado
+(~3 400 resultados vía list_samples) queda dominada por los 0.2–0.3 s de
+los lotes delta/adjuntos ya optimizados, y la bandeja de trabajo completa
+en 0.31 s. El motor tiene margen sobrado para el horizonte de decenas de
+miles de resultados por instalación; no se requiere acción adicional.

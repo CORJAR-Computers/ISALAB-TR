@@ -35,8 +35,16 @@ en lote y refresco de UI dirigido por eventos sin polling redundante.
   arranque): borrado de la telemetría `EVENT_LOG` con más de 30 días (la
   tabla crecía sin límite y eclipsaba los backups locales) e índices para
   las rutas de consulta principales (`LAB_RESULTS.ANALYTE_ID`,
-  `LAB_RESULTS.ANALYZED_AT`, `SAMPLES.PATIENT_ID`, `EVENT_LOG.CREATED_AT`),
-  que en Firebird no existían pese a ser las FK más consultadas.
+  `LAB_RESULTS.ANALYZED_AT`, `SAMPLES.PATIENT_ID`, `EVENT_LOG.CREATED_AT`).
+  La migración `0024` afina lo anterior tras el perfilado con EXPLAIN PLAN
+  sobre una base de ~100k resultados: Firebird 5 auto-indexa las FOREIGN
+  KEY (a diferencia de FB4), así que `IX_LAB_RESULTS_ANALYTE` e
+  `IX_SAMPLES_PATIENT` eran duplicados exactos de índices de sistema que el
+  optimizador jamás eligió — se eliminan para no pagar su mantenimiento en
+  escritura; se conservan los de fecha (`EVENT_LOG.CREATED_AT`,
+  `LAB_RESULTS.ANALYZED_AT`). Con 102k resultados, la ficha de una muestra
+  abre en ~10 ms, el delta en lote corre en ~0.2 s y la bandeja de trabajo
+  completa en ~0.3 s (medido, no estimado).
 - **Cache de IA acotada**: `AiCache` limpia entradas expiradas en cada
   `set()` y expulsa las más antiguas al superar 500 entradas, de modo que la
   memoria queda acotada en sesiones largas (antes el mapa solo crecía).
@@ -57,7 +65,9 @@ en lote y refresco de UI dirigido por eventos sin polling redundante.
   carpeta vigilada, que no pasa por mutations del frontend), y su
   `refetchInterval` de 30 s se eliminó. La bandeja de trabajo conserva el
   suyo de 60 s: el tiempo transcurrido desde la recepción avanza con el
-  reloj aunque no cambie nada en la base de datos.
+  reloj aunque no cambie nada en la base de datos. El modelo completo queda
+  documentado en `docs/event-driven-refresh.md`, con la regla de decisión
+  de cuándo un `refetchInterval` está justificado.
 - **Cobertura E2E y de PDF del rango manual**: nuevo spec Playwright
   (`e2e/custom-reference-ranges.spec.ts`) que recorre el flujo completo con
   un analito sin rango en el catálogo (captura `min,max`, estado en vivo,
