@@ -176,16 +176,15 @@ fn seed(conn: &mut SimpleConnection) {
     // Estadísticas del optimizador frescas (así trabaja una instalación
     // real después de usar la app; sin esto los planes serían pesimistas).
     conn.execute("EXECUTE PACKAGE RDB$ADMIN", ()).ok();
-    for (table,) in [
-        ("LAB_RESULTS",),
-        ("SAMPLES",),
-        ("PATIENTS",),
-        ("EVENT_LOG",),
-        ("REFERENCE_RANGES",),
-        ("ANALYTES",),
+    for table in [
+        "LAB_RESULTS",
+        "SAMPLES",
+        "PATIENTS",
+        "EVENT_LOG",
+        "REFERENCE_RANGES",
+        "ANALYTES",
     ] {
-        let sql = format!("SET STATISTICS INDEX ALL");
-        let _ = conn.execute(&sql, ());
+        let _ = conn.execute("SET STATISTICS INDEX ALL", ());
         let _ = conn.execute(&format!("UPDATE STATISTICS {table}"), ());
     }
 
