@@ -378,6 +378,8 @@
         sampleTypeName: t.name,
         receivedAt: input.receivedAt,
         status: "RECIBIDA",
+        analyzerId: input.analyzerId ?? null,
+        analyzerName: input.analyzerId != null ? analyzerById(input.analyzerId)?.name ?? null : null,
         collectedBy: input.collectedBy ?? null,
         notes: input.notes ?? null,
         results: [],

@@ -129,7 +129,21 @@ export function SampleDetailDialog({
   const attachFile = useAttachResultFile(sampleId);
   const removeAttachment = useDeleteResultAttachment(sampleId);
   const deleteResult = useDeleteLabResult();
-  const { data: referenceRanges = [] } = useReferenceRanges(sample?.analyzerId ?? 1);
+  // Rangos del equipo de la muestra + catálogo GENERAL (ANALYZER_ID = 1).
+  // El catálogo sembrado (migraciones 0020/0021) vive en el perfil GENERAL;
+  // si la muestra corre en un equipo concreto (p. ej. MINDRAY B2800) se
+  // prefieren sus rangos propios y se rellenan los huecos con el GENERAL,
+  // así la tabla nunca queda toda en "Sin rango" tras actualizar desde una
+  // versión anterior.
+  const { data: analyzerRanges = [] } = useReferenceRanges(sample?.analyzerId ?? 1);
+  const { data: generalRanges = [] } = useReferenceRanges(1);
+  const referenceRanges = useMemo(() => {
+    if (sample?.analyzerId == null || sample.analyzerId === 1) return generalRanges;
+    // Hueco = par (analito, especie) que el equipo no cubre con sus propios rangos.
+    const covered = new Set(analyzerRanges.map((r) => `${r.analyteId}:${r.speciesId}`));
+    const filled = generalRanges.filter((r) => !covered.has(`${r.analyteId}:${r.speciesId}`));
+    return [...analyzerRanges, ...filled];
+  }, [sample?.analyzerId, analyzerRanges, generalRanges]);
   const { data: panels = [] } = usePanels();
   const [panelId, setPanelId] = useState<number | null>(null);
   const { data: panelAnalytes = [] } = usePanelAnalytes(panelId);
