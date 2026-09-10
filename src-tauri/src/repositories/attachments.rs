@@ -258,7 +258,14 @@ mod integration_tests {
             Some("image/png".into()),
         )
         .unwrap();
-        insert(&mut conn, result_a, "placa_a2.png", "/data/att/a2.png", None).unwrap();
+        insert(
+            &mut conn,
+            result_a,
+            "placa_a2.png",
+            "/data/att/a2.png",
+            None,
+        )
+        .unwrap();
         insert(
             &mut conn,
             result_b,

@@ -479,7 +479,10 @@ pub fn list_results(
     let attachments_by_result =
         crate::repositories::attachments::list_for_results_of_sample(conn, sample_id)?;
     for r in &mut results {
-        r.attachments = attachments_by_result.get(&r.id).cloned().unwrap_or_default();
+        r.attachments = attachments_by_result
+            .get(&r.id)
+            .cloned()
+            .unwrap_or_default();
     }
 
     // Delta check: variación contra el resultado previo del paciente para
@@ -766,7 +769,11 @@ pub fn delta_variations(
     }
 
     let analyte_ids: Vec<i32> = values.iter().map(|(aid, _)| *aid).collect();
-    let placeholders = analyte_ids.iter().map(|_| "?").collect::<Vec<_>>().join(", ");
+    let placeholders = analyte_ids
+        .iter()
+        .map(|_| "?")
+        .collect::<Vec<_>>()
+        .join(", ");
     let sql = format!(
         "WITH ranked AS (
              SELECT r.ANALYTE_ID, r.RESULT_VALUE,
@@ -1363,7 +1370,13 @@ mod integration_tests {
         ] {
             conn.execute(
                 sample_insert,
-                (&id, &format!("M-2026-{id:04}"), &patient_id, &received, &status),
+                (
+                    &id,
+                    &format!("M-2026-{id:04}"),
+                    &patient_id,
+                    &received,
+                    &status,
+                ),
             )
             .unwrap();
         }
@@ -1386,7 +1399,12 @@ mod integration_tests {
         }
         // (id, analyte_id, value) — resultados actuales de la muestra 2
         // (se excluyen a sí mismos del delta check).
-        for (id, aid, val) in [(9101, 500, 44.0), (9102, 501, 80.0), (9103, 502, 9.9), (9104, 503, 1.0)] {
+        for (id, aid, val) in [
+            (9101, 500, 44.0),
+            (9102, 501, 80.0),
+            (9103, 502, 9.9),
+            (9104, 503, 1.0),
+        ] {
             conn.execute(
                 "INSERT INTO LAB_RESULTS (ID, SAMPLE_ID, ANALYTE_ID, RESULT_VALUE, STATUS)
                  VALUES (?, 2, ?, ?, 'NORMAL')",

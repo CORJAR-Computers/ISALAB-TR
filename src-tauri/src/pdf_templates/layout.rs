@@ -779,7 +779,8 @@ mod tests {
             "la columna Referencias debe mostrar el rango manual con asterisco: {texts:?}"
         );
         assert!(
-            texts.iter()
+            texts
+                .iter()
                 .any(|t| t.contains("definido por el veterinario")),
             "debe aparecer la nota al pie: {texts:?}"
         );
@@ -798,10 +799,9 @@ mod tests {
             texts.iter().any(|t| t.contains("<= 60.0 *")),
             "rango abierto solo-máximo: {texts:?}"
         );
-        assert!(
-            texts.iter()
-                .any(|t| t.contains("definido por el veterinario")),
-        );
+        assert!(texts
+            .iter()
+            .any(|t| t.contains("definido por el veterinario")),);
     }
 
     /// Sin rango manual, la nota al pie NO aparece (no hay que confundir
@@ -814,12 +814,16 @@ mod tests {
 
         let texts = pdf_texts(&pdf.ops);
         assert!(
-            !texts.iter().any(|t| t.contains("definido por el veterinario")),
+            !texts
+                .iter()
+                .any(|t| t.contains("definido por el veterinario")),
             "sin rango manual no debe haber nota: {texts:?}"
         );
         // El rango del catálogo se imprime SIN asterisco.
         assert!(
-            texts.iter().any(|t| t.contains("37.0 - 55.0") && !t.contains('*')),
+            texts
+                .iter()
+                .any(|t| t.contains("37.0 - 55.0") && !t.contains('*')),
             "rango de catálogo sin asterisco: {texts:?}"
         );
     }
