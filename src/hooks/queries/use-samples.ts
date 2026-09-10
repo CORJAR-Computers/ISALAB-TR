@@ -26,7 +26,12 @@ export function useSampleCounts() {
 }
 
 /** Bandeja de trabajo diaria: pendientes por tipo con tiempo transcurrido.
- *  Se auto-refresca cada minuto porque el tiempo transcurrido avanza en vivo. */
+ *  Conserva su refetchInterval de 60 s (único de la app, a propósito): los
+ *  eventos Firebird cubren los cambios de datos, pero el tiempo transcurrido
+ *  desde la recepción avanza con el reloj sin que nada cambie en la BD, así
+ *  que sin refresco periódico la columna de urgencia quedaría congelada.
+ *  Las urgencias se ordenan por rangos de horas — 60 s es granularidad más
+ *  que suficiente. */
 export function useWorklist() {
   return useQuery({
     queryKey: ["worklist"],
