@@ -4,6 +4,20 @@ All notable changes to ISALAB will be documented in this file.
 
 The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.1.0/).
 
+## [Unreleased]
+
+### Added
+
+- **`npm run verify-updater`**: verificación de extremo a extremo del
+  auto-updater contra el feed publicado (`scripts/verify-updater.mjs`).
+  Replica lo que hace el plugin en una instalación real: fetch del endpoint
+  de `tauri.conf.json`, comparación semver contra la versión del repo,
+  texto del popup que vería el usuario, descarga del instalador y
+  verificación minisign con la pubkey embebida (algoritmo exacto de
+  `minisign-verify`: Ed25519 sobre blake2b-512 del instalador + firma
+  global sobre la firma del archivo y el trusted comment). Pensado para
+  correrlo antes de publicar el draft de cada release.
+
 ## [1.1.0] - 2026-09-10
 
 ### 🎯 Release Summary

@@ -19,6 +19,7 @@
     "icons": "node scripts/gen-icons.mjs",
     "lint": "eslint .",
     "check:bindings": "node scripts/check-bindings.mjs",
+    "verify-updater": "node scripts/verify-updater.mjs",
     "lint:fix": "eslint . --fix",
     "test": "vitest run",
     "test:watch": "vitest",
