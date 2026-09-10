@@ -1,4 +1,5 @@
 pub mod events;
+pub mod maintenance;
 pub mod migrations;
 pub mod seed;
 
@@ -127,6 +128,11 @@ pub fn bootstrap(db_path: &Path, fbclient: &Path) -> Result<(DbPool, i32), AppEr
 
     // Primer arranque: contraseña por defecto del admin (admin123).
     seed::ensure_default_admin(&mut first)?;
+
+    // Mantenimiento: poda de la telemetría de eventos (EVENT_LOG > 30 días).
+    // Best-effort: un fallo no impide arrancar; se reintenta en el próximo
+    // arranque. Usa la misma conexión de bootstrap (antes de montar el pool).
+    let _ = maintenance::prune_event_log_conn(&mut first);
 
     let pool = DbPool(Arc::new(Mutex::new(VecDeque::new())));
     pool.release(first);

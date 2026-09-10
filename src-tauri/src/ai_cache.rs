@@ -10,6 +10,12 @@ use std::time::{Duration, Instant};
 /// TTL por defecto para las interpretaciones cacheadas (24 horas).
 const DEFAULT_TTL: Duration = Duration::from_secs(24 * 60 * 60);
 
+/// Tope blando de entradas: al superarlo se expulsa la más antigua.
+/// Una interpretación LLM ronda los KB, así que el tope acota la memoria
+/// (≈500 × 8 KB ≈ 4 MB) sin riesgo práctico de expulsar entradas vivas:
+/// una clínica rara vez interpreta 500 muestras distintas dentro del TTL.
+const MAX_ENTRIES: usize = 500;
+
 /// Entrada del cache con timestamp y hash de resultados.
 #[derive(Debug, Clone)]
 struct CacheEntry {
@@ -65,8 +71,29 @@ impl AiCache {
     }
 
     /// Almacena una interpretación en el cache.
+    ///
+    /// Antes de insertar hace `cleanup()` de expirados y aplica el tope de
+    /// entradas (expulsa la más antigua): la memoria queda acotada aunque la
+    /// sesión dure días. O(n) con n acotado por MAX_ENTRIES, imperceptible.
     pub fn set(&self, sample_id: i32, interpretation: String, results_hash: u64) {
         if let Ok(mut entries) = self.entries.lock() {
+            // 1. Limpia expirados (el cleanup() público existe para tests y
+            //    mantenimiento explícito; aquí se hace inline para no
+            //    re-adquirir el lock).
+            entries.retain(|_, entry| entry.created_at.elapsed() <= self.ttl);
+
+            // 2. Tope de entradas: expulsa la más antigua mientras sobre.
+            while entries.len() >= MAX_ENTRIES {
+                let Some(oldest) = entries
+                    .iter()
+                    .min_by_key(|(_, e)| e.created_at)
+                    .map(|(k, _)| *k)
+                else {
+                    break;
+                };
+                entries.remove(&oldest);
+            }
+
             entries.insert(
                 sample_id,
                 CacheEntry {
@@ -181,6 +208,45 @@ mod tests {
 
         cache.cleanup();
         assert!(cache.is_empty());
+    }
+
+    #[test]
+    fn test_cache_evicts_oldest_when_full() {
+        // Cache con tope bajo redefiniendo MAX_ENTRIES no es posible por ser
+        // const: la prueba llena el cache real con MAX_ENTRIES entradas y
+        // verifica que al insertar una más se expulsa la más antigua y el
+        // tamaño queda acotado al tope.
+        let cache = AiCache::new();
+
+        for i in 0..MAX_ENTRIES as i32 {
+            cache.set(i, format!("Interpretación {i}"), i as u64);
+        }
+        assert_eq!(cache.len(), MAX_ENTRIES);
+
+        // La entrada 0 es la más antigua: insertar una nueva la expulsa.
+        cache.set(MAX_ENTRIES as i32, "Nueva".to_string(), 999);
+        assert_eq!(cache.len(), MAX_ENTRIES);
+        assert!(cache.get(0, 0).is_none());
+        assert!(cache.get(1, 1).is_some());
+        assert_eq!(
+            cache.get(MAX_ENTRIES as i32, 999),
+            Some("Nueva".to_string())
+        );
+    }
+
+    #[test]
+    fn test_cache_set_cleans_expired_entries() {
+        // Con TTL corto, set() tras la expiración limpia el mapa en vez de
+        // acumular muertos (comportamiento nuevo en producción).
+        let cache = AiCache::with_ttl(Duration::from_millis(10));
+        cache.set(1, "Vieja".to_string(), 1);
+        std::thread::sleep(Duration::from_millis(20));
+
+        cache.set(2, "Nueva".to_string(), 2);
+
+        assert_eq!(cache.len(), 1); // solo la nueva
+        assert!(cache.get(1, 1).is_none());
+        assert!(cache.get(2, 2).is_some());
     }
 
     #[test]
