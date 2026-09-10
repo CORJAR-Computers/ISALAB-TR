@@ -214,6 +214,10 @@ jobs:
       # `tauri build` genera el instalador y su firma .sig, pero NO el
       # manifiesto latest.json que el auto-updater consulta en el endpoint
       # .../releases/latest/download/latest.json. Se genera aquí.
+      # El texto del popup del auto-updater vive en .github/updater-notes.md
+      # (español, primera línea = "ISALAB <versión>"). Si el archivo falta o
+      # anuncia otra versión, se usa el texto genérico con un warning visible:
+      # mejor un popup simple que bloquear la release.
       - name: Generate updater manifest (latest.json)
         shell: pwsh
         run: |
@@ -223,9 +227,22 @@ jobs:
           if (-not (Test-Path $sigPath)) { throw "Firma del instalador no encontrada: $sigPath" }
           $signature = (Get-Content $sigPath -Raw).Trim()
           $url = "https://github.com/${{ github.repository }}/releases/download/${{ github.ref_name }}/${exe}"
+          $notesPath = ".github/updater-notes.md"
+          $notes = "ISALAB v${version}"
+          if (Test-Path $notesPath) {
+            $notes = (Get-Content $notesPath -Raw -Encoding UTF8).Trim()
+            if (-not $notes.StartsWith("ISALAB ${version}")) {
+              Write-Host "::warning::updater-notes.md no comienza con 'ISALAB ${version}'; el popup mostrará texto de otra versión. Actualiza .github/updater-notes.md antes de tagear."
+            } else {
+              $firstLine = ($notes -split "`n")[0]
+              Write-Host "Notas del updater: $firstLine"
+            }
+          } else {
+            Write-Host "::warning::falta .github/updater-notes.md; el popup mostrará solo 'ISALAB v${version}'."
+          }
           $manifest = [ordered]@{
             version   = $version
-            notes     = "ISALAB v${version}"
+            notes     = $notes
             pub_date  = (Get-Date).ToUniversalTime().ToString("yyyy-MM-ddTHH:mm:ss.fffZ")
             platforms = [ordered]@{
               "windows-x86_64" = [ordered]@{
@@ -374,19 +391,34 @@ jobs:
           signature=$(tr -d '\r\n' < "$sig_path")
           url="https://github.com/${{ github.repository }}/releases/download/${{ inputs.tag }}/${exe}"
           pub_date=$(date -u +%Y-%m-%dT%H:%M:%S.000Z)
+          # El texto del popup vive en .github/updater-notes.md (misma convención
+          # que el job principal: primera línea = "ISALAB <versión>"); el script
+          # node valida y avisa con ::warning:: si falta o está desactualizado.
           node -e '
             const fs = require("fs");
-            const [version, pubDate, signature, url, out] = process.argv.slice(1);
+            const [version, pubDate, signature, url, notesPath, out] = process.argv.slice(1);
+            let notes = `ISALAB v${version}`;
+            if (notesPath && fs.existsSync(notesPath)) {
+              const raw = fs.readFileSync(notesPath, "utf8").trim();
+              if (!raw.startsWith(`ISALAB ${version}`)) {
+                console.warn(`::warning::updater-notes.md no comienza con (ISALAB ${version}); el popup mostrará texto de otra versión. Actualiza .github/updater-notes.md antes de tagear.`);
+              } else {
+                notes = raw;
+                console.log(`Notas del updater: ${raw.split("\n")[0]}`);
+              }
+            } else {
+              console.warn(`::warning::falta .github/updater-notes.md; el popup mostrará solo (ISALAB v${version}).`);
+            }
             const manifest = {
               version,
-              notes: `ISALAB v${version}`,
+              notes,
               pub_date: pubDate,
               platforms: {
                 "windows-x86_64": { signature, url },
               },
             };
             fs.writeFileSync(out, JSON.stringify(manifest, null, 2) + "\n");
-          ' "$version" "$pub_date" "$signature" "$url" "$bundle/latest.json"
+          ' "$version" "$pub_date" "$signature" "$url" ".github/updater-notes.md" "$bundle/latest.json"
           echo "latest.json generado para v${version}: $url"
 
       - name: Create GitHub Release
