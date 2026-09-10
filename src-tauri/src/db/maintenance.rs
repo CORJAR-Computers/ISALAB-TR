@@ -24,9 +24,7 @@ const EVENT_LOG_RETENTION_DAYS: i32 = 30;
 
 /// SQL de poda compartido por el conteo y el borrado.
 fn prune_sql() -> String {
-    format!(
-        "CREATED_AT < CURRENT_TIMESTAMP - {EVENT_LOG_RETENTION_DAYS}"
-    )
+    format!("CREATED_AT < CURRENT_TIMESTAMP - {EVENT_LOG_RETENTION_DAYS}")
 }
 
 /// Borra de EVENT_LOG las filas con más de `EVENT_LOG_RETENTION_DAYS` y
@@ -41,11 +39,8 @@ pub fn prune_event_log_conn(conn: &mut SimpleConnection) -> Result<u64, AppError
         )
         .map_err(AppError::from)?;
 
-    conn.execute(
-        &format!("DELETE FROM EVENT_LOG WHERE {where_clause}"),
-        (),
-    )
-    .map_err(AppError::from)?;
+    conn.execute(&format!("DELETE FROM EVENT_LOG WHERE {where_clause}"), ())
+        .map_err(AppError::from)?;
 
     Ok(deleted.map(|(n,)| n.max(0) as u64).unwrap_or(0))
 }
