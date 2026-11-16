@@ -4,6 +4,7 @@ export type Theme = "light" | "dark";
 
 export type View =
   | "dashboard"
+  | "reception"
   | "agenda"
   | "patients"
   | "clinical-history"

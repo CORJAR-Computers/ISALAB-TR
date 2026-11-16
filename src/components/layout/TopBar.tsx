@@ -60,6 +60,10 @@ const TITLES: Record<string, { title: string; subtitle: string }> = {
     title: "Catálogo de servicios",
     subtitle: "Precios, duración e IVA de toda la clínica",
   },
+  reception: {
+    title: "Recepción de pacientes",
+    subtitle: "Check-in, cola de espera y cobro de la visita",
+  },
   users: {
     title: "Usuarios",
     subtitle: "Cuentas y roles del sistema",

@@ -1,5 +1,5 @@
 import { useEffect, useRef, useState } from "react";
-import { ChevronDown, Info, X } from "lucide-react";
+import { ChevronDown, DoorOpen, Info, X } from "lucide-react";
 import { cn } from "@/lib/utils";
 import { useUiStore, type View } from "@/stores/ui-store";
 import { usePermissions } from "@/hooks/use-permissions";
@@ -51,6 +51,7 @@ const SECTIONS: NavSection[] = [
     label: "Operación",
     items: [
       { view: "dashboard", label: "Panel de control", icon: LayoutDashboard },
+      { view: "reception", label: "Recepción de pacientes", icon: DoorOpen },
       { view: "agenda", label: "Agenda de consultas", icon: CalendarClock },
       { view: "patients", label: "Pacientes", icon: Users },
       { view: "clinical-history", label: "Historial Clínico", icon: HeartPulse },

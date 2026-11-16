@@ -69,6 +69,9 @@ const AuditLogPage = lazy(() =>
 const ServicesPage = lazy(() =>
   import("@/features/services/ServicesPage").then((m) => ({ default: m.ServicesPage })),
 );
+const ReceptionPage = lazy(() =>
+  import("@/features/reception/ReceptionPage").then((m) => ({ default: m.ReceptionPage })),
+);
 
 /** Fallback mientras se carga la pagina. */
 function PageFallback() {
@@ -234,6 +237,7 @@ export default function App() {
               {view === "reports" && <ReportsPage />}
               {view === "qc" && <QcPage />}
               {view === "services" && <ServicesPage />}
+              {view === "reception" && <ReceptionPage />}
               {view === "settings" && <SettingsPage />}
               {view === "users" && <UsersPage />}
               {view === "audit-log" && <AuditLogPage />}</Suspense>
