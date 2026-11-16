@@ -27,7 +27,9 @@ import { Textarea } from "@/components/ui/textarea";
 import {
   Select,
   SelectContent,
+  SelectGroup,
   SelectItem,
+  SelectLabel,
   SelectTrigger,
   SelectValue,
 } from "@/components/ui/select";
@@ -38,7 +40,10 @@ import {
   useCreateInvoice,
   useOwners,
   usePatients,
+  useServiceCategories,
+  useServices,
 } from "@/hooks/use-queries";
+import type { Service } from "@/bindings";
 import { getErrorMessage } from "@/lib/api";
 import { PAYMENT_METHOD_LABEL } from "@/lib/status";
 import { cn, formatCOP } from "@/lib/utils";
@@ -47,6 +52,8 @@ const invoiceItemSchema = z.object({
   description: z.string().min(1, "Descripción requerida"),
   quantity: z.coerce.number().int().min(1, "Cantidad mínima: 1"),
   unitPrice: z.coerce.number().min(0, "Precio no puede ser negativo"),
+  // Servicio del catálogo del que proviene la línea (null = manual).
+  serviceId: z.number().nullable(),
 });
 
 const invoiceSchema = z.object({
@@ -74,10 +81,13 @@ export function NewInvoiceDialog({
 
   const [ownerSearch, setOwnerSearch] = useState("");
   const [patientSearch, setPatientSearch] = useState("");
+  const [catalogServiceId, setCatalogServiceId] = useState("");
 
   const { data: owners = [], isLoading: loadingOwners } = useOwners(ownerSearch);
   const { data: patients = [], isLoading: loadingPatients } =
     usePatients(patientSearch);
+  const { data: categories = [] } = useServiceCategories();
+  const { data: catalogServices = [] } = useServices(null, "");
 
   const form = useForm<z.input<typeof invoiceSchema>, unknown, z.output<typeof invoiceSchema>>({
     resolver: zodResolver(invoiceSchema),
@@ -87,7 +97,7 @@ export function NewInvoiceDialog({
       taxRate: null,
       paymentMethod: "EFECTIVO",
       notes: null,
-      items: [{ description: "", quantity: 1, unitPrice: 0 }],
+      items: [{ description: "", quantity: 1, unitPrice: 0, serviceId: null }],
     },
   });
 
@@ -116,16 +126,43 @@ export function NewInvoiceDialog({
         taxRate: settings?.taxRate ?? 19,
         paymentMethod: "EFECTIVO",
         notes: null,
-        items: [{ description: "", quantity: 1, unitPrice: 0 }],
+        items: [{ description: "", quantity: 1, unitPrice: 0, serviceId: null }],
       });
       setOwnerSearch("");
       setPatientSearch("");
+      setCatalogServiceId("");
     }
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [open]);
 
   const watchedItems = form.watch("items");
   const watchedTaxRate = form.watch("taxRate");
+
+  /** Agrega una línea desde el catálogo: descripción, precio e IVA. */
+  const addFromCatalog = (service: Service) => {
+    append({
+      description: service.name,
+      quantity: 1,
+      unitPrice: service.price,
+      serviceId: service.id,
+    });
+    // Si el servicio define su propio IVA y el usuario no ha fijado uno,
+    // se usa ese (las facturas de una sola línea son lo común por ahora).
+    if (service.taxRate != null && form.getValues("taxRate") == null) {
+      form.setValue("taxRate", service.taxRate);
+    }
+    setCatalogServiceId("");
+  };
+
+  // Servicios agrupados por categoría para el selector del catálogo.
+  const catalogGroups = useMemo(() => {
+    return categories
+      .map((cat) => ({
+        name: cat.name,
+        services: catalogServices.filter((s) => s.categoryId === cat.id),
+      }))
+      .filter((g) => g.services.length > 0);
+  }, [categories, catalogServices]);
 
   const totals = useMemo(() => {
     const subtotal = watchedItems.reduce((acc, it) => {
@@ -151,6 +188,7 @@ export function NewInvoiceDialog({
           description: it.description.trim(),
           quantity: it.quantity,
           unitPrice: it.unitPrice,
+          serviceId: it.serviceId ?? null,
         })),
       });
       toast.success(`Factura ${invoice.invoiceNumber} emitida`, {
@@ -269,6 +307,40 @@ export function NewInvoiceDialog({
               />
             </div>
 
+            {/* Catálogo de servicios */}
+            <div className="space-y-2">
+              <Label>Desde el catálogo</Label>
+              <Select
+                value={catalogServiceId}
+                onValueChange={(v) => {
+                  const service = catalogServices.find(
+                    (s) => s.id === Number(v),
+                  );
+                  if (service) addFromCatalog(service);
+                }}
+              >
+                <SelectTrigger className="w-full">
+                  <SelectValue placeholder="Busca un servicio… (baño, vacuna, consulta)" />
+                </SelectTrigger>
+                <SelectContent>
+                  {catalogGroups.map((group) => (
+                    <SelectGroup key={group.name}>
+                      <SelectLabel>{group.name}</SelectLabel>
+                      {group.services.map((s) => (
+                        <SelectItem key={s.id} value={s.id.toString()}>
+                          {s.name} · {formatCOP(s.price ?? 0)}
+                        </SelectItem>
+                      ))}
+                    </SelectGroup>
+                  ))}
+                </SelectContent>
+              </Select>
+              <p className="text-muted-foreground text-xs">
+                El precio se copia a la línea (edítable); el catálogo nunca
+                reescribe facturas emitidas.
+              </p>
+            </div>
+
             {/* Conceptos */}
             <div className="space-y-2">
               <Label>Conceptos *</Label>
@@ -335,7 +407,9 @@ export function NewInvoiceDialog({
                 type="button"
                 variant="outline"
                 size="sm"
-                onClick={() => append({ description: "", quantity: 1, unitPrice: 0 })}
+                onClick={() =>
+                  append({ description: "", quantity: 1, unitPrice: 0, serviceId: null })
+                }
               >
                 <Plus className="size-3.5" />
                 Agregar concepto

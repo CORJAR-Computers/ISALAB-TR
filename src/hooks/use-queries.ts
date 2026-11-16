@@ -115,4 +115,12 @@ export {
   useAcknowledgeCritical,
   useSendCriticalEmail,
   useTestSmtpConnection,
+  useServiceCategories,
+  useAllServiceCategories,
+  useServices,
+  useService,
+  useSaveService,
+  useSaveServiceCategory,
+  useDeleteServiceCategory,
+  useSetServiceActive,
 } from "./queries";

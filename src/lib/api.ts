@@ -69,6 +69,10 @@ import type {
   VaccineListItem,
   VaccineType,
   SecondaryLogo,
+  Service,
+  ServiceCategory,
+  SaveServiceCategoryInput,
+  SaveServiceInput,
   WorklistData,
 } from "@/bindings";
 
@@ -349,6 +353,31 @@ export const api = {
     invoke<Sample>("accession_lab_order", { input }),
   getOrderForSample: (sampleId: number) =>
     invoke<LabOrder | null>("get_order_for_sample", { sampleId }),
+
+  // ---- Catálogo de servicios (clínica) ----
+  listServiceCategories: () =>
+    invoke<ServiceCategory[]>("list_service_categories"),
+  listAllServiceCategories: () =>
+    invoke<ServiceCategory[]>("list_all_service_categories"),
+  saveServiceCategory: (input: SaveServiceCategoryInput) =>
+    invoke<ServiceCategory>("save_service_category", { input }),
+  deleteServiceCategory: (id: number) =>
+    invoke<void>("delete_service_category", { id }),
+  listServices: (
+    categoryId: number | null,
+    search: string | null,
+    includeInactive?: boolean,
+  ) =>
+    invoke<Service[]>("list_services", {
+      categoryId,
+      search,
+      includeInactive: includeInactive ?? false,
+    }),
+  getService: (id: number) => invoke<Service | null>("get_service", { id }),
+  saveService: (input: SaveServiceInput) =>
+    invoke<Service>("save_service", { input }),
+  setServiceActive: (id: number, active: boolean) =>
+    invoke<Service>("set_service_active", { id, active }),
 
   // ---- Búsqueda global (paleta Ctrl+K) ----
   globalSearch: (query: string) =>

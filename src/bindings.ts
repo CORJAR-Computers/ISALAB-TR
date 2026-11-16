@@ -22,11 +22,47 @@ export const commands = {
 	 *  búsqueda) en `dest_path` y devuelve la ruta.
 	 */
 	exportResultsCsv: (destPath: string, status: string | null, search: string | null) => typedError<string, AppError>(__TAURI_INVOKE("export_results_csv", { destPath, status, search })),
+	/**  Lista las categorías del catálogo (operativas; admin puede ver inactivas). */
+	listServiceCategories: () => typedError<ServiceCategory[], AppError>(__TAURI_INVOKE("list_service_categories")),
+	/**  Lista TODAS las categorías, incluidas las inactivas (solo ADMIN). */
+	listAllServiceCategories: () => typedError<ServiceCategory[], AppError>(__TAURI_INVOKE("list_all_service_categories")),
+	/**  Crea o actualiza una categoría del catálogo (ADMIN). */
+	saveServiceCategory: (input: SaveServiceCategoryInput) => typedError<ServiceCategory, AppError>(__TAURI_INVOKE("save_service_category", { input })),
+	/**  Da de baja una categoría (baja lógica si tiene servicios; ADMIN). */
+	deleteServiceCategory: (id: number) => typedError<null, AppError>(__TAURI_INVOKE("delete_service_category", { id })),
+	/**  Lista servicios del catálogo con filtros (lectura para toda la sesión). */
+	listServices: (categoryId: number | null, search: string | null, includeInactive: boolean | null) => typedError<Service[], AppError>(__TAURI_INVOKE("list_services", { categoryId, search, includeInactive })),
+	/**  Obtiene un servicio por ID. */
+	getService: (id: number) => typedError<{
+	id: number,
+	code: string,
+	name: string,
+	categoryId: number,
+	categoryName: string,
+	description: string | null,
+	durationMin: number,
+	price: number | null,
+	/**  NULL = usa el IVA global de la clínica. */
+	taxRate: number | null,
+	requiresVet: boolean,
+	requiresGroomer: boolean,
+	/**  NULL = todas las especies. */
+	speciesId: number | null,
+	sortOrder: number,
+	isActive: boolean,
+} | null, AppError>(__TAURI_INVOKE("get_service", { id })),
+	/**  Crea o actualiza un servicio del catálogo (ADMIN). */
+	saveService: (input: SaveServiceInput) => typedError<Service, AppError>(__TAURI_INVOKE("save_service", { input })),
+	/**  Activa o desactiva un servicio (baja lógica; ADMIN). */
+	setServiceActive: (id: number, active: boolean) => typedError<Service, AppError>(__TAURI_INVOKE("set_service_active", { id, active })),
 	listSpecies: () => typedError<Species[], AppError>(__TAURI_INVOKE("list_species")),
 	listBreeds: (speciesId: number) => typedError<Breed[], AppError>(__TAURI_INVOKE("list_breeds", { speciesId })),
 	listSampleTypes: () => typedError<SampleType[], AppError>(__TAURI_INVOKE("list_sample_types")),
 	listAnalytes: () => typedError<Analyte[], AppError>(__TAURI_INVOKE("list_analytes")),
-	/**  Crea un analito nuevo en el catálogo de laboratorio (p. ej. desde Ajustes → Equipos y rangos → "nuevo analito"). Requiere rol VET o ADMIN. */
+	/**
+	 *  Crea un analito nuevo en el catálogo de laboratorio (p. ej. desde
+	 *  Ajustes → Equipos y rangos → "nuevo analito"). Requiere rol VET o ADMIN.
+	 */
 	createAnalyte: (input: CreateAnalyteInput) => typedError<Analyte, AppError>(__TAURI_INVOKE("create_analyte", { input })),
 	/**  Catálogo de vacunas del esquema (Rabia, Polivalente, FeLV…). */
 	listVaccineTypes: () => typedError<VaccineType[], AppError>(__TAURI_INVOKE("list_vaccine_types")),
@@ -505,16 +541,6 @@ export type Analyte = {
 	method: string | null,
 };
 
-/**  Entrada para crear un analito nuevo (catálogo de laboratorio). */
-export type CreateAnalyteInput = {
-	/**  Código corto único (p. ej. "LACT"). Se normaliza a mayúsculas. */
-	code: string,
-	name: string,
-	unit: string | null,
-	method: string | null,
-	description: string | null,
-};
-
 /**  Conteo de un analito (para el ranking de los más solicitados). */
 export type AnalyteCount = {
 	analyteName: string,
@@ -677,6 +703,16 @@ export type ConsultationListItem = {
 	veterinarianName: string | null,
 };
 
+/**  Entrada para crear un analito nuevo (catálogo de laboratorio). */
+export type CreateAnalyteInput = {
+	/**  Código corto único (p. ej. "LACT"). Se normaliza a mayúsculas. */
+	code: string,
+	name: string,
+	unit: string | null,
+	method: string | null,
+	description: string | null,
+};
+
 export type CreateAnalyzerInput = {
 	code: string,
 	name: string,
@@ -711,6 +747,11 @@ export type CreateInvoiceItemInput = {
 	description: string,
 	quantity: number,
 	unitPrice: number | null,
+	/**
+	 *  Servicio del catálogo del que proviene la línea (opcional; las líneas
+	 *  manuales no lo traen). Solo rastreo: el precio de la línea es una copia.
+	 */
+	serviceId: number | null,
 };
 
 /**  Crear una orden de laboratorio. */
@@ -1455,11 +1496,69 @@ export type SaveAnalyzerSourceInput = {
 	mapping: AnalyzerImportMapping | null,
 };
 
+/**  Entrada de alta/edición de una categoría. */
+export type SaveServiceCategoryInput = {
+	/**  `None` = crear; `Some` = editar. */
+	id: number | null,
+	code: string,
+	name: string,
+	sortOrder: number,
+};
+
+/**  Entrada de alta/edición de un servicio. */
+export type SaveServiceInput = {
+	/**  `None` = crear; `Some` = editar. */
+	id: number | null,
+	code: string,
+	name: string,
+	categoryId: number,
+	description: string | null,
+	durationMin: number,
+	price: number | null,
+	taxRate: number | null,
+	requiresVet: boolean,
+	requiresGroomer: boolean,
+	speciesId: number | null,
+	sortOrder: number,
+};
+
 export type SecondaryLogo = {
 	id: number,
 	name: string,
 	logoPath: string,
 	createdAt: string,
+};
+
+/**
+ *  Servicio del catálogo: única fuente de precio, duración, IVA y
+ *  profesional requerido para toda la clínica.
+ */
+export type Service = {
+	id: number,
+	code: string,
+	name: string,
+	categoryId: number,
+	categoryName: string,
+	description: string | null,
+	durationMin: number,
+	price: number | null,
+	/**  NULL = usa el IVA global de la clínica. */
+	taxRate: number | null,
+	requiresVet: boolean,
+	requiresGroomer: boolean,
+	/**  NULL = todas las especies. */
+	speciesId: number | null,
+	sortOrder: number,
+	isActive: boolean,
+};
+
+/**  Categoría del catálogo de servicios (CONSULTA, PELUQUERIA…). */
+export type ServiceCategory = {
+	id: number,
+	code: string,
+	name: string,
+	sortOrder: number,
+	isActive: boolean,
 };
 
 /**  Usuario autenticado (sin hash de contraseña). */

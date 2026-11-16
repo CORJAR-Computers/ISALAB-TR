@@ -118,6 +118,16 @@ export {
 } from "./use-notifications";
 export { useDashboardStats } from "./use-dashboard";
 export {
+  useServiceCategories,
+  useAllServiceCategories,
+  useServices,
+  useService,
+  useSaveService,
+  useSaveServiceCategory,
+  useDeleteServiceCategory,
+  useSetServiceActive,
+} from "./use-services";
+export {
   useReports,
   useGenerateReport,
   useGenerateSampleLabels,
