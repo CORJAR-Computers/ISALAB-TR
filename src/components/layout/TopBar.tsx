@@ -48,6 +48,18 @@ const TITLES: Record<string, { title: string; subtitle: string }> = {
     title: "Bandeja de trabajo",
     subtitle: "Muestras pendientes por tipo de análisis",
   },
+  qc: {
+    title: "Control de calidad (QC)",
+    subtitle: "Westgard, Levey-Jennings y materiales de control",
+  },
+  "lab-orders": {
+    title: "Órdenes de laboratorio",
+    subtitle: "Pruebas solicitadas y accessioning",
+  },
+  services: {
+    title: "Catálogo de servicios",
+    subtitle: "Precios, duración e IVA de toda la clínica",
+  },
   users: {
     title: "Usuarios",
     subtitle: "Cuentas y roles del sistema",

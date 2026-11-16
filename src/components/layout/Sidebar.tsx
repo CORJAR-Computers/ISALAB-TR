@@ -1,3 +1,5 @@
+import { useEffect, useRef, useState } from "react";
+import { ChevronDown, Info, X } from "lucide-react";
 import { cn } from "@/lib/utils";
 import { useUiStore, type View } from "@/stores/ui-store";
 import { usePermissions } from "@/hooks/use-permissions";
@@ -6,7 +8,6 @@ import {
   CalendarClock,
   FlaskConical,
   HeartPulse,
-  Info,
   FileText,
   LayoutDashboard,
   ListTodo,
@@ -18,28 +19,82 @@ import {
   Shield,
   Syringe,
   Users,
-  X,
+  LayoutList,
 } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import logoSidebar from "@/assets/logo_sidebar.png";
 
-const NAV_ITEMS: Array<{ view: View; label: string; icon: typeof Users; adminOnly?: boolean }> = [
-  { view: "dashboard", label: "Panel de control", icon: LayoutDashboard },
-  { view: "agenda", label: "Agenda de consultas", icon: CalendarClock },
-  { view: "patients", label: "Pacientes", icon: Users },
-  { view: "clinical-history", label: "Historial Clínico", icon: HeartPulse },
-  { view: "samples", label: "Muestras & Laboratorio", icon: FlaskConical },
-  { view: "worklist", label: "Bandeja de trabajo", icon: ListTodo },
-  { view: "lab-orders", label: "Órdenes de laboratorio", icon: ClipboardList },
-  { view: "surgeries", label: "Cirugías", icon: Scissors },
-  { view: "vaccines", label: "Vacunación", icon: Syringe },
-  { view: "invoices", label: "Facturación", icon: Receipt },
-  { view: "reports", label: "Reportes PDF", icon: FileText },
-  { view: "qc", label: "Control de calidad (QC)", icon: Activity },
-  { view: "users", label: "Usuarios", icon: Shield, adminOnly: true },
-  { view: "audit-log", label: "Auditoría", icon: ScrollText, adminOnly: true },
-  { view: "settings", label: "Configuración", icon: Settings, adminOnly: true },
+type NavItem = {
+  view: View;
+  label: string;
+  icon: typeof Users;
+  adminOnly?: boolean;
+};
+
+type NavSection = {
+  id: string;
+  label: string;
+  items: NavItem[];
+};
+
+/**
+ * Navegación por secciones colapsables: con la clínica integral el menú pasa
+ * de 15 a ~20 entradas; agruparlas evita una lista plana interminable.
+ * Cada fase del plan de clínica agrega su grupo sin saturar:
+ *  - fase 2: Recepción (reception, appointments) → grupo "Recepción"
+ *  - fase 4: Peluquería (grooming) → grupo "Estética"
+ *  - fase 1: Catálogo de servicios → grupo "Administración"
+ */
+const SECTIONS: NavSection[] = [
+  {
+    id: "operacion",
+    label: "Operación",
+    items: [
+      { view: "dashboard", label: "Panel de control", icon: LayoutDashboard },
+      { view: "agenda", label: "Agenda de consultas", icon: CalendarClock },
+      { view: "patients", label: "Pacientes", icon: Users },
+      { view: "clinical-history", label: "Historial Clínico", icon: HeartPulse },
+    ],
+  },
+  {
+    id: "laboratorio",
+    label: "Laboratorio",
+    items: [
+      { view: "samples", label: "Muestras & Laboratorio", icon: FlaskConical },
+      { view: "worklist", label: "Bandeja de trabajo", icon: ListTodo },
+      { view: "lab-orders", label: "Órdenes de laboratorio", icon: ClipboardList },
+      { view: "qc", label: "Control de calidad (QC)", icon: Activity },
+    ],
+  },
+  {
+    id: "clinica",
+    label: "Clínica",
+    items: [
+      { view: "surgeries", label: "Cirugías", icon: Scissors },
+      { view: "vaccines", label: "Vacunación", icon: Syringe },
+    ],
+  },
+  {
+    id: "administracion",
+    label: "Administración",
+    items: [
+      { view: "invoices", label: "Facturación", icon: Receipt },
+      { view: "reports", label: "Reportes PDF", icon: FileText },
+      { view: "services", label: "Catálogo de servicios", icon: LayoutList, adminOnly: true },
+      { view: "users", label: "Usuarios", icon: Shield, adminOnly: true },
+      { view: "audit-log", label: "Auditoría", icon: ScrollText, adminOnly: true },
+      { view: "settings", label: "Configuración", icon: Settings, adminOnly: true },
+    ],
+  },
 ];
+
+/**
+ * Estado de las secciones: SIEMPRE colapsadas al montar la app. No se
+ * persiste en localStorage para que cada arranque sea determinista (menú
+ * limpio, solo títulos de sección); la sección de la vista activa se abre
+ * sola únicamente cuando la navegación llega desde otra sección.
+ */
+const INITIAL_OPEN: string[] = [];
 
 export function Sidebar() {
   const sidebarOpen = useUiStore((s) => s.sidebarOpen);
@@ -48,7 +103,37 @@ export function Sidebar() {
   const view = useUiStore((s) => s.view);
   const navigate = useUiStore((s) => s.navigate);
   const { isAdmin } = usePermissions();
-  const items = NAV_ITEMS.filter((item) => !item.adminOnly || isAdmin);
+
+  const [openSections, setOpenSections] = useState<string[]>(INITIAL_OPEN);
+
+  // Vista con la que se montó la sidebar: el auto-apertura solo reacciona a
+  // cambios de vista DESPUÉS del montaje (al llegar desde la paleta Ctrl+K o
+  // desde un botón de otra página), nunca al arranque de la app.
+  const mountedView = useRef(view);
+
+  // Auto-abre la sección que contiene la vista activa (p. ej. al llegar
+  // desde la paleta Ctrl+K o desde un botón de otra página).
+  useEffect(() => {
+    if (view === mountedView.current) return;
+    mountedView.current = view;
+    const section = SECTIONS.find((s) =>
+      s.items.some((item) => item.view === view),
+    );
+    if (!section) return;
+    setOpenSections((prev) =>
+      prev.includes(section.id) ? prev : [...prev, section.id],
+    );
+  }, [view]);
+
+  const toggleSection = (id: string) =>
+    setOpenSections((prev) =>
+      prev.includes(id) ? prev.filter((s) => s !== id) : [...prev, id],
+    );
+
+  const filtered = SECTIONS.map((section) => ({
+    ...section,
+    items: section.items.filter((item) => !item.adminOnly || isAdmin),
+  })).filter((section) => section.items.length > 0);
 
   return (
     <>
@@ -88,43 +173,75 @@ export function Sidebar() {
           </Button>
         </div>
 
-        {/* Navegación */}
-        <nav className="flex-1 space-y-1 overflow-y-auto p-3">
-          {items.map((item) => {
-            const Icon = item.icon;
-            const active = view === item.view;
+        {/* Navegación por secciones */}
+        <nav className="flex-1 overflow-y-auto p-3">
+          {filtered.map((section) => {
+            const open = openSections.includes(section.id);
+            const activeInView = section.items.some((item) => item.view === view);
             return (
-              <button
-                key={item.view}
-                type="button"
-                onClick={() => navigate(item.view)}
-                title={item.label}
-                className={cn(
-                  "group relative flex w-full items-center gap-3 rounded-xl px-3 py-2.5 text-sm font-medium transition-all duration-200",
-                  active
-                    ? "bg-linear-to-r from-primary to-primary/90 text-primary-foreground shadow-md"
-                    : "text-muted-foreground hover:bg-sidebar-accent hover:text-sidebar-accent-foreground hover:translate-x-0.5",
-                )}
-              >
-                {/* Indicador activo */}
-                <span
+              <div key={section.id} className="mb-1">
+                <button
+                  type="button"
+                  onClick={() => toggleSection(section.id)}
+                  aria-expanded={open}
                   className={cn(
-                    "absolute top-1/2 left-0 h-5 w-1 -translate-y-1/2 rounded-r-full bg-foreground/70 transition-opacity",
-                    active ? "opacity-100" : "opacity-0",
-                  )}
-                />
-                <span
-                  className={cn(
-                    "flex size-7 items-center justify-center rounded-lg transition-colors",
-                    active
-                      ? "bg-white/20"
-                      : "bg-muted/60 group-hover:bg-background/60",
+                    "flex w-full items-center gap-2 rounded-lg px-3 py-2 text-[11px] font-semibold uppercase tracking-wider transition-colors",
+                    activeInView && !open
+                      ? "text-primary"
+                      : "text-muted-foreground hover:text-sidebar-accent-foreground",
                   )}
                 >
-                  <Icon className="size-4 shrink-0" />
-                </span>
-                <span className="flex-1 text-left">{item.label}</span>
-              </button>
+                  <span className="flex-1 text-left">{section.label}</span>
+                  <ChevronDown
+                    className={cn(
+                      "size-3.5 shrink-0 transition-transform duration-200",
+                      open && "rotate-180",
+                    )}
+                  />
+                </button>
+
+                {open && (
+                  <div className="space-y-0.5 pt-0.5">
+                    {section.items.map((item) => {
+                      const Icon = item.icon;
+                      const active = view === item.view;
+                      return (
+                        <button
+                          key={item.view}
+                          type="button"
+                          onClick={() => navigate(item.view)}
+                          title={item.label}
+                          className={cn(
+                            "group relative flex w-full items-center gap-3 rounded-xl py-2.5 pr-3 pl-5 text-sm font-medium transition-all duration-200",
+                            active
+                              ? "bg-linear-to-r from-primary to-primary/90 text-primary-foreground shadow-md"
+                              : "text-muted-foreground hover:bg-sidebar-accent hover:text-sidebar-accent-foreground hover:translate-x-0.5",
+                          )}
+                        >
+                          {/* Indicador activo */}
+                          <span
+                            className={cn(
+                              "absolute top-1/2 left-0 h-5 w-1 -translate-y-1/2 rounded-r-full bg-foreground/70 transition-opacity",
+                              active ? "opacity-100" : "opacity-0",
+                            )}
+                          />
+                          <span
+                            className={cn(
+                              "flex size-7 items-center justify-center rounded-lg transition-colors",
+                              active
+                                ? "bg-white/20"
+                                : "bg-muted/60 group-hover:bg-background/60",
+                            )}
+                          >
+                            <Icon className="size-4 shrink-0" />
+                          </span>
+                          <span className="flex-1 text-left">{item.label}</span>
+                        </button>
+                      );
+                    })}
+                  </div>
+                )}
+              </div>
             );
           })}
         </nav>

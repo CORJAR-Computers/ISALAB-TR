@@ -15,6 +15,7 @@ export type View =
   | "invoices"
   | "reports"
   | "qc"
+  | "services"
   | "users"
   | "audit-log"
   | "settings";
