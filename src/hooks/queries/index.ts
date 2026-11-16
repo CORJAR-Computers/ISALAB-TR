@@ -128,6 +128,16 @@ export {
   useSetServiceActive,
 } from "./use-services";
 export {
+  useVisits,
+  useVisit,
+  useCreateVisit,
+  useSetVisitStatus,
+  useAddVisitService,
+  useRemoveVisitService,
+  useUpdateVisitServiceStatus,
+  useCheckoutVisit,
+} from "./use-visits";
+export {
   useReports,
   useGenerateReport,
   useGenerateSampleLabels,

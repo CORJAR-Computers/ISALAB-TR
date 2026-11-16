@@ -4,6 +4,7 @@ import {
   KeyRound,
   Loader2,
   Plus,
+  Scissors,
   Shield,
   ShieldAlert,
   UserCheck,
@@ -69,7 +70,7 @@ const createSchema = z.object({
     .min(3, "Mínimo 3 caracteres")
     .max(40, "Máximo 40 caracteres"),
   fullName: z.string().min(3, "Nombre completo requerido"),
-  role: z.enum(["ADMIN", "VETERINARIO", "AUXILIAR"]),
+  role: z.enum(["ADMIN", "VETERINARIO", "AUXILIAR", "RECEPCION", "PELUQUERO"]),
   initialPassword: z
     .string()
     .min(6, "Mínimo 6 caracteres"),
@@ -187,6 +188,18 @@ function CreateUserDialog({
                           Auxiliar
                         </span>
                       </SelectItem>
+                      <SelectItem value="RECEPCION">
+                        <span className="flex items-center gap-2">
+                          <UserCheck className="size-3.5 text-amber-500" />
+                          Recepción
+                        </span>
+                      </SelectItem>
+                      <SelectItem value="PELUQUERO">
+                        <span className="flex items-center gap-2">
+                          <Scissors className="size-3.5 text-pink-500" />
+                          Peluquero
+                        </span>
+                      </SelectItem>
                     </SelectContent>
                   </Select>
                   <FormMessage />
@@ -246,6 +259,8 @@ export function UsersPage() {
     ADMIN: "default",
     VETERINARIO: "secondary",
     AUXILIAR: "outline",
+    RECEPCION: "secondary",
+    PELUQUERO: "outline",
   };
 
   if (!isAdmin) {

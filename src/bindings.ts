@@ -1729,6 +1729,94 @@ export type WorklistSample = {
 	abnormalCount: number,
 };
 
+/**  Línea de servicio dentro de una visita (precio congelado del catálogo). */
+export type VisitService = {
+	id: number,
+	visitId: number,
+	serviceId: number,
+	serviceName: string,
+	serviceCode: string,
+	categoryId: number,
+	categoryName: string,
+	/**  Profesional asignado (veterinario, peluquero…). */
+	professionalId: number | null,
+	professionalName: string | null,
+	quantity: number,
+	unitPrice: number | null,
+	/**  NULL = IVA global de la clínica. */
+	taxRate: number | null,
+	/**  PENDIENTE | EN_PROCESO | COMPLETADA | CANCELADA */
+	status: string,
+	/**  YYYY-MM-DD HH:MM:SS (NULL si no inició). */
+	startedAt: string | null,
+	finishedAt: string | null,
+	notes: string | null,
+	seq: number,
+};
+
+/**  Visita completa (con sus líneas de servicio). */
+export type Visit = {
+	/**  Código único (V-YYYY-NNNN). */
+	code: string,
+	id: number,
+	patientId: number,
+	patientName: string,
+	ownerId: number,
+	ownerName: string,
+	appointmentId: number | null,
+	/**  YYYY-MM-DD HH:MM:SS */
+	arrivedAt: string,
+	/**  NORMAL | URGENTE */
+	priority: string,
+	/**  EN_ESPERA | EN_ATENCION | FINALIZADA | FACTURADA | CANCELADA */
+	status: string,
+	notes: string | null,
+	createdByName: string | null,
+	services: VisitService[],
+};
+
+/**  Fila del listado de visitas de la cola de recepción (sin líneas). */
+export type VisitListItem = {
+	id: number,
+	code: string,
+	patientId: number,
+	patientName: string,
+	ownerId: number,
+	ownerName: string,
+	arrivedAt: string,
+	priority: string,
+	status: string,
+	notes: string | null,
+	/**  Resumen "Baño + Consulta general". */
+	servicesSummary: string,
+	/**  Total estimado de las líneas no canceladas (precio congelado). */
+	estimatedTotal: number | null,
+};
+
+export type AddVisitServiceInput = {
+	serviceId: number,
+	/**  Profesional asignado a esta línea. */
+	professionalId: number | null,
+	quantity: number,
+	notes: string | null,
+};
+
+export type CreateVisitInput = {
+	patientId: number,
+	/**  Si no llega, se toma del paciente. */
+	ownerId: number | null,
+	priority: string | null,
+	notes: string | null,
+	services: AddVisitServiceInput[],
+};
+
+export type UpdateVisitServiceStatusInput = {
+	/**  Estado de la línea: EN_PROCESO | COMPLETADA | CANCELADA. */
+	status: string,
+	/**  Reasignación opcional del profesional. */
+	professionalId: number | null,
+};
+
 /* Tauri Specta runtime */
 async function typedError<T, E>(result: Promise<T>): Promise<{ status: "ok"; data: T } | { status: "error"; error: E }> {
     try {

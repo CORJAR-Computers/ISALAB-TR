@@ -73,6 +73,12 @@ import type {
   ServiceCategory,
   SaveServiceCategoryInput,
   SaveServiceInput,
+  Visit,
+  VisitListItem,
+  VisitService,
+  CreateVisitInput,
+  AddVisitServiceInput,
+  UpdateVisitServiceStatusInput,
   WorklistData,
 } from "@/bindings";
 
@@ -378,6 +384,26 @@ export const api = {
     invoke<Service>("save_service", { input }),
   setServiceActive: (id: number, active: boolean) =>
     invoke<Service>("set_service_active", { id, active }),
+
+  // ---- Recepción de la clínica (visitas) ----
+  listVisits: (date: string | null, status: string | null, search: string | null) =>
+    invoke<VisitListItem[]>("list_visits", { date, status, search }),
+  getVisit: (id: number) => invoke<Visit | null>("get_visit", { id }),
+  createVisit: (input: CreateVisitInput) =>
+    invoke<Visit>("create_visit", { input }),
+  setVisitStatus: (id: number, status: string) =>
+    invoke<Visit>("set_visit_status", { id, status }),
+  addVisitService: (visitId: number, input: AddVisitServiceInput) =>
+    invoke<VisitService>("add_visit_service", { visitId, input }),
+  removeVisitService: (visitId: number, lineId: number) =>
+    invoke<void>("remove_visit_service", { visitId, lineId }),
+  updateVisitServiceStatus: (
+    visitId: number,
+    lineId: number,
+    input: UpdateVisitServiceStatusInput,
+  ) => invoke<VisitService>("update_visit_service_status", { visitId, lineId, input }),
+  checkoutVisit: (visitId: number, paymentMethod: string | null, notes: string | null) =>
+    invoke<Invoice>("checkout_visit", { visitId, paymentMethod, notes }),
 
   // ---- Búsqueda global (paleta Ctrl+K) ----
   globalSearch: (query: string) =>

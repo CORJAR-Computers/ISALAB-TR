@@ -123,4 +123,12 @@ export {
   useSaveServiceCategory,
   useDeleteServiceCategory,
   useSetServiceActive,
+  useVisits,
+  useVisit,
+  useCreateVisit,
+  useSetVisitStatus,
+  useAddVisitService,
+  useRemoveVisitService,
+  useUpdateVisitServiceStatus,
+  useCheckoutVisit,
 } from "./queries";

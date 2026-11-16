@@ -62,6 +62,29 @@ export const CONSULTATION_STATUS: Record<
   CANCELADA: { label: "Cancelada", variant: "destructive" },
 };
 
+/** Estados de una visita de recepción (migración 0027). */
+export const VISIT_STATUS: Record<
+  string,
+  { label: string; variant: BadgeVariant }
+> = {
+  EN_ESPERA: { label: "En espera", variant: "secondary" },
+  EN_ATENCION: { label: "En atención", variant: "warning" },
+  FINALIZADA: { label: "Finalizada", variant: "success" },
+  FACTURADA: { label: "Facturada", variant: "default" },
+  CANCELADA: { label: "Cancelada", variant: "destructive" },
+};
+
+/** Estados de una línea de servicio de visita. */
+export const VISIT_SERVICE_STATUS: Record<
+  string,
+  { label: string; variant: BadgeVariant }
+> = {
+  PENDIENTE: { label: "Pendiente", variant: "secondary" },
+  EN_PROCESO: { label: "En proceso", variant: "warning" },
+  COMPLETADA: { label: "Completada", variant: "success" },
+  CANCELADA: { label: "Cancelada", variant: "destructive" },
+};
+
 export const SEX_LABEL: Record<string, string> = {
   M: "Macho",
   F: "Hembra",
@@ -71,6 +94,17 @@ export const ROLE_LABEL: Record<string, string> = {
   ADMIN: "Administrador",
   VETERINARIO: "Veterinario",
   AUXILIAR: "Auxiliar",
+  RECEPCION: "Recepción",
+  PELUQUERO: "Peluquero",
+};
+
+/** Estilos del badge de rol (orden: jerárquico). */
+export const ROLE_BADGE_CLASS: Record<string, string> = {
+  ADMIN: "bg-purple-100 text-purple-700 dark:bg-purple-500/20 dark:text-purple-300",
+  VETERINARIO: "bg-blue-100 text-blue-700 dark:bg-blue-500/20 dark:text-blue-300",
+  AUXILIAR: "bg-teal-100 text-teal-700 dark:bg-teal-500/20 dark:text-teal-300",
+  RECEPCION: "bg-amber-100 text-amber-700 dark:bg-amber-500/20 dark:text-amber-300",
+  PELUQUERO: "bg-pink-100 text-pink-700 dark:bg-pink-500/20 dark:text-pink-300",
 };
 
 export const SURGERY_STATUS: Record<
