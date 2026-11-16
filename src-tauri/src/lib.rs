@@ -79,6 +79,10 @@ use crate::commands::samples::{
     set_sample_quality, set_sample_status,
 };
 use crate::commands::search::global_search;
+use crate::commands::services::{
+    delete_service_category, get_service, list_all_service_categories, list_service_categories,
+    list_services, save_service, save_service_category, set_service_active,
+};
 use crate::commands::settings::{
     delete_secondary_logo, get_clinic_settings, import_clinic_logo, import_pkcs12,
     import_secondary_logo, list_secondary_logos, save_clinic_settings,
@@ -112,6 +116,14 @@ fn specta_builder() -> Builder<tauri::Wry> {
             create_local_backup,
             export_samples_csv,
             export_results_csv,
+            list_service_categories,
+            list_all_service_categories,
+            save_service_category,
+            delete_service_category,
+            list_services,
+            get_service,
+            save_service,
+            set_service_active,
             list_species,
             list_breeds,
             list_sample_types,
@@ -241,6 +253,11 @@ fn specta_builder() -> Builder<tauri::Wry> {
         .typ::<crate::models::analyzer_source::AnalyzerSource>()
         .typ::<crate::models::analyzer_source::SaveAnalyzerSourceInput>()
         .typ::<crate::models::analyzer_source::AnalyzerImportJob>()
+        // Catálogo de servicios (fase clínica 1).
+        .typ::<crate::models::service::ServiceCategory>()
+        .typ::<crate::models::service::Service>()
+        .typ::<crate::models::service::SaveServiceCategoryInput>()
+        .typ::<crate::models::service::SaveServiceInput>()
 }
 
 #[cfg_attr(mobile, tauri::mobile_entry_point)]

@@ -102,6 +102,10 @@ pub const MIGRATIONS: &[(&str, &str)] = &[
         "0024_drop_redundant_indexes",
         include_str!("../../migrations/0024_drop_redundant_indexes.sql"),
     ),
+    (
+        "0025_service_catalog",
+        include_str!("../../migrations/0025_service_catalog.sql"),
+    ),
 ];
 
 /// Indica si una migración de datos de demostración debe aplicarse.

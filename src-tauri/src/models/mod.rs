@@ -17,6 +17,7 @@ pub mod report;
 pub mod sample;
 pub mod sample_list_item;
 pub mod search;
+pub mod service;
 pub mod settings;
 pub mod species;
 pub mod status_count;

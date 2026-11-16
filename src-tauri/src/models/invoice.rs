@@ -60,6 +60,9 @@ pub struct CreateInvoiceItemInput {
     pub description: String,
     pub quantity: i32,
     pub unit_price: f64,
+    /// Servicio del catálogo del que proviene la línea (opcional; las líneas
+    /// manuales no lo traen). Solo rastreo: el precio de la línea es una copia.
+    pub service_id: Option<i32>,
 }
 
 #[derive(Debug, Clone, Serialize, Deserialize, Type)]

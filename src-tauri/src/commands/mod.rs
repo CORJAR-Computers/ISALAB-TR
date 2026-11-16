@@ -18,6 +18,7 @@ pub mod qc;
 pub mod reports;
 pub mod samples;
 pub mod search;
+pub mod services;
 pub mod settings;
 pub mod surgeries;
 pub mod users;

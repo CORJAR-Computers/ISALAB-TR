@@ -5,6 +5,9 @@ description = "Sistema de gestión para laboratorios veterinarios (Firebird 5 Em
 authors = ["ISALAB"]
 edition = "2021"
 rust-version = "1.77.2"
+# Binario por defecto de `cargo run`: el crate también tiene `profile_seed`
+# (herramienta de profiling) y sin esta clave `cargo run` no sabe cuál ejecutar.
+default-run = "isalab"
 
 [lib]
 name = "isalab_lib"

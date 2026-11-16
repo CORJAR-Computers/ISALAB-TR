@@ -188,8 +188,8 @@ pub fn create(
         let item_id = next_id(conn, "GEN_INVOICE_ITEMS_ID")?;
         conn.execute(
             "INSERT INTO INVOICE_ITEMS
-                (ID, INVOICE_ID, DESCRIPTION, QUANTITY, UNIT_PRICE, LINE_TOTAL)
-             VALUES (?, ?, ?, ?, ?, ?)",
+                (ID, INVOICE_ID, DESCRIPTION, QUANTITY, UNIT_PRICE, LINE_TOTAL, SERVICE_ID)
+             VALUES (?, ?, ?, ?, ?, ?, ?)",
             (
                 &item_id,
                 &id,
@@ -197,6 +197,7 @@ pub fn create(
                 &it.quantity,
                 &it.unit_price,
                 &line_total,
+                &it.service_id,
             ),
         )
         .map_err(AppError::from)?;
@@ -425,11 +426,13 @@ mod integration_tests {
                     description: "Consulta general".into(),
                     quantity: 1,
                     unit_price: 100000.0,
+                    service_id: Some(1),
                 },
                 crate::models::invoice::CreateInvoiceItemInput {
                     description: "Laboratorio".into(),
                     quantity: 2,
                     unit_price: 50000.0,
+                    service_id: Some(9),
                 },
             ],
         };
