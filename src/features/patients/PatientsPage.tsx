@@ -202,9 +202,9 @@ export function PatientsPage() {
       <NewPatientDialog
         open={dialogOpen}
         onOpenChange={setDialogOpen}
-        onCreated={(id) => {
+        onCreated={(patient) => {
           setDialogOpen(false);
-          setActivePatient(id);
+          setActivePatient(patient.id);
           navigate("clinical-history");
         }}
       />

@@ -1,5 +1,5 @@
 import { useEffect, useMemo, useState } from "react";
-import { ClipboardPlus, DoorOpen, Search, UserPlus } from "lucide-react";
+import { ClipboardPlus, DoorOpen, Search } from "lucide-react";
 import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
@@ -19,11 +19,11 @@ import { usePermissions } from "@/hooks/use-permissions";
 import { getErrorMessage } from "@/lib/api";
 import { VISIT_STATUS } from "@/lib/status";
 import { cn, formatCOP } from "@/lib/utils";
-import { useUiStore } from "@/stores/ui-store";
 import { toast } from "sonner";
+import { PatientQuickCreateButton } from "@/features/patients/PatientQuickCreateButton";
 import { NewVisitDialog } from "./NewVisitDialog";
 import { VisitDetailDialog } from "./VisitDetailDialog";
-import type { VisitListItem } from "@/bindings";
+import type { Patient, VisitListItem } from "@/bindings";
 
 /** Pestañas de la cola: estado + etiqueta. */
 const QUEUE_TABS: Array<{ status: string | null; label: string }> = [
@@ -42,10 +42,9 @@ export function ReceptionPage() {
   const [search, setSearch] = useState("");
   const [debouncedSearch, setDebouncedSearch] = useState("");
   const [newVisitOpen, setNewVisitOpen] = useState(false);
+  const [presetPatient, setPresetPatient] = useState<Patient | null>(null);
   const [detailVisit, setDetailVisit] = useState<VisitListItem | null>(null);
   const { canReceive } = usePermissions();
-  const navigate = useUiStore((s) => s.navigate);
-  const setActivePatient = useUiStore((s) => s.setActivePatient);
   const setStatus = useSetVisitStatus();
 
   useEffect(() => {
@@ -123,16 +122,17 @@ export function ReceptionPage() {
                   <ClipboardPlus className="size-4" />
                   Nueva visita
                 </Button>
-                <Button
-                  variant="outline"
-                  onClick={() => {
-                    setActivePatient(null);
-                    navigate("patients");
+                <PatientQuickCreateButton
+                  onCreated={(patient) => {
+                    toast.success("Paciente registrado", {
+                      description: `${patient.name} · listo para su visita`,
+                    });
+                    // Se queda en Recepción y abre la visita con el paciente
+                    // ya seleccionado (sin perder el contexto del módulo).
+                    setPresetPatient(patient);
+                    setNewVisitOpen(true);
                   }}
-                >
-                  <UserPlus className="size-4" />
-                  Pacientes
-                </Button>
+                />
               </div>
             </CardContent>
           </Card>
@@ -275,7 +275,14 @@ export function ReceptionPage() {
         </div>
       </div>
 
-      <NewVisitDialog open={newVisitOpen} onOpenChange={setNewVisitOpen} />
+      <NewVisitDialog
+        open={newVisitOpen}
+        onOpenChange={(open) => {
+          setNewVisitOpen(open);
+          if (!open) setPresetPatient(null);
+        }}
+        presetPatient={presetPatient}
+      />
       <VisitDetailDialog
         visitSummary={detailVisit}
         onClose={() => setDetailVisit(null)}

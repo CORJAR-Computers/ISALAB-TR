@@ -33,6 +33,7 @@ import {
 import { Separator } from "@/components/ui/separator";
 import { useBreeds, useCreatePatient, useSpecies } from "@/hooks/use-queries";
 import { getErrorMessage } from "@/lib/api";
+import type { Patient } from "@/bindings";
 
 const DOC_TYPES = [
   { value: "CC", label: "Cédula de Ciudadanía" },
@@ -72,7 +73,8 @@ export function NewPatientDialog({
 }: {
   open: boolean;
   onOpenChange: (open: boolean) => void;
-  onCreated?: (patientId: number) => void;
+  /** Recibe el paciente recién creado (con owner/species resueltos). */
+  onCreated?: (patient: Patient) => void;
 }) {
   const { data: species = [] } = useSpecies();
   const createPatient = useCreatePatient();
@@ -137,7 +139,7 @@ export function NewPatientDialog({
       toast.success(`Paciente ${patient.name} registrado`, {
         description: `#${patient.id} · ${patient.speciesName}`,
       });
-      onCreated?.(patient.id);
+      onCreated?.(patient);
       form.reset();
     } catch (e) {
       toast.error("No se pudo crear el paciente", {

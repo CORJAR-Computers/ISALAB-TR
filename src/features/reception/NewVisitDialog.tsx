@@ -41,6 +41,7 @@ import {
 } from "@/hooks/use-queries";
 import { getErrorMessage } from "@/lib/api";
 import { cn, formatCOP } from "@/lib/utils";
+import { PatientQuickCreateButton } from "@/features/patients/PatientQuickCreateButton";
 import type { Patient, Service } from "@/bindings";
 
 const formSchema = z.object({
@@ -219,32 +220,47 @@ export function NewVisitDialog({
                       className="pl-9"
                     />
                   </div>
-                  <FormField
-                    control={form.control}
-                    name="patientId"
-                    render={({ field }) => (
-                      <FormItem>
-                        <Select
-                          value={field.value ? String(field.value) : ""}
-                          onValueChange={(v) => field.onChange(Number(v))}
-                        >
-                          <FormControl>
-                            <SelectTrigger className="w-full">
-                              <SelectValue placeholder="Selecciona el paciente…" />
-                            </SelectTrigger>
-                          </FormControl>
-                          <SelectContent className="max-h-64">
-                            {patients.map((p) => (
-                              <SelectItem key={p.id} value={p.id.toString()}>
-                                {p.name} · {p.ownerName}
-                              </SelectItem>
-                            ))}
-                          </SelectContent>
-                        </Select>
-                        <FormMessage />
-                      </FormItem>
-                    )}
-                  />
+                  <div className="flex items-start gap-2">
+                    <FormField
+                      control={form.control}
+                      name="patientId"
+                      render={({ field }) => (
+                        <FormItem className="flex-1">
+                          <Select
+                            value={field.value ? String(field.value) : ""}
+                            onValueChange={(v) => field.onChange(Number(v))}
+                          >
+                            <FormControl>
+                              <SelectTrigger className="w-full">
+                                <SelectValue placeholder="Selecciona el paciente…" />
+                              </SelectTrigger>
+                            </FormControl>
+                            <SelectContent className="max-h-64">
+                              {patients.map((p) => (
+                                <SelectItem key={p.id} value={p.id.toString()}>
+                                  {p.name} · {p.ownerName}
+                                </SelectItem>
+                              ))}
+                            </SelectContent>
+                          </Select>
+                          <FormMessage />
+                        </FormItem>
+                      )}
+                    />
+                    {/* Alta en línea: el nuevo paciente queda seleccionado
+                        sin abandonar el diálogo de la visita. */}
+                    <PatientQuickCreateButton
+                      label=""
+                      className="shrink-0 [&>svg]:mx-auto"
+                      onCreated={(patient) => {
+                        form.setValue("patientId", patient.id);
+                        setPatientSearch("");
+                        toast.info("Paciente listo para la visita", {
+                          description: `${patient.name} · ${patient.ownerName}`,
+                        });
+                      }}
+                    />
+                  </div>
                 </>
               )}
             </div>

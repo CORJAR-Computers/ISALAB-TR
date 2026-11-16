@@ -4,16 +4,10 @@ import { zodResolver } from "@hookform/resolvers/zod";
 import { z } from "zod";
 import { toast } from "sonner";
 import { openPath } from "@tauri-apps/plugin-opener";
-import {
-  CheckCircle2,
-  FlaskConical,
-  Loader2,
-  Plus,
-  Printer,
-  Search,
-} from "lucide-react";
+import { CheckCircle2, FlaskConical, Loader2, Plus, Printer, Search } from "lucide-react";
 import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
+import { PatientQuickCreateButton } from "@/features/patients/PatientQuickCreateButton";
 import {
   Dialog,
   DialogContent,
@@ -273,13 +267,27 @@ export function NewSampleDialog({
                   <FormItem>
                     <FormLabel>Paciente</FormLabel>
                     <div className="space-y-2">
-                      <div className="relative">
-                        <Search className="text-muted-foreground absolute top-1/2 left-3 size-4 -translate-y-1/2" />
-                        <Input
-                          value={search}
-                          onChange={(e) => setSearch(e.target.value)}
-                          placeholder="Buscar paciente (nombre, propietario)…"
-                          className="pl-9"
+                      <div className="flex items-start gap-2">
+                        <div className="relative flex-1">
+                          <Search className="text-muted-foreground absolute top-1/2 left-3 size-4 -translate-y-1/2" />
+                          <Input
+                            value={search}
+                            onChange={(e) => setSearch(e.target.value)}
+                            placeholder="Buscar paciente (nombre, propietario)…"
+                            className="pl-9"
+                          />
+                        </div>
+                        {/* Alta en línea: el nuevo paciente queda seleccionado. */}
+                        <PatientQuickCreateButton
+                          label=""
+                          className="shrink-0 [&>svg]:mx-auto"
+                          onCreated={(patient) => {
+                            field.onChange(patient.id);
+                            setSearch("");
+                            toast.info("Paciente listo para la muestra", {
+                              description: `${patient.name} · ${patient.ownerName}`,
+                            });
+                          }}
                         />
                       </div>
                       <div className="max-h-40 space-y-1 overflow-y-auto rounded-lg border p-1">

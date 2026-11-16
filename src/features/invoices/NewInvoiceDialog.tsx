@@ -47,6 +47,7 @@ import type { Service } from "@/bindings";
 import { getErrorMessage } from "@/lib/api";
 import { PAYMENT_METHOD_LABEL } from "@/lib/status";
 import { cn, formatCOP } from "@/lib/utils";
+import { PatientQuickCreateButton } from "@/features/patients/PatientQuickCreateButton";
 
 const invoiceItemSchema = z.object({
   description: z.string().min(1, "Descripción requerida"),
@@ -268,16 +269,33 @@ export function NewInvoiceDialog({
                 render={({ field }) => (
                   <FormItem>
                     <FormLabel>Paciente (opcional)</FormLabel>
-                    <div className="relative">
-                      <Search className="text-muted-foreground absolute top-1/2 left-3 size-4 -translate-y-1/2" />
-                      <Input
-                        value={patientSearch}
-                        onChange={(e) => {
-                          setPatientSearch(e.target.value);
-                          field.onChange(null);
+                    <div className="flex items-start gap-2">
+                      <div className="relative flex-1">
+                        <Search className="text-muted-foreground absolute top-1/2 left-3 size-4 -translate-y-1/2" />
+                        <Input
+                          value={patientSearch}
+                          onChange={(e) => {
+                            setPatientSearch(e.target.value);
+                            field.onChange(null);
+                          }}
+                          placeholder="Buscar paciente…"
+                          className="pl-9"
+                        />
+                      </div>
+                      {/* Alta en línea: crea propietario+paciente y los deja
+                          seleccionados sin abandonar la factura. */}
+                      <PatientQuickCreateButton
+                        label=""
+                        className="shrink-0 [&>svg]:mx-auto"
+                        onCreated={(patient) => {
+                          form.setValue("ownerId", patient.ownerId);
+                          form.setValue("patientId", patient.id);
+                          setOwnerSearch("");
+                          setPatientSearch("");
+                          toast.info("Cliente y paciente listos", {
+                            description: `${patient.name} · ${patient.ownerName}`,
+                          });
                         }}
-                        placeholder="Buscar paciente…"
-                        className="pl-9"
                       />
                     </div>
                     {loadingPatients ? (

@@ -5,6 +5,7 @@ import { z } from "zod";
 import { toast } from "sonner";
 import { Loader2, Scissors, Search } from "lucide-react";
 import { Button } from "@/components/ui/button";
+import { PatientQuickCreateButton } from "@/features/patients/PatientQuickCreateButton";
 import {
   Dialog,
   DialogContent,
@@ -120,16 +121,27 @@ export function NewSurgeryDialog({
               render={({ field }) => (
                 <FormItem>
                   <FormLabel>Paciente</FormLabel>
-                  <div className="relative">
-                    <Search className="text-muted-foreground absolute top-1/2 left-3 size-4 -translate-y-1/2" />
-                    <Input
-                      value={search}
-                      onChange={(e) => {
-                        setSearch(e.target.value);
-                        field.onChange(undefined);
+                  <div className="flex items-start gap-2">
+                    <div className="relative flex-1">
+                      <Search className="text-muted-foreground absolute top-1/2 left-3 size-4 -translate-y-1/2" />
+                      <Input
+                        value={search}
+                        onChange={(e) => {
+                          setSearch(e.target.value);
+                          field.onChange(undefined);
+                        }}
+                        placeholder="Buscar paciente…"
+                        className="pl-9"
+                      />
+                    </div>
+                    {/* Alta en línea: el nuevo paciente queda seleccionado. */}
+                    <PatientQuickCreateButton
+                      label=""
+                      className="shrink-0 [&>svg]:mx-auto"
+                      onCreated={(patient) => {
+                        field.onChange(patient.id);
+                        setSearch("");
                       }}
-                      placeholder="Buscar paciente…"
-                      className="pl-9"
                     />
                   </div>
                   {loadingPatients ? (

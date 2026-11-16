@@ -55,6 +55,55 @@ export const commands = {
 	saveService: (input: SaveServiceInput) => typedError<Service, AppError>(__TAURI_INVOKE("save_service", { input })),
 	/**  Activa o desactiva un servicio (baja lógica; ADMIN). */
 	setServiceActive: (id: number, active: boolean) => typedError<Service, AppError>(__TAURI_INVOKE("set_service_active", { id, active })),
+	/**
+	 *  Lista la cola de recepción con filtros: fecha (YYYY-MM-DD), estado y
+	 *  búsqueda libre. Urgentes primero.
+	 */
+	listVisits: (date: string | null, status: string | null, search: string | null) => typedError<VisitListItem[], AppError>(__TAURI_INVOKE("list_visits", { date, status, search })),
+	/**  Ficha completa de una visita (con sus líneas de servicio). */
+	getVisit: (id: number) => typedError<{
+	id: number,
+	/**  Código único (V-YYYY-NNNN). */
+	code: string,
+	patientId: number,
+	patientName: string,
+	ownerId: number,
+	ownerName: string,
+	appointmentId: number | null,
+	/**  YYYY-MM-DD HH:MM:SS */
+	arrivedAt: string,
+	/**  NORMAL | URGENTE */
+	priority: string,
+	/**  EN_ESPERA | EN_ATENCION | FINALIZADA | FACTURADA | CANCELADA */
+	status: string,
+	notes: string | null,
+	createdByName: string | null,
+	services: VisitService[],
+} | null, AppError>(__TAURI_INVOKE("get_visit", { id })),
+	/**
+	 *  Check-in de un paciente: crea la visita con sus servicios iniciales
+	 *  (precios congelados del catálogo en este instante).
+	 */
+	createVisit: (input: CreateVisitInput) => typedError<Visit, AppError>(__TAURI_INVOKE("create_visit", { input })),
+	/**
+	 *  Cambia el estado de la visita (EN_ESPERA → EN_ATENCION → FINALIZADA;
+	 *  CANCELADA posible desde estados no facturados).
+	 */
+	setVisitStatus: (id: number, status: string) => typedError<Visit, AppError>(__TAURI_INVOKE("set_visit_status", { id, status })),
+	/**  Agrega un servicio a la visita (snapshot de precio del catálogo). */
+	addVisitService: (visitId: number, input: AddVisitServiceInput) => typedError<VisitService, AppError>(__TAURI_INVOKE("add_visit_service", { visitId, input })),
+	/**  Quita una línea PENDIENTE de la visita. */
+	removeVisitService: (visitId: number, lineId: number) => typedError<null, AppError>(__TAURI_INVOKE("remove_visit_service", { visitId, lineId })),
+	/**
+	 *  Cambia el estado de una línea (PENDIENTE → EN_PROCESO → COMPLETADA/CANCELADA).
+	 *  El peluquero/veterinario usa esto desde su bandeja.
+	 */
+	updateVisitServiceStatus: (visitId: number, lineId: number, input: UpdateVisitServiceStatusInput) => typedError<VisitService, AppError>(__TAURI_INVOKE("update_visit_service_status", { visitId, lineId, input })),
+	/**
+	 *  Cobra la visita: genera la factura desde las líneas con precio congelado
+	 *  y marca la visita FACTURADA. Una sola factura por visita.
+	 */
+	checkoutVisit: (visitId: number, paymentMethod: string | null, notes: string | null) => typedError<Invoice, AppError>(__TAURI_INVOKE("checkout_visit", { visitId, paymentMethod, notes })),
 	listSpecies: () => typedError<Species[], AppError>(__TAURI_INVOKE("list_species")),
 	listBreeds: (speciesId: number) => typedError<Breed[], AppError>(__TAURI_INVOKE("list_breeds", { speciesId })),
 	listSampleTypes: () => typedError<SampleType[], AppError>(__TAURI_INVOKE("list_sample_types")),
@@ -533,6 +582,14 @@ export type AccessionOrderInput = {
 	notes: string | null,
 };
 
+export type AddVisitServiceInput = {
+	serviceId: number,
+	/**  Profesional asignado a esta línea. */
+	professionalId: number | null,
+	quantity: number,
+	notes: string | null,
+};
+
 export type Analyte = {
 	id: number,
 	code: string,
@@ -838,6 +895,15 @@ export type CreateVaccineInput = {
 	lot: string | null,
 	manufacturer: string | null,
 	notes: string | null,
+};
+
+export type CreateVisitInput = {
+	patientId: number,
+	/**  Si no llega, se toma del paciente. */
+	ownerId: number | null,
+	priority: string | null,
+	notes: string | null,
+	services: AddVisitServiceInput[],
 };
 
 /**  Volumen de muestras recibidas en un día (tendencia). */
@@ -1621,6 +1687,13 @@ export type UpdateAnalyzerInput = {
 	notes: string | null,
 };
 
+export type UpdateVisitServiceStatusInput = {
+	/**  Estado de la línea: EN_PROCESO | COMPLETADA | CANCELADA. */
+	status: string,
+	/**  Reasignación opcional del profesional. */
+	professionalId: number | null,
+};
+
 /**  Fila del listado de usuarios (nunca expone el hash). */
 export type UserListItem = {
 	id: number,
@@ -1667,6 +1740,70 @@ export type VaccineType = {
 	id: number,
 	code: string,
 	name: string,
+};
+
+/**  Visita completa (con sus líneas de servicio). */
+export type Visit = {
+	id: number,
+	/**  Código único (V-YYYY-NNNN). */
+	code: string,
+	patientId: number,
+	patientName: string,
+	ownerId: number,
+	ownerName: string,
+	appointmentId: number | null,
+	/**  YYYY-MM-DD HH:MM:SS */
+	arrivedAt: string,
+	/**  NORMAL | URGENTE */
+	priority: string,
+	/**  EN_ESPERA | EN_ATENCION | FINALIZADA | FACTURADA | CANCELADA */
+	status: string,
+	notes: string | null,
+	createdByName: string | null,
+	services: VisitService[],
+};
+
+/**  Fila del listado de visitas de la cola de recepción (sin líneas). */
+export type VisitListItem = {
+	id: number,
+	code: string,
+	patientId: number,
+	patientName: string,
+	ownerId: number,
+	ownerName: string,
+	arrivedAt: string,
+	priority: string,
+	status: string,
+	notes: string | null,
+	/**  Resumen "Baño + Consulta general". */
+	servicesSummary: string,
+	/**  Total estimado de las líneas no canceladas (precio congelado). */
+	estimatedTotal: number | null,
+};
+
+/**  Línea de servicio dentro de una visita (precio congelado del catálogo). */
+export type VisitService = {
+	id: number,
+	visitId: number,
+	serviceId: number,
+	serviceName: string,
+	serviceCode: string,
+	categoryId: number,
+	categoryName: string,
+	/**  Profesional asignado (veterinario, peluquero…). */
+	professionalId: number | null,
+	professionalName: string | null,
+	quantity: number,
+	unitPrice: number | null,
+	/**  NULL = IVA global de la clínica. */
+	taxRate: number | null,
+	/**  PENDIENTE | EN_PROCESO | COMPLETADA | CANCELADA */
+	status: string,
+	/**  YYYY-MM-DD HH:MM:SS (NULL si no inició). */
+	startedAt: string | null,
+	finishedAt: string | null,
+	notes: string | null,
+	seq: number,
 };
 
 /**
@@ -1727,94 +1864,6 @@ export type WorklistSample = {
 	resultCount: number,
 	/**  Nº de resultados fuera de rango (ALTO/BAJO) — alerta visual. */
 	abnormalCount: number,
-};
-
-/**  Línea de servicio dentro de una visita (precio congelado del catálogo). */
-export type VisitService = {
-	id: number,
-	visitId: number,
-	serviceId: number,
-	serviceName: string,
-	serviceCode: string,
-	categoryId: number,
-	categoryName: string,
-	/**  Profesional asignado (veterinario, peluquero…). */
-	professionalId: number | null,
-	professionalName: string | null,
-	quantity: number,
-	unitPrice: number | null,
-	/**  NULL = IVA global de la clínica. */
-	taxRate: number | null,
-	/**  PENDIENTE | EN_PROCESO | COMPLETADA | CANCELADA */
-	status: string,
-	/**  YYYY-MM-DD HH:MM:SS (NULL si no inició). */
-	startedAt: string | null,
-	finishedAt: string | null,
-	notes: string | null,
-	seq: number,
-};
-
-/**  Visita completa (con sus líneas de servicio). */
-export type Visit = {
-	/**  Código único (V-YYYY-NNNN). */
-	code: string,
-	id: number,
-	patientId: number,
-	patientName: string,
-	ownerId: number,
-	ownerName: string,
-	appointmentId: number | null,
-	/**  YYYY-MM-DD HH:MM:SS */
-	arrivedAt: string,
-	/**  NORMAL | URGENTE */
-	priority: string,
-	/**  EN_ESPERA | EN_ATENCION | FINALIZADA | FACTURADA | CANCELADA */
-	status: string,
-	notes: string | null,
-	createdByName: string | null,
-	services: VisitService[],
-};
-
-/**  Fila del listado de visitas de la cola de recepción (sin líneas). */
-export type VisitListItem = {
-	id: number,
-	code: string,
-	patientId: number,
-	patientName: string,
-	ownerId: number,
-	ownerName: string,
-	arrivedAt: string,
-	priority: string,
-	status: string,
-	notes: string | null,
-	/**  Resumen "Baño + Consulta general". */
-	servicesSummary: string,
-	/**  Total estimado de las líneas no canceladas (precio congelado). */
-	estimatedTotal: number | null,
-};
-
-export type AddVisitServiceInput = {
-	serviceId: number,
-	/**  Profesional asignado a esta línea. */
-	professionalId: number | null,
-	quantity: number,
-	notes: string | null,
-};
-
-export type CreateVisitInput = {
-	patientId: number,
-	/**  Si no llega, se toma del paciente. */
-	ownerId: number | null,
-	priority: string | null,
-	notes: string | null,
-	services: AddVisitServiceInput[],
-};
-
-export type UpdateVisitServiceStatusInput = {
-	/**  Estado de la línea: EN_PROCESO | COMPLETADA | CANCELADA. */
-	status: string,
-	/**  Reasignación opcional del profesional. */
-	professionalId: number | null,
 };
 
 /* Tauri Specta runtime */
