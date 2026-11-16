@@ -106,6 +106,14 @@ pub const MIGRATIONS: &[(&str, &str)] = &[
         "0025_service_catalog",
         include_str!("../../migrations/0025_service_catalog.sql"),
     ),
+    (
+        "0026_clinic_roles",
+        include_str!("../../migrations/0026_clinic_roles.sql"),
+    ),
+    (
+        "0027_visits",
+        include_str!("../../migrations/0027_visits.sql"),
+    ),
 ];
 
 /// Indica si una migración de datos de demostración debe aplicarse.

@@ -5,8 +5,14 @@ use crate::auth;
 use crate::error::AppError;
 use crate::models::auth::{CreateUserInput, SessionUser, UserListItem};
 
-/// Roles permitidos por el CHECK de la tabla USERS.
-pub const ROLES: [&str; 3] = ["ADMIN", "VETERINARIO", "AUXILIAR"];
+/// Roles permitidos por el CHECK de la tabla USERS (migración 0026).
+pub const ROLES: [&str; 5] = [
+    "ADMIN",
+    "VETERINARIO",
+    "AUXILIAR",
+    "RECEPCION",
+    "PELUQUERO",
+];
 
 /// Mínimo de caracteres para las contraseñas.
 pub const MIN_PASSWORD_LEN: usize = 6;
@@ -16,7 +22,8 @@ fn validate_role(role: &str) -> Result<(), AppError> {
         Ok(())
     } else {
         Err(AppError::Validation(format!(
-            "Rol inválido: {role} (esperado ADMIN, VETERINARIO o AUXILIAR)"
+            "Rol inválido: {role} (esperado ADMIN, VETERINARIO, AUXILIAR, \
+             RECEPCION o PELUQUERO)"
         )))
     }
 }
@@ -227,8 +234,9 @@ mod tests {
         }
 
         let users = list(&mut conn).unwrap();
-        // 1 admin (seed) + 3 new users
-        assert_eq!(users.len(), 4);
+        // 1 admin (seed) + 5 usuarios (uno por rol: ADMIN, VETERINARIO,
+        // AUXILIAR, RECEPCION, PELUQUERO).
+        assert_eq!(users.len(), 6);
 
         cleanup_test_db(&db_path);
     }

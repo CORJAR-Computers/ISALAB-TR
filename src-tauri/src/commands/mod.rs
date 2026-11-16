@@ -23,6 +23,7 @@ pub mod settings;
 pub mod surgeries;
 pub mod users;
 pub mod vaccines;
+pub mod visits;
 
 // Nota: `current_user()` fue consolidado en `crate::auth::require_session()`.
 // Todos los comandos deben usar `crate::auth::require_session` o

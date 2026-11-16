@@ -20,6 +20,7 @@ pub mod settings;
 pub mod surgeries;
 pub mod users;
 pub mod vaccines;
+pub mod visits;
 
 use rsfbclient::prelude::*;
 use rsfbclient::SimpleConnection;

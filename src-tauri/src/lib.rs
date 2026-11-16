@@ -92,6 +92,10 @@ use crate::commands::surgeries::{
 };
 use crate::commands::users::{change_password, create_user, list_users};
 use crate::commands::vaccines::{create_vaccine, list_vaccines};
+use crate::commands::visits::{
+    add_visit_service, checkout_visit, create_visit, get_visit, list_visits, remove_visit_service,
+    set_visit_status, update_visit_service_status,
+};
 use crate::state::AppState;
 
 /// Dimensiones (lógicas) de la ventana tras recortarlas al área de trabajo
@@ -124,6 +128,14 @@ fn specta_builder() -> Builder<tauri::Wry> {
             get_service,
             save_service,
             set_service_active,
+            list_visits,
+            get_visit,
+            create_visit,
+            set_visit_status,
+            add_visit_service,
+            remove_visit_service,
+            update_visit_service_status,
+            checkout_visit,
             list_species,
             list_breeds,
             list_sample_types,
@@ -258,6 +270,13 @@ fn specta_builder() -> Builder<tauri::Wry> {
         .typ::<crate::models::service::Service>()
         .typ::<crate::models::service::SaveServiceCategoryInput>()
         .typ::<crate::models::service::SaveServiceInput>()
+        // Recepción de la clínica (fase 2).
+        .typ::<crate::models::visit::Visit>()
+        .typ::<crate::models::visit::VisitService>()
+        .typ::<crate::models::visit::VisitListItem>()
+        .typ::<crate::models::visit::CreateVisitInput>()
+        .typ::<crate::models::visit::AddVisitServiceInput>()
+        .typ::<crate::models::visit::UpdateVisitServiceStatusInput>()
 }
 
 #[cfg_attr(mobile, tauri::mobile_entry_point)]

@@ -23,4 +23,5 @@ pub mod species;
 pub mod status_count;
 pub mod surgery;
 pub mod vaccine;
+pub mod visit;
 pub mod worklist;
