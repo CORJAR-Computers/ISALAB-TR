@@ -138,6 +138,13 @@ export {
   useCheckoutVisit,
 } from "./use-visits";
 export {
+  useAppointments,
+  useCreateAppointment,
+  useSetAppointmentStatus,
+  useCancelAppointment,
+  useCheckInAppointment,
+} from "./use-appointments";
+export {
   useReports,
   useGenerateReport,
   useGenerateSampleLabels,

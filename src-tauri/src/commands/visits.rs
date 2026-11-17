@@ -63,7 +63,7 @@ pub fn create_visit(
 ) -> Result<Visit, AppError> {
     let user = require_receive(&state)?;
     let mut pooled = state.pool.acquire()?;
-    let visit = visits_repo::create_visit(pooled.conn(), &input, Some(user.id))?;
+    let visit = visits_repo::create_visit(pooled.conn(), &input, Some(user.id), None)?;
 
     log_visit_audit(
         &state,

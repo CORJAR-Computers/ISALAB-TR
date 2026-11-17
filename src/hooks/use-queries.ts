@@ -131,4 +131,9 @@ export {
   useRemoveVisitService,
   useUpdateVisitServiceStatus,
   useCheckoutVisit,
+  useAppointments,
+  useCreateAppointment,
+  useSetAppointmentStatus,
+  useCancelAppointment,
+  useCheckInAppointment,
 } from "./queries";

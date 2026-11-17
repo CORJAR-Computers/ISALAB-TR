@@ -104,6 +104,28 @@ export const commands = {
 	 *  y marca la visita FACTURADA. Una sola factura por visita.
 	 */
 	checkoutVisit: (visitId: number, paymentMethod: string | null, notes: string | null) => typedError<Invoice, AppError>(__TAURI_INVOKE("checkout_visit", { visitId, paymentMethod, notes })),
+	/**
+	 *  Lista la agenda con filtros opcionales: fecha (YYYY-MM-DD), estado y
+	 *  profesional.
+	 */
+	listAppointments: (
+		date: string | null,
+		status: string | null,
+		professionalId: number | null,
+	) => typedError<AppointmentListItem[], AppError>(__TAURI_INVOKE("list_appointments", { date, status, professionalId })),
+	/**  Ficha completa de una cita. */
+	getAppointment: (id: number) => typedError<Appointment | null, AppError>(__TAURI_INVOKE("get_appointment", { id })),
+	/**  Crea una cita. Valida solapamiento de horarios. */
+	createAppointment: (input: CreateAppointmentInput) => typedError<Appointment, AppError>(__TAURI_INVOKE("create_appointment", { input })),
+	/**  Cambia el estado de una cita (máquina de estados). */
+	setAppointmentStatus: (
+		id: number,
+		input: UpdateAppointmentStatusInput,
+	) => typedError<Appointment, AppError>(__TAURI_INVOKE("set_appointment_status", { id, input })),
+	/**  Anula una cita (CANCELADA). */
+	cancelAppointment: (id: number) => typedError<Appointment, AppError>(__TAURI_INVOKE("cancel_appointment", { id })),
+	/**  Check-in: convierte la cita en visita (crea VISITA con APPOINTMENT_ID). */
+	checkInAppointment: (id: number) => typedError<Visit, AppError>(__TAURI_INVOKE("check_in_appointment", { id })),
 	listSpecies: () => typedError<Species[], AppError>(__TAURI_INVOKE("list_species")),
 	listBreeds: (speciesId: number) => typedError<Breed[], AppError>(__TAURI_INVOKE("list_breeds", { speciesId })),
 	listSampleTypes: () => typedError<SampleType[], AppError>(__TAURI_INVOKE("list_sample_types")),
@@ -1864,6 +1886,68 @@ export type WorklistSample = {
 	resultCount: number,
 	/**  Nº de resultados fuera de rango (ALTO/BAJO) — alerta visual. */
 	abnormalCount: number,
+};
+
+/**  Cita de la agenda generalizada (cualquier servicio del catálogo). */
+export type Appointment = {
+	id: number,
+	/**  Código único (C-YYYY-NNNN). */
+	code: string,
+	patientId: number,
+	patientName: string,
+	ownerId: number,
+	ownerName: string,
+	serviceId: number,
+	serviceName: string,
+	serviceCode: string,
+	categoryId: number,
+	categoryName: string,
+	professionalId: number | null,
+	professionalName: string | null,
+	/**  YYYY-MM-DD HH:MM:SS */
+	scheduledAt: string,
+	durationMin: number,
+	/**  PROGRAMADA | CONFIRMADA | EN_ATENCION | ATENDIDA | NO_ASISTIO | CANCELADA */
+	status: string,
+	notes: string | null,
+	createdAt: string,
+	updatedAt: string,
+};
+
+/**  Fila del listado de citas (sin notas ni timestamps de creación). */
+export type AppointmentListItem = {
+	id: number,
+	code: string,
+	patientId: number,
+	patientName: string,
+	ownerId: number,
+	ownerName: string,
+	serviceId: number,
+	serviceName: string,
+	scheduledAt: string,
+	durationMin: number,
+	status: string,
+	professionalName: string | null,
+};
+
+/**  Entrada para crear una cita. */
+export type CreateAppointmentInput = {
+	patientId: number,
+	serviceId: number,
+	/**  Profesional asignado (veterinario, peluquero…). NULL = sin asignar. */
+	professionalId: number | null,
+	/**  YYYY-MM-DD HH:MM:SS */
+	scheduledAt: string,
+	/**  Duración en minutos (si no llega, se toma del catálogo del servicio). */
+	durationMin: number | null,
+	notes: string | null,
+};
+
+/**  Cambio de estado de una cita. */
+export type UpdateAppointmentStatusInput = {
+	/**  Estado: PROGRAMADA | CONFIRMADA | EN_ATENCION | ATENDIDA | NO_ASISTIO | CANCELADA */
+	status: string,
+	notes: string | null,
 };
 
 /* Tauri Specta runtime */

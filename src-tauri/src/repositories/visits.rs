@@ -31,7 +31,7 @@ type VisitServiceRow = (
     String,         // service code
     i32,            // category_id
     String,         // category_name
-    Option<i32>,    // professional_id
+    Option<i64>,    // professional_id (rsfbclient lee INTEGER NULL como i64)
     Option<String>, // professional_name
     i32,            // quantity
     f64,            // unit_price
@@ -52,7 +52,7 @@ fn map_visit_service(r: VisitServiceRow) -> VisitService {
         service_code: r.4,
         category_id: r.5,
         category_name: r.6,
-        professional_id: r.7,
+        professional_id: r.7.map(|v| v as i32),
         professional_name: r.8,
         quantity: r.9,
         unit_price: r.10,
@@ -103,7 +103,7 @@ type VisitHeaderRow = (
     String,         // patient_name
     i32,            // owner_id
     String,         // owner_name
-    Option<i32>,    // appointment_id
+    Option<i64>,    // appointment_id (rsfbclient lee INTEGER con valor como i64)
     String,         // arrived_at
     String,         // priority
     String,         // status
@@ -138,7 +138,7 @@ pub fn get_visit(conn: &mut SimpleConnection, id: i32) -> Result<Option<Visit>, 
         patient_name: r.3,
         owner_id: r.4,
         owner_name: r.5,
-        appointment_id: r.6,
+        appointment_id: r.6.map(|v| v as i32),
         arrived_at: r.7,
         priority: r.8,
         status: r.9,
@@ -167,10 +167,12 @@ fn default_tax_rate(conn: &mut SimpleConnection) -> Result<f64, AppError> {
 
 /// Registra el check-in de una visita con sus servicios iniciales. El precio
 /// de cada línea se congela desde el catálogo (SERVICES) en este momento.
+/// `appointment_id` vincula la visita a la cita de origen (fase 3).
 pub fn create_visit(
     conn: &mut SimpleConnection,
     input: &crate::models::visit::CreateVisitInput,
     created_by: Option<i32>,
+    appointment_id: Option<i32>,
 ) -> Result<Visit, AppError> {
     let priority = input.priority.as_deref().unwrap_or("NORMAL");
     if !matches!(priority, "NORMAL" | "URGENTE") {
@@ -201,9 +203,9 @@ pub fn create_visit(
 
     let id = next_id(conn, "GEN_VISITS_ID")?;
     conn.execute(
-        "INSERT INTO VISITS (ID, PATIENT_ID, OWNER_ID, PRIORITY, NOTES, CREATED_BY)
-         VALUES (?, ?, ?, ?, ?, ?)",
-        (&id, &input.patient_id, &owner_id, &priority, &input.notes, &created_by),
+        "INSERT INTO VISITS (ID, PATIENT_ID, OWNER_ID, APPOINTMENT_ID, PRIORITY, NOTES, CREATED_BY)
+         VALUES (?, ?, ?, ?, ?, ?, ?)",
+        (&id, &input.patient_id, &owner_id, &appointment_id, &priority, &input.notes, &created_by),
     )
     .map_err(AppError::from)?;
 
@@ -765,7 +767,7 @@ mod tests {
             notes: Some("Llega cojeando".into()),
             services: vec![svc(1, 1), svc(9, 1)],
         };
-        create_visit(conn, &input, None).unwrap()
+        create_visit(conn, &input, None, None).unwrap()
     }
 
     #[test]
@@ -944,7 +946,7 @@ mod tests {
             notes: None,
             services: vec![svc(1, 1), svc(9, 1)],
         };
-        let visit = create_visit(&mut conn, &input, None).unwrap();
+        let visit = create_visit(&mut conn, &input, None, None).unwrap();
         set_visit_status(&mut conn, visit.id, "EN_ATENCION").unwrap();
         set_visit_status(&mut conn, visit.id, "FINALIZADA").unwrap();
 
@@ -968,7 +970,7 @@ mod tests {
             notes: None,
             services: vec![svc(3, 1)],
         };
-        let v2 = create_visit(&mut conn, &input, None).unwrap();
+        let v2 = create_visit(&mut conn, &input, None, None).unwrap();
 
         // Por estado.
         let waiting = list_visits(&mut conn, None, Some("EN_ESPERA"), None).unwrap();
@@ -999,7 +1001,7 @@ mod tests {
             notes: None,
             services: vec![],
         };
-        assert!(create_visit(&mut conn, &input, None).is_err());
+        assert!(create_visit(&mut conn, &input, None, None).is_err());
 
         // Paciente inexistente.
         let input = CreateVisitInput {
@@ -1009,7 +1011,7 @@ mod tests {
             notes: None,
             services: vec![svc(1, 1)],
         };
-        assert!(create_visit(&mut conn, &input, None).is_err());
+        assert!(create_visit(&mut conn, &input, None, None).is_err());
 
         // Prioridad inválida.
         let input = CreateVisitInput {
@@ -1019,7 +1021,7 @@ mod tests {
             notes: None,
             services: vec![svc(1, 1)],
         };
-        assert!(create_visit(&mut conn, &input, None).is_err());
+        assert!(create_visit(&mut conn, &input, None, None).is_err());
 
         // Cantidad inválida en una línea.
         let input = CreateVisitInput {
@@ -1029,7 +1031,7 @@ mod tests {
             notes: None,
             services: vec![svc(1, 0)],
         };
-        assert!(create_visit(&mut conn, &input, None).is_err());
+        assert!(create_visit(&mut conn, &input, None, None).is_err());
         test_helpers::cleanup_test_db(&db_path);
     }
 }

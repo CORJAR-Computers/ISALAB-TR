@@ -79,6 +79,10 @@ import type {
   CreateVisitInput,
   AddVisitServiceInput,
   UpdateVisitServiceStatusInput,
+  Appointment,
+  AppointmentListItem,
+  CreateAppointmentInput,
+  UpdateAppointmentStatusInput,
   WorklistData,
 } from "@/bindings";
 
@@ -404,6 +408,22 @@ export const api = {
   ) => invoke<VisitService>("update_visit_service_status", { visitId, lineId, input }),
   checkoutVisit: (visitId: number, paymentMethod: string | null, notes: string | null) =>
     invoke<Invoice>("checkout_visit", { visitId, paymentMethod, notes }),
+
+  // ---- Agenda generalizada (citas) ----
+  listAppointments: (
+    date: string | null,
+    status: string | null,
+    professionalId: number | null,
+  ) => invoke<AppointmentListItem[]>("list_appointments", { date, status, professionalId }),
+  getAppointment: (id: number) => invoke<Appointment | null>("get_appointment", { id }),
+  createAppointment: (input: CreateAppointmentInput) =>
+    invoke<Appointment>("create_appointment", { input }),
+  setAppointmentStatus: (
+    id: number,
+    input: UpdateAppointmentStatusInput,
+  ) => invoke<Appointment>("set_appointment_status", { id, input }),
+  cancelAppointment: (id: number) => invoke<Appointment>("cancel_appointment", { id }),
+  checkInAppointment: (id: number) => invoke<Visit>("check_in_appointment", { id }),
 
   // ---- Búsqueda global (paleta Ctrl+K) ----
   globalSearch: (query: string) =>

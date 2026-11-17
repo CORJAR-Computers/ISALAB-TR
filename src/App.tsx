@@ -72,6 +72,9 @@ const ServicesPage = lazy(() =>
 const ReceptionPage = lazy(() =>
   import("@/features/reception/ReceptionPage").then((m) => ({ default: m.ReceptionPage })),
 );
+const AppointmentCalendar = lazy(() =>
+  import("@/features/agenda/AppointmentCalendar").then((m) => ({ default: m.AppointmentCalendar })),
+);
 
 /** Fallback mientras se carga la pagina. */
 function PageFallback() {
@@ -238,6 +241,7 @@ export default function App() {
               {view === "qc" && <QcPage />}
               {view === "services" && <ServicesPage />}
               {view === "reception" && <ReceptionPage />}
+              {view === "appointments" && <AppointmentCalendar />}
               {view === "settings" && <SettingsPage />}
               {view === "users" && <UsersPage />}
               {view === "audit-log" && <AuditLogPage />}</Suspense>

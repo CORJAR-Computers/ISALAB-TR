@@ -1,5 +1,6 @@
 pub mod analyzer_sources;
 pub mod analyzers;
+pub mod appointments;
 pub mod attachments;
 pub mod auth;
 pub mod catalog;

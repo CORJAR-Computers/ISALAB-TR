@@ -5,6 +5,7 @@ export type Theme = "light" | "dark";
 export type View =
   | "dashboard"
   | "reception"
+  | "appointments"
   | "agenda"
   | "patients"
   | "clinical-history"

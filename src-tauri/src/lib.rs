@@ -36,6 +36,10 @@ use crate::commands::analyzers::{
     list_analyzers, list_reference_ranges, set_analyzer_active, update_analyzer,
     update_reference_range,
 };
+use crate::commands::appointments::{
+    cancel_appointment, check_in_appointment, create_appointment, get_appointment,
+    list_appointments, set_appointment_status,
+};
 use crate::commands::attachments::{attach_result_file, delete_result_attachment};
 use crate::commands::auth::{get_session, list_audit_log, login, logout};
 use crate::commands::catalog::{
@@ -136,6 +140,12 @@ fn specta_builder() -> Builder<tauri::Wry> {
             remove_visit_service,
             update_visit_service_status,
             checkout_visit,
+            list_appointments,
+            get_appointment,
+            create_appointment,
+            set_appointment_status,
+            cancel_appointment,
+            check_in_appointment,
             list_species,
             list_breeds,
             list_sample_types,
@@ -277,6 +287,11 @@ fn specta_builder() -> Builder<tauri::Wry> {
         .typ::<crate::models::visit::CreateVisitInput>()
         .typ::<crate::models::visit::AddVisitServiceInput>()
         .typ::<crate::models::visit::UpdateVisitServiceStatusInput>()
+        // Agenda generalizada (fase 3).
+        .typ::<crate::models::appointment::Appointment>()
+        .typ::<crate::models::appointment::AppointmentListItem>()
+        .typ::<crate::models::appointment::CreateAppointmentInput>()
+        .typ::<crate::models::appointment::UpdateAppointmentStatusInput>()
 }
 
 #[cfg_attr(mobile, tauri::mobile_entry_point)]
