@@ -108,24 +108,95 @@ export const commands = {
 	 *  Lista la agenda con filtros opcionales: fecha (YYYY-MM-DD), estado y
 	 *  profesional.
 	 */
-	listAppointments: (
-		date: string | null,
-		status: string | null,
-		professionalId: number | null,
-	) => typedError<AppointmentListItem[], AppError>(__TAURI_INVOKE("list_appointments", { date, status, professionalId })),
+	listAppointments: (date: string | null, status: string | null, professionalId: number | null) => typedError<AppointmentListItem[], AppError>(__TAURI_INVOKE("list_appointments", { date, status, professionalId })),
 	/**  Ficha completa de una cita. */
-	getAppointment: (id: number) => typedError<Appointment | null, AppError>(__TAURI_INVOKE("get_appointment", { id })),
+	getAppointment: (id: number) => typedError<{
+	id: number,
+	/**  Código único (C-YYYY-NNNN). */
+	code: string,
+	patientId: number,
+	patientName: string,
+	ownerId: number,
+	ownerName: string,
+	serviceId: number,
+	serviceName: string,
+	serviceCode: string,
+	categoryId: number,
+	categoryName: string,
+	professionalId: number | null,
+	professionalName: string | null,
+	/**  YYYY-MM-DD HH:MM:SS */
+	scheduledAt: string,
+	durationMin: number,
+	/**  PROGRAMADA | CONFIRMADA | EN_ATENCION | ATENDIDA | NO_ASISTIO | CANCELADA */
+	status: string,
+	notes: string | null,
+	createdAt: string,
+	updatedAt: string,
+} | null, AppError>(__TAURI_INVOKE("get_appointment", { id })),
 	/**  Crea una cita. Valida solapamiento de horarios. */
 	createAppointment: (input: CreateAppointmentInput) => typedError<Appointment, AppError>(__TAURI_INVOKE("create_appointment", { input })),
 	/**  Cambia el estado de una cita (máquina de estados). */
-	setAppointmentStatus: (
-		id: number,
-		input: UpdateAppointmentStatusInput,
-	) => typedError<Appointment, AppError>(__TAURI_INVOKE("set_appointment_status", { id, input })),
+	setAppointmentStatus: (id: number, input: UpdateAppointmentStatusInput) => typedError<Appointment, AppError>(__TAURI_INVOKE("set_appointment_status", { id, input })),
 	/**  Anula una cita (CANCELADA). */
 	cancelAppointment: (id: number) => typedError<Appointment, AppError>(__TAURI_INVOKE("cancel_appointment", { id })),
-	/**  Check-in: convierte la cita en visita (crea VISITA con APPOINTMENT_ID). */
+	/**
+	 *  Check-in: convierte la cita en visita (crea VISITA con APPOINTMENT_ID y
+	 *  la cita pasa a ATENDIDA).
+	 */
 	checkInAppointment: (id: number) => typedError<Visit, AppError>(__TAURI_INVOKE("check_in_appointment", { id })),
+	/**  Ficha de sesión de la línea de servicio, o `None` si aún no existe. */
+	getGroomingSession: (visitServiceId: number) => typedError<{
+	id: number,
+	visitServiceId: number,
+	visitId: number,
+	serviceName: string,
+	patientId: number,
+	patientName: string,
+	ownerName: string,
+	/**  Peluquero asignado a la sesión. */
+	groomerId: number | null,
+	groomerName: string | null,
+	/**  Corte de raza, higiénico, cachorro… */
+	style: string | null,
+	/**  Medicado, antipulgas… */
+	bathType: string | null,
+	coatCondition: string | null,
+	/**  0 = sin enredos … 3 = enredo severo. */
+	mattingLevel: number,
+	weightKg: number | null,
+	/**  Tranquilo, nervioso, agresivo… */
+	behavior: string | null,
+	productsUsed: string | null,
+	/**  YYYY-MM-DD HH:MM:SS (NULL si no inició). */
+	startedAt: string | null,
+	finishedAt: string | null,
+	/**  YYYY-MM-DD (NULL si no se sugiere próximo turno). */
+	nextSuggestedAt: string | null,
+	notes: string | null,
+	createdAt: string,
+	updatedAt: string,
+} | null, AppError>(__TAURI_INVOKE("get_grooming_session", { visitServiceId })),
+	/**  Crea o actualiza la sesión de peluquería de una línea (1 sesión por línea). */
+	upsertGroomingSession: (input: UpsertGroomingSessionInput) => typedError<GroomingSession, AppError>(__TAURI_INVOKE("upsert_grooming_session", { input })),
+	/**
+	 *  Cierra la sesión (FINISHED_AT) y la línea de servicio pasa a COMPLETADA;
+	 *  sugiere el próximo turno con NEXT_SUGGESTED_AT.
+	 */
+	finishGroomingSession: (visitServiceId: number, input: FinishGroomingSessionInput) => typedError<GroomingSession, AppError>(__TAURI_INVOKE("finish_grooming_session", { visitServiceId, input })),
+	/**  Tablero del día: líneas de peluquería de las visitas de una fecha. */
+	listGroomingDay: (date: string) => typedError<GroomingDayLine[], AppError>(__TAURI_INVOKE("list_grooming_day", { date })),
+	/**  Próximos turnos sugeridos por sesiones cerradas (recordatorios). */
+	listGroomingReminders: () => typedError<GroomingReminder[], AppError>(__TAURI_INVOKE("list_grooming_reminders")),
+	/**  Fotos antes/después (o documentos) de una visita, más recientes primero. */
+	listVisitAttachments: (visitId: number) => typedError<VisitAttachment[], AppError>(__TAURI_INVOKE("list_visit_attachments", { visitId })),
+	/**
+	 *  Copia una foto (antes/después) o documento a app_data/attachments y la
+	 *  asocia a la visita. Devuelve el adjunto creado para refrescar la UI.
+	 */
+	addVisitAttachment: (sourcePath: string, input: AddVisitAttachmentInput) => typedError<VisitAttachment, AppError>(__TAURI_INVOKE("add_visit_attachment", { sourcePath, input })),
+	/**  Elimina un adjunto de visita: borra el archivo y su registro. */
+	deleteVisitAttachment: (id: number) => typedError<null, AppError>(__TAURI_INVOKE("delete_visit_attachment", { id })),
 	listSpecies: () => typedError<Species[], AppError>(__TAURI_INVOKE("list_species")),
 	listBreeds: (speciesId: number) => typedError<Breed[], AppError>(__TAURI_INVOKE("list_breeds", { speciesId })),
 	listSampleTypes: () => typedError<SampleType[], AppError>(__TAURI_INVOKE("list_sample_types")),
@@ -604,6 +675,12 @@ export type AccessionOrderInput = {
 	notes: string | null,
 };
 
+export type AddVisitAttachmentInput = {
+	visitId: number,
+	/**  BEFORE | AFTER | DOCUMENT */
+	kind: string | null,
+};
+
 export type AddVisitServiceInput = {
 	serviceId: number,
 	/**  Profesional asignado a esta línea. */
@@ -689,6 +766,51 @@ export type AnalyzerSource = {
 
 /**  Error tipado de la app. Se serializa como `{ type, data }` para el frontend. */
 export type AppError = { type: "Db"; data: string } | { type: "NotFound"; data: string } | { type: "Validation"; data: string } | { type: "Forbidden"; data: string } | { type: "Internal"; data: string };
+
+/**  Cita de la agenda generalizada (cualquier servicio del catálogo). */
+export type Appointment = {
+	id: number,
+	/**  Código único (C-YYYY-NNNN). */
+	code: string,
+	patientId: number,
+	patientName: string,
+	ownerId: number,
+	ownerName: string,
+	serviceId: number,
+	serviceName: string,
+	serviceCode: string,
+	categoryId: number,
+	categoryName: string,
+	professionalId: number | null,
+	professionalName: string | null,
+	/**  YYYY-MM-DD HH:MM:SS */
+	scheduledAt: string,
+	durationMin: number,
+	/**  PROGRAMADA | CONFIRMADA | EN_ATENCION | ATENDIDA | NO_ASISTIO | CANCELADA */
+	status: string,
+	notes: string | null,
+	createdAt: string,
+	updatedAt: string,
+};
+
+/**  Fila del listado de citas (sin notas ni timestamps de creación). */
+export type AppointmentListItem = {
+	id: number,
+	code: string,
+	patientId: number,
+	patientName: string,
+	ownerId: number,
+	ownerName: string,
+	serviceId: number,
+	serviceName: string,
+	/**  Categoría del servicio (p. ej. PELUQUERIA) para filtrar la agenda. */
+	categoryId: number,
+	categoryName: string,
+	scheduledAt: string,
+	durationMin: number,
+	status: string,
+	professionalName: string | null,
+};
 
 /**  Fila del registro de auditoría (USER_AUDIT_LOG). */
 export type AuditLogEntry = {
@@ -797,6 +919,19 @@ export type CreateAnalyzerInput = {
 	name: string,
 	manufacturer: string | null,
 	model: string | null,
+	notes: string | null,
+};
+
+/**  Entrada para crear una cita. */
+export type CreateAppointmentInput = {
+	patientId: number,
+	serviceId: number,
+	/**  Profesional asignado (veterinario, peluquero…). NULL = sin asignar. */
+	professionalId: number | null,
+	/**  YYYY-MM-DD HH:MM:SS */
+	scheduledAt: string,
+	/**  Duración en minutos (si no llega, se toma del catálogo del servicio). */
+	durationMin: number | null,
 	notes: string | null,
 };
 
@@ -987,6 +1122,15 @@ export type DbHealth = {
 	schemaVersion: number,
 };
 
+/**  Cierra la sesión: FINISHED_AT, próximo turno sugerido y notas de cierre. */
+export type FinishGroomingSessionInput = {
+	/**  NULL = ahora (CURRENT_TIMESTAMP). */
+	finishedAt: string | null,
+	/**  YYYY-MM-DD o NULL. */
+	nextSuggestedAt: string | null,
+	notes: string | null,
+};
+
 /**
  *  Resultado de la búsqueda global (paleta Ctrl+K): una entidad del sistema
  *  con su destino de navegación en la UI.
@@ -1001,6 +1145,83 @@ export type GlobalSearchResult = {
 	subtitle: string,
 	/**  Código de trazabilidad cuando existe (PAC-, M-, FAC-…). */
 	code: string | null,
+};
+
+/**
+ *  Línea de peluquería del tablero del día: servicio de categoría PELUQUERIA
+ *  dentro de una visita de la fecha, con el estado de su sesión.
+ */
+export type GroomingDayLine = {
+	visitServiceId: number,
+	visitId: number,
+	visitCode: string,
+	patientId: number,
+	patientName: string,
+	ownerName: string,
+	serviceId: number,
+	serviceName: string,
+	professionalId: number | null,
+	professionalName: string | null,
+	/**  Estado de la línea: PENDIENTE | EN_PROCESO | COMPLETADA | CANCELADA */
+	lineStatus: string,
+	/**  SIN_SESION | ABIERTA (ficha sin iniciar) | EN_PROCESO | FINALIZADA */
+	sessionState: string,
+	/**  YYYY-MM-DD HH:MM:SS llegada del paciente. */
+	arrivedAt: string,
+	/**  Estado de la visita: EN_ESPERA | EN_ATENCION | FINALIZADA | FACTURADA | CANCELADA */
+	visitStatus: string,
+	/**  YYYY-MM-DD próximo turno sugerido (si la sesión lo fijó). */
+	nextSuggestedAt: string | null,
+	/**  Nivel de enredos de la ficha (0 si no hay sesión). */
+	mattingLevel: number,
+};
+
+/**  Próximo turno sugerido por una sesión finalizada (recordatorio). */
+export type GroomingReminder = {
+	sessionId: number,
+	visitServiceId: number,
+	patientName: string,
+	ownerName: string,
+	serviceName: string,
+	/**  YYYY-MM-DD */
+	nextSuggestedAt: string,
+	groomerName: string | null,
+};
+
+/**
+ *  Ficha de sesión de peluquería: una por línea de servicio de categoría
+ *  PELUQUERIA en una visita (migración 0029).
+ */
+export type GroomingSession = {
+	id: number,
+	visitServiceId: number,
+	visitId: number,
+	serviceName: string,
+	patientId: number,
+	patientName: string,
+	ownerName: string,
+	/**  Peluquero asignado a la sesión. */
+	groomerId: number | null,
+	groomerName: string | null,
+	/**  Corte de raza, higiénico, cachorro… */
+	style: string | null,
+	/**  Medicado, antipulgas… */
+	bathType: string | null,
+	coatCondition: string | null,
+	/**  0 = sin enredos … 3 = enredo severo. */
+	mattingLevel: number,
+	weightKg: number | null,
+	/**  Tranquilo, nervioso, agresivo… */
+	behavior: string | null,
+	productsUsed: string | null,
+	/**  YYYY-MM-DD HH:MM:SS (NULL si no inició). */
+	startedAt: string | null,
+	finishedAt: string | null,
+	/**  YYYY-MM-DD (NULL si no se sugiere próximo turno). */
+	nextSuggestedAt: string | null,
+	notes: string | null,
+	createdAt: string,
+	updatedAt: string,
 };
 
 export type ImportColumnMapping = {
@@ -1709,11 +1930,36 @@ export type UpdateAnalyzerInput = {
 	notes: string | null,
 };
 
+/**  Cambio de estado de una cita. */
+export type UpdateAppointmentStatusInput = {
+	/**  Estado: PROGRAMADA | CONFIRMADA | EN_ATENCION | ATENDIDA | NO_ASISTIO | CANCELADA */
+	status: string,
+	notes: string | null,
+};
+
 export type UpdateVisitServiceStatusInput = {
 	/**  Estado de la línea: EN_PROCESO | COMPLETADA | CANCELADA. */
 	status: string,
 	/**  Reasignación opcional del profesional. */
 	professionalId: number | null,
+};
+
+/**  Crea o actualiza la sesión de una línea de peluquería (upsert 1:1). */
+export type UpsertGroomingSessionInput = {
+	visitServiceId: number,
+	groomerId: number | null,
+	style: string | null,
+	bathType: string | null,
+	coatCondition: string | null,
+	mattingLevel: number,
+	weightKg: number | null,
+	behavior: string | null,
+	productsUsed: string | null,
+	/**  NULL = iniciar ahora (CURRENT_TIMESTAMP). */
+	startedAt: string | null,
+	/**  YYYY-MM-DD o NULL. */
+	nextSuggestedAt: string | null,
+	notes: string | null,
 };
 
 /**  Fila del listado de usuarios (nunca expone el hash). */
@@ -1783,6 +2029,19 @@ export type Visit = {
 	notes: string | null,
 	createdByName: string | null,
 	services: VisitService[],
+};
+
+/**  Foto antes/después (o documento) adjunta a una visita (migración 0029). */
+export type VisitAttachment = {
+	id: number,
+	visitId: number,
+	fileName: string,
+	/**  Ruta persistida en app_data/attachments. */
+	filePath: string,
+	mimeType: string | null,
+	/**  BEFORE | AFTER | DOCUMENT */
+	kind: string | null,
+	createdAt: string,
 };
 
 /**  Fila del listado de visitas de la cola de recepción (sin líneas). */
@@ -1886,68 +2145,6 @@ export type WorklistSample = {
 	resultCount: number,
 	/**  Nº de resultados fuera de rango (ALTO/BAJO) — alerta visual. */
 	abnormalCount: number,
-};
-
-/**  Cita de la agenda generalizada (cualquier servicio del catálogo). */
-export type Appointment = {
-	id: number,
-	/**  Código único (C-YYYY-NNNN). */
-	code: string,
-	patientId: number,
-	patientName: string,
-	ownerId: number,
-	ownerName: string,
-	serviceId: number,
-	serviceName: string,
-	serviceCode: string,
-	categoryId: number,
-	categoryName: string,
-	professionalId: number | null,
-	professionalName: string | null,
-	/**  YYYY-MM-DD HH:MM:SS */
-	scheduledAt: string,
-	durationMin: number,
-	/**  PROGRAMADA | CONFIRMADA | EN_ATENCION | ATENDIDA | NO_ASISTIO | CANCELADA */
-	status: string,
-	notes: string | null,
-	createdAt: string,
-	updatedAt: string,
-};
-
-/**  Fila del listado de citas (sin notas ni timestamps de creación). */
-export type AppointmentListItem = {
-	id: number,
-	code: string,
-	patientId: number,
-	patientName: string,
-	ownerId: number,
-	ownerName: string,
-	serviceId: number,
-	serviceName: string,
-	scheduledAt: string,
-	durationMin: number,
-	status: string,
-	professionalName: string | null,
-};
-
-/**  Entrada para crear una cita. */
-export type CreateAppointmentInput = {
-	patientId: number,
-	serviceId: number,
-	/**  Profesional asignado (veterinario, peluquero…). NULL = sin asignar. */
-	professionalId: number | null,
-	/**  YYYY-MM-DD HH:MM:SS */
-	scheduledAt: string,
-	/**  Duración en minutos (si no llega, se toma del catálogo del servicio). */
-	durationMin: number | null,
-	notes: string | null,
-};
-
-/**  Cambio de estado de una cita. */
-export type UpdateAppointmentStatusInput = {
-	/**  Estado: PROGRAMADA | CONFIRMADA | EN_ATENCION | ATENDIDA | NO_ASISTIO | CANCELADA */
-	status: string,
-	notes: string | null,
 };
 
 /* Tauri Specta runtime */

@@ -83,6 +83,12 @@ import type {
   AppointmentListItem,
   CreateAppointmentInput,
   UpdateAppointmentStatusInput,
+  GroomingSession,
+  UpsertGroomingSessionInput,
+  FinishGroomingSessionInput,
+  GroomingDayLine,
+  GroomingReminder,
+  VisitAttachment,
   WorklistData,
 } from "@/bindings";
 
@@ -424,6 +430,29 @@ export const api = {
   ) => invoke<Appointment>("set_appointment_status", { id, input }),
   cancelAppointment: (id: number) => invoke<Appointment>("cancel_appointment", { id }),
   checkInAppointment: (id: number) => invoke<Visit>("check_in_appointment", { id }),
+
+  // ---- Peluquería (sesiones y adjuntos de visita) ----
+  getGroomingSession: (visitServiceId: number) =>
+    invoke<GroomingSession | null>("get_grooming_session", { visitServiceId }),
+  upsertGroomingSession: (input: UpsertGroomingSessionInput) =>
+    invoke<GroomingSession>("upsert_grooming_session", { input }),
+  finishGroomingSession: (
+    visitServiceId: number,
+    input: FinishGroomingSessionInput,
+  ) => invoke<GroomingSession>("finish_grooming_session", { visitServiceId, input }),
+  listGroomingDay: (date: string) =>
+    invoke<GroomingDayLine[]>("list_grooming_day", { date }),
+  listGroomingReminders: () =>
+    invoke<GroomingReminder[]>("list_grooming_reminders"),
+  listVisitAttachments: (visitId: number) =>
+    invoke<VisitAttachment[]>("list_visit_attachments", { visitId }),
+  addVisitAttachment: (sourcePath: string, visitId: number, kind: string | null) =>
+    invoke<VisitAttachment>("add_visit_attachment", {
+      sourcePath,
+      input: { visitId, kind },
+    }),
+  deleteVisitAttachment: (id: number) =>
+    invoke<void>("delete_visit_attachment", { id }),
 
   // ---- Búsqueda global (paleta Ctrl+K) ----
   globalSearch: (query: string) =>

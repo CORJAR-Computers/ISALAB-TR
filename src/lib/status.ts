@@ -85,6 +85,47 @@ export const VISIT_SERVICE_STATUS: Record<
   CANCELADA: { label: "Cancelada", variant: "destructive" },
 };
 
+/** Estado de la sesión de peluquería de una línea (tablero del día). */
+export const GROOMING_SESSION_STATE: Record<
+  string,
+  { label: string; variant: BadgeVariant }
+> = {
+  SIN_SESION: { label: "Sin ficha", variant: "secondary" },
+  ABIERTA: { label: "Ficha abierta", variant: "warning" },
+  EN_PROCESO: { label: "En proceso", variant: "warning" },
+  FINALIZADA: { label: "Finalizada", variant: "success" },
+};
+
+/** Nivel de enredos del pelaje (0–3). */
+export const GROOMING_MATTING: Record<number, string> = {
+  0: "Sin enredos",
+  1: "Leve",
+  2: "Moderado",
+  3: "Severo",
+};
+
+/** Comportamiento del paciente durante la sesión. */
+export const GROOMING_BEHAVIOR_LABEL: Record<string, string> = {
+  Tranquilo: "Tranquilo",
+  Nervioso: "Nervioso",
+  Agresivo: "Agresivo",
+};
+
+/** Tipo de baño. */
+export const GROOMING_BATH_LABEL: Record<string, string> = {
+  Normal: "Normal",
+  Medicado: "Medicado",
+  Antipulgas: "Antipulgas",
+  Deshedding: "Deshedding (deslanado)",
+};
+
+/** Etiqueta del tipo de adjunto de visita. */
+export const VISIT_ATTACHMENT_KIND: Record<string, string> = {
+  BEFORE: "Antes",
+  AFTER: "Después",
+  DOCUMENT: "Documento",
+};
+
 export const SEX_LABEL: Record<string, string> = {
   M: "Macho",
   F: "Hembra",

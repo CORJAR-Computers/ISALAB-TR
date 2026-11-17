@@ -9,6 +9,7 @@ pub mod clinical_history;
 pub mod dashboard;
 pub mod db;
 pub mod exports;
+pub mod grooming;
 pub mod import;
 pub mod invoices;
 pub mod lab_orders;

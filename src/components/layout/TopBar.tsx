@@ -64,6 +64,14 @@ const TITLES: Record<string, { title: string; subtitle: string }> = {
     title: "Recepción de pacientes",
     subtitle: "Check-in, cola de espera y cobro de la visita",
   },
+  appointments: {
+    title: "Agenda de citas",
+    subtitle: "Citas de cualquier servicio con check-in a visita",
+  },
+  grooming: {
+    title: "Peluquería",
+    subtitle: "Sesiones del día, fichas y próximos turnos",
+  },
   users: {
     title: "Usuarios",
     subtitle: "Cuentas y roles del sistema",

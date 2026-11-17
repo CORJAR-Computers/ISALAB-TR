@@ -17,6 +17,7 @@ import {
   ScrollText,
   Settings,
   Shield,
+  Sparkles,
   Syringe,
   Users,
   LayoutList,
@@ -74,6 +75,13 @@ const SECTIONS: NavSection[] = [
     items: [
       { view: "surgeries", label: "Cirugías", icon: Scissors },
       { view: "vaccines", label: "Vacunación", icon: Syringe },
+    ],
+  },
+  {
+    id: "estetica",
+    label: "Estética",
+    items: [
+      { view: "grooming", label: "Peluquería", icon: Sparkles },
     ],
   },
   {

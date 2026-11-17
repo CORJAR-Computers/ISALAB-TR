@@ -41,6 +41,9 @@ pub struct AppointmentListItem {
     pub owner_name: String,
     pub service_id: i32,
     pub service_name: String,
+    /// Categoría del servicio (p. ej. PELUQUERIA) para filtrar la agenda.
+    pub category_id: i32,
+    pub category_name: String,
     pub scheduled_at: String,
     pub duration_min: i32,
     pub status: String,

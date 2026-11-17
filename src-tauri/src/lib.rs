@@ -52,6 +52,10 @@ use crate::commands::clinical_history::{
 use crate::commands::dashboard::get_dashboard_stats;
 use crate::commands::db::{create_local_backup, db_health};
 use crate::commands::exports::{export_results_csv, export_samples_csv};
+use crate::commands::grooming::{
+    add_visit_attachment, delete_visit_attachment, finish_grooming_session, get_grooming_session,
+    list_grooming_day, list_grooming_reminders, list_visit_attachments, upsert_grooming_session,
+};
 use crate::commands::import::{import_analyzer_results, preview_analyzer_import};
 use crate::commands::invoices::{
     count_invoices, create_invoice, get_invoice, list_invoices, set_invoice_status,
@@ -146,6 +150,14 @@ fn specta_builder() -> Builder<tauri::Wry> {
             set_appointment_status,
             cancel_appointment,
             check_in_appointment,
+            get_grooming_session,
+            upsert_grooming_session,
+            finish_grooming_session,
+            list_grooming_day,
+            list_grooming_reminders,
+            list_visit_attachments,
+            add_visit_attachment,
+            delete_visit_attachment,
             list_species,
             list_breeds,
             list_sample_types,
@@ -292,6 +304,14 @@ fn specta_builder() -> Builder<tauri::Wry> {
         .typ::<crate::models::appointment::AppointmentListItem>()
         .typ::<crate::models::appointment::CreateAppointmentInput>()
         .typ::<crate::models::appointment::UpdateAppointmentStatusInput>()
+        // Peluquería (fase 4).
+        .typ::<crate::models::grooming::GroomingSession>()
+        .typ::<crate::models::grooming::UpsertGroomingSessionInput>()
+        .typ::<crate::models::grooming::FinishGroomingSessionInput>()
+        .typ::<crate::models::grooming::VisitAttachment>()
+        .typ::<crate::models::grooming::AddVisitAttachmentInput>()
+        .typ::<crate::models::grooming::GroomingDayLine>()
+        .typ::<crate::models::grooming::GroomingReminder>()
 }
 
 #[cfg_attr(mobile, tauri::mobile_entry_point)]

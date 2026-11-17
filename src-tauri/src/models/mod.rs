@@ -5,6 +5,7 @@ pub mod auth;
 pub mod clinical_history;
 pub mod consultation;
 pub mod dashboard;
+pub mod grooming;
 pub mod import;
 pub mod invoice;
 pub mod lab_order;

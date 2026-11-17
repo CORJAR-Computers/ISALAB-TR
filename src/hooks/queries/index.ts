@@ -145,6 +145,16 @@ export {
   useCheckInAppointment,
 } from "./use-appointments";
 export {
+  useGroomingSession,
+  useGroomingDay,
+  useGroomingReminders,
+  useVisitAttachments,
+  useUpsertGroomingSession,
+  useFinishGroomingSession,
+  useAddVisitAttachment,
+  useDeleteVisitAttachment,
+} from "./use-grooming";
+export {
   useReports,
   useGenerateReport,
   useGenerateSampleLabels,

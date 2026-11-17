@@ -136,4 +136,12 @@ export {
   useSetAppointmentStatus,
   useCancelAppointment,
   useCheckInAppointment,
+  useGroomingSession,
+  useGroomingDay,
+  useGroomingReminders,
+  useVisitAttachments,
+  useUpsertGroomingSession,
+  useFinishGroomingSession,
+  useAddVisitAttachment,
+  useDeleteVisitAttachment,
 } from "./queries";

@@ -74,6 +74,8 @@ type AppointmentListRow = (
     String,         // owner_name
     i32,            // service_id
     String,         // service_name
+    i32,            // category_id
+    String,         // category_name
     String,         // scheduled_at
     i32,            // duration_min
     String,         // status
@@ -90,10 +92,12 @@ fn map_appointment_list(r: AppointmentListRow) -> AppointmentListItem {
         owner_name: r.5,
         service_id: r.6,
         service_name: r.7,
-        scheduled_at: r.8,
-        duration_min: r.9,
-        status: r.10,
-        professional_name: r.11,
+        category_id: r.8,
+        category_name: r.9,
+        scheduled_at: r.10,
+        duration_min: r.11,
+        status: r.12,
+        professional_name: r.13,
     }
 }
 
@@ -120,6 +124,7 @@ const APPOINTMENT_LIST_SELECT: &str = "
            a.PATIENT_ID, p.NAME,
            o.ID, o.FULL_NAME,
            a.SERVICE_ID, s.NAME,
+           s.CATEGORY_ID, c.NAME,
            LEFT(CAST(a.SCHEDULED_AT AS VARCHAR(60)), 19),
            a.DURATION_MIN, a.STATUS,
            u.FULL_NAME
@@ -127,6 +132,7 @@ const APPOINTMENT_LIST_SELECT: &str = "
     JOIN PATIENTS p ON p.ID = a.PATIENT_ID
     JOIN OWNERS o ON o.ID = p.OWNER_ID
     JOIN SERVICES s ON s.ID = a.SERVICE_ID
+    JOIN SERVICE_CATEGORIES c ON c.ID = s.CATEGORY_ID
     LEFT JOIN USERS u ON u.ID = a.PROFESSIONAL_ID";
 
 // Duración del servicio desde el catálogo (fallback 30 min).
