@@ -8,6 +8,7 @@ import {
 } from "@/components/ui/dialog";
 import { Button } from "@/components/ui/button";
 import { Badge } from "@/components/ui/badge";
+import { useClinicBranding } from "@/hooks/use-queries";
 import { useUiStore } from "@/stores/ui-store";
 import logoSidebar from "@/assets/logo_sidebar.png";
 import { useEffect, useState } from "react";
@@ -33,6 +34,8 @@ interface AboutDialogProps {
 export function AboutDialog({ checking = false, onCheckUpdate }: AboutDialogProps) {
   const aboutOpen = useUiStore((s) => s.aboutOpen);
   const setAboutOpen = useUiStore((s) => s.setAboutOpen);
+  const { data: branding } = useClinicBranding();
+  const tagline = branding?.tagline || "Clínica Veterinaria";
   const [appVersion, setAppVersion] = useState<string | null>(null);
 
   useEffect(() => {
@@ -84,9 +87,7 @@ export function AboutDialog({ checking = false, onCheckUpdate }: AboutDialogProp
               <h2 className="text-xl font-bold tracking-tight mt-1 text-white">
                 ISALAB
               </h2>
-              <p className="text-xs text-white/80">
-                Sistema de Gestión & Trazabilidad para Laboratorios Veterinarios
-              </p>
+              <p className="text-xs text-white/80">{tagline}</p>
             </div>
           </div>
         </div>

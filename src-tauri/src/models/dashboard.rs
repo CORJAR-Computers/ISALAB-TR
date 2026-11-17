@@ -1,6 +1,7 @@
 use serde::{Deserialize, Serialize};
 use specta::Type;
 
+use crate::models::appointment::AppointmentListItem;
 use crate::models::consultation::ConsultationListItem;
 use crate::models::sample_list_item::SampleListItem;
 use crate::models::surgery::Surgery;
@@ -35,6 +36,15 @@ pub struct SampleTypeTurnaround {
     pub count: i32,
 }
 
+/// Ingresos por categoría de servicio (mes en curso, facturas PAGADA).
+#[derive(Debug, Clone, Serialize, Deserialize, Type)]
+#[serde(rename_all = "camelCase")]
+pub struct RevenueByCategory {
+    pub category_id: i32,
+    pub category_name: String,
+    pub revenue: f64,
+}
+
 /// Métricas del panel de control (dashboard) con las próximas citas,
 /// cirugías y refuerzos de vacunación de la agenda.
 #[derive(Debug, Clone, Serialize, Deserialize, Type)]
@@ -63,6 +73,22 @@ pub struct DashboardStats {
     // ---- Agenda ----
     pub consultations_pending: i32,
     pub surgeries_programmed: i32,
+    // ---- Recepción (clínica) ----
+    /// Visitas abiertas hoy (llegaron en la fecha actual).
+    pub visits_today: i32,
+    /// Visitas aún en espera (cola de recepción).
+    pub visits_waiting: i32,
+    /// Visitas urgentes sin atender.
+    pub visits_urgent_waiting: i32,
+    /// Espera promedio de las visitas de hoy que ya iniciaron atención
+    /// (minutos entre ARRIVED_AT y el primer STARTED_AT de sus líneas).
+    pub avg_wait_minutes: f64,
+    /// Citas agendadas para hoy (todas las categorías).
+    pub appointments_today: i32,
+    /// Líneas de estética (PELUQUERIA) en visitas de hoy.
+    pub grooming_sessions_today: i32,
+    /// Ingresos del mes en curso por categoría de servicio (facturas PAGADA).
+    pub revenue_by_category: Vec<RevenueByCategory>,
     // ---- Vacunación ----
     /// Refuerzos cuya fecha ya venció.
     pub vaccines_due: i32,
@@ -80,4 +106,6 @@ pub struct DashboardStats {
     pub upcoming_vaccines: Vec<VaccineListItem>,
     /// Últimas muestras recibidas (máx. 5).
     pub recent_samples: Vec<SampleListItem>,
+    /// Próximas citas de la agenda (máx. 5, PROGRAMADA/CONFIRMADA).
+    pub upcoming_appointments: Vec<AppointmentListItem>,
 }

@@ -345,6 +345,36 @@ pub fn list_appointments(
     Ok(rows.into_iter().map(map_appointment_list).collect())
 }
 
+/// Próximas citas de la agenda (PROGRAMADA/CONFIRMADA desde ahora, máx.
+/// `limit`, ascendente por fecha/hora) para el panel de control.
+pub fn list_upcoming_appointments(
+    conn: &mut SimpleConnection,
+    limit: i32,
+) -> Result<Vec<AppointmentListItem>, AppError> {
+    let sql = format!(
+        "SELECT FIRST {limit} a.ID, a.CODE,
+            a.PATIENT_ID, p.NAME,
+            o.ID, o.FULL_NAME,
+            a.SERVICE_ID, s.NAME,
+            s.CATEGORY_ID, c.NAME,
+            LEFT(CAST(a.SCHEDULED_AT AS VARCHAR(60)), 19),
+            a.DURATION_MIN, a.STATUS,
+            u.FULL_NAME
+     FROM APPOINTMENTS a
+     JOIN PATIENTS p ON p.ID = a.PATIENT_ID
+     JOIN OWNERS o ON o.ID = p.OWNER_ID
+     JOIN SERVICES s ON s.ID = a.SERVICE_ID
+     JOIN SERVICE_CATEGORIES c ON c.ID = s.CATEGORY_ID
+     LEFT JOIN USERS u ON u.ID = a.PROFESSIONAL_ID
+     WHERE a.STATUS IN ('PROGRAMADA', 'CONFIRMADA')
+       AND a.SCHEDULED_AT >= CURRENT_TIMESTAMP
+     ORDER BY a.SCHEDULED_AT, a.ID"
+    );
+
+    let rows: Vec<AppointmentListRow> = conn.query(&sql, ()).map_err(AppError::from)?;
+    Ok(rows.into_iter().map(map_appointment_list).collect())
+}
+
 /// Cita completa o `None`.
 pub fn get_appointment(conn: &mut SimpleConnection, id: i32) -> Result<Option<Appointment>, AppError> {
     let row: Option<AppointmentRow> = conn

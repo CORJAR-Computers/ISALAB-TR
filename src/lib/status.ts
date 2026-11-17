@@ -62,6 +62,19 @@ export const CONSULTATION_STATUS: Record<
   CANCELADA: { label: "Cancelada", variant: "destructive" },
 };
 
+/** Estados de una cita de la agenda generalizada (migración 0028). */
+export const APPOINTMENT_STATUS: Record<
+  string,
+  { label: string; variant: BadgeVariant }
+> = {
+  PROGRAMADA: { label: "Programada", variant: "secondary" },
+  CONFIRMADA: { label: "Confirmada", variant: "default" },
+  EN_ATENCION: { label: "En atención", variant: "warning" },
+  ATENDIDA: { label: "Atendida", variant: "success" },
+  NO_ASISTIO: { label: "No asistió", variant: "destructive" },
+  CANCELADA: { label: "Cancelada", variant: "outline" },
+};
+
 /** Estados de una visita de recepción (migración 0027). */
 export const VISIT_STATUS: Record<
   string,

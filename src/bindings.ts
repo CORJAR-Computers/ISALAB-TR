@@ -443,6 +443,13 @@ export const commands = {
 	/**  Estado de la última corrida QC por analizador (badge de alerta). */
 	listQcAnalyzerStatus: () => typedError<QcAnalyzerStatus[], AppError>(__TAURI_INVOKE("list_qc_analyzer_status")),
 	/**
+	 *  Datos de marca públicos de la clínica (nombre comercial y tagline).
+	 * 
+	 *  No exige sesión: el login los usa para mostrar «Clínica Veterinaria» (o el
+	 *  tagline configurado) antes de autenticar. No expone ningún secreto.
+	 */
+	getClinicBranding: () => typedError<ClinicBranding, AppError>(__TAURI_INVOKE("get_clinic_branding")),
+	/**
 	 *  Configuración de la clínica (nombre, NIT, IVA, firma de reportes…).
 	 * 
 	 *  Los secretos (`groq_api_key`, `pkcs12_password`) se devuelven siempre
@@ -833,6 +840,19 @@ export type ChangePasswordInput = {
 	newPassword: string,
 };
 
+/**
+ *  Datos de marca públicos de la clínica (nombre comercial y tagline).
+ * 
+ *  No exigen sesión: el login los necesita para mostrar la marca antes de
+ *  que el usuario se autentique.
+ */
+export type ClinicBranding = {
+	/**  Nombre comercial configurado (o el valor por defecto). */
+	clinicName: string,
+	/**  Texto de marca (login, sidebar, About); NULL = usar "Clínica Veterinaria". */
+	tagline: string | null,
+};
+
 /**  Configuración de la clínica (tabla CLINIC_SETTINGS, claves planas). */
 export type ClinicSettings = {
 	clinicName: string,
@@ -864,6 +884,15 @@ export type ClinicSettings = {
 	smtpPassword: string | null,
 	/**  Remitente (dirección "de" de los correos). */
 	smtpFrom: string | null,
+	/**  Texto de marca (login, sidebar, About); NULL = usar "Clínica Veterinaria". */
+	tagline: string | null,
+	/**
+	 *  Duración por defecto de la sesión de estética (minutos) cuando el
+	 *  servicio del catálogo no la define.
+	 */
+	groomingDefaultDuration: number | null,
+	/**  Prefijo del ticket de turno de recepción (opcional). */
+	receptionTicketPrefix: string | null,
 };
 
 /**  Agregado del historial clínico completo de un paciente. */
@@ -873,6 +902,12 @@ export type ClinicalHistory = {
 	consultations: Consultation[],
 	vaccines: Vaccine[],
 	samples: Sample[],
+	/**  Visitas de recepción del paciente (fase 5). */
+	visits: VisitListItem[],
+	/**  Sesiones de estética del paciente (fase 5). */
+	groomingSessions: GroomingSession[],
+	/**  Cobros (facturas) del paciente, de la más reciente (fase 5). */
+	charges: PatientChargeSummary[],
 };
 
 export type Consultation = {
@@ -1097,6 +1132,23 @@ export type DashboardStats = {
 	topAnalytes: AnalyteCount[],
 	consultationsPending: number,
 	surgeriesProgrammed: number,
+	/**  Visitas abiertas hoy (llegaron en la fecha actual). */
+	visitsToday: number,
+	/**  Visitas aún en espera (cola de recepción). */
+	visitsWaiting: number,
+	/**  Visitas urgentes sin atender. */
+	visitsUrgentWaiting: number,
+	/**
+	 *  Espera promedio de las visitas de hoy que ya iniciaron atención
+	 *  (minutos entre ARRIVED_AT y el primer STARTED_AT de sus líneas).
+	 */
+	avgWaitMinutes: number | null,
+	/**  Citas agendadas para hoy (todas las categorías). */
+	appointmentsToday: number,
+	/**  Líneas de estética (PELUQUERIA) en visitas de hoy. */
+	groomingSessionsToday: number,
+	/**  Ingresos del mes en curso por categoría de servicio (facturas PAGADA). */
+	revenueByCategory: RevenueByCategory[],
 	/**  Refuerzos cuya fecha ya venció. */
 	vaccinesDue: number,
 	/**  Facturas emitidas sin pagar. */
@@ -1111,6 +1163,8 @@ export type DashboardStats = {
 	upcomingVaccines: VaccineListItem[],
 	/**  Últimas muestras recibidas (máx. 5). */
 	recentSamples: SampleListItem[],
+	/**  Próximas citas de la agenda (máx. 5, PROGRAMADA/CONFIRMADA). */
+	upcomingAppointments: AppointmentListItem[],
 };
 
 export type DbHealth = {
@@ -1500,6 +1554,21 @@ export type Patient = {
 	ageMonths: number,
 };
 
+/**
+ *  Resumen compacto de un cobro (factura) del paciente para la línea de
+ *  tiempo del historial clínico.
+ */
+export type PatientChargeSummary = {
+	invoiceId: number,
+	/**  Número de factura (FAC-…). */
+	invoiceNumber: string,
+	/**  YYYY-MM-DD HH:MM:SS */
+	issueDate: string,
+	total: number | null,
+	/**  EMITIDA | PAGADA | ANULADA */
+	status: string,
+};
+
 /**  Estado QC del último corrida por analizador (badge de alerta en la UI). */
 export type QcAnalyzerStatus = {
 	analyzerId: number,
@@ -1688,6 +1757,13 @@ export type ResultAttachment = {
 	filePath: string,
 	mimeType: string | null,
 	createdAt: string,
+};
+
+/**  Ingresos por categoría de servicio (mes en curso, facturas PAGADA). */
+export type RevenueByCategory = {
+	categoryId: number,
+	categoryName: string,
+	revenue: number | null,
 };
 
 export type Sample = {

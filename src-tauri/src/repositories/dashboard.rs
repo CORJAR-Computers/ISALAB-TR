@@ -4,10 +4,11 @@ use rsfbclient::SimpleConnection;
 use crate::error::AppError;
 use crate::models::consultation::ConsultationListItem;
 use crate::models::dashboard::{
-    AnalyteCount, DailySampleVolume, DashboardStats, SampleTypeTurnaround,
+    AnalyteCount, DailySampleVolume, DashboardStats, RevenueByCategory, SampleTypeTurnaround,
 };
 use crate::repositories::{
-    samples as samples_repo, surgeries as surgeries_repo, vaccines as vaccines_repo,
+    appointments as appointments_repo, samples as samples_repo, surgeries as surgeries_repo,
+    vaccines as vaccines_repo,
 };
 
 type ConsultationListItemRow = (
@@ -168,9 +169,57 @@ pub fn get_stats(conn: &mut SimpleConnection) -> Result<DashboardStats, AppError
         .map(|(v,): (f64,)| v)
         .unwrap_or(0.0);
 
+    // ---- Recepción / clínica ----
+    let visits_today = count(
+        conn,
+        "SELECT COUNT(*) FROM VISITS WHERE CAST(ARRIVED_AT AS DATE) = CURRENT_DATE",
+    )?;
+    let visits_waiting = count(
+        conn,
+        "SELECT COUNT(*) FROM VISITS WHERE STATUS = 'EN_ESPERA'",
+    )?;
+    let visits_urgent_waiting = count(
+        conn,
+        "SELECT COUNT(*) FROM VISITS WHERE STATUS = 'EN_ESPERA' AND PRIORITY = 'URGENTE'",
+    )?;
+    // Espera promedio de hoy: minutos entre la llegada y el primer STARTED_AT
+    // de las líneas de la visita (solo visitas que ya iniciaron atención).
+    let avg_wait_minutes = conn
+        .query_first(
+            "SELECT COALESCE(CAST(AVG(DATEDIFF(MINUTE FROM v.ARRIVED_AT TO w.STARTED))
+                    AS DOUBLE PRECISION), 0)
+             FROM VISITS v
+             JOIN (SELECT VISIT_ID, MIN(STARTED_AT) AS STARTED
+                     FROM VISIT_SERVICES
+                    WHERE STARTED_AT IS NOT NULL
+                 GROUP BY VISIT_ID) w
+               ON w.VISIT_ID = v.ID
+             WHERE CAST(v.ARRIVED_AT AS DATE) = CURRENT_DATE",
+            (),
+        )
+        .map_err(AppError::from)?
+        .map(|(v,): (f64,)| v)
+        .unwrap_or(0.0);
+    let appointments_today = count(
+        conn,
+        "SELECT COUNT(*) FROM APPOINTMENTS WHERE CAST(SCHEDULED_AT AS DATE) = CURRENT_DATE",
+    )?;
+    let grooming_sessions_today = count(
+        conn,
+        "SELECT COUNT(*)
+           FROM VISIT_SERVICES vs
+           JOIN SERVICES s ON s.ID = vs.SERVICE_ID
+           JOIN SERVICE_CATEGORIES c ON c.ID = s.CATEGORY_ID
+           JOIN VISITS v ON v.ID = vs.VISIT_ID
+          WHERE c.CODE = 'PELUQUERIA'
+            AND CAST(v.ARRIVED_AT AS DATE) = CURRENT_DATE",
+    )?;
+    let revenue_by_category = list_revenue_by_category(conn)?;
+
     let upcoming_consultations = list_upcoming_consultations(conn, 5)?;
     let upcoming_surgeries = surgeries_repo::list_upcoming(conn, 5)?;
     let upcoming_vaccines = vaccines_repo::list_upcoming(conn, 5)?;
+    let upcoming_appointments = appointments_repo::list_upcoming_appointments(conn, 5)?;
     let mut recent = samples_repo::list(conn, None, None)?;
     recent.truncate(5);
 
@@ -192,11 +241,48 @@ pub fn get_stats(conn: &mut SimpleConnection) -> Result<DashboardStats, AppError
         vaccines_due,
         invoices_unpaid,
         revenue_total,
+        visits_today,
+        visits_waiting,
+        visits_urgent_waiting,
+        avg_wait_minutes,
+        appointments_today,
+        grooming_sessions_today,
+        revenue_by_category,
         upcoming_consultations,
         upcoming_surgeries,
         upcoming_vaccines,
         recent_samples: recent,
+        upcoming_appointments,
     })
+}
+
+/// Ingresos del mes en curso por categoría de servicio (facturas PAGADA con
+/// líneas vinculadas al catálogo vía INVOICE_ITEMS.SERVICE_ID).
+fn list_revenue_by_category(conn: &mut SimpleConnection) -> Result<Vec<RevenueByCategory>, AppError> {
+    let rows: Vec<(i32, String, f64)> = conn
+        .query(
+            "SELECT s.CATEGORY_ID, c.NAME,
+                    COALESCE(CAST(SUM(ii.LINE_TOTAL) AS DOUBLE PRECISION), 0)
+             FROM INVOICES i
+             JOIN INVOICE_ITEMS ii ON ii.INVOICE_ID = i.ID
+             JOIN SERVICES s ON s.ID = ii.SERVICE_ID
+             JOIN SERVICE_CATEGORIES c ON c.ID = s.CATEGORY_ID
+             WHERE i.STATUS = 'PAGADA'
+               AND EXTRACT(YEAR FROM i.ISSUE_DATE) = EXTRACT(YEAR FROM CURRENT_DATE)
+               AND EXTRACT(MONTH FROM i.ISSUE_DATE) = EXTRACT(MONTH FROM CURRENT_DATE)
+             GROUP BY s.CATEGORY_ID, c.NAME
+             ORDER BY 3 DESC",
+            (),
+        )
+        .map_err(AppError::from)?;
+    Ok(rows
+        .into_iter()
+        .map(|(category_id, category_name, revenue)| RevenueByCategory {
+            category_id,
+            category_name,
+            revenue,
+        })
+        .collect())
 }
 
 /// Volumen de muestras recibidas por día en los últimos 7 días (incluye días
@@ -298,6 +384,15 @@ mod tests {
         assert!(stats.upcoming_surgeries.is_empty());
         assert!(stats.upcoming_vaccines.is_empty());
         assert!(stats.recent_samples.is_empty());
+        // Clínica (fase 5)
+        assert_eq!(stats.visits_today, 0);
+        assert_eq!(stats.visits_waiting, 0);
+        assert_eq!(stats.visits_urgent_waiting, 0);
+        assert_eq!(stats.avg_wait_minutes, 0.0);
+        assert_eq!(stats.appointments_today, 0);
+        assert_eq!(stats.grooming_sessions_today, 0);
+        assert!(stats.revenue_by_category.is_empty());
+        assert!(stats.upcoming_appointments.is_empty());
 
         cleanup_test_db(&db_path);
     }
@@ -465,6 +560,134 @@ mod tests {
         let stats = get_stats(&mut conn).unwrap();
         assert_eq!(stats.invoices_unpaid, 1);
         assert!((stats.revenue_total - 200000.0).abs() < 0.01);
+
+        cleanup_test_db(&db_path);
+    }
+
+    /// Métricas de recepción/clínica (fase 5): visitas de hoy, cola de espera,
+    /// espera promedio, citas y sesiones de estética de hoy e ingresos del mes
+    /// por categoría.
+    #[test]
+    fn test_get_stats_clinic_metrics() {
+        let (mut conn, db_path) = setup();
+        let patient_id = insert_test_patient(&mut conn);
+
+        // Visita de hoy EN_ESPERA (urgente): cuenta en la cola.
+        conn.execute(
+            "INSERT INTO VISITS (ID, PATIENT_ID, OWNER_ID, ARRIVED_AT, PRIORITY, STATUS)
+             VALUES (1, ?, 1, CURRENT_TIMESTAMP, 'URGENTE', 'EN_ESPERA')",
+            (&patient_id,),
+        )
+        .unwrap();
+        // Visita de hoy con línea iniciada hace 30 min: espera promedio 30.
+        conn.execute(
+            "INSERT INTO VISITS (ID, PATIENT_ID, OWNER_ID, ARRIVED_AT, STATUS)
+             VALUES (2, ?, 1, DATEADD(-30 MINUTE TO CURRENT_TIMESTAMP), 'EN_ATENCION')",
+            (&patient_id,),
+        )
+        .unwrap();
+        conn.execute(
+            "INSERT INTO VISIT_SERVICES (ID, VISIT_ID, SERVICE_ID, UNIT_PRICE, STATUS, STARTED_AT)
+             VALUES (1, 2, 1, 50000, 'EN_PROCESO', CURRENT_TIMESTAMP)",
+            (),
+        )
+        .unwrap();
+        // Visita de ayer: no cuenta en las métricas de hoy.
+        conn.execute(
+            "INSERT INTO VISITS (ID, PATIENT_ID, OWNER_ID, ARRIVED_AT, STATUS)
+             VALUES (3, ?, 1, DATEADD(-1 DAY TO CURRENT_TIMESTAMP), 'EN_ESPERA')",
+            (&patient_id,),
+        )
+        .unwrap();
+
+        // Cita de hoy (y otra de mañana, que no cuenta para hoy).
+        conn.execute(
+            "INSERT INTO APPOINTMENTS (ID, CODE, PATIENT_ID, SERVICE_ID, SCHEDULED_AT,
+                                        DURATION_MIN, STATUS)
+             VALUES (1, 'C-2026-0001', ?, 1, CURRENT_TIMESTAMP, 30, 'PROGRAMADA')",
+            (&patient_id,),
+        )
+        .unwrap();
+        conn.execute(
+            "INSERT INTO APPOINTMENTS (ID, CODE, PATIENT_ID, SERVICE_ID, SCHEDULED_AT,
+                                        DURATION_MIN, STATUS)
+             VALUES (2, 'C-2026-0002', ?, 1, DATEADD(1 DAY TO CURRENT_TIMESTAMP), 30, 'PROGRAMADA')",
+            (&patient_id,),
+        )
+        .unwrap();
+
+        // Línea de estética (PELUQUERIA) en visita de hoy.
+        conn.execute(
+            "INSERT INTO VISIT_SERVICES (ID, VISIT_ID, SERVICE_ID, UNIT_PRICE, STATUS)
+             VALUES (2, 1, 11, 60000, 'PENDIENTE')",
+            (),
+        )
+        .unwrap();
+
+        // Factura PAGADA de este mes con línea del catálogo (servicio 1).
+        conn.execute(
+            "INSERT INTO INVOICES (ID, OWNER_ID, PATIENT_ID, INVOICE_NUMBER, ISSUE_DATE,
+                                    TOTAL, STATUS)
+             VALUES (1, 1, ?, 'FAC-0001', CURRENT_TIMESTAMP, 95000, 'PAGADA')",
+            (&patient_id,),
+        )
+        .unwrap();
+        conn.execute(
+            "INSERT INTO INVOICE_ITEMS (ID, INVOICE_ID, SERVICE_ID, DESCRIPTION, QUANTITY,
+                                         UNIT_PRICE, LINE_TOTAL)
+             VALUES (1, 1, 1, 'Consulta general', 1, 95000, 95000)",
+            (),
+        )
+        .unwrap();
+
+        // Próximas citas (1 de hoy ya pasó de las futuras de mañana).
+        let stats = get_stats(&mut conn).unwrap();
+        assert_eq!(stats.visits_today, 2);
+        // Cola de espera: la urgente de hoy y la de ayer siguen EN_ESPERA.
+        assert_eq!(stats.visits_waiting, 2);
+        assert_eq!(stats.visits_urgent_waiting, 1);
+        assert!((stats.avg_wait_minutes - 30.0).abs() < 0.01);
+        assert_eq!(stats.appointments_today, 1);
+        assert_eq!(stats.grooming_sessions_today, 1);
+        assert_eq!(stats.revenue_by_category.len(), 1);
+        assert!((stats.revenue_by_category[0].revenue - 95000.0).abs() < 0.01);
+        assert!(!stats.upcoming_appointments.is_empty());
+
+        cleanup_test_db(&db_path);
+    }
+
+    /// El listado de próximas citas del panel solo trae PROGRAMADA/CONFIRMADA
+    /// desde ahora, en orden ascendente y limitado.
+    #[test]
+    fn test_list_upcoming_appointments() {
+        let (mut conn, db_path) = setup();
+        let patient_id = insert_test_patient(&mut conn);
+
+        for i in 1..=3 {
+            let code = format!("C-2026-000{i}");
+            // La fecha se construye con un literal: Firebird no acepta un
+            // parámetro enlazado dentro de DATEADD.
+            let sql = format!(
+                "INSERT INTO APPOINTMENTS (ID, CODE, PATIENT_ID, SERVICE_ID, SCHEDULED_AT,
+                                            DURATION_MIN, STATUS)
+                 VALUES (?, ?, ?, 1, DATEADD({i} HOUR TO CURRENT_TIMESTAMP),
+                         30, 'PROGRAMADA')"
+            );
+            conn.execute(&sql, (&i, &code, &patient_id)).unwrap();
+        }
+        // Una cancelada no aparece.
+        conn.execute(
+            "INSERT INTO APPOINTMENTS (ID, CODE, PATIENT_ID, SERVICE_ID, SCHEDULED_AT,
+                                        DURATION_MIN, STATUS)
+             VALUES (9, 'C-2026-0009', ?, 1, DATEADD(9 HOUR TO CURRENT_TIMESTAMP),
+                     30, 'CANCELADA')",
+            (&patient_id,),
+        )
+        .unwrap();
+
+        let items = appointments_repo::list_upcoming_appointments(&mut conn, 2).unwrap();
+        assert_eq!(items.len(), 2);
+        assert_eq!(items[0].status, "PROGRAMADA");
 
         cleanup_test_db(&db_path);
     }

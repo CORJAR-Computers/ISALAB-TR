@@ -2,13 +2,14 @@ use rsfbclient::prelude::*;
 use rsfbclient::SimpleConnection;
 
 use crate::error::AppError;
-use crate::models::clinical_history::ClinicalHistory;
+use crate::models::clinical_history::{ClinicalHistory, PatientChargeSummary};
 use crate::models::consultation::{Consultation, ConsultationListItem, CreateConsultationInput};
 use crate::models::sample::{
     CreateSampleInput, LabResult, RegisterResultInput, RegisterResultsInput, Sample,
 };
 use crate::repositories::{
-    next_id, patient as patient_repo, samples as samples_repo, vaccines as vaccines_repo,
+    grooming as grooming_repo, next_id, patient as patient_repo, samples as samples_repo,
+    vaccines as vaccines_repo, visits as visits_repo,
 };
 
 type ConsultationRow = (
@@ -83,6 +84,9 @@ pub fn get_clinical_history(
     let consultations = list_consultations(conn, patient_id)?;
     let vaccines = vaccines_repo::by_patient(conn, patient_id)?;
     let samples = list_samples(conn, patient_id)?;
+    let visits = visits_repo::list_visits_by_patient(conn, patient_id)?;
+    let grooming_sessions = grooming_repo::list_grooming_sessions_by_patient(conn, patient_id)?;
+    let charges = list_patient_charges(conn, patient_id)?;
 
     Ok(ClinicalHistory {
         patient,
@@ -90,7 +94,38 @@ pub fn get_clinical_history(
         consultations,
         vaccines,
         samples,
+        visits,
+        grooming_sessions,
+        charges,
     })
+}
+
+/// Cobros del paciente (facturas compactas), de la más reciente.
+fn list_patient_charges(
+    conn: &mut SimpleConnection,
+    patient_id: i32,
+) -> Result<Vec<PatientChargeSummary>, AppError> {
+    let rows: Vec<(i32, String, String, f64, String)> = conn
+        .query(
+            "SELECT i.ID, i.INVOICE_NUMBER,
+                    LEFT(CAST(i.ISSUE_DATE AS VARCHAR(60)), 19),
+                    CAST(i.TOTAL AS DOUBLE PRECISION), i.STATUS
+             FROM INVOICES i
+             WHERE i.PATIENT_ID = ?
+             ORDER BY i.ISSUE_DATE DESC, i.ID DESC",
+            (&patient_id,),
+        )
+        .map_err(AppError::from)?;
+    Ok(rows
+        .into_iter()
+        .map(|(invoice_id, invoice_number, issue_date, total, status)| PatientChargeSummary {
+            invoice_id,
+            invoice_number,
+            issue_date,
+            total,
+            status,
+        })
+        .collect())
 }
 
 // ============================ CONSULTAS =====================================
@@ -902,6 +937,69 @@ mod tests {
 
         // Verificar vacunas (vacío en este test)
         assert_eq!(history.vaccines.len(), 0);
+
+        // Fase 5: sin visitas/estética/cobros en este escenario
+        assert_eq!(history.visits.len(), 0);
+        assert_eq!(history.grooming_sessions.len(), 0);
+        assert_eq!(history.charges.len(), 0);
+
+        cleanup_test_db(&db_path);
+    }
+
+    /// El historial incluye las visitas de recepción, las sesiones de
+    /// estética y los cobros (facturas) del paciente (fase 5).
+    #[test]
+    fn test_get_clinical_history_visits_grooming_and_charges() {
+        let (mut conn, db_path) = setup();
+        let patient_id = insert_test_patient(&mut conn);
+
+        // Visita de recepción con una línea de servicio.
+        conn.execute(
+            "INSERT INTO VISITS (ID, PATIENT_ID, OWNER_ID, ARRIVED_AT, STATUS)
+             VALUES (1, ?, 1, CURRENT_TIMESTAMP, 'EN_ESPERA')",
+            (&patient_id,),
+        )
+        .unwrap();
+        conn.execute(
+            "INSERT INTO VISIT_SERVICES (ID, VISIT_ID, SERVICE_ID, UNIT_PRICE, STATUS)
+             VALUES (1, 1, 1, 50000, 'PENDIENTE')",
+            (),
+        )
+        .unwrap();
+
+        // Línea de estética con su ficha de sesión.
+        conn.execute(
+            "INSERT INTO VISIT_SERVICES (ID, VISIT_ID, SERVICE_ID, UNIT_PRICE, STATUS)
+             VALUES (2, 1, 11, 60000, 'PENDIENTE')",
+            (),
+        )
+        .unwrap();
+        conn.execute(
+            "INSERT INTO GROOMING_SESSIONS (ID, VISIT_SERVICE_ID, MATTING_LEVEL, CREATED_AT, UPDATED_AT)
+             VALUES (1, 2, 1, CURRENT_TIMESTAMP, CURRENT_TIMESTAMP)",
+            (),
+        )
+        .unwrap();
+
+        // Factura (cobro) del paciente.
+        conn.execute(
+            "INSERT INTO INVOICES (ID, OWNER_ID, PATIENT_ID, INVOICE_NUMBER, ISSUE_DATE,
+                                    TOTAL, STATUS)
+             VALUES (1, 1, ?, 'FAC-0001', CURRENT_TIMESTAMP, 95000, 'PAGADA')",
+            (&patient_id,),
+        )
+        .unwrap();
+
+        let history = get_clinical_history(&mut conn, patient_id).unwrap();
+        assert_eq!(history.visits.len(), 1);
+        assert_eq!(history.visits[0].services_summary, "Consulta general + Baño");
+        assert!((history.visits[0].estimated_total - 110000.0).abs() < 0.01);
+        assert_eq!(history.grooming_sessions.len(), 1);
+        assert_eq!(history.grooming_sessions[0].service_name, "Baño");
+        assert_eq!(history.charges.len(), 1);
+        assert_eq!(history.charges[0].invoice_number, "FAC-0001");
+        assert_eq!(history.charges[0].status, "PAGADA");
+        assert!((history.charges[0].total - 95000.0).abs() < 0.01);
 
         cleanup_test_db(&db_path);
     }

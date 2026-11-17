@@ -122,6 +122,14 @@ pub const MIGRATIONS: &[(&str, &str)] = &[
         "0029_grooming",
         include_str!("../../migrations/0029_grooming.sql"),
     ),
+    (
+        "0030_clinic_indexes",
+        include_str!("../../migrations/0030_clinic_indexes.sql"),
+    ),
+    (
+        "0031_settings",
+        include_str!("../../migrations/0031_settings.sql"),
+    ),
 ];
 
 /// Indica si una migración de datos de demostración debe aplicarse.

@@ -1,11 +1,14 @@
 import { useEffect, useRef, useState } from "react";
 import {
+  CalendarClock,
   CornerDownLeft,
   FlaskConical,
   Receipt,
   Scissors,
   Search,
+  Stethoscope,
   Users,
+  Wrench,
 } from "lucide-react";
 import {
   Dialog,
@@ -23,9 +26,12 @@ const KIND_META: Record<
   { icon: typeof Users; label: string; tone: string }
 > = {
   patient: { icon: Users, label: "Paciente", tone: "bg-primary/10 text-primary" },
+  visit: { icon: Stethoscope, label: "Visita", tone: "bg-sky-500/15 text-sky-600 dark:text-sky-400" },
+  appointment: { icon: CalendarClock, label: "Cita", tone: "bg-primary/10 text-primary" },
   sample: { icon: FlaskConical, label: "Muestra", tone: "bg-warning/15 text-warning" },
   invoice: { icon: Receipt, label: "Factura", tone: "bg-success/15 text-success" },
   surgery: { icon: Scissors, label: "Cirugía", tone: "bg-destructive/10 text-destructive" },
+  service: { icon: Wrench, label: "Servicio", tone: "bg-muted text-muted-foreground" },
 };
 
 /**
@@ -101,6 +107,15 @@ export function GlobalSearchPalette() {
         navigate("surgeries");
         requestEntity("surgery", r.id);
         break;
+      case "visit":
+        navigate("reception");
+        break;
+      case "appointment":
+        navigate("appointments");
+        break;
+      case "service":
+        navigate("services");
+        break;
     }
   };
 
@@ -140,7 +155,7 @@ export function GlobalSearchPalette() {
             value={query}
             onChange={(e) => setQuery(e.target.value)}
             onKeyDown={onInputKeyDown}
-            placeholder="Buscar paciente, muestra, factura o cirugía…"
+            placeholder="Buscar paciente, visita, cita, servicio, muestra, factura o cirugía…"
             className="h-12 min-w-0 flex-1 bg-transparent text-sm outline-none placeholder:text-muted-foreground"
           />
           <kbd className="text-muted-foreground hidden rounded border bg-muted px-1.5 py-0.5 text-[10px] font-medium sm:block">
@@ -234,7 +249,7 @@ export function GlobalSearchPalette() {
             <kbd className="rounded border bg-muted px-1 py-0.5">↵</kbd> abrir
           </span>
           <span className="ml-auto hidden sm:block">
-            Busca por código o nombre en pacientes, muestras, facturas y cirugías
+            Busca por código o nombre en toda la clínica y el laboratorio
           </span>
         </div>
       </DialogContent>

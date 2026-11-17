@@ -304,8 +304,67 @@ pub fn list_visits(
         .collect())
 }
 
-// ============================== ESTADOS =====================================
+/// Historial: todas las visitas de un paciente (recepción), de la más
+/// reciente a la más antigua, con el resumen de servicios y el total estimado.
+pub fn list_visits_by_patient(
+    conn: &mut SimpleConnection,
+    patient_id: i32,
+) -> Result<Vec<VisitListItem>, AppError> {
+    let sql = "
+        SELECT v.ID, v.CODE, v.PATIENT_ID, p.NAME,
+               v.OWNER_ID, o.FULL_NAME,
+               LEFT(CAST(v.ARRIVED_AT AS VARCHAR(60)), 19),
+               v.PRIORITY, v.STATUS, v.NOTES,
+               COALESCE((SELECT LIST(s2.NAME, ' + ')
+                           FROM VISIT_SERVICES vs2
+                           JOIN SERVICES s2 ON s2.ID = vs2.SERVICE_ID
+                          WHERE vs2.VISIT_ID = v.ID
+                            AND vs2.STATUS <> 'CANCELADA'), ''),
+               COALESCE((SELECT SUM(CAST(vs3.UNIT_PRICE AS DOUBLE PRECISION) * vs3.QUANTITY)
+                           FROM VISIT_SERVICES vs3
+                          WHERE vs3.VISIT_ID = v.ID
+                            AND vs3.STATUS <> 'CANCELADA'), 0.0)
+        FROM VISITS v
+        JOIN PATIENTS p ON p.ID = v.PATIENT_ID
+        JOIN OWNERS o ON o.ID = v.OWNER_ID
+        WHERE v.PATIENT_ID = ?
+        ORDER BY v.ARRIVED_AT DESC, v.ID DESC";
 
+    let rows: Vec<(
+        i32,
+        String,
+        i32,
+        String,
+        i32,
+        String,
+        String,
+        String,
+        String,
+        Option<String>,
+        String,
+        f64,
+    )> = conn.query(sql, (&patient_id,)).map_err(AppError::from)?;
+
+    Ok(rows
+        .into_iter()
+        .map(|r| VisitListItem {
+            id: r.0,
+            code: r.1,
+            patient_id: r.2,
+            patient_name: r.3,
+            owner_id: r.4,
+            owner_name: r.5,
+            arrived_at: r.6,
+            priority: r.7,
+            status: r.8,
+            notes: r.9,
+            services_summary: r.10,
+            estimated_total: r.11,
+        })
+        .collect())
+}
+
+// ============================== ESTADOS =====================================
 /// Cambia el estado de la visita validando la transición.
 /// FACTURADA solo se establece vía `checkout_visit`.
 pub fn set_visit_status(

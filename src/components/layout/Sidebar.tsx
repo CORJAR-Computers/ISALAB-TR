@@ -23,6 +23,7 @@ import {
   LayoutList,
 } from "lucide-react";
 import { Button } from "@/components/ui/button";
+import { useClinicBranding } from "@/hooks/use-queries";
 import logoSidebar from "@/assets/logo_sidebar.png";
 
 type NavItem = {
@@ -113,6 +114,8 @@ export function Sidebar() {
   const view = useUiStore((s) => s.view);
   const navigate = useUiStore((s) => s.navigate);
   const { isAdmin } = usePermissions();
+  const { data: branding } = useClinicBranding();
+  const tagline = branding?.tagline || "Clínica Veterinaria";
 
   const [openSections, setOpenSections] = useState<string[]>(INITIAL_OPEN);
 
@@ -167,7 +170,7 @@ export function Sidebar() {
           <div className="flex h-12 flex-1 items-center justify-center rounded-xl border border-primary/10 bg-primary/6 px-3 transition-colors hover:bg-primary/10">
             <img
               src={logoSidebar}
-              alt="ISALAB · Laboratorio Veterinario"
+              alt={`ISALAB · ${tagline}`}
               className="max-h-full w-full object-contain"
               draggable={false}
             />

@@ -111,6 +111,23 @@ pub fn get_grooming_session(
     Ok(row.map(map_grooming))
 }
 
+/// Todas las sesiones de estética de un paciente (historial clínico),
+/// de la más reciente a la más antigua.
+pub fn list_grooming_sessions_by_patient(
+    conn: &mut SimpleConnection,
+    patient_id: i32,
+) -> Result<Vec<GroomingSession>, AppError> {
+    let rows: Vec<GroomingRow> = conn
+        .query(
+            &format!(
+                "{GROOMING_SELECT} WHERE v.PATIENT_ID = ? ORDER BY g.CREATED_AT DESC, g.ID DESC"
+            ),
+            (&patient_id,),
+        )
+        .map_err(AppError::from)?;
+    Ok(rows.into_iter().map(map_grooming).collect())
+}
+
 /// Valida que la línea sea de categoría PELUQUERIA y devuelve (visit_id, service_name).
 fn grooming_line(
     conn: &mut SimpleConnection,

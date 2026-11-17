@@ -1,9 +1,11 @@
-# ISALAB · Laboratorio Veterinario
+# ISALAB · Clínica Veterinaria
 
-Sistema de escritorio moderno para **laboratorios veterinarios** (inspirado en
-[ISALAB](https://github.com/CORJAR-Computers/ISALAB.git)): historiales clínicos
-multiespecie, muestras analíticas con trazabilidad, vacunación, reportes PDF
-firmados y facturación.
+Sistema de escritorio moderno para **clínicas veterinarias integrales** con
+laboratorio propio (inspirado en
+[ISALAB](https://github.com/CORJAR-Computers/ISALAB.git)): recepción de
+pacientes y citas, historiales clínicos multiespecie, muestras analíticas con
+trazabilidad, vacunación, estética (peluquería), reportes PDF firmados y
+facturación.
 
 ## Stack
 

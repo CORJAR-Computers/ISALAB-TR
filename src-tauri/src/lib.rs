@@ -92,8 +92,8 @@ use crate::commands::services::{
     list_services, save_service, save_service_category, set_service_active,
 };
 use crate::commands::settings::{
-    delete_secondary_logo, get_clinic_settings, import_clinic_logo, import_pkcs12,
-    import_secondary_logo, list_secondary_logos, save_clinic_settings,
+    delete_secondary_logo, get_clinic_branding, get_clinic_settings, import_clinic_logo,
+    import_pkcs12, import_secondary_logo, list_secondary_logos, save_clinic_settings,
 };
 use crate::commands::surgeries::{
     count_surgeries, create_surgery, list_surgeries, set_surgery_status,
@@ -211,6 +211,7 @@ fn specta_builder() -> Builder<tauri::Wry> {
             delete_qc_run,
             get_qc_chart,
             list_qc_analyzer_status,
+            get_clinic_branding,
             get_clinic_settings,
             save_clinic_settings,
             import_clinic_logo,

@@ -14,6 +14,7 @@ import type {
   Breed,
   ChangePasswordInput,
   ClinicalHistory,
+  ClinicBranding,
   ClinicSettings,
   Consultation,
   ConsultationListItem,
@@ -251,6 +252,7 @@ export const api = {
     invoke<void>("delete_analyzer_import_job", { jobId }),
 
   // ---- Configuración ----
+  getClinicBranding: () => invoke<ClinicBranding>("get_clinic_branding"),
   getClinicSettings: () => invoke<ClinicSettings>("get_clinic_settings"),
   saveClinicSettings: (input: ClinicSettings) =>
     invoke<ClinicSettings>("save_clinic_settings", { input }),

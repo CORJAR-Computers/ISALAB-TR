@@ -45,6 +45,9 @@ function makeHistory(
     consultations: [],
     vaccines: [],
     samples: [],
+    visits: [],
+    groomingSessions: [],
+    charges: [],
     ...overrides,
   };
 }
@@ -207,5 +210,66 @@ describe("ClinicalTimeline", () => {
     expect(screen.getByText(/Plan:/)).toBeInTheDocument();
     expect(screen.getByText("Ninguno")).toBeInTheDocument();
     expect(screen.getByText("Atendió: Dr. García")).toBeInTheDocument();
+  });
+
+  it("renders visit, grooming and charge entries (fase 5)", () => {
+    const history = makeHistory({
+      visits: [
+        {
+          id: 7,
+          code: "V-2026-0007",
+          patientId: 1,
+          patientName: "Firulais",
+          ownerId: 2,
+          ownerName: "Juan Pérez",
+          arrivedAt: "2025-04-05 09:00:00",
+          priority: "NORMAL",
+          status: "FACTURADA",
+          notes: null,
+          servicesSummary: "Baño + Consulta general",
+          estimatedTotal: 100000,
+        },
+      ],
+      groomingSessions: [
+        {
+          id: 3,
+          visitServiceId: 9,
+          visitId: 7,
+          serviceName: "Baño",
+          patientId: 1,
+          patientName: "Firulais",
+          ownerName: "Juan Pérez",
+          groomerId: 2,
+          groomerName: "Camila",
+          style: "Corte de raza",
+          bathType: "Normal",
+          coatCondition: null,
+          mattingLevel: 0,
+          weightKg: null,
+          behavior: null,
+          productsUsed: null,
+          startedAt: "2025-04-05 09:10:00",
+          finishedAt: "2025-04-05 10:00:00",
+          nextSuggestedAt: "2025-06-05",
+          notes: null,
+          createdAt: "2025-04-05 09:05:00",
+          updatedAt: "2025-04-05 10:00:00",
+        },
+      ],
+      charges: [
+        {
+          invoiceId: 12,
+          invoiceNumber: "FAC-0012",
+          issueDate: "2025-04-05 10:30:00",
+          total: 100000,
+          status: "PAGADA",
+        },
+      ],
+    });
+    render(<ClinicalTimeline history={history} />);
+    expect(screen.getByText("3 registros · orden cronológico")).toBeInTheDocument();
+    expect(screen.getByText("Visita V-2026-0007")).toBeInTheDocument();
+    expect(screen.getByText("Estética · Baño")).toBeInTheDocument();
+    expect(screen.getByText("Cobro FAC-0012")).toBeInTheDocument();
   });
 });

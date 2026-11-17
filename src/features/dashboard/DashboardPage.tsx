@@ -14,8 +14,10 @@ import {
   Plus,
   Receipt,
   Scissors,
+  Sparkles,
   Stethoscope,
   Syringe,
+  Timer,
   TrendingUp,
   Wallet,
 } from "lucide-react";
@@ -36,6 +38,7 @@ import {
 import { getErrorMessage } from "@/lib/api";
 import { cn, formatCOP, formatDate, formatDateTime } from "@/lib/utils";
 import {
+  APPOINTMENT_STATUS,
   CONSULTATION_STATUS,
   INVOICE_STATUS,
   SAMPLE_STATUS,
@@ -82,6 +85,11 @@ function formatHours(hours: number): string {
   const h = Math.floor(hours);
   const m = Math.round((hours - h) * 60);
   return m > 0 ? `${h} h ${m} min` : `${h} h`;
+}
+
+function formatMinutes(minutes: number): string {
+  if (!minutes || minutes <= 0) return "—";
+  return formatHours(minutes / 60);
 }
 
 function formatDayShort(date?: string): string {
@@ -275,6 +283,46 @@ export function DashboardPage() {
           label="Ingresos (COP)"
           value={formatCOP(stats.revenueTotal ?? 0)}
           tone="bg-emerald-500/15 text-emerald-600 dark:text-emerald-400"
+        />
+      </div>
+
+      {/* Recepción de hoy (clínica) */}
+      <div className="grid grid-cols-2 gap-3 sm:grid-cols-3 lg:grid-cols-5">
+        <StatCard
+          icon={Stethoscope}
+          label="Visitas de hoy"
+          value={stats.visitsToday}
+          tone="bg-sky-500/15 text-sky-600 dark:text-sky-400"
+        />
+        <StatCard
+          icon={Clock}
+          label={
+            stats.visitsUrgentWaiting > 0
+              ? `En espera · ${stats.visitsUrgentWaiting} urgente${
+                  stats.visitsUrgentWaiting === 1 ? "" : "s"
+                }`
+              : "En espera"
+          }
+          value={stats.visitsWaiting}
+          tone="bg-warning/15 text-warning"
+        />
+        <StatCard
+          icon={Timer}
+          label="Espera promedio"
+          value={formatMinutes(stats.avgWaitMinutes ?? 0)}
+          tone="bg-primary/10 text-primary"
+        />
+        <StatCard
+          icon={CalendarClock}
+          label="Citas de hoy"
+          value={stats.appointmentsToday}
+          tone="bg-violet-500/15 text-violet-600 dark:text-violet-400"
+        />
+        <StatCard
+          icon={Sparkles}
+          label="Estética de hoy"
+          value={stats.groomingSessionsToday}
+          tone="bg-pink-500/15 text-pink-600 dark:text-pink-400"
         />
       </div>
 
@@ -496,8 +544,101 @@ export function DashboardPage() {
         </Card>
       </div>
 
+      {/* Ingresos del mes por categoría de servicio */}
+      <Card className="gap-0 p-0">
+        <CardHeader className="border-b bg-gradient-to-r from-transparent via-transparent to-primary/[0.04]">
+          <CardTitle className="flex items-center gap-2 text-base">
+            <span className="bg-primary/10 text-primary flex size-7 items-center justify-center rounded-lg">
+              <Wallet className="size-4" />
+            </span>
+            Ingresos del mes por categoría
+          </CardTitle>
+          <CardDescription>
+            Facturas pagadas del mes en curso vinculadas al catálogo de
+            servicios.
+          </CardDescription>
+        </CardHeader>
+        <CardContent className="p-4">
+          {stats.revenueByCategory.length === 0 ? (
+            <p className="text-muted-foreground py-4 text-center text-sm">
+              Sin ingresos de servicios catalogados este mes.
+            </p>
+          ) : (
+            <div className="grid gap-x-6 gap-y-3 sm:grid-cols-2">
+              {stats.revenueByCategory.map((c) => {
+                const max = Math.max(
+                  1,
+                  ...stats.revenueByCategory.map((x) => x.revenue ?? 0),
+                );
+                const revenue = c.revenue ?? 0;
+                return (
+                  <div key={c.categoryId}>
+                    <div className="flex items-baseline justify-between gap-2">
+                      <p className="truncate text-sm font-medium">
+                        {c.categoryName}
+                      </p>
+                      <p className="text-muted-foreground shrink-0 text-xs font-semibold tabular-nums">
+                        {formatCOP(revenue)}
+                      </p>
+                    </div>
+                    <div className="bg-muted mt-1 h-2 overflow-hidden rounded-full">
+                      <div
+                        className="bg-primary/70 h-full rounded-full transition-all duration-500"
+                        style={{ width: `${(revenue / max) * 100}%` }}
+                        title={`${c.categoryName}: ${formatCOP(revenue)}`}
+                      />
+                    </div>
+                  </div>
+                );
+              })}
+            </div>
+          )}
+        </CardContent>
+      </Card>
+
       {/* Agenda */}
       <div className="grid gap-4 lg:grid-cols-2">
+        <AgendaList
+          title="Próximas citas de la agenda"
+          icon={CalendarClock}
+          empty="Sin citas próximas en la agenda."
+          items={stats.upcomingAppointments}
+        >
+          {stats.upcomingAppointments.map((a) => {
+            const st = APPOINTMENT_STATUS[a.status] ?? {
+              label: a.status,
+              variant: "secondary" as const,
+            };
+            return (
+              <button
+                key={a.id}
+                type="button"
+                onClick={() => navigate("appointments")}
+                className="hover:bg-accent flex w-full items-center gap-3 rounded-lg px-3 py-2.5 text-left transition-all duration-200 hover:translate-x-0.5"
+              >
+                <div className="bg-primary/10 text-primary flex size-9 shrink-0 items-center justify-center rounded-full text-xs font-bold">
+                  {a.scheduledAt.slice(8, 10)}
+                </div>
+                <div className="min-w-0 flex-1">
+                  <p className="truncate text-sm font-medium">{a.patientName}</p>
+                  <p className="text-muted-foreground truncate text-xs">
+                    {a.serviceName} · {a.ownerName}
+                    {a.professionalName ? ` · ${a.professionalName}` : ""}
+                  </p>
+                </div>
+                <div className="text-right">
+                  <p className="text-xs font-semibold tabular-nums">
+                    {formatDateTime(a.scheduledAt)}
+                  </p>
+                  <Badge variant={st.variant} className="mt-0.5">
+                    {st.label}
+                  </Badge>
+                </div>
+              </button>
+            );
+          })}
+        </AgendaList>
+
         <AgendaList
           title="Próximas consultas"
           icon={Stethoscope}

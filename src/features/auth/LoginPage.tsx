@@ -24,9 +24,12 @@ import {
   FormMessage,
 } from "@/components/ui/form";
 import { Input } from "@/components/ui/input";
-import { useLogin } from "@/hooks/use-queries";
+import { useClinicBranding, useLogin } from "@/hooks/use-queries";
 import { getErrorMessage } from "@/lib/api";
 import logoSidebar from "@/assets/logo_sidebar.png";
+
+/** Texto de marca configurable (clinic.tagline) con respaldo. */
+const TAGLINE_FALLBACK = "Clínica Veterinaria";
 
 const loginSchema = z.object({
   username: z.string().min(1, "El usuario es requerido"),
@@ -43,6 +46,8 @@ const FEATURES = [
 
 export function LoginPage() {
   const login = useLogin();
+  const { data: branding } = useClinicBranding();
+  const tagline = branding?.tagline || TAGLINE_FALLBACK;
   const [showPassword, setShowPassword] = useState(false);
 
   const form = useForm<LoginValues>({
@@ -92,9 +97,7 @@ export function LoginPage() {
             </div>
             <div>
               <p className="text-xl font-bold tracking-wide">ISALAB</p>
-              <p className="text-white/70 text-xs">
-                Laboratorio Veterinario
-              </p>
+              <p className="text-white/70 text-xs">{tagline}</p>
             </div>
           </div>
         </div>
@@ -141,7 +144,7 @@ export function LoginPage() {
             <div className="bg-card flex size-16 items-center justify-center rounded-2xl border p-2 shadow-md">
               <img
                 src={logoSidebar}
-                alt="ISALAB · Laboratorio Veterinario"
+                alt={`ISALAB · ${tagline}`}
                 className="h-auto max-h-full w-full object-contain"
                 draggable={false}
               />
@@ -149,7 +152,7 @@ export function LoginPage() {
             <div>
               <h1 className="text-xl font-bold tracking-wide">ISALAB</h1>
               <p className="text-muted-foreground text-sm">
-                Laboratorio Veterinario · Inicia sesión
+                {tagline} · Inicia sesión
               </p>
             </div>
           </div>

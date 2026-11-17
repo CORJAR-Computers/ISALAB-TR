@@ -64,6 +64,9 @@ const schema = z.object({
   groqApiKey: z.string().optional(),
   pkcs12Path: z.string().optional(),
   pkcs12Password: z.string().optional(),
+  tagline: z.string().optional(),
+  groomingDuration: z.string().optional(),
+  receptionTicketPrefix: z.string().optional(),
   smtpHost: z.string().optional(),
   smtpPort: z.coerce.number().int().min(1).max(65535).optional(),
   smtpTls: z.enum(["NONE", "STARTTLS", "TLS"]),
@@ -115,6 +118,9 @@ export function SettingsPage() {
       smtpUsername: "",
       smtpPassword: "",
       smtpFrom: "",
+      tagline: "",
+      groomingDuration: "",
+      receptionTicketPrefix: "",
     },
   });
 
@@ -143,6 +149,12 @@ export function SettingsPage() {
         smtpUsername: settings.smtpUsername ?? "",
         smtpPassword: settings.smtpPassword ?? "",
         smtpFrom: settings.smtpFrom ?? "",
+        tagline: settings.tagline ?? "",
+        groomingDuration:
+          settings.groomingDefaultDuration != null
+            ? String(settings.groomingDefaultDuration)
+            : "",
+        receptionTicketPrefix: settings.receptionTicketPrefix ?? "",
       });
     }
   }, [settings, form]);
@@ -240,6 +252,14 @@ export function SettingsPage() {
           ? values.smtpPassword.trim()
           : null,
       smtpFrom: toNullable(values.smtpFrom),
+      tagline: toNullable(values.tagline),
+      groomingDefaultDuration: (() => {
+        const raw = values.groomingDuration?.trim();
+        if (!raw) return null;
+        const n = Number(raw);
+        return Number.isFinite(n) && n > 0 ? Math.round(n) : null;
+      })(),
+      receptionTicketPrefix: toNullable(values.receptionTicketPrefix),
     };
     try {
       await save.mutateAsync(input);
@@ -461,6 +481,60 @@ export function SettingsPage() {
                     <FormControl>
                       <Input placeholder="Bogotá D.C." {...field} />
                     </FormControl>
+                    <FormMessage />
+                  </FormItem>
+                )}
+              />
+              <FormField
+                control={form.control}
+                name="tagline"
+                render={({ field }) => (
+                  <FormItem>
+                    <FormLabel>Texto de marca</FormLabel>
+                    <FormControl>
+                      <Input placeholder="Clínica Veterinaria" {...field} />
+                    </FormControl>
+                    <FormDescription>
+                      Aparece en el login, la barra lateral y «Acerca de».
+                    </FormDescription>
+                    <FormMessage />
+                  </FormItem>
+                )}
+              />
+              <FormField
+                control={form.control}
+                name="groomingDuration"
+                render={({ field }) => (
+                  <FormItem>
+                    <FormLabel>Duración por defecto de estética (min)</FormLabel>
+                    <FormControl>
+                      <Input
+                        type="number"
+                        min={5}
+                        placeholder="60"
+                        {...field}
+                        onChange={(e) => field.onChange(e.target.value)}
+                      />
+                    </FormControl>
+                    <FormDescription>
+                      Se usa cuando el servicio del catálogo no define duración.
+                    </FormDescription>
+                    <FormMessage />
+                  </FormItem>
+                )}
+              />
+              <FormField
+                control={form.control}
+                name="receptionTicketPrefix"
+                render={({ field }) => (
+                  <FormItem>
+                    <FormLabel>Prefijo del ticket de recepción</FormLabel>
+                    <FormControl>
+                      <Input placeholder="T" {...field} />
+                    </FormControl>
+                    <FormDescription>
+                      Opcional: prefijo impreso en el turno de recepción.
+                    </FormDescription>
                     <FormMessage />
                   </FormItem>
                 )}

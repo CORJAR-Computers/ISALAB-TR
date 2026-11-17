@@ -4,7 +4,7 @@ use tauri::{AppHandle, Manager, State};
 
 use crate::auth::{require_admin, require_session};
 use crate::error::AppError;
-use crate::models::settings::ClinicSettings;
+use crate::models::settings::{ClinicBranding, ClinicSettings};
 use crate::pdf_templates::validate_pkcs12;
 use crate::repositories::auth as auth_repo;
 use crate::repositories::logos as logos_repo;
@@ -47,6 +47,17 @@ fn validate_pkcs12_source(path: &Path) -> Result<String, AppError> {
         )));
     }
     Ok(ext)
+}
+
+/// Datos de marca públicos de la clínica (nombre comercial y tagline).
+///
+/// No exige sesión: el login los usa para mostrar «Clínica Veterinaria» (o el
+/// tagline configurado) antes de autenticar. No expone ningún secreto.
+#[tauri::command]
+#[specta::specta]
+pub fn get_clinic_branding(state: State<'_, AppState>) -> Result<ClinicBranding, AppError> {
+    let mut pooled = state.pool.acquire()?;
+    settings_repo::get_branding(pooled.conn())
 }
 
 /// Configuración de la clínica (nombre, NIT, IVA, firma de reportes…).

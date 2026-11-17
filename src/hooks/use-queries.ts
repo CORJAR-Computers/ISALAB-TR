@@ -57,6 +57,7 @@ export {
   useAnalyzerImportJobs,
   useFailedAnalyzerImports,
   useDeleteAnalyzerImportJob,
+  useClinicBranding,
   useClinicSettings,
   useSaveClinicSettings,
   useImportClinicLogo,

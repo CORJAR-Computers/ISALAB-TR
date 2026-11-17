@@ -2,10 +2,10 @@ use rsfbclient::prelude::*;
 use rsfbclient::SimpleConnection;
 
 use crate::error::AppError;
-use crate::models::settings::ClinicSettings;
+use crate::models::settings::{ClinicBranding, ClinicSettings};
 
 /// Mapa de clave → valor de la tabla CLINIC_SETTINGS.
-const SETTING_KEYS: [(&str, &str); 19] = [
+const SETTING_KEYS: [(&str, &str); 22] = [
     ("clinic.name", "clinic_name"),
     ("clinic.nit", "clinic_nit"),
     ("clinic.address", "address"),
@@ -25,6 +25,9 @@ const SETTING_KEYS: [(&str, &str); 19] = [
     ("smtp.username", "smtp_username"),
     ("smtp.password", "smtp_password"),
     ("smtp.from", "smtp_from"),
+    ("clinic.tagline", "tagline"),
+    ("grooming.default_duration", "grooming_default_duration"),
+    ("reception.ticket_prefix", "reception_ticket_prefix"),
     // pkcs12_password NUNCA se persiste en base de datos
 ];
 
@@ -133,10 +136,32 @@ pub fn get(conn: &mut SimpleConnection) -> Result<ClinicSettings, AppError> {
                 }
             }
             "smtp_from" => s.smtp_from = v.filter(|x| !x.is_empty()),
+            "tagline" => s.tagline = v.filter(|x| !x.is_empty()),
+            "grooming_default_duration" => {
+                if let Some(val) = v {
+                    s.grooming_default_duration = val.parse().ok();
+                }
+            }
+            "reception_ticket_prefix" => {
+                s.reception_ticket_prefix = v.filter(|x| !x.is_empty())
+            }
             _ => {}
         }
     }
     Ok(s)
+}
+
+/// Datos de marca públicos (nombre comercial + tagline).
+///
+/// Lee solo dos claves de CLINIC_SETTINGS, sin tocar secretos: permite
+/// mostrarlos en el login, antes de que exista una sesión.
+pub fn get_branding(conn: &mut SimpleConnection) -> Result<ClinicBranding, AppError> {
+    let clinic_name = value(conn, "clinic.name")?.filter(|v| !v.is_empty());
+    let tagline = value(conn, "clinic.tagline")?.filter(|v| !v.is_empty());
+    Ok(ClinicBranding {
+        clinic_name: clinic_name.unwrap_or_else(|| "Mi Clínica Veterinaria".into()),
+        tagline,
+    })
 }
 
 /// Upsert de cada clave (preserva DESCRIPTION y las claves desconocidas).
@@ -182,6 +207,11 @@ pub fn save(
             "smtp_username" => input.smtp_username.clone(),
             "smtp_password" => smtp_encrypted.clone(),
             "smtp_from" => input.smtp_from.clone(),
+            "tagline" => input.tagline.clone(),
+            "grooming_default_duration" => {
+                input.grooming_default_duration.map(|d| d.to_string())
+            }
+            "reception_ticket_prefix" => input.reception_ticket_prefix.clone(),
             _ => None,
         };
 
@@ -257,10 +287,16 @@ mod tests {
             smtp_username: Some("lab@pethealth.com".to_string()),
             smtp_password: Some("smtp_secret".to_string()),
             smtp_from: Some("ISALAB <lab@pethealth.com>".to_string()),
+            tagline: Some("Clínica Veterinaria Integral".to_string()),
+            grooming_default_duration: Some(45),
+            reception_ticket_prefix: Some("T".to_string()),
         };
 
         let saved = save(&mut conn, &input).unwrap();
         assert_eq!(saved.clinic_name, "Pet Health Clinic");
+        assert_eq!(saved.tagline.as_deref(), Some("Clínica Veterinaria Integral"));
+        assert_eq!(saved.grooming_default_duration, Some(45));
+        assert_eq!(saved.reception_ticket_prefix.as_deref(), Some("T"));
         assert_eq!(saved.smtp_host.as_deref(), Some("smtp.gmail.com"));
         assert_eq!(saved.smtp_port, Some(587));
         assert_eq!(saved.smtp_username.as_deref(), Some("lab@pethealth.com"));
@@ -339,6 +375,9 @@ mod tests {
             smtp_username: None,
             smtp_password: None,
             smtp_from: None,
+            tagline: None,
+            grooming_default_duration: None,
+            reception_ticket_prefix: None,
         };
 
         let saved = save(&mut conn, &input).unwrap();
@@ -384,6 +423,33 @@ mod tests {
         let settings = get(&mut conn).unwrap();
         assert_eq!(settings.clinic_name, "Mi Clínica Veterinaria");
         assert_eq!(settings.tax_rate, 19.0);
+        cleanup_test_db(&db_path);
+    }
+
+    /// La marca pública (nombre + tagline) se lee sin sesión y con valores
+    /// por defecto cuando la clínica aún no configuró nada.
+    #[test]
+    fn test_get_branding_defaults_and_values() {
+        let (mut conn, db_path) = setup();
+
+        // Sin configurar: nombre por defecto y sin tagline.
+        let branding = get_branding(&mut conn).unwrap();
+        assert_eq!(branding.clinic_name, "Mi Clínica Veterinaria");
+        assert!(branding.tagline.is_none());
+
+        // Tras guardar: devuelve los valores configurados.
+        let input = ClinicSettings {
+            clinic_name: "Patitas Felices".to_string(),
+            clinic_nit: "900123456-1".to_string(),
+            tagline: Some("Clínica Veterinaria Integral".to_string()),
+            ..Default::default()
+        };
+        save(&mut conn, &input).unwrap();
+
+        let branding = get_branding(&mut conn).unwrap();
+        assert_eq!(branding.clinic_name, "Patitas Felices");
+        assert_eq!(branding.tagline.as_deref(), Some("Clínica Veterinaria Integral"));
+
         cleanup_test_db(&db_path);
     }
 

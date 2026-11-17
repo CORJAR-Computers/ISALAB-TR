@@ -1,6 +1,19 @@
 use serde::{Deserialize, Serialize};
 use specta::Type;
 
+/// Datos de marca públicos de la clínica (nombre comercial y tagline).
+///
+/// No exigen sesión: el login los necesita para mostrar la marca antes de
+/// que el usuario se autentique.
+#[derive(Debug, Clone, Serialize, Deserialize, Type)]
+#[serde(rename_all = "camelCase")]
+pub struct ClinicBranding {
+    /// Nombre comercial configurado (o el valor por defecto).
+    pub clinic_name: String,
+    /// Texto de marca (login, sidebar, About); NULL = usar "Clínica Veterinaria".
+    pub tagline: Option<String>,
+}
+
 /// Configuración de la clínica (tabla CLINIC_SETTINGS, claves planas).
 #[derive(Debug, Clone, Serialize, Deserialize, Type)]
 #[serde(rename_all = "camelCase")]
@@ -34,6 +47,13 @@ pub struct ClinicSettings {
     pub smtp_password: Option<String>,
     /// Remitente (dirección "de" de los correos).
     pub smtp_from: Option<String>,
+    /// Texto de marca (login, sidebar, About); NULL = usar "Clínica Veterinaria".
+    pub tagline: Option<String>,
+    /// Duración por defecto de la sesión de estética (minutos) cuando el
+    /// servicio del catálogo no la define.
+    pub grooming_default_duration: Option<i32>,
+    /// Prefijo del ticket de turno de recepción (opcional).
+    pub reception_ticket_prefix: Option<String>,
 }
 
 impl Default for ClinicSettings {
@@ -59,6 +79,9 @@ impl Default for ClinicSettings {
             smtp_username: None,
             smtp_password: None,
             smtp_from: None,
+            tagline: None,
+            grooming_default_duration: None,
+            reception_ticket_prefix: None,
         }
     }
 }

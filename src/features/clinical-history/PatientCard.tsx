@@ -1,4 +1,4 @@
-import { Calendar, MapPin, Phone, User } from "lucide-react";
+import { Calendar, MapPin, Phone, Sparkles, User } from "lucide-react";
 import {
   Card,
   CardContent,
@@ -7,16 +7,22 @@ import {
   CardDescription,
 } from "@/components/ui/card";
 import { Badge } from "@/components/ui/badge";
-import { formatAge, formatDate } from "@/lib/utils";
-import { SEX_LABEL } from "@/lib/status";
-import type { Owner, Patient } from "@/bindings";
+import { formatAge, formatDate, formatDateTime } from "@/lib/utils";
+import { SEX_LABEL, VISIT_STATUS } from "@/lib/status";
+import type { Owner, Patient, VisitListItem } from "@/bindings";
 
 export function PatientCard({
   patient,
   owner,
+  lastVisit,
+  nextGroomingAt,
 }: {
   patient: Patient;
   owner: Owner | null;
+  /** Visita de recepción más reciente del paciente (fase 5). */
+  lastVisit?: VisitListItem | null;
+  /** Fecha del próximo turno sugerido de estética (fase 5). */
+  nextGroomingAt?: string | null;
 }) {
   return (
     <Card>
@@ -77,6 +83,46 @@ export function PatientCard({
             </p>
           </div>
         </div>
+
+        {/* Resumen de recepción/estética (fase 5) */}
+        {(lastVisit || nextGroomingAt) && (
+          <div className="mt-4 grid gap-4 sm:grid-cols-2">
+            <div>
+              <p className="text-muted-foreground flex items-center gap-1.5 text-xs font-medium tracking-wide uppercase">
+                <Calendar className="size-3" />
+                Última visita
+              </p>
+              {lastVisit ? (
+                <p className="mt-1 flex flex-wrap items-center gap-2 text-sm">
+                  <span className="font-mono text-xs font-semibold">
+                    {lastVisit.code}
+                  </span>
+                  <span className="text-muted-foreground text-xs">
+                    {formatDateTime(lastVisit.arrivedAt)}
+                  </span>
+                  <Badge
+                    variant={
+                      VISIT_STATUS[lastVisit.status]?.variant ?? "secondary"
+                    }
+                  >
+                    {VISIT_STATUS[lastVisit.status]?.label ?? lastVisit.status}
+                  </Badge>
+                </p>
+              ) : (
+                <p className="mt-1 text-sm text-muted-foreground">—</p>
+              )}
+            </div>
+            <div>
+              <p className="text-muted-foreground flex items-center gap-1.5 text-xs font-medium tracking-wide uppercase">
+                <Sparkles className="size-3" />
+                Próximo turno de estética
+              </p>
+              <p className="mt-1 text-sm">
+                {nextGroomingAt ? formatDate(nextGroomingAt) : "—"}
+              </p>
+            </div>
+          </div>
+        )}
 
         {owner && (
           <div className="bg-muted/50 mt-4 flex flex-wrap gap-x-6 gap-y-1 rounded-lg px-3 py-2 text-xs text-muted-foreground">

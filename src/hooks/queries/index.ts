@@ -70,6 +70,7 @@ export {
   useDeleteAnalyzerImportJob,
 } from "./use-analyzer-sources";
 export {
+  useClinicBranding,
   useClinicSettings,
   useSaveClinicSettings,
   useImportClinicLogo,

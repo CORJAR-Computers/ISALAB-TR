@@ -1,5 +1,5 @@
 import { useState } from "react";
-import { ClipboardList, FlaskConical, Search, Stethoscope, Syringe } from "lucide-react";
+import { ClipboardList, DoorOpen, FlaskConical, Search, Stethoscope, Syringe } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import {
@@ -16,6 +16,7 @@ import { LAB_ORDER_STATUS } from "@/lib/status";
 import { formatDateTime } from "@/lib/utils";
 import { useUiStore } from "@/stores/ui-store";
 import { NewVaccineDialog } from "@/features/vaccines/NewVaccineDialog";
+import { NewVisitDialog } from "@/features/reception/NewVisitDialog";
 import { PatientCard } from "./PatientCard";
 import { ClinicalTimeline } from "./ClinicalTimeline";
 import { NewConsultationDialog } from "./NewConsultationDialog";
@@ -31,6 +32,7 @@ export function ClinicalHistoryPage() {
   const [consultOpen, setConsultOpen] = useState(false);
   const [sampleOpen, setSampleOpen] = useState(false);
   const [vaccineOpen, setVaccineOpen] = useState(false);
+  const [visitOpen, setVisitOpen] = useState(false);
   const { isVetOrAdmin } = usePermissions();
 
   const { data: patients = [], isLoading: loadingPatients } =
@@ -118,6 +120,15 @@ export function ClinicalHistoryPage() {
     );
   }
 
+  // Resumen de recepción/estética para la ficha (fase 5).
+  const lastVisit = history.visits[0] ?? null;
+  const today = new Date().toISOString().slice(0, 10);
+  const nextGroomingAt =
+    history.groomingSessions
+      .map((g) => g.nextSuggestedAt)
+      .filter((d): d is string => !!d && d >= today)
+      .sort()[0] ?? null;
+
   return (
     <div className="space-y-5">
       {/* Acciones */}
@@ -140,6 +151,10 @@ export function ClinicalHistoryPage() {
             Registrar vacuna
           </Button>
         )}
+        <Button variant="outline" onClick={() => setVisitOpen(true)}>
+          <DoorOpen className="size-4" />
+          Nueva visita
+        </Button>
         <Button
           variant="ghost"
           size="sm"
@@ -153,6 +168,8 @@ export function ClinicalHistoryPage() {
       <PatientCard
         patient={history.patient}
         owner={history.owner}
+        lastVisit={lastVisit}
+        nextGroomingAt={nextGroomingAt}
       />
 
       <PatientTrendsChart patientId={activePatientId} />
@@ -175,6 +192,11 @@ export function ClinicalHistoryPage() {
         open={vaccineOpen}
         onOpenChange={setVaccineOpen}
         patientId={activePatientId}
+      />
+      <NewVisitDialog
+        open={visitOpen}
+        onOpenChange={setVisitOpen}
+        presetPatient={history.patient}
       />
     </div>
   );

@@ -1,7 +1,10 @@
 import { useState, type ReactNode } from "react";
 import {
   ChevronDown,
+  DoorOpen,
   FlaskConical,
+  Receipt,
+  Sparkles,
   Stethoscope,
   Syringe,
   MessageCircle,
@@ -19,15 +22,40 @@ import {
 } from "@/components/ui/table";
 import { Button } from "@/components/ui/button";
 import { toast } from "sonner";
-import { cn, formatDate, formatDateTime } from "@/lib/utils";
+import { cn, formatCOP, formatDate, formatDateTime } from "@/lib/utils";
 import { sendWhatsAppMessage } from "@/lib/whatsapp";
-import { CONSULTATION_STATUS, RESULT_STATUS, SAMPLE_STATUS } from "@/lib/status";
-import type { ClinicalHistory, Consultation, Sample, Vaccine, Patient, Owner } from "@/bindings";
+import {
+  CONSULTATION_STATUS,
+  GROOMING_SESSION_STATE,
+  INVOICE_STATUS,
+  RESULT_STATUS,
+  SAMPLE_STATUS,
+  VISIT_STATUS,
+} from "@/lib/status";
+import type {
+  ClinicalHistory,
+  Consultation,
+  GroomingSession,
+  Patient,
+  PatientChargeSummary,
+  Sample,
+  Vaccine,
+  Owner,
+  VisitListItem,
+} from "@/bindings";
 
 type TimelineItem =
   | { kind: "consultation"; key: string; date: string; data: Consultation }
   | { kind: "vaccine"; key: string; date: string; data: Vaccine }
-  | { kind: "sample"; key: string; date: string; data: Sample };
+  | { kind: "sample"; key: string; date: string; data: Sample }
+  | { kind: "visit"; key: string; date: string; data: VisitListItem }
+  | { kind: "grooming"; key: string; date: string; data: GroomingSession }
+  | {
+      kind: "charge";
+      key: string;
+      date: string;
+      data: PatientChargeSummary;
+    };
 
 export function ClinicalTimeline({ history }: { history: ClinicalHistory }) {
   const items: TimelineItem[] = [
@@ -48,6 +76,24 @@ export function ClinicalTimeline({ history }: { history: ClinicalHistory }) {
       key: `s-${s.id}`,
       date: s.receivedAt,
       data: s,
+    })),
+    ...history.visits.map((v) => ({
+      kind: "visit" as const,
+      key: `visit-${v.id}`,
+      date: v.arrivedAt,
+      data: v,
+    })),
+    ...history.groomingSessions.map((g) => ({
+      kind: "grooming" as const,
+      key: `grooming-${g.id}`,
+      date: g.finishedAt ?? g.startedAt ?? g.createdAt,
+      data: g,
+    })),
+    ...history.charges.map((c) => ({
+      kind: "charge" as const,
+      key: `charge-${c.invoiceId}`,
+      date: c.issueDate,
+      data: c,
     })),
   ].sort((a, b) => b.date.localeCompare(a.date));
 
@@ -85,6 +131,9 @@ export function ClinicalTimeline({ history }: { history: ClinicalHistory }) {
                     item.kind === "consultation" && "border-primary",
                     item.kind === "vaccine" && "border-success",
                     item.kind === "sample" && "border-warning",
+                    item.kind === "visit" && "border-sky-500",
+                    item.kind === "grooming" && "border-pink-500",
+                    item.kind === "charge" && "border-emerald-500",
                   )}
                 >
                   <TimelineDot kind={item.kind} />
@@ -103,6 +152,9 @@ export function ClinicalTimeline({ history }: { history: ClinicalHistory }) {
                     onToggle={() => toggle(item.key)}
                   />
                 )}
+                {item.kind === "visit" && <VisitEntry item={item} />}
+                {item.kind === "grooming" && <GroomingEntry item={item} />}
+                {item.kind === "charge" && <ChargeEntry item={item} />}
               </li>
             ))}
           </ol>
@@ -118,13 +170,25 @@ function TimelineDot({ kind }: { kind: TimelineItem["kind"] }) {
       ? Stethoscope
       : kind === "vaccine"
         ? Syringe
-        : FlaskConical;
+        : kind === "visit"
+          ? DoorOpen
+          : kind === "grooming"
+            ? Sparkles
+            : kind === "charge"
+              ? Receipt
+              : FlaskConical;
   const color =
     kind === "consultation"
       ? "text-primary"
       : kind === "vaccine"
         ? "text-success"
-        : "text-warning";
+        : kind === "visit"
+          ? "text-sky-600 dark:text-sky-400"
+          : kind === "grooming"
+            ? "text-pink-600 dark:text-pink-400"
+            : kind === "charge"
+              ? "text-emerald-600 dark:text-emerald-400"
+              : "text-warning";
   return <Icon className={cn("size-3", color)} />;
 }
 
@@ -370,8 +434,7 @@ function SampleEntry({
             <p className="text-muted-foreground px-4 py-5 text-center text-sm">
               Aún no se han cargado resultados para esta muestra.
             </p>
-          ) : (
-            <Table>
+          ) : (            <Table>
               <TableHeader>
                 <TableRow className="hover:bg-transparent">
                   <TableHead>Analito</TableHead>
@@ -441,5 +504,110 @@ function SampleEntry({
         </div>
       )}
     </div>
+  );
+}
+
+function VisitEntry({
+  item,
+}: {
+  item: Extract<TimelineItem, { kind: "visit" }>;
+}) {
+  const v = item.data;
+  const status = VISIT_STATUS[v.status] ?? {
+    label: v.status,
+    variant: "secondary" as const,
+  };
+  return (
+    <EntryShell
+      icon={DoorOpen}
+      title={`Visita ${v.code}`}
+      date={v.arrivedAt}
+      badge={
+        <>
+          <Badge variant={status.variant}>{status.label}</Badge>
+          {v.priority === "URGENTE" && (
+            <Badge variant="destructive">Urgente</Badge>
+          )}
+        </>
+      }
+    >
+      <p>
+        <span className="font-medium">Servicios:</span>{" "}
+        {v.servicesSummary || "—"}
+      </p>
+      <p>
+        <span className="font-medium">Total estimado:</span>{" "}
+        {formatCOP(v.estimatedTotal ?? 0)}
+      </p>
+    </EntryShell>
+  );
+}
+
+function GroomingEntry({
+  item,
+}: {
+  item: Extract<TimelineItem, { kind: "grooming" }>;
+}) {
+  const g = item.data;
+  const state = GROOMING_SESSION_STATE[
+    g.finishedAt ? "FINALIZADA" : g.startedAt ? "EN_PROCESO" : "ABIERTA"
+  ] ?? {
+    label: "Ficha",
+    variant: "secondary" as const,
+  };
+  return (
+    <EntryShell
+      icon={Sparkles}
+      title={`Estética · ${g.serviceName}`}
+      date={g.finishedAt ?? g.startedAt ?? g.createdAt}
+      badge={
+        <>
+          <Badge variant={state.variant}>{state.label}</Badge>
+          {g.nextSuggestedAt && (
+            <Badge variant="outline">
+              Próximo turno: {formatDate(g.nextSuggestedAt)}
+            </Badge>
+          )}
+        </>
+      }
+    >
+      {g.groomerName && (
+        <p>
+          <span className="font-medium">Peluquero:</span> {g.groomerName}
+        </p>
+      )}
+      {(g.style || g.bathType) && (
+        <p>
+          {g.style}
+          {g.style && g.bathType ? " · " : ""}
+          {g.bathType}
+        </p>
+      )}
+      {g.notes && <p>{g.notes}</p>}
+    </EntryShell>
+  );
+}
+
+function ChargeEntry({
+  item,
+}: {
+  item: Extract<TimelineItem, { kind: "charge" }>;
+}) {
+  const c = item.data;
+  const status = INVOICE_STATUS[c.status] ?? {
+    label: c.status,
+    variant: "secondary" as const,
+  };
+  return (
+    <EntryShell
+      icon={Receipt}
+      title={`Cobro ${c.invoiceNumber}`}
+      date={c.issueDate}
+      badge={<Badge variant={status.variant}>{status.label}</Badge>}
+    >
+      <p>
+        <span className="font-medium">Total:</span> {formatCOP(c.total ?? 0)}
+      </p>
+    </EntryShell>
   );
 }

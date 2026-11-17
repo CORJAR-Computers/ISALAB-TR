@@ -13,7 +13,7 @@
     "windows": [
       {
         "label": "main",
-        "title": "ISALAB · Laboratorio Veterinario",
+        "title": "ISALAB · Clínica Veterinaria",
         "width": 1280,
         "height": 820,
         "minWidth": 560,
@@ -62,7 +62,7 @@
     "resources": [
       "binaries/firebird/**/*"
     ],
-    "shortDescription": "Sistema de gestión para laboratorios veterinarios",
+    "shortDescription": "Sistema de gestión para clínicas y laboratorios veterinarios",
     "longDescription": "ISALAB — historiales clínicos, muestras analíticas, vacunación, reportes PDF y facturación. Tauri v2 · Rust · Firebird 5 Embedded.",
     "createUpdaterArtifacts": true,
     "windows": {
