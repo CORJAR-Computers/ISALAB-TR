@@ -8,6 +8,7 @@ use rsfbclient::FbError;
 use tauri::{AppHandle, Manager};
 
 use crate::ai_cache::AiCache;
+use crate::db::config::{self, DbConfig, DbMode};
 use crate::db::{bootstrap, DbPool};
 use crate::models::auth::SessionUser;
 
@@ -57,8 +58,8 @@ impl LoginAttempts {
 /// Estado global gestionado por Tauri (accesible en cada comando).
 pub struct AppState {
     pub pool: DbPool,
-    pub db_path: PathBuf,
-    pub fbclient_path: PathBuf,
+    /// Configuración efectiva de la conexión (embedded o servidor remoto).
+    pub db: DbConfig,
     pub schema_version: i32,
     pub init_error: Option<String>,
     /// Sesión activa (una única sesión local, como corresponde a una app de
@@ -77,9 +78,10 @@ pub struct AppState {
 }
 
 impl AppState {
-    /// Inicializa Firebird Embedded (crea DB si falta, migra, monta el pool y
-    /// los listeners de eventos). Nunca aborta: si algo falla queda registrado
-    /// en `init_error` y el frontend muestra el banner de setup.
+    /// Inicializa la capa de datos (conexión, pool y listeners de eventos).
+    ///
+    /// Nunca aborta: si algo falla queda registrado en `init_error` y el
+    /// frontend muestra el banner con la acción correctiva.
     pub fn init(app: &AppHandle) -> Self {
         let app_data = app
             .path()
@@ -87,7 +89,7 @@ impl AppState {
             .unwrap_or_else(|_| PathBuf::from("."));
         let _ = std::fs::create_dir_all(&app_data);
 
-        let db_path = app_data.join("isalab.fdb");
+        let embedded_db = app_data.join("isalab.fdb");
         let fbclient_path = app
             .path()
             .resolve(
@@ -96,20 +98,23 @@ impl AppState {
             )
             .unwrap_or_else(|_| PathBuf::from("binaries/firebird/fbclient.dll"));
 
-        match bootstrap(&db_path, &fbclient_path) {
+        let (db, config_error) = match config::resolve(&app_data, &embedded_db, &fbclient_path) {
+            Ok(db) => (db, None),
+            Err(e) => (
+                unconfigured_remote(&embedded_db, &fbclient_path),
+                Some(e.to_string()),
+            ),
+        };
+
+        match bootstrap(&db) {
             Ok((pool, schema_version)) => {
-                let listeners = crate::db::events::start_firebird_listeners(
-                    app.clone(),
-                    &db_path,
-                    &fbclient_path,
-                )
-                .unwrap_or_default();
+                let listeners = crate::db::events::start_firebird_listeners(app.clone(), &db)
+                    .unwrap_or_default();
                 Self {
                     pool,
-                    db_path,
-                    fbclient_path,
+                    db,
                     schema_version,
-                    init_error: None,
+                    init_error: config_error,
                     session: Mutex::new(None),
                     login_attempts: Mutex::new(HashMap::new()),
                     ai_cache: AiCache::new(),
@@ -119,10 +124,9 @@ impl AppState {
             }
             Err(e) => Self {
                 pool: DbPool::empty(),
-                db_path,
-                fbclient_path,
+                db,
                 schema_version: 0,
-                init_error: Some(e.to_string()),
+                init_error: Some(config_error.unwrap_or_else(|| e.to_string())),
                 session: Mutex::new(None),
                 login_attempts: Mutex::new(HashMap::new()),
                 ai_cache: AiCache::new(),
@@ -130,5 +134,14 @@ impl AppState {
                 listeners: Vec::new(),
             },
         }
+    }
+}
+
+/// Configuración remota vacía: permite que la UI abra el diálogo de conexión
+/// aunque el archivo guardado no se pueda descifrar.
+fn unconfigured_remote(embedded_db: &std::path::Path, fbclient: &std::path::Path) -> DbConfig {
+    DbConfig {
+        mode: DbMode::Remote,
+        ..DbConfig::embedded(embedded_db, fbclient)
     }
 }

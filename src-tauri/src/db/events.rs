@@ -1,10 +1,10 @@
-use std::path::Path;
 use std::thread::JoinHandle;
 
 use rsfbclient::prelude::*;
 use rsfbclient::{FbError, RemoteEventsManager};
 use tauri::{AppHandle, Emitter};
 
+use crate::db::config::DbConfig;
 use crate::error::AppError;
 use crate::models::sample::{LabResultChangedEvent, SampleChangedEvent};
 
@@ -20,10 +20,12 @@ enum EventKind {
 /// handler lee la última fila de EVENT_LOG (escrita por los triggers
 /// AI_SAMPLES / AI_LAB_RESULTS) y re-emite un evento de Tauri con el payload
 /// real (id de muestra, paciente y estado) para la UI.
+///
+/// En modo remoto cada listener usa su propia conexión al servidor (los
+/// eventos viajan por el puerto auxiliar, ver `RemoteAuxPort`).
 pub fn start_firebird_listeners(
     app: AppHandle,
-    db_path: &Path,
-    fbclient: &Path,
+    cfg: &DbConfig,
 ) -> Result<Vec<JoinHandle<Result<(), FbError>>>, AppError> {
     let mut handles = Vec::new();
 
@@ -31,7 +33,7 @@ pub fn start_firebird_listeners(
         ("SAMPLE_CHANGED", EventKind::Sample),
         ("LAB_RESULT_CHANGED", EventKind::LabResult),
     ] {
-        let conn = super::new_connection(db_path, fbclient)?;
+        let conn = super::connect(cfg)?;
         let app = app.clone();
         let name = event_name.to_string();
         // El nombre vive también dentro del closure (move) y en el error.

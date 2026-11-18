@@ -89,7 +89,7 @@ fn inject_to_path(dir: &Path) {
 }
 
 /// Ruta al fbclient.dll resuelto.
-fn fbclient_path() -> PathBuf {
+pub fn fbclient_path() -> PathBuf {
     resolve_firebird_dir().join("fbclient.dll")
 }
 

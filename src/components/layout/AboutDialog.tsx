@@ -127,7 +127,7 @@ export function AboutDialog({ checking = false, onCheckUpdate }: AboutDialogProp
                 <Database className="size-4 text-blue-600" /> Base de Datos
               </div>
               <p className="text-xs text-muted-foreground">
-                Firebird 5.0 Embedded (Página 16 KB)
+                Firebird 5.0 Server (red local, página 16 KB)
               </p>
             </div>
 
@@ -158,7 +158,7 @@ export function AboutDialog({ checking = false, onCheckUpdate }: AboutDialogProp
             <ul className="text-xs text-muted-foreground space-y-1 list-disc pl-4">
               <li>Trazabilidad de muestras y validación analítica multiespecie por edad y sexo.</li>
               <li>Generación de informes de laboratorio, recetas, consentimientos, recibos y carnets de vacunación.</li>
-              <li>Auditoría nativa de acciones de usuario y almacenamiento cifrado local.</li>
+              <li>Auditoría nativa de acciones de usuario y secretos cifrados con DPAPI.</li>
             </ul>
           </div>
         </div>

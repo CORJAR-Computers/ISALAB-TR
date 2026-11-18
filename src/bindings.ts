@@ -4,8 +4,30 @@ import { invoke as __TAURI_INVOKE } from "@tauri-apps/api/core";
 
 /** Commands */
 export const commands = {
-	/**  Estado de la conexión Firebird Embedded (banner de setup en la UI). */
+	/**
+	 *  Estado real de la conexión Firebird (ping con timeout).
+	 * 
+	 *  No se limita a leer el arranque: si el servidor se cayó o volvió, este
+	 *  comando lo refleja y limpia el pool para que la app se recupere sola.
+	 */
 	dbHealth: () => __TAURI_INVOKE<DbHealth>("db_health"),
+	getDbConnection: () => __TAURI_INVOKE<DbConnectionInfo>("get_db_connection"),
+	/**
+	 *  Guarda la conexión al servidor en `db-connection.json`.
+	 * 
+	 *  No exige sesión a propósito: si la base no está configurada o no responde
+	 *  no se puede iniciar sesión, y sin esto el equipo quedaría bloqueado. Solo
+	 *  escribe un archivo local del propio PC (la contraseña va cifrada con DPAPI).
+	 *  El cambio se aplica al reiniciar la aplicación.
+	 */
+	saveDbConnection: (input: SaveDbConnectionInput) => typedError<string, AppError>(__TAURI_INVOKE("save_db_connection", { input })),
+	/**
+	 *  Prueba una conexión sin guardarla.
+	 * 
+	 *  Si la contraseña viene vacía se usa la actual: así «Probar» funciona al
+	 *  abrir el diálogo sin volver a escribirla.
+	 */
+	testDbConnection: (input: SaveDbConnectionInput) => __TAURI_INVOKE<DbTestResult>("test_db_connection", { input }),
 	/**
 	 *  Búsqueda global (paleta Ctrl+K): pacientes, muestras, facturas y cirugías
 	 *  por código o nombre, con su destino de navegación en la UI.
@@ -1286,12 +1308,60 @@ export type DashboardStats = {
 	upcomingAppointments: AppointmentListItem[],
 };
 
+/**  Datos de conexión que se muestran en el diálogo «Configurar servidor». */
+export type DbConnectionInfo = {
+	mode: string,
+	host: string,
+	port: number,
+	database: string,
+	user: string,
+	hasPassword: boolean,
+	target: string,
+	/**  `environment` | `file` | `default`. */
+	source: string,
+};
+
 export type DbHealth = {
+	/**  `true` solo cuando la conexión y el esquema son correctos. */
 	ok: boolean,
+	status: DbStatus,
 	message: string,
-	dbPath: string,
-	fbclientFound: boolean,
-	fbclientPath: string,
+	/**  `embedded` | `remote`. */
+	mode: string,
+	/**  Destino legible: `192.168.1.10/3050 · ISALAB`. */
+	target: string,
+	host: string,
+	port: number,
+	database: string,
+	user: string,
+	clientFound: boolean,
+	clientPath: string,
+	schemaVersion: number,
+	expectedSchemaVersion: number,
+	latencyMs: number,
+};
+
+/**  Estado de la conexión que se muestra en el banner de la UI. */
+export type DbStatus = 
+/**  Remoto sin host/usuario definidos. */
+"notConfigured" | 
+/**  No se encontró `fbclient.dll` junto a la app. */
+"clientMissing" | 
+/**  El servidor no responde (apagado, IP incorrecta, firewall, cable). */
+"serverUnreachable" | 
+/**  El servidor respondió pero rechazó las credenciales. */
+"authFailed" | 
+/**  El esquema es más antiguo que el que espera esta versión de la app. */
+"schemaTooOld" | 
+/**  El esquema es más nuevo que el que entiende esta versión de la app. */
+"schemaTooNew" | 
+/**  Conexión y esquema correctos. */
+"connected";
+
+export type DbTestResult = {
+	status: DbStatus,
+	message: string,
+	latencyMs: number,
 	schemaVersion: number,
 };
 
@@ -2050,6 +2120,15 @@ export type SaveAnalyzerSourceInput = {
 	folderPath: string | null,
 	enabled: boolean,
 	mapping: AnalyzerImportMapping | null,
+};
+
+export type SaveDbConnectionInput = {
+	host: string,
+	port: number,
+	database: string,
+	user: string,
+	/**  Vacío = conservar la contraseña ya guardada. */
+	password: string,
 };
 
 /**  Alta o edición de un producto del catálogo. */

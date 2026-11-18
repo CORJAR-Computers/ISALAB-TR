@@ -156,6 +156,11 @@ fn should_seed_demo_data() -> bool {
         .unwrap_or(false)
 }
 
+/// Versión de esquema que espera esta versión de la app.
+pub fn expected_version() -> i32 {
+    MIGRATIONS.len() as i32
+}
+
 /// Aplica las migraciones pendientes. Devuelve la versión de schema resultante.
 pub fn run_migrations(conn: &mut SimpleConnection) -> Result<i32, AppError> {
     ensure_schema_table(conn)?;

@@ -39,6 +39,9 @@ if (!collectMatch) {
 }
 const rustCommands = new Set(
   collectMatch[1]
+    // Los comentarios de línea (`// Estancia e inventario (fase 6).`) van
+    // pegados al comando siguiente dentro del mismo trozo tras el split.
+    .replace(/\/\/[^\n]*/g, "")
     .split(",")
     .map((s) => s.trim())
     .filter((s) => s.length > 0 && /^[a-z_][a-z0-9_]*$/.test(s)),

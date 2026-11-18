@@ -50,7 +50,9 @@ use crate::commands::clinical_history::{
     set_consultation_status,
 };
 use crate::commands::dashboard::get_dashboard_stats;
-use crate::commands::db::{create_local_backup, db_health};
+use crate::commands::db::{
+    create_local_backup, db_health, get_db_connection, save_db_connection, test_db_connection,
+};
 use crate::commands::exports::{export_results_csv, export_samples_csv};
 use crate::commands::grooming::{
     add_visit_attachment, delete_visit_attachment, finish_grooming_session, get_grooming_session,
@@ -99,12 +101,12 @@ use crate::commands::settings::{
     delete_secondary_logo, get_clinic_branding, get_clinic_settings, import_clinic_logo,
     import_pkcs12, import_secondary_logo, list_secondary_logos, save_clinic_settings,
 };
-use crate::commands::surgeries::{
-    count_surgeries, create_surgery, list_surgeries, set_surgery_status,
-};
 use crate::commands::stays::{
     add_stay_event, cancel_stay, check_out_stay, create_stay, get_stay, list_resource_board,
     list_resources, list_stay_events, list_stays, save_resource,
+};
+use crate::commands::surgeries::{
+    count_surgeries, create_surgery, list_surgeries, set_surgery_status,
 };
 use crate::commands::users::{change_password, create_user, list_users};
 use crate::commands::vaccines::{create_vaccine, list_vaccines};
@@ -128,10 +130,13 @@ fn fitted_size(cur: (f64, f64), wa: (f64, f64), min: (f64, f64)) -> Option<(f64,
     Some((cur.0.min(wa.0).max(min.0), cur.1.min(wa.1).max(min.1)))
 }
 
-fn specta_builder() -> Builder<tauri::Wry> {
+pub fn specta_builder() -> Builder<tauri::Wry> {
     Builder::<tauri::Wry>::new()
         .commands(collect_commands![
             db_health,
+            get_db_connection,
+            save_db_connection,
+            test_db_connection,
             global_search,
             create_local_backup,
             export_samples_csv,

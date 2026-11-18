@@ -1,5 +1,5 @@
-import { lazy, Suspense, useEffect } from "react";
-import { AlertTriangle, Loader2, RefreshCw } from "lucide-react";
+import { lazy, Suspense, useEffect, useState } from "react";
+import { AlertTriangle, Loader2, RefreshCw, ServerCog } from "lucide-react";
 import { emit } from "@tauri-apps/api/event";
 import { Sidebar } from "@/components/layout/Sidebar";
 import { TopBar } from "@/components/layout/TopBar";
@@ -19,6 +19,8 @@ import { useSessionStore } from "@/stores/session-store";
 import { api } from "@/lib/api";
 import { LoginPage } from "@/features/auth/LoginPage";
 import { GlobalSearchPalette } from "@/features/search/GlobalSearchPalette";
+import { DbConnectionDialog } from "@/features/db/DbConnectionDialog";
+import { DB_STATUS_LABEL } from "@/lib/db-status";
 
 // Code-splitting: cada pagina se carga solo cuando el usuario navega a ella.
 const DashboardPage = lazy(() =>
@@ -104,6 +106,7 @@ export default function App() {
   const closeChangePassword = useSessionStore((s) => s.closeChangePassword);
   const mustChangePassword = session?.mustChangePassword === true;
   const { data: health, refetch: refetchHealth } = useDbHealth();
+  const [dbDialogOpen, setDbDialogOpen] = useState(false);
 
   useFirebirdEvents();
   useSessionTimeout();
@@ -151,7 +154,7 @@ export default function App() {
     return <LoginPage />;
   }
 
-  const firebirdMissing = health && !health.ok && !health.fbclientFound;
+  const dbDown = health ? !health.ok : false;
 
   return (
     <ErrorBoundary FallbackComponent={GlobalErrorFallback}>
@@ -162,6 +165,7 @@ export default function App() {
           onCheckUpdate={updater.checkNow}
         />
         <GlobalSearchPalette />
+        <DbConnectionDialog open={dbDialogOpen} onOpenChange={setDbDialogOpen} />
         <ChangePasswordDialog
           open={mustChangePassword || changePasswordOpen}
           onOpenChange={mustChangePassword ? () => {} : closeChangePassword}
@@ -180,56 +184,67 @@ export default function App() {
         <div className="lg:pl-64">
           <TopBar />
 
-          {/* Banner de configuración de Firebird Embedded */}
-          {firebirdMissing && (
-            <div className="border-b bg-warning/10 px-4 py-3 lg:px-6">
+          {/* Banner de estado de la base de datos (servidor o local) */}
+          {dbDown && health && (
+            <div className="border-destructive/30 bg-destructive/5 border-b px-4 py-3 lg:px-6">
               <div className="mx-auto flex max-w-6xl flex-col gap-3 sm:flex-row sm:items-center">
                 <div className="flex items-start gap-3">
-                  <span className="flex size-8 shrink-0 items-center justify-center rounded-lg bg-warning/20">
-                    <AlertTriangle className="size-4.5 text-warning" />
+                  <span className="bg-destructive/15 flex size-8 shrink-0 items-center justify-center rounded-lg">
+                    <AlertTriangle className="text-destructive size-4.5" />
                   </span>
                   <div>
                     <p className="text-sm font-semibold">
-                      Motor Firebird Embedded no encontrado
+                      {DB_STATUS_LABEL[health.status]}
                     </p>
                     <p className="text-muted-foreground mt-0.5 text-xs leading-relaxed">
-                      Copia <code className="font-mono">fbclient.dll</code> de
-                      Firebird 5 en{" "}
-                      <code className="font-mono">src-tauri/binaries/firebird/</code>{" "}
-                      (ver README). La base de datos se creará automáticamente al
-                      primer arranque válido.
+                      {health.message}
+                    </p>
+                    <p className="text-muted-foreground mt-1 font-mono text-[11px]">
+                      {health.target}
                     </p>
                   </div>
                 </div>
-                <Button
-                  size="sm"
-                  variant="outline"
-                  className="shrink-0"
-                  onClick={() => refetchHealth()}
-                >
-                  <RefreshCw className="size-3.5" />
-                  Reintentar
-                </Button>
+                <div className="flex shrink-0 gap-2">
+                  <Button
+                    size="sm"
+                    variant="outline"
+                    onClick={() => refetchHealth()}
+                  >
+                    <RefreshCw className="size-3.5" />
+                    Reintentar
+                  </Button>
+                  <Button
+                    size="sm"
+                    variant="ghost"
+                    onClick={() => setDbDialogOpen(true)}
+                  >
+                    <ServerCog className="size-3.5" />
+                    Configurar servidor
+                  </Button>
+                </div>
               </div>
             </div>
           )}
 
           {health?.ok && (
             <div className="mx-auto max-w-6xl px-4 pt-4 lg:px-6">
-              <div className="flex flex-wrap items-center gap-2 text-xs text-muted-foreground">
+              <div className="text-muted-foreground flex flex-wrap items-center gap-2 text-xs">
                 <Badge variant="success" className="gap-1">
                   <span className="relative flex size-1.5">
-                    <span className="absolute inline-flex h-full w-full animate-ping rounded-full bg-success opacity-60" />
-                    <span className="relative inline-flex size-1.5 rounded-full bg-success" />
+                    <span className="bg-success absolute inline-flex h-full w-full animate-ping rounded-full opacity-60" />
+                    <span className="bg-success relative inline-flex size-1.5 rounded-full" />
                   </span>
                   Firebird conectado
                 </Badge>
                 <Badge variant="secondary">
                   Schema v{health.schemaVersion}
                 </Badge>
-                <Badge variant="outline" className="font-mono max-w-72 truncate">
-                  {health.dbPath}
+                <Badge variant="outline" className="max-w-72 truncate font-mono">
+                  {health.target}
                 </Badge>
+                {health.latencyMs > 0 && (
+                  <span className="text-[11px]">{health.latencyMs} ms</span>
+                )}
               </div>
             </div>
           )}

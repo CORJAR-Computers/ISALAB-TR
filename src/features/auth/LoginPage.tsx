@@ -10,6 +10,7 @@ import {
   HeartPulse,
   KeyRound,
   Loader2,
+  ServerCog,
   ShieldCheck,
   Stethoscope,
   User,
@@ -26,6 +27,7 @@ import {
 import { Input } from "@/components/ui/input";
 import { useClinicBranding, useLogin } from "@/hooks/use-queries";
 import { getErrorMessage } from "@/lib/api";
+import { DbConnectionDialog } from "@/features/db/DbConnectionDialog";
 import logoSidebar from "@/assets/logo_sidebar.png";
 
 /** Texto de marca configurable (clinic.tagline) con respaldo. */
@@ -49,6 +51,7 @@ export function LoginPage() {
   const { data: branding } = useClinicBranding();
   const tagline = branding?.tagline || TAGLINE_FALLBACK;
   const [showPassword, setShowPassword] = useState(false);
+  const [dbDialogOpen, setDbDialogOpen] = useState(false);
 
   const form = useForm<LoginValues>({
     resolver: zodResolver(loginSchema),
@@ -111,8 +114,8 @@ export function LoginPage() {
             </h2>
             <p className="mt-4 max-w-md text-sm leading-relaxed text-white/75">
               Pacientes, consultas, laboratorio, vacunación, cirugías y
-              facturación con datos 100 % locales: seguros y siempre
-              disponibles.
+              facturación con los datos centralizados en el servidor de la
+              clínica.
             </p>
           </div>
 
@@ -133,7 +136,7 @@ export function LoginPage() {
 
         <div className="text-white/50 relative flex items-center gap-2 text-xs">
           <ShieldCheck className="size-3.5" />
-          Firebird 5 Embedded · Tauri v2 · datos locales
+          Firebird 5 Server · Tauri v2 · red local
         </div>
       </div>
 
@@ -253,12 +256,26 @@ export function LoginPage() {
             </form>
           </Form>
 
-          <p className="text-muted-foreground mt-6 flex items-center justify-center gap-1.5 text-center text-xs">
-            <ShieldCheck className="size-3.5" />
-            Tus datos nunca salen de este equipo
-          </p>
+          <div className="text-muted-foreground mt-6 flex flex-col items-center gap-2 text-center text-xs">
+            <p className="flex items-center gap-1.5">
+              <ShieldCheck className="size-3.5" />
+              Los datos se guardan en el servidor de la clínica
+            </p>
+            <Button
+              type="button"
+              variant="ghost"
+              size="sm"
+              className="text-muted-foreground h-7 text-xs"
+              onClick={() => setDbDialogOpen(true)}
+            >
+              <ServerCog className="size-3.5" />
+              Configurar servidor
+            </Button>
+          </div>
         </div>
       </div>
+
+      <DbConnectionDialog open={dbDialogOpen} onOpenChange={setDbDialogOpen} />
     </div>
   );
 }

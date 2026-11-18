@@ -28,7 +28,9 @@ import type {
   CreateUserInput,
   CreateVaccineInput,
   DashboardStats,
+  DbConnectionInfo,
   DbHealth,
+  DbTestResult,
   GlobalSearchResult,
   ImportPreview,
   ImportSummary,
@@ -106,6 +108,7 @@ import type {
   StockMovement,
   SaveProductInput,
   CreateStockMovementInput,
+  SaveDbConnectionInput,
 } from "@/bindings";
 
 /** Extrae el mensaje legible de un AppError serializado por Tauri. */
@@ -125,6 +128,11 @@ export function getErrorMessage(e: unknown): string {
 export const api = {
   // ---- Diagnóstico / setup ----
   dbHealth: () => invoke<DbHealth>("db_health"),
+  getDbConnection: () => invoke<DbConnectionInfo>("get_db_connection"),
+  saveDbConnection: (input: SaveDbConnectionInput) =>
+    invoke<string>("save_db_connection", { input }),
+  testDbConnection: (input: SaveDbConnectionInput) =>
+    invoke<DbTestResult>("test_db_connection", { input }),
 
   // ---- Catálogos ----
   listSpecies: () => invoke<Species[]>("list_species"),
