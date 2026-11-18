@@ -554,6 +554,24 @@ con CI verde, siguiendo el proceso de `docs/release-process.md`.
 - [ ] Login, sidebar y About dicen "Clínica Veterinaria" (o el tagline
       configurado).
 
+### Fase 6 (opcional, fuera del MVP)
+
+- [ ] Un ADMIN registra recursos (canil, gatera, box) con tipo y capacidad;
+      el tablero muestra la ocupación de cada uno.
+- [ ] Recepción/Auxiliar/Veterinario registran una estancia con tipo
+      (guardería, hospedaje u hospitalización), tarifa diaria y recurso;
+      el recurso no acepta más pacientes que su capacidad.
+- [ ] La estancia lleva bitácora de cuidados (comida, medicación, paseo,
+      limpieza, nota, valoración veterinaria) con autor y fecha.
+- [ ] El check-out cierra la estancia, calcula los días y el valor estimado y
+      libera el recurso; una estancia cerrada no se vuelve a cerrar.
+- [ ] El catálogo de productos (alimentos, medicamentos, accesorios, insumos)
+      lleva precio de costo, precio de venta, IVA y stock mínimo.
+- [ ] Cada entrada, salida, consumo, devolución o ajuste actualiza el stock;
+      el stock es la suma de los movimientos y nunca queda en negativo.
+- [ ] Los productos en el mínimo de reposición aparecen en alerta y el
+      inventario se valora a costo.
+
 ---
 
 ## 10. Pruebas

@@ -130,6 +130,14 @@ pub const MIGRATIONS: &[(&str, &str)] = &[
         "0031_settings",
         include_str!("../../migrations/0031_settings.sql"),
     ),
+    (
+        "0032_stays",
+        include_str!("../../migrations/0032_stays.sql"),
+    ),
+    (
+        "0033_products",
+        include_str!("../../migrations/0033_products.sql"),
+    ),
 ];
 
 /// Indica si una migración de datos de demostración debe aplicarse.

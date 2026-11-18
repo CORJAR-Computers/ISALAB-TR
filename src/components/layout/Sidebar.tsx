@@ -5,6 +5,7 @@ import { useUiStore, type View } from "@/stores/ui-store";
 import { usePermissions } from "@/hooks/use-permissions";
 import {
   Activity,
+  BedDouble,
   CalendarClock,
   FlaskConical,
   HeartPulse,
@@ -12,6 +13,7 @@ import {
   LayoutDashboard,
   ListTodo,
   ClipboardList,
+  Package,
   Receipt,
   Scissors,
   ScrollText,
@@ -31,6 +33,8 @@ type NavItem = {
   label: string;
   icon: typeof Users;
   adminOnly?: boolean;
+  /** Capacidad del rol exigida para ver la entrada (fase 6). */
+  capability?: "canStay" | "canInventory" | "canGroom" | "canReceive";
 };
 
 type NavSection = {
@@ -46,6 +50,7 @@ type NavSection = {
  *  - fase 2: Recepción (reception, appointments) → grupo "Recepción"
  *  - fase 4: Peluquería (grooming) → grupo "Estética"
  *  - fase 1: Catálogo de servicios → grupo "Administración"
+ *  - fase 6: Estancia (stays) y comercio (products) → sus propios grupos
  */
 const SECTIONS: NavSection[] = [
   {
@@ -76,6 +81,7 @@ const SECTIONS: NavSection[] = [
     items: [
       { view: "surgeries", label: "Cirugías", icon: Scissors },
       { view: "vaccines", label: "Vacunación", icon: Syringe },
+      { view: "stays", label: "Estancia y hospedaje", icon: BedDouble, capability: "canStay" },
     ],
   },
   {
@@ -83,6 +89,13 @@ const SECTIONS: NavSection[] = [
     label: "Estética",
     items: [
       { view: "grooming", label: "Peluquería", icon: Sparkles },
+    ],
+  },
+  {
+    id: "comercio",
+    label: "Comercio",
+    items: [
+      { view: "products", label: "Inventario y productos", icon: Package, capability: "canInventory" },
     ],
   },
   {
@@ -113,9 +126,20 @@ export function Sidebar() {
   const setAboutOpen = useUiStore((s) => s.setAboutOpen);
   const view = useUiStore((s) => s.view);
   const navigate = useUiStore((s) => s.navigate);
-  const { isAdmin } = usePermissions();
+  const perms = usePermissions();
+  const { isAdmin } = perms;
   const { data: branding } = useClinicBranding();
   const tagline = branding?.tagline || "Clínica Veterinaria";
+
+  // Mapa de capacidades para filtrar las entradas del menú. Incluye todas
+  // las declaradas en `NavItem.capability` para que ninguna quede oculta
+  // por error.
+  const capabilityMap: Record<string, boolean> = {
+    canStay: perms.canStay,
+    canInventory: perms.canInventory,
+    canGroom: perms.canGroom,
+    canReceive: perms.canReceive,
+  };
 
   const [openSections, setOpenSections] = useState<string[]>(INITIAL_OPEN);
 
@@ -145,7 +169,11 @@ export function Sidebar() {
 
   const filtered = SECTIONS.map((section) => ({
     ...section,
-    items: section.items.filter((item) => !item.adminOnly || isAdmin),
+    items: section.items.filter((item) => {
+      if (item.adminOnly && !isAdmin) return false;
+      if (item.capability && !capabilityMap[item.capability]) return false;
+      return true;
+    }),
   })).filter((section) => section.items.length > 0);
 
   return (

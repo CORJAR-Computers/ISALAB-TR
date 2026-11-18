@@ -16,6 +16,10 @@ export type Capabilities = {
   canGroom: boolean;
   /** Facturación y cobro de visitas. */
   canBill: boolean;
+  /** Estancias: guardería, hospedaje y hospitalización. */
+  canStay: boolean;
+  /** Catálogo de productos e inventario (entradas, salidas, consumos). */
+  canInventory: boolean;
   isAdmin: boolean;
   isVetOrAdmin: boolean;
 };
@@ -30,6 +34,8 @@ const byRole = (role: string): Capabilities => {
         canClinical: true,
         canGroom: true,
         canBill: true,
+        canStay: true,
+        canInventory: true,
         isAdmin: true,
         isVetOrAdmin: true,
       };
@@ -41,6 +47,9 @@ const byRole = (role: string): Capabilities => {
         canClinical: true,
         canGroom: false,
         canBill: true,
+        canStay: true,
+        // El veterinario no administra el inventario de la tienda.
+        canInventory: false,
         isAdmin: false,
         isVetOrAdmin: true,
       };
@@ -52,6 +61,8 @@ const byRole = (role: string): Capabilities => {
         canClinical: false,
         canGroom: true,
         canBill: true,
+        canStay: true,
+        canInventory: true,
         isAdmin: false,
         isVetOrAdmin: false,
       };
@@ -63,6 +74,8 @@ const byRole = (role: string): Capabilities => {
         canClinical: false,
         canGroom: false,
         canBill: true,
+        canStay: true,
+        canInventory: true,
         isAdmin: false,
         isVetOrAdmin: false,
       };
@@ -74,6 +87,8 @@ const byRole = (role: string): Capabilities => {
         canClinical: false,
         canGroom: true,
         canBill: false,
+        canStay: false,
+        canInventory: false,
         isAdmin: false,
         isVetOrAdmin: false,
       };
@@ -85,6 +100,8 @@ const byRole = (role: string): Capabilities => {
         canClinical: false,
         canGroom: false,
         canBill: false,
+        canStay: false,
+        canInventory: false,
         isAdmin: false,
         isVetOrAdmin: false,
       };

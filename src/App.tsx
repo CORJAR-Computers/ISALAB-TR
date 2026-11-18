@@ -78,6 +78,12 @@ const AppointmentCalendar = lazy(() =>
 const GroomingPage = lazy(() =>
   import("@/features/grooming/GroomingPage").then((m) => ({ default: m.GroomingPage })),
 );
+const StaysPage = lazy(() =>
+  import("@/features/stays/StaysPage").then((m) => ({ default: m.StaysPage })),
+);
+const ProductsPage = lazy(() =>
+  import("@/features/products/ProductsPage").then((m) => ({ default: m.ProductsPage })),
+);
 
 /** Fallback mientras se carga la pagina. */
 function PageFallback() {
@@ -246,6 +252,8 @@ export default function App() {
               {view === "reception" && <ReceptionPage />}
               {view === "appointments" && <AppointmentCalendar />}
               {view === "grooming" && <GroomingPage />}
+              {view === "stays" && <StaysPage />}
+              {view === "products" && <ProductsPage />}
               {view === "settings" && <SettingsPage />}
               {view === "users" && <UsersPage />}
               {view === "audit-log" && <AuditLogPage />}</Suspense>

@@ -165,4 +165,24 @@ export {
   useGenerateCertificadoCirugia,
   useGenerateCarnetVacunacion,
 } from "./use-reports";
+export {
+  useResources,
+  useResourceBoard,
+  useStays,
+  useStay,
+  useStayEvents,
+  useSaveResource,
+  useCreateStay,
+  useCheckOutStay,
+  useCancelStay,
+  useAddStayEvent,
+} from "./use-stays";
+export {
+  useProducts,
+  useProduct,
+  useStockMovements,
+  useSaveProduct,
+  useSetProductActive,
+  useAddStockMovement,
+} from "./use-products";
 export { useAuditLog } from "./use-audit";

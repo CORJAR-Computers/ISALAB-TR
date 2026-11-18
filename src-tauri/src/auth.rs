@@ -80,6 +80,10 @@ pub struct Capabilities {
     pub can_groom: bool,
     /// Facturación y cobro de visitas.
     pub can_bill: bool,
+    /// Estancias (guardería, hospedaje, hospitalización) y bitácora de cuidados.
+    pub can_stay: bool,
+    /// Catálogo de productos e inventario (entradas, salidas, consumos).
+    pub can_inventory: bool,
     /// Administración completa (usuarios, catálogo, configuración).
     pub is_admin: bool,
 }
@@ -92,6 +96,8 @@ impl Capabilities {
             can_clinical: true,
             can_groom: true,
             can_bill: true,
+            can_stay: true,
+            can_inventory: true,
             is_admin: true,
         }
     }
@@ -106,6 +112,8 @@ pub fn capabilities_for_role(role: &str) -> Capabilities {
             can_clinical: true,
             can_groom: false,
             can_bill: true,
+            can_stay: true,
+            can_inventory: false,
             is_admin: false,
         },
         // El AUXILIAR histórico podía facturar (create_invoice exige
@@ -116,6 +124,8 @@ pub fn capabilities_for_role(role: &str) -> Capabilities {
             can_clinical: false,
             can_groom: true,
             can_bill: true,
+            can_stay: true,
+            can_inventory: true,
             is_admin: false,
         },
         "RECEPCION" => Capabilities {
@@ -123,6 +133,8 @@ pub fn capabilities_for_role(role: &str) -> Capabilities {
             can_clinical: false,
             can_groom: false,
             can_bill: true,
+            can_stay: true,
+            can_inventory: true,
             is_admin: false,
         },
         "PELUQUERO" => Capabilities {
@@ -130,6 +142,8 @@ pub fn capabilities_for_role(role: &str) -> Capabilities {
             can_clinical: false,
             can_groom: true,
             can_bill: false,
+            can_stay: false,
+            can_inventory: false,
             is_admin: false,
         },
         _ => Capabilities {
@@ -137,6 +151,8 @@ pub fn capabilities_for_role(role: &str) -> Capabilities {
             can_clinical: false,
             can_groom: false,
             can_bill: false,
+            can_stay: false,
+            can_inventory: false,
             is_admin: false,
         },
     }
@@ -185,6 +201,25 @@ pub fn require_bill(state: &AppState) -> Result<SessionUser, AppError> {
     )
 }
 
+/// Exige capacidad de estancia (guardería, hospedaje y hospitalización).
+pub fn require_stay(state: &AppState) -> Result<SessionUser, AppError> {
+    require_capability(
+        state,
+        |c| c.can_stay,
+        "Se requiere capacidad de estancia (Recepción, Auxiliar, \
+         Veterinario o Administrador)",
+    )
+}
+
+/// Exige capacidad de inventario (catálogo de productos y movimientos).
+pub fn require_inventory(state: &AppState) -> Result<SessionUser, AppError> {
+    require_capability(
+        state,
+        |c| c.can_inventory,
+        "Se requiere capacidad de inventario (Recepción, Auxiliar o Administrador)",
+    )
+}
+
 #[cfg(test)]
 mod tests {
     use super::*;
@@ -193,26 +228,33 @@ mod tests {
     fn test_capabilities_by_role() {
         let admin = capabilities_for_role("ADMIN");
         assert!(admin.is_admin && admin.can_receive && admin.can_bill);
+        assert!(admin.can_stay && admin.can_inventory);
 
         let recep = capabilities_for_role("RECEPCION");
         assert!(recep.can_receive && recep.can_bill);
+        assert!(recep.can_stay && recep.can_inventory);
         assert!(!recep.can_clinical && !recep.can_groom && !recep.is_admin);
 
         let groom = capabilities_for_role("PELUQUERO");
         assert!(groom.can_groom);
         assert!(!groom.can_receive && !groom.can_bill && !groom.is_admin);
+        assert!(!groom.can_stay && !groom.can_inventory);
 
         let aux = capabilities_for_role("AUXILIAR");
         assert!(aux.can_receive && aux.can_groom && aux.can_bill);
+        assert!(aux.can_stay && aux.can_inventory);
         assert!(!aux.can_clinical && !aux.is_admin);
 
         let vet = capabilities_for_role("VETERINARIO");
         assert!(vet.can_clinical && vet.can_receive && vet.can_bill);
-        assert!(!vet.can_groom && !vet.is_admin);
+        assert!(vet.can_stay);
+        // El veterinario no administra el inventario de la tienda.
+        assert!(!vet.can_inventory && !vet.can_groom && !vet.is_admin);
 
         // Rol desconocido: sin capacidades.
         let guest = capabilities_for_role("GUEST");
         assert!(!guest.can_receive && !guest.is_admin);
+        assert!(!guest.can_stay && !guest.can_inventory);
     }
 
     #[test]

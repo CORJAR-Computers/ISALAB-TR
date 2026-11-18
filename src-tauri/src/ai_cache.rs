@@ -197,17 +197,26 @@ mod tests {
 
     #[test]
     fn test_cache_cleanup() {
-        let cache = AiCache::with_ttl(Duration::from_millis(10));
+        // TTL largo para contar entradas: `set()` purga las expiradas, así
+        // que con un TTL de 10 ms la primera entrada podía desaparecer
+        // entre los dos `set()` y la aserción dependía de la carga del
+        // proceso (test flaky).
+        let cache = AiCache::with_ttl(Duration::from_secs(60));
         cache.set(1, "Uno".to_string(), 1);
         cache.set(2, "Dos".to_string(), 2);
 
         assert_eq!(cache.len(), 2);
 
-        // Esperar a que expiren
-        std::thread::sleep(Duration::from_millis(20));
+        // Una entrada con TTL corto caduca y `cleanup()` la elimina.
+        let expiring = AiCache::with_ttl(Duration::from_millis(10));
+        expiring.set(1, "Uno".to_string(), 1);
+        assert_eq!(expiring.len(), 1);
 
-        cache.cleanup();
-        assert!(cache.is_empty());
+        // Esperar a que expire
+        std::thread::sleep(Duration::from_millis(30));
+
+        expiring.cleanup();
+        assert!(expiring.is_empty());
     }
 
     #[test]

@@ -91,6 +91,21 @@ import type {
   GroomingReminder,
   VisitAttachment,
   WorklistData,
+  // Estancia e inventario (fase 6).
+  Resource,
+  ResourceBoardItem,
+  Stay,
+  StayListItem,
+  StayEvent,
+  CreateStayInput,
+  CheckOutStayInput,
+  CreateStayEventInput,
+  SaveResourceInput,
+  Product,
+  ProductStockItem,
+  StockMovement,
+  SaveProductInput,
+  CreateStockMovementInput,
 } from "@/bindings";
 
 /** Extrae el mensaje legible de un AppError serializado por Tauri. */
@@ -456,10 +471,52 @@ export const api = {
   deleteVisitAttachment: (id: number) =>
     invoke<void>("delete_visit_attachment", { id }),
 
+  // ---- Estancia (guardería, hospedaje, hospitalización) ----
+  listResources: (includeInactive: boolean | null) =>
+    invoke<Resource[]>("list_resources", { includeInactive }),
+  listResourceBoard: () =>
+    invoke<ResourceBoardItem[]>("list_resource_board"),
+  saveResource: (input: SaveResourceInput) =>
+    invoke<Resource>("save_resource", { input }),
+  listStays: (
+    status: string | null,
+    kind: string | null,
+    patientId: number | null,
+  ) => invoke<StayListItem[]>("list_stays", { status, kind, patientId }),
+  getStay: (id: number) => invoke<Stay | null>("get_stay", { id }),
+  createStay: (input: CreateStayInput) => invoke<Stay>("create_stay", { input }),
+  checkOutStay: (id: number, input: CheckOutStayInput) =>
+    invoke<Stay>("check_out_stay", { id, input }),
+  cancelStay: (id: number) => invoke<Stay>("cancel_stay", { id }),
+  addStayEvent: (stayId: number, input: CreateStayEventInput) =>
+    invoke<StayEvent>("add_stay_event", { stayId, input }),
+  listStayEvents: (stayId: number) =>
+    invoke<StayEvent[]>("list_stay_events", { stayId }),
+
+  // ---- Catálogo de productos e inventario ----
+  listProducts: (
+    search: string | null,
+    category: string | null,
+    includeInactive: boolean | null,
+  ) =>
+    invoke<ProductStockItem[]>("list_products", {
+      search,
+      category,
+      includeInactive,
+    }),
+  getProduct: (id: number) => invoke<Product | null>("get_product", { id }),
+  saveProduct: (input: SaveProductInput) =>
+    invoke<Product>("save_product", { input }),
+  setProductActive: (id: number, active: boolean) =>
+    invoke<Product>("set_product_active", { id, active }),
+  addStockMovement: (input: CreateStockMovementInput) =>
+    invoke<StockMovement>("add_stock_movement", { input }),
+  listStockMovements: (productId: number | null, limit: number | null) =>
+    invoke<StockMovement[]>("list_stock_movements", { productId, limit }),
+
   // ---- Búsqueda global (paleta Ctrl+K) ----
   globalSearch: (query: string) =>
     invoke<GlobalSearchResult[]>("global_search", { query }),
-
   // ---- Dashboard ----
   getDashboardStats: () => invoke<DashboardStats>("get_dashboard_stats"),
 

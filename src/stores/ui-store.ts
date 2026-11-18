@@ -7,6 +7,8 @@ export type View =
   | "reception"
   | "appointments"
   | "grooming"
+  | "stays"
+  | "products"
   | "agenda"
   | "patients"
   | "clinical-history"

@@ -139,6 +139,78 @@ export const VISIT_ATTACHMENT_KIND: Record<string, string> = {
   DOCUMENT: "Documento",
 };
 
+/* ===================== ESTANCIA E INVENTARIO (fase 6) ===================== */
+
+/** Estados de una estancia (migración 0032). */
+export const STAY_STATUS: Record<
+  string,
+  { label: string; variant: BadgeVariant }
+> = {
+  ABIERTA: { label: "Abierta", variant: "success" },
+  CERRADA: { label: "Cerrada", variant: "secondary" },
+  CANCELADA: { label: "Cancelada", variant: "destructive" },
+};
+
+/** Tipos de estancia: guardería, hospedaje u hospitalización. */
+export const STAY_KIND: Record<
+  string,
+  { label: string; variant: BadgeVariant }
+> = {
+  GUARDERIA: { label: "Guardería", variant: "secondary" },
+  HOSPEDAJE: { label: "Hospedaje", variant: "default" },
+  HOSPITALIZACION: { label: "Hospitalización", variant: "warning" },
+};
+
+/** Tipos de evento de la bitácora de cuidados. */
+export const STAY_EVENT_KIND: Record<string, string> = {
+  COMIDA: "Comida",
+  MEDICACION: "Medicación",
+  PASEO: "Paseo",
+  LIMPIEZA: "Limpieza",
+  NOTA: "Nota",
+  VETERINARIO: "Valoración veterinaria",
+};
+
+/** Tipos de recurso (espacio físico de la clínica). */
+export const RESOURCE_KIND: Record<string, string> = {
+  CANIL: "Canil",
+  GATO: "Gatera",
+  RECEPERA: "Recupera",
+  QUIRURGICO: "Quirúrgico",
+  AISLAMIENTO: "Aislamiento",
+  PERRERA: "Perrera",
+};
+
+/** Categorías del catálogo de productos (migración 0033). */
+export const PRODUCT_CATEGORY: Record<string, string> = {
+  ALIMENTO: "Alimento",
+  MEDICAMENTO: "Medicamento",
+  ACCESORIO: "Accesorio",
+  INSUMO: "Insumo",
+};
+
+/** Tipos de movimiento de inventario. */
+export const STOCK_MOVEMENT_KIND: Record<
+  string,
+  { label: string; variant: BadgeVariant }
+> = {
+  ENTRADA: { label: "Entrada", variant: "success" },
+  SALIDA: { label: "Salida", variant: "destructive" },
+  CONSUMO: { label: "Consumo", variant: "warning" },
+  DEVOLUCION: { label: "Devolución", variant: "default" },
+  AJUSTE: { label: "Ajuste", variant: "secondary" },
+};
+
+/** Unidades de medida del catálogo de productos. */
+export const PRODUCT_UNIT: Record<string, string> = {
+  UNIDAD: "Unidad",
+  KG: "Kilogramo",
+  LT: "Litro",
+  PAQUETE: "Paquete",
+  CAJA: "Caja",
+  BOLSA: "Bolsa",
+};
+
 export const SEX_LABEL: Record<string, string> = {
   M: "Macho",
   F: "Hembra",

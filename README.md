@@ -4,8 +4,9 @@ Sistema de escritorio moderno para **clínicas veterinarias integrales** con
 laboratorio propio (inspirado en
 [ISALAB](https://github.com/CORJAR-Computers/ISALAB.git)): recepción de
 pacientes y citas, historiales clínicos multiespecie, muestras analíticas con
-trazabilidad, vacunación, estética (peluquería), reportes PDF firmados y
-facturación.
+trazabilidad, vacunación, estética (peluquería), estancia (guardería,
+hospedaje y hospitalización), inventario de productos y insumos, reportes PDF
+firmados y facturación.
 
 ## Stack
 
@@ -205,7 +206,7 @@ npm run tauri:build     # ídem
 - **Cifrado de secretos (DPAPI de Windows)**: la clave de IA (Groq) se almacena **cifrada con DPAPI** en `CLINIC_SETTINGS` (formato `enc:v1:<base64>`), ligada al usuario de Windows que la configuró. Una copia de la base de datos no expone la clave; los valores legacy en texto plano se re-cifran automáticamente al primer acceso.
 - **Auditoría**: tabla `USER_AUDIT_LOG` registra inicios/cierres de sesión, intentos fallidos de login, cambios de contraseña, creación de usuarios, cambios de configuración, importación de logos/certificados y transiciones de estado en muestras, facturas, consultas y cirugías. Desde la v0.3.0 el historial se consulta en la **UI de Auditoría** (solo `ADMIN`, tabla paginada con filtros).
 - **CSP**: Content Security Policy configurado (`script-src 'self'`, sin eval).
-- **Tests**: 208 tests de Rust (`cargo test`) + 102 de frontend con Vitest (`npm test`).
+- **Tests**: 352 tests de Rust (`cargo test`) + 135 de frontend con Vitest (`npm test`).
 
 ## Firmado de código (SmartScreen)
 
@@ -360,3 +361,9 @@ src-tauri/               # Backend Rust
   logos secundarios y preferencia por paciente, refactor de plantillas PDF
   (`layout.rs`), instalador NSIS con Firebird embebido y pipeline de release
   en GitHub Actions.
+- [x] **Clínica integral (fases 1–6)**: catálogo de servicios con precios
+  congelados, recepción con cola de espera, agenda generalizada, peluquería
+  con ficha y adjuntos, panel con métricas e historial clínico unificado, y
+  —fuera del MVP— estancia (guardería, hospedaje y hospitalización con
+  recursos y bitácora de cuidados) e inventario de productos con libro de
+  movimientos.

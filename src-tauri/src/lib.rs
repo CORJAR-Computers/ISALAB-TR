@@ -72,6 +72,10 @@ use crate::commands::patients::{
     create_patient, get_patient, get_patient_by_code, get_patient_lab_trends, list_owners,
     list_patients,
 };
+use crate::commands::products::{
+    add_stock_movement, get_product, list_products, list_stock_movements, save_product,
+    set_product_active,
+};
 use crate::commands::qc::{
     delete_qc_material, delete_qc_run, get_qc_chart, list_qc_analyzer_status, list_qc_materials,
     list_qc_runs, list_qc_targets, record_qc_run, save_qc_material,
@@ -97,6 +101,10 @@ use crate::commands::settings::{
 };
 use crate::commands::surgeries::{
     count_surgeries, create_surgery, list_surgeries, set_surgery_status,
+};
+use crate::commands::stays::{
+    add_stay_event, cancel_stay, check_out_stay, create_stay, get_stay, list_resource_board,
+    list_resources, list_stay_events, list_stays, save_resource,
 };
 use crate::commands::users::{change_password, create_user, list_users};
 use crate::commands::vaccines::{create_vaccine, list_vaccines};
@@ -271,6 +279,23 @@ fn specta_builder() -> Builder<tauri::Wry> {
             list_analyzer_import_jobs,
             list_failed_analyzer_imports,
             delete_analyzer_import_job,
+            // Estancia e inventario (fase 6).
+            list_resources,
+            list_resource_board,
+            save_resource,
+            list_stays,
+            get_stay,
+            create_stay,
+            check_out_stay,
+            cancel_stay,
+            add_stay_event,
+            list_stay_events,
+            list_products,
+            get_product,
+            save_product,
+            set_product_active,
+            add_stock_movement,
+            list_stock_movements,
         ])
         // Tipos expuestos para la UI (eventos Firebird → Tauri, auditoría).
         .typ::<crate::models::sample::SampleChangedEvent>()
@@ -313,6 +338,21 @@ fn specta_builder() -> Builder<tauri::Wry> {
         .typ::<crate::models::grooming::AddVisitAttachmentInput>()
         .typ::<crate::models::grooming::GroomingDayLine>()
         .typ::<crate::models::grooming::GroomingReminder>()
+        // Estancia e inventario (fase 6).
+        .typ::<crate::models::stay::Resource>()
+        .typ::<crate::models::stay::ResourceBoardItem>()
+        .typ::<crate::models::stay::Stay>()
+        .typ::<crate::models::stay::StayListItem>()
+        .typ::<crate::models::stay::StayEvent>()
+        .typ::<crate::models::stay::CreateStayInput>()
+        .typ::<crate::models::stay::CheckOutStayInput>()
+        .typ::<crate::models::stay::CreateStayEventInput>()
+        .typ::<crate::models::stay::SaveResourceInput>()
+        .typ::<crate::models::product::Product>()
+        .typ::<crate::models::product::ProductStockItem>()
+        .typ::<crate::models::product::StockMovement>()
+        .typ::<crate::models::product::SaveProductInput>()
+        .typ::<crate::models::product::CreateStockMovementInput>()
 }
 
 #[cfg_attr(mobile, tauri::mobile_entry_point)]

@@ -666,6 +666,80 @@ export const commands = {
 	 *  sondeo (o "Probar ahora") volverá a intentar importarlo.
 	 */
 	deleteAnalyzerImportJob: (jobId: number) => typedError<null, AppError>(__TAURI_INVOKE("delete_analyzer_import_job", { jobId })),
+	/**  Espacios físicos de la clínica (caniles, gateras, boxes…). */
+	listResources: (includeInactive: boolean | null) => typedError<Resource[], AppError>(__TAURI_INVOKE("list_resources", { includeInactive })),
+	/**  Tablero de estancias: recursos con su ocupación actual. */
+	listResourceBoard: () => typedError<ResourceBoardItem[], AppError>(__TAURI_INVOKE("list_resource_board")),
+	/**  Crea o edita un recurso (solo ADMIN). */
+	saveResource: (input: SaveResourceInput) => typedError<Resource, AppError>(__TAURI_INVOKE("save_resource", { input })),
+	/**  Lista estancias con filtros opcionales (estado, tipo, paciente). */
+	listStays: (status: string | null, kind: string | null, patientId: number | null) => typedError<StayListItem[], AppError>(__TAURI_INVOKE("list_stays", { status, kind, patientId })),
+	/**  Estancia completa por id. */
+	getStay: (id: number) => typedError<{
+	id: number,
+	/**  Código E-YYYY-NNNN. */
+	code: string,
+	patientId: number,
+	patientName: string,
+	ownerId: number,
+	ownerName: string,
+	ownerPhone: string | null,
+	visitId: number | null,
+	resourceId: number | null,
+	resourceName: string | null,
+	/**  GUARDERIA | HOSPEDAJE | HOSPITALIZACION */
+	kind: string,
+	/**  ABIERTA | CERRADA | CANCELADA */
+	status: string,
+	/**  YYYY-MM-DD HH:MM:SS */
+	checkInAt: string,
+	checkOutAt: string | null,
+	dailyRate: number | null,
+	notes: string | null,
+	/**  Días de estancia (mín. 1 mientras esté abierta). */
+	days: number,
+	/**  Valor estimado de la estancia hasta la fecha actual. */
+	estimatedTotal: number | null,
+} | null, AppError>(__TAURI_INVOKE("get_stay", { id })),
+	/**  Ingreso de una estancia (guardería, hospedaje u hospitalización). */
+	createStay: (input: CreateStayInput) => typedError<Stay, AppError>(__TAURI_INVOKE("create_stay", { input })),
+	/**  Check-out de una estancia. */
+	checkOutStay: (id: number, input: CheckOutStayInput) => typedError<Stay, AppError>(__TAURI_INVOKE("check_out_stay", { id, input })),
+	/**  Cancela una estancia abierta. */
+	cancelStay: (id: number) => typedError<Stay, AppError>(__TAURI_INVOKE("cancel_stay", { id })),
+	/**  Añade un evento a la bitácora de cuidados de la estancia. */
+	addStayEvent: (stayId: number, input: CreateStayEventInput) => typedError<StayEvent, AppError>(__TAURI_INVOKE("add_stay_event", { stayId, input })),
+	/**  Bitácora de cuidados de una estancia. */
+	listStayEvents: (stayId: number) => typedError<StayEvent[], AppError>(__TAURI_INVOKE("list_stay_events", { stayId })),
+	/**  Catálogo de productos con su stock actual. */
+	listProducts: (search: string | null, category: string | null, includeInactive: boolean | null) => typedError<ProductStockItem[], AppError>(__TAURI_INVOKE("list_products", { search, category, includeInactive })),
+	/**  Producto del catálogo por id. */
+	getProduct: (id: number) => typedError<{
+	id: number,
+	/**  Código interno (SKU) único. */
+	code: string,
+	name: string,
+	/**  ALIMENTO | MEDICAMENTO | ACCESORIO | INSUMO */
+	category: string,
+	/**  UNIDAD | KG | LT | PAQUETE | CAJA | BOLSA */
+	unit: string,
+	costPrice: number | null,
+	salePrice: number | null,
+	/**  IVA del producto; NULL = usa el IVA global de la clínica. */
+	taxRate: number | null,
+	/**  Stock mínimo para la alerta de reposición. */
+	minStock: number,
+	active: boolean,
+	notes: string | null,
+} | null, AppError>(__TAURI_INVOKE("get_product", { id })),
+	/**  Crea o edita un producto del catálogo (solo ADMIN). */
+	saveProduct: (input: SaveProductInput) => typedError<Product, AppError>(__TAURI_INVOKE("save_product", { input })),
+	/**  Activa o desactiva un producto del catálogo (solo ADMIN). */
+	setProductActive: (id: number, active: boolean) => typedError<Product, AppError>(__TAURI_INVOKE("set_product_active", { id, active })),
+	/**  Registra un movimiento de inventario (entrada, salida, consumo…). */
+	addStockMovement: (input: CreateStockMovementInput) => typedError<StockMovement, AppError>(__TAURI_INVOKE("add_stock_movement", { input })),
+	/**  Histórico de movimientos de inventario. */
+	listStockMovements: (productId: number | null, limit: number | null) => typedError<StockMovement[], AppError>(__TAURI_INVOKE("list_stock_movements", { productId, limit })),
 };
 
 /* Types */
@@ -838,6 +912,13 @@ export type Breed = {
 export type ChangePasswordInput = {
 	currentPassword: string,
 	newPassword: string,
+};
+
+/**  Cierre de estancia (check-out). */
+export type CheckOutStayInput = {
+	/**  YYYY-MM-DD HH:MM:SS (vacío = ahora). */
+	checkOutAt: string | null,
+	notes: string | null,
 };
 
 /**
@@ -1056,6 +1137,44 @@ export type CreateSampleInput = {
 	qualityIndex: string | null,
 	qualitySeverity: string | null,
 	qualityNote: string | null,
+};
+
+/**  Evento de cuidados (bitácora de la estancia). */
+export type CreateStayEventInput = {
+	/**  COMIDA | MEDICACION | PASEO | LIMPIEZA | NOTA | VETERINARIO */
+	kind: string,
+	/**  YYYY-MM-DD HH:MM:SS (vacío = ahora). */
+	occurredAt: string | null,
+	notes: string | null,
+};
+
+/**  Alta de estancia (ingreso a guardería, hospedaje u hospitalización). */
+export type CreateStayInput = {
+	patientId: number,
+	/**  Visita que originó el ingreso (opcional). */
+	visitId: number | null,
+	resourceId: number | null,
+	/**  GUARDERIA | HOSPEDAJE | HOSPITALIZACION */
+	kind: string,
+	/**  YYYY-MM-DD HH:MM:SS (vacío = ahora). */
+	checkInAt: string | null,
+	dailyRate: number | null,
+	notes: string | null,
+};
+
+/**  Movimiento de inventario (entrada, salida, consumo, devolución o ajuste). */
+export type CreateStockMovementInput = {
+	productId: number,
+	/**  Magnitud positiva siempre: el tipo define el signo. */
+	quantity: number,
+	/**  ENTRADA | SALIDA | CONSUMO | DEVOLUCION | AJUSTE */
+	kind: string,
+	unitCost: number | null,
+	reason: string | null,
+	/**  Estancia que consumió el producto (opcional). */
+	stayId: number | null,
+	/**  Visita que consumió el producto (opcional). */
+	visitId: number | null,
 };
 
 export type CreateSurgeryInput = {
@@ -1569,6 +1688,37 @@ export type PatientChargeSummary = {
 	status: string,
 };
 
+/**  Producto del catálogo de comercio (alimentos, medicamentos, accesorios). */
+export type Product = {
+	id: number,
+	/**  Código interno (SKU) único. */
+	code: string,
+	name: string,
+	/**  ALIMENTO | MEDICAMENTO | ACCESORIO | INSUMO */
+	category: string,
+	/**  UNIDAD | KG | LT | PAQUETE | CAJA | BOLSA */
+	unit: string,
+	costPrice: number | null,
+	salePrice: number | null,
+	/**  IVA del producto; NULL = usa el IVA global de la clínica. */
+	taxRate: number | null,
+	/**  Stock mínimo para la alerta de reposición. */
+	minStock: number,
+	active: boolean,
+	notes: string | null,
+};
+
+/**  Producto con su stock actual (suma de los movimientos). */
+export type ProductStockItem = {
+	product: Product,
+	/**  Stock actual (entradas − salidas). */
+	stock: number,
+	/**  true si el stock está por debajo del mínimo configurado. */
+	lowStock: boolean,
+	/**  Valor del inventario a costo (stock × costo unitario). */
+	stockValue: number | null,
+};
+
 /**  Estado QC del último corrida por analizador (badge de alerta en la UI). */
 export type QcAnalyzerStatus = {
 	analyzerId: number,
@@ -1747,6 +1897,27 @@ export type ReportFile = {
 	generatedAt: string,
 };
 
+/**  Espacio físico de la clínica donde se alojan los pacientes. */
+export type Resource = {
+	id: number,
+	name: string,
+	/**  CANIL | GATO | RECEPERA | QUIRURGICO | AISLAMIENTO | PERRERA */
+	kind: string,
+	/**  Lugares disponibles en el recurso (casi siempre 1). */
+	capacity: number,
+	active: boolean,
+	notes: string | null,
+};
+
+/**  Recurso con su ocupación actual (tablero de estancias). */
+export type ResourceBoardItem = {
+	resource: Resource,
+	/**  Estancias abiertas asignadas a este recurso. */
+	occupied: number,
+	/**  Estancias abiertas que requieren observación veterinaria. */
+	needsVet: number,
+};
+
 /**  Archivo adjunto de un resultado (foto de placa, frotis o electroforesis). */
 export type ResultAttachment = {
 	id: number,
@@ -1881,6 +2052,36 @@ export type SaveAnalyzerSourceInput = {
 	mapping: AnalyzerImportMapping | null,
 };
 
+/**  Alta o edición de un producto del catálogo. */
+export type SaveProductInput = {
+	/**  NULL = crear; con ID = editar. */
+	id: number | null,
+	code: string,
+	name: string,
+	/**  ALIMENTO | MEDICAMENTO | ACCESORIO | INSUMO */
+	category: string,
+	/**  UNIDAD | KG | LT | PAQUETE | CAJA | BOLSA */
+	unit: string | null,
+	costPrice: number | null,
+	salePrice: number | null,
+	taxRate: number | null,
+	minStock: number | null,
+	active: boolean | null,
+	notes: string | null,
+};
+
+/**  Alta o edición de un recurso (canil, gatera, box…). */
+export type SaveResourceInput = {
+	/**  NULL = crear; con ID = editar. */
+	id: number | null,
+	name: string,
+	/**  CANIL | GATO | RECEPERA | QUIRURGICO | AISLAMIENTO | PERRERA */
+	kind: string,
+	capacity: number | null,
+	active: boolean | null,
+	notes: string | null,
+};
+
 /**  Entrada de alta/edición de una categoría. */
 export type SaveServiceCategoryInput = {
 	/**  `None` = crear; `Some` = editar. */
@@ -1967,6 +2168,81 @@ export type Species = {
 export type StatusCount = {
 	status: string,
 	count: number,
+};
+
+/**  Estancia de un paciente (guardería, hospedaje u hospitalización). */
+export type Stay = {
+	id: number,
+	/**  Código E-YYYY-NNNN. */
+	code: string,
+	patientId: number,
+	patientName: string,
+	ownerId: number,
+	ownerName: string,
+	ownerPhone: string | null,
+	visitId: number | null,
+	resourceId: number | null,
+	resourceName: string | null,
+	/**  GUARDERIA | HOSPEDAJE | HOSPITALIZACION */
+	kind: string,
+	/**  ABIERTA | CERRADA | CANCELADA */
+	status: string,
+	/**  YYYY-MM-DD HH:MM:SS */
+	checkInAt: string,
+	checkOutAt: string | null,
+	dailyRate: number | null,
+	notes: string | null,
+	/**  Días de estancia (mín. 1 mientras esté abierta). */
+	days: number,
+	/**  Valor estimado de la estancia hasta la fecha actual. */
+	estimatedTotal: number | null,
+};
+
+/**  Evento de la bitácora de cuidados de una estancia. */
+export type StayEvent = {
+	id: number,
+	stayId: number,
+	/**  COMIDA | MEDICACION | PASEO | LIMPIEZA | NOTA | VETERINARIO */
+	kind: string,
+	/**  YYYY-MM-DD HH:MM:SS */
+	occurredAt: string,
+	notes: string | null,
+	authorName: string | null,
+};
+
+/**  Fila compacta del listado de estancias. */
+export type StayListItem = {
+	id: number,
+	code: string,
+	patientId: number,
+	patientName: string,
+	ownerName: string,
+	resourceName: string | null,
+	kind: string,
+	status: string,
+	checkInAt: string,
+	checkOutAt: string | null,
+	days: number,
+	estimatedTotal: number | null,
+};
+
+/**  Movimiento de inventario (entrada o salida). */
+export type StockMovement = {
+	id: number,
+	productId: number,
+	productName: string,
+	productCode: string,
+	/**  Positivo = entrada; negativo = salida. */
+	quantity: number,
+	/**  ENTRADA | SALIDA | CONSUMO | DEVOLUCION | AJUSTE */
+	kind: string,
+	unitCost: number | null,
+	reason: string | null,
+	stayId: number | null,
+	visitId: number | null,
+	authorName: string | null,
+	/**  YYYY-MM-DD HH:MM:SS */
+	createdAt: string,
 };
 
 /**  Cirugía programada con datos del paciente unidos (agenda quirúrgica). */
