@@ -457,16 +457,29 @@ Tareas:
    una PC de administración:
 
    ```text
-   isalab.exe --migrate --host 192.168.1.10 --database ISALAB --user SYSDBA
+   isalab-migrate --host 192.168.1.10 --database ISALAB --user SYSDBA --no-demo
+   isalab-migrate --status --host 192.168.1.10
    ```
 
-   (o un binario `src-tauri/src/bin/migrate.rs`). Reutiliza
-   `migrations::run_migrations` y `seed::ensure_default_admin`.
-3. `run_migrations` se ejecuta dentro de una **transacción por migración**
-   (DDL es transaccional en Firebird) y registra `SCHEMA_MIGRATIONS` en la misma
-   transacción: si falla, no queda a medias.
+   (binario `src-tauri/src/bin/isalab-migrate.rs`). Reutiliza
+   `migrations::run_migrations_with` y `seed::ensure_default_admin`.
+3. `run_migrations` registra cada migración en `SCHEMA_MIGRATIONS` con estado
+   `RUNNING` y la pasa a `DONE` al terminar todas sus sentencias. **No se usa
+   una transacción por migración**: verificado contra 5.0.3, Firebird no deja
+   usar metadatos nuevos (p. ej. una columna recién añadida con `ALTER TABLE`)
+   dentro de la misma transacción que los creó (`Column unknown … hasta
+   COMMIT`), y varias migraciones mezclan DDL y backfills. Con `RUNNING`/`DONE`
+   una migración a medias nunca pasa inadvertida: no cuenta como aplicada y el
+   runner se niega a seguir hasta repararla a mano.
 4. `ensure_default_admin` se mueve al runner (un único UPDATE, no 3).
 5. Tras migrar, el runner vuelve a aplicar los grants a `ISALAB_APP`.
+   Firebird **no** admite `GRANT … ON ALL TABLES IN DATABASE` (el parser rechaza
+   `ALL` tras `ON`): el runner enumera tablas, vistas, generadores,
+   procedimientos y funciones de usuario y otorga permiso uno por uno. Como los
+   grants son una foto del momento, cada corrida cubre los objetos nuevos.
+   Firebird acepta `GRANT` a usuarios inexistentes sin error, así que el runner
+   comprueba primero el beneficiario en `SEC$USERS` (o `RDB$ROLES` para roles) y
+   avisa si esa cuenta no puede leer el catálogo de seguridad.
 6. `maintenance::prune_event_log` se mueve a una tarea programada del servidor
    (o se ejecuta solo en el runner). Los clientes no podan.
 7. `should_seed_demo_data()` sigue devolviendo `true` en debug; añadir guardia
@@ -484,8 +497,8 @@ Tareas:
   3 muestran el estado "desactualizado" hasta que corre el runner.
 - Runner aplica 0001–0033 + grants en una sola pasada; los 3 clientes pasan a
   `CONNECTED`.
-- Fallo simulado en una migración → no queda versión registrada ni objetos
-  parciales.
+- Fallo simulado en una migración → la fila queda `RUNNING`, la versión no
+  avanza y el runner se detiene con un mensaje accionable.
 - Test Rust: dos migraciones concurrentes no pueden registrarse dos veces.
 
 **Riesgo:** un despliegue con migraciones nuevas exige coordinar actualización

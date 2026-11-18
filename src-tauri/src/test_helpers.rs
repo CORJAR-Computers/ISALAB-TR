@@ -93,16 +93,41 @@ pub fn fbclient_path() -> PathBuf {
     resolve_firebird_dir().join("fbclient.dll")
 }
 
-/// Crea una base de datos temporal para tests con nombre único.
-/// Devuelve la conexión y la ruta de la DB.
-pub fn setup_test_db() -> (SimpleConnection, PathBuf) {
+/// Ruta única para una base temporal de tests.
+fn temp_db_path(kind: &str) -> PathBuf {
     let thread_id = std::thread::current().id();
     let timestamp = std::time::SystemTime::now()
         .duration_since(std::time::UNIX_EPOCH)
         .unwrap_or_default()
         .as_nanos();
-    let db_path =
-        std::env::temp_dir().join(format!("isalab_test_{:?}_{}.fdb", thread_id, timestamp));
+    std::env::temp_dir().join(format!("isalab_{kind}_{thread_id:?}_{timestamp}.fdb"))
+}
+
+/// Crea una base de datos temporal vacía (sin migraciones) con nombre único.
+///
+/// La usan los tests del runner: necesitan partir de cero para comprobar el
+/// registro de versiones y el rollback de una migración fallida.
+pub fn setup_empty_test_db() -> (SimpleConnection, PathBuf) {
+    let db_path = temp_db_path("empty");
+    let _ = std::fs::remove_file(&db_path);
+
+    let fbclient = fbclient_path();
+    if !fbclient.exists() {
+        panic!(
+            "fbclient.dll no encontrado en {}. Los tests de integración requieren Firebird 5 Embedded.",
+            fbclient.display()
+        );
+    }
+
+    let conn =
+        create_database(&db_path, &fbclient).expect("No se pudo crear la base de datos de prueba");
+    (conn, db_path)
+}
+
+/// Crea una base de datos temporal para tests con nombre único.
+/// Devuelve la conexión y la ruta de la DB.
+pub fn setup_test_db() -> (SimpleConnection, PathBuf) {
+    let db_path = temp_db_path("test");
 
     // Asegurar que no existe una DB previa
     let _ = std::fs::remove_file(&db_path);

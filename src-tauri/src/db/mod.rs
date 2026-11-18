@@ -5,6 +5,7 @@
 
 pub mod config;
 pub mod events;
+pub mod grants;
 pub mod health;
 pub mod maintenance;
 pub mod migrations;

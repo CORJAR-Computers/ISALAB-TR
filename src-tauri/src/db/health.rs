@@ -159,20 +159,11 @@ pub fn ping(cfg: &DbConfig) -> DbPing {
 }
 
 /// Versión actual del esquema, o 0 si la tabla de migraciones no existe.
-pub(crate) fn schema_version_of(conn: &mut rsfbclient::SimpleConnection) -> Result<i32, AppError> {
-    let exists: Option<(i16,)> = conn
-        .query_first(
-            "SELECT 1 FROM rdb$relations WHERE rdb$relation_name = 'SCHEMA_MIGRATIONS'",
-            (),
-        )
-        .map_err(AppError::from)?;
-    if exists.is_none() {
-        return Ok(0);
-    }
-    let max: Option<(i32,)> = conn
-        .query_first("SELECT MAX(VERSION) FROM SCHEMA_MIGRATIONS", ())
-        .map_err(AppError::from)?;
-    Ok(max.map(|(v,)| v).unwrap_or(0))
+///
+/// Solo cuentan las migraciones terminadas: una ejecución interrumpida deja la
+/// fila en `RUNNING` y la app debe seguir viendo la versión anterior.
+pub fn schema_version_of(conn: &mut rsfbclient::SimpleConnection) -> Result<i32, AppError> {
+    migrations::applied_version(conn)
 }
 
 #[cfg(test)]
