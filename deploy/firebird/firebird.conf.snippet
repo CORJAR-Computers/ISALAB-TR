@@ -1,0 +1,23 @@
+# firebird.conf — fragmento de referencia para el servidor Firebird de ISALAB
+#
+# Archivo real: <directorio de Firebird>\firebird.conf
+# Añadir estas líneas al final y reiniciar el servicio.
+#
+# No se toca el resto del archivo: los valores por defecto de WireCrypt,
+# autenticación (Srp) y pool de páginas son los adecuados para 3 clientes.
+
+# Puerto fijo para eventos remotos.
+#
+# Sin esto el servidor elige un puerto al azar en cada arranque y los clientes
+# no pueden recibir los eventos de la base (invalidación de caché en la UI)
+# porque el firewall solo tiene abiertos los puertos conocidos.
+RemoteAuxPort = 3051
+
+# Solo se abren las bases que estén dentro del directorio de datos y la base
+# de seguridad del propio servidor.
+#
+# OJO: el separador es ';' (punto y coma), NO la coma. Con comas el servidor
+# interpreta un único directorio con un nombre imposible y toda conexión
+# falla con:
+#   Use of database at location ... is not allowed by server configuration
+DatabaseAccess = Restrict C:\Firebird\data;C:\Firebird\Firebird_5_0\security5.fdb

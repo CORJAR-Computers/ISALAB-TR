@@ -1,0 +1,19 @@
+# databases.conf — fragmento de referencia para el servidor Firebird de ISALAB
+#
+# Archivo real: <directorio de Firebird>\databases.conf
+# Reiniciar el servicio tras editarlo.
+#
+# Los alias son la única forma de conectar que se documenta en la clínica:
+# las PCs cliente usan `192.168.1.10/3050:ISALAB`, nunca la ruta del .fdb.
+# Así se puede mover el archivo de sitio cambiando solo esta línea.
+
+# Alias de la base de la clínica.
+ISALAB = C:\Firebird\data\isalab.fdb
+
+# La base de seguridad no debe aceptar conexiones remotas: si se corrompe o
+# alguien la abre desde la red, se comprometen todas las credenciales del
+# servidor. Todo el tráfico remoto debe ir a ISALAB.
+security.db = $(dir_secDb)/security5.fdb
+{
+    RemoteAccess = false
+}
