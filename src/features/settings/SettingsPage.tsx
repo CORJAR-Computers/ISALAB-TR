@@ -24,6 +24,7 @@ import {
   FormMessage,
 } from "@/components/ui/form";
 import { Input } from "@/components/ui/input";
+import { Label } from "@/components/ui/label";
 import {
   Select,
   SelectContent,
@@ -128,7 +129,9 @@ export function SettingsPage() {
     },
   });
 
-  // Carga los valores guardados cuando llegan del backend.
+  // Carga los valores guardados cuando llegan del backend. `keepDirtyValues`
+  // evita que un refetch (p. ej. la invalidación tras importar el logo o el
+  // certificado) borre ediciones sin guardar, como la contraseña PKCS#12.
   useEffect(() => {
     if (settings) {
       form.reset({
@@ -157,7 +160,7 @@ export function SettingsPage() {
             ? String(settings.groomingDefaultDuration)
             : "",
         receptionTicketPrefix: settings.receptionTicketPrefix ?? "",
-      });
+      }, { keepDirtyValues: true });
     }
   }, [settings, form]);
 
@@ -362,6 +365,7 @@ export function SettingsPage() {
     if (!window.confirm("¿Seguro que deseas eliminar el certificado digital?")) return;
     try {
       await deletePkcs12.mutateAsync();
+      form.setValue("pkcs12Password", "");
       toast.success("Certificado eliminado", {
         description: "Los reportes volverán a usar el modo de firma configurado.",
       });
@@ -858,7 +862,7 @@ export function SettingsPage() {
                 )}
               />
               <div className="space-y-2 sm:col-span-2">
-                <FormLabel>Certificado digital (.p12/.pfx)</FormLabel>
+                <Label>Certificado digital (.p12/.pfx)</Label>
                 <div className="flex flex-wrap items-center gap-2">
                   <Button
                     type="button"
