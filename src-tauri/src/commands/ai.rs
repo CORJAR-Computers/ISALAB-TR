@@ -388,6 +388,11 @@ pub fn interpret_lab_results(
     // 6. Construct prompt with clinical context
     let prompt = build_interpretation_prompt(&patient, &sample, &sample.results, Some(&ctx));
 
+    // La conexión vuelve al pool antes de la llamada HTTP: Groq puede tardar
+    // hasta 60 s y el pool es de 4 conexiones por PC. Retenerla dejaría al
+    // resto de la app sin margen para leer o guardar mientras se espera.
+    drop(pooled);
+
     // 7. Call Groq API via HTTP blocking request with timeout
     let client = reqwest::blocking::Client::builder()
         .timeout(std::time::Duration::from_secs(60))
@@ -515,6 +520,9 @@ pub fn test_groq_connection(state: State<'_, AppState>) -> Result<String, AppErr
     let mut pooled = state.pool.acquire()?;
     let settings = settings_repo::get(pooled.conn())?;
     let api_key = groq_api_key_or_error(&settings)?;
+    // Igual que en `interpret_lab_results`: no se retiene una conexión
+    // mientras se espera la respuesta de la red (hasta 30 s aquí).
+    drop(pooled);
 
     // Solicitud mínima (modelo barato, sin contexto clínico) para validar la clave.
     let client = reqwest::blocking::Client::builder()

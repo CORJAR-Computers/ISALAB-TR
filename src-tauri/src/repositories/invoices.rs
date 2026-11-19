@@ -1,6 +1,7 @@
 use rsfbclient::prelude::*;
 use rsfbclient::SimpleConnection;
 
+use crate::db;
 use crate::error::AppError;
 use crate::models::invoice::{CreateInvoiceInput, Invoice, InvoiceItem, InvoiceListItem};
 use crate::repositories::next_id;
@@ -150,60 +151,64 @@ pub fn create(
         }
     }
 
-    let subtotal: f64 = input
-        .items
-        .iter()
-        .map(|it| it.quantity as f64 * it.unit_price)
-        .sum();
-    let tax_rate = match input.tax_rate {
-        Some(rate) => rate,
-        None => default_tax_rate(conn)?,
-    };
-    let tax_amount = subtotal * tax_rate / 100.0;
-    let total = subtotal + tax_amount;
+    // Cabecera + líneas en una sola transacción: con 3 PCs escribiendo, una
+    // factura a medias (sin todos sus ítems) sería imposible de cobrar.
+    db::tx::in_transaction(conn, |conn| {
+        let subtotal: f64 = input
+            .items
+            .iter()
+            .map(|it| it.quantity as f64 * it.unit_price)
+            .sum();
+        let tax_rate = match input.tax_rate {
+            Some(rate) => rate,
+            None => default_tax_rate(conn)?,
+        };
+        let tax_amount = subtotal * tax_rate / 100.0;
+        let total = subtotal + tax_amount;
 
-    let id = next_id(conn, "GEN_INVOICES_ID")?;
-    conn.execute(
-        "INSERT INTO INVOICES
-            (ID, PATIENT_ID, OWNER_ID, CONSULTATION_ID, SUBTOTAL, TAX_RATE,
-             TAX_AMOUNT, TOTAL, STATUS, PAYMENT_METHOD, NOTES)
-         VALUES (?, ?, ?, ?, ?, ?, ?, ?, 'EMITIDA', ?, ?)",
-        (
-            &id,
-            &input.patient_id,
-            &input.owner_id,
-            &input.consultation_id,
-            &subtotal,
-            &tax_rate,
-            &tax_amount,
-            &total,
-            &input.payment_method,
-            &input.notes,
-        ),
-    )
-    .map_err(AppError::from)?;
-
-    for it in &input.items {
-        let line_total = it.quantity as f64 * it.unit_price;
-        let item_id = next_id(conn, "GEN_INVOICE_ITEMS_ID")?;
+        let id = next_id(conn, "GEN_INVOICES_ID")?;
         conn.execute(
-            "INSERT INTO INVOICE_ITEMS
-                (ID, INVOICE_ID, DESCRIPTION, QUANTITY, UNIT_PRICE, LINE_TOTAL, SERVICE_ID)
-             VALUES (?, ?, ?, ?, ?, ?, ?)",
+            "INSERT INTO INVOICES
+                (ID, PATIENT_ID, OWNER_ID, CONSULTATION_ID, SUBTOTAL, TAX_RATE,
+                 TAX_AMOUNT, TOTAL, STATUS, PAYMENT_METHOD, NOTES)
+             VALUES (?, ?, ?, ?, ?, ?, ?, ?, 'EMITIDA', ?, ?)",
             (
-                &item_id,
                 &id,
-                &it.description,
-                &it.quantity,
-                &it.unit_price,
-                &line_total,
-                &it.service_id,
+                &input.patient_id,
+                &input.owner_id,
+                &input.consultation_id,
+                &subtotal,
+                &tax_rate,
+                &tax_amount,
+                &total,
+                &input.payment_method,
+                &input.notes,
             ),
         )
         .map_err(AppError::from)?;
-    }
 
-    get(conn, id)?.ok_or_else(|| AppError::Internal("Factura creada pero no recuperada".into()))
+        for it in &input.items {
+            let line_total = it.quantity as f64 * it.unit_price;
+            let item_id = next_id(conn, "GEN_INVOICE_ITEMS_ID")?;
+            conn.execute(
+                "INSERT INTO INVOICE_ITEMS
+                    (ID, INVOICE_ID, DESCRIPTION, QUANTITY, UNIT_PRICE, LINE_TOTAL, SERVICE_ID)
+                 VALUES (?, ?, ?, ?, ?, ?, ?)",
+                (
+                    &item_id,
+                    &id,
+                    &it.description,
+                    &it.quantity,
+                    &it.unit_price,
+                    &line_total,
+                    &it.service_id,
+                ),
+            )
+            .map_err(AppError::from)?;
+        }
+
+        get(conn, id)?.ok_or_else(|| AppError::Internal("Factura creada pero no recuperada".into()))
+    })
 }
 
 /// Listado de facturas con filtros opcionales por estado y búsqueda
@@ -255,31 +260,45 @@ pub fn list(
 
 /// Cambia el estado de una factura: EMITIDA → PAGADA/ANULADA, PAGADA → ANULADA.
 pub fn set_status(conn: &mut SimpleConnection, id: i32, status: &str) -> Result<Invoice, AppError> {
-    let current: Option<(String,)> = conn
-        .query_first("SELECT STATUS FROM INVOICES WHERE ID = ?", (&id,))
-        .map_err(AppError::from)?;
-    let (current,) =
-        current.ok_or_else(|| AppError::NotFound(format!("Factura {id} no encontrada")))?;
-
-    let allowed = match status {
-        "PAGADA" => current == "EMITIDA",
-        "ANULADA" => matches!(current.as_str(), "EMITIDA" | "PAGADA"),
-        _ => false,
+    // Estados de origen admitidos por cada transición.
+    let from: &[&str] = match status {
+        "PAGADA" => &["EMITIDA"],
+        "ANULADA" => &["EMITIDA", "PAGADA"],
+        _ => &[],
     };
-    if !allowed {
+    if from.is_empty() {
+        return Err(AppError::Validation(format!(
+            "Estado de factura inválido: {status}"
+        )));
+    }
+
+    // Compare-and-set: si otra PC ya cobró o anuló la factura, este UPDATE
+    // afecta 0 filas. Evita el doble cobro y la anulación de una ya pagada
+    // (los estados son un conjunto fijo interno: se interpolan sin riesgo).
+    let allowed = from
+        .iter()
+        .map(|s| format!("'{s}'"))
+        .collect::<Vec<_>>()
+        .join(", ");
+    let sql = format!(
+        "UPDATE INVOICES
+            SET STATUS = ?, UPDATED_AT = CURRENT_TIMESTAMP
+          WHERE ID = ? AND STATUS IN ({allowed})"
+    );
+    let updated = conn.execute(&sql, (&status, &id)).map_err(AppError::from)?;
+
+    if updated == 0 {
+        let current: Option<(String,)> = conn
+            .query_first("SELECT STATUS FROM INVOICES WHERE ID = ?", (&id,))
+            .map_err(AppError::from)?;
+        let Some((current,)) = current else {
+            return Err(AppError::NotFound(format!("Factura {id} no encontrada")));
+        };
         return Err(AppError::Validation(format!(
             "Transición de estado no permitida: {current} → {status} \
              (EMITIDA→PAGADA, →ANULADA)"
         )));
     }
-
-    conn.execute(
-        "UPDATE INVOICES
-            SET STATUS = ?, UPDATED_AT = CURRENT_TIMESTAMP
-          WHERE ID = ?",
-        (&status, &id),
-    )
-    .map_err(AppError::from)?;
 
     get(conn, id)?
         .ok_or_else(|| AppError::Internal("Factura actualizada pero no recuperada".into()))

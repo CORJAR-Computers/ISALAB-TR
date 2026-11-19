@@ -1,6 +1,7 @@
 use rsfbclient::prelude::*;
 use rsfbclient::SimpleConnection;
 
+use crate::db;
 use crate::error::AppError;
 use crate::models::product::{
     CreateStockMovementInput, Product, ProductStockItem, SaveProductInput, StockMovement,
@@ -326,57 +327,62 @@ pub fn add_stock_movement(
         _ => input.quantity,
     };
 
-    // No se permite dejar el stock en negativo.
-    if signed < 0 {
-        let stock: Option<(i32,)> = conn
-            .query_first(
-                "SELECT COALESCE(SUM(QUANTITY), 0) FROM STOCK_MOVEMENTS WHERE PRODUCT_ID = ?",
-                (&input.product_id,),
-            )
-            .map_err(AppError::from)?;
-        let current = stock.map(|(v,)| v).unwrap_or(0);
-        if current + signed < 0 {
-            return Err(AppError::Validation(format!(
-                "Stock insuficiente de «{product_name}»: disponible {current}"
-            )));
+    // Validación de stock + inserción en una transacción: dos PCs consumiendo
+    // el mismo producto a la vez podrían pasar ambas la validación con el
+    // stock leído y dejarlo en negativo.
+    db::tx::in_transaction(conn, |conn| {
+        // No se permite dejar el stock en negativo.
+        if signed < 0 {
+            let stock: Option<(i32,)> = conn
+                .query_first(
+                    "SELECT COALESCE(SUM(QUANTITY), 0) FROM STOCK_MOVEMENTS WHERE PRODUCT_ID = ?",
+                    (&input.product_id,),
+                )
+                .map_err(AppError::from)?;
+            let current = stock.map(|(v,)| v).unwrap_or(0);
+            if current + signed < 0 {
+                return Err(AppError::Validation(format!(
+                    "Stock insuficiente de «{product_name}»: disponible {current}"
+                )));
+            }
         }
-    }
 
-    let unit_cost = input.unit_cost.unwrap_or(cost_price);
-    let id = next_id(conn, "GEN_STOCK_MOVEMENTS_ID")?;
-    conn.execute(
-        "INSERT INTO STOCK_MOVEMENTS (ID, PRODUCT_ID, QUANTITY, KIND, UNIT_COST, REASON,
-                                      STAY_ID, VISIT_ID, CREATED_BY)
-         VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?)",
-        (
-            &id,
-            &input.product_id,
-            &signed,
-            &kind,
-            &unit_cost,
-            &input.reason,
-            &input.stay_id,
-            &input.visit_id,
-            &user_id,
-        ),
-    )
-    .map_err(AppError::from)?;
-
-    let row: Option<StockMovementRow> = conn
-        .query_first(
-            "SELECT m.ID, m.PRODUCT_ID, p.NAME, p.CODE, m.QUANTITY, m.KIND,
-                    CAST(m.UNIT_COST AS DOUBLE PRECISION), m.REASON,
-                    m.STAY_ID, m.VISIT_ID, u.FULL_NAME,
-                    LEFT(CAST(m.CREATED_AT AS VARCHAR(60)), 19)
-             FROM STOCK_MOVEMENTS m
-             JOIN PRODUCTS p ON p.ID = m.PRODUCT_ID
-             LEFT JOIN USERS u ON u.ID = m.CREATED_BY
-             WHERE m.ID = ?",
-            (&id,),
+        let unit_cost = input.unit_cost.unwrap_or(cost_price);
+        let id = next_id(conn, "GEN_STOCK_MOVEMENTS_ID")?;
+        conn.execute(
+            "INSERT INTO STOCK_MOVEMENTS (ID, PRODUCT_ID, QUANTITY, KIND, UNIT_COST, REASON,
+                                          STAY_ID, VISIT_ID, CREATED_BY)
+             VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?)",
+            (
+                &id,
+                &input.product_id,
+                &signed,
+                &kind,
+                &unit_cost,
+                &input.reason,
+                &input.stay_id,
+                &input.visit_id,
+                &user_id,
+            ),
         )
         .map_err(AppError::from)?;
-    row.map(map_movement)
-        .ok_or_else(|| AppError::Internal("Movimiento creado pero no recuperado".into()))
+
+        let row: Option<StockMovementRow> = conn
+            .query_first(
+                "SELECT m.ID, m.PRODUCT_ID, p.NAME, p.CODE, m.QUANTITY, m.KIND,
+                        CAST(m.UNIT_COST AS DOUBLE PRECISION), m.REASON,
+                        m.STAY_ID, m.VISIT_ID, u.FULL_NAME,
+                        LEFT(CAST(m.CREATED_AT AS VARCHAR(60)), 19)
+                 FROM STOCK_MOVEMENTS m
+                 JOIN PRODUCTS p ON p.ID = m.PRODUCT_ID
+                 LEFT JOIN USERS u ON u.ID = m.CREATED_BY
+                 WHERE m.ID = ?",
+                (&id,),
+            )
+            .map_err(AppError::from)?;
+        row.map(map_movement)
+            .ok_or_else(|| AppError::Internal("Movimiento creado pero no recuperado".into()))
+    })
 }
 
 /// Histórico de movimientos de un producto (más reciente primero).

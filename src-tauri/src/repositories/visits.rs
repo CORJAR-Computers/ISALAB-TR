@@ -1,6 +1,7 @@
 use rsfbclient::prelude::*;
 use rsfbclient::SimpleConnection;
 
+use crate::db;
 use crate::error::AppError;
 use crate::models::visit::{
     AddVisitServiceInput, UpdateVisitServiceStatusInput, Visit, VisitListItem, VisitService,
@@ -201,27 +202,31 @@ pub fn create_visit(
     };
     let owner_id = input.owner_id.unwrap_or(patient_owner);
 
-    let id = next_id(conn, "GEN_VISITS_ID")?;
-    conn.execute(
-        "INSERT INTO VISITS (ID, PATIENT_ID, OWNER_ID, APPOINTMENT_ID, PRIORITY, NOTES, CREATED_BY)
-         VALUES (?, ?, ?, ?, ?, ?, ?)",
-        (&id, &input.patient_id, &owner_id, &appointment_id, &priority, &input.notes, &created_by),
-    )
-    .map_err(AppError::from)?;
+    // Cabecera + líneas de servicio en una sola transacción: una visita sin
+    // todas sus líneas distorsiona la cola, la facturación y el tablero.
+    db::tx::in_transaction(conn, |conn| {
+        let id = next_id(conn, "GEN_VISITS_ID")?;
+        conn.execute(
+            "INSERT INTO VISITS (ID, PATIENT_ID, OWNER_ID, APPOINTMENT_ID, PRIORITY, NOTES, CREATED_BY)
+             VALUES (?, ?, ?, ?, ?, ?, ?)",
+            (&id, &input.patient_id, &owner_id, &appointment_id, &priority, &input.notes, &created_by),
+        )
+        .map_err(AppError::from)?;
 
-    for svc in &input.services {
-        insert_visit_service(
-            conn,
-            id,
-            svc.service_id,
-            svc.professional_id,
-            svc.quantity,
-            svc.notes.as_deref(),
-        )?;
-    }
+        for svc in &input.services {
+            insert_visit_service(
+                conn,
+                id,
+                svc.service_id,
+                svc.professional_id,
+                svc.quantity,
+                svc.notes.as_deref(),
+            )?;
+        }
 
-    get_visit(conn, id)?
-        .ok_or_else(|| AppError::Internal("Visita creada pero no recuperada".into()))
+        get_visit(conn, id)?
+            .ok_or_else(|| AppError::Internal("Visita creada pero no recuperada".into()))
+    })
 }
 
 // ============================== LISTADO =====================================
@@ -372,30 +377,45 @@ pub fn set_visit_status(
     id: i32,
     status: &str,
 ) -> Result<Visit, AppError> {
-    let current: Option<(String,)> = conn
-        .query_first("SELECT STATUS FROM VISITS WHERE ID = ?", (&id,))
-        .map_err(AppError::from)?;
-    let (current,) =
-        current.ok_or_else(|| AppError::NotFound(format!("Visita {id} no encontrada")))?;
-
-    let allowed = match status {
-        "EN_ATENCION" => current == "EN_ESPERA",
-        "FINALIZADA" => current == "EN_ATENCION",
-        "CANCELADA" => matches!(current.as_str(), "EN_ESPERA" | "EN_ATENCION" | "FINALIZADA"),
-        "FACTURADA" => current == "FINALIZADA",
-        _ => false,
+    // Estados de origen admitidos por cada transición.
+    let from: &[&str] = match status {
+        "EN_ATENCION" => &["EN_ESPERA"],
+        "FINALIZADA" => &["EN_ATENCION"],
+        "CANCELADA" => &["EN_ESPERA", "EN_ATENCION", "FINALIZADA"],
+        "FACTURADA" => &["FINALIZADA"],
+        _ => &[],
     };
-    if !allowed {
+    if from.is_empty() {
+        return Err(AppError::Validation(format!(
+            "Estado de visita inválido: {status}"
+        )));
+    }
+
+    // Compare-and-set: si otra PC ya movió la visita (p. ej. la facturó), este
+    // UPDATE afecta 0 filas en lugar de devolverla a un estado anterior.
+    // Los estados son un conjunto fijo interno: se interpolan sin riesgo.
+    let allowed = from
+        .iter()
+        .map(|s| format!("'{s}'"))
+        .collect::<Vec<_>>()
+        .join(", ");
+    let sql = format!(
+        "UPDATE VISITS SET STATUS = ?, UPDATED_AT = CURRENT_TIMESTAMP
+          WHERE ID = ? AND STATUS IN ({allowed})"
+    );
+    let updated = conn.execute(&sql, (&status, &id)).map_err(AppError::from)?;
+
+    if updated == 0 {
+        let current: Option<(String,)> = conn
+            .query_first("SELECT STATUS FROM VISITS WHERE ID = ?", (&id,))
+            .map_err(AppError::from)?;
+        let Some((current,)) = current else {
+            return Err(AppError::NotFound(format!("Visita {id} no encontrada")));
+        };
         return Err(AppError::Validation(format!(
             "Transición de estado inválida: {current} → {status}"
         )));
     }
-
-    conn.execute(
-        "UPDATE VISITS SET STATUS = ?, UPDATED_AT = CURRENT_TIMESTAMP WHERE ID = ?",
-        (&status, &id),
-    )
-    .map_err(AppError::from)?;
 
     get_visit(conn, id)?
         .ok_or_else(|| AppError::Internal("Visita actualizada pero no recuperada".into()))

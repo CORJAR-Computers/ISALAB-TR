@@ -1,6 +1,7 @@
 use rsfbclient::prelude::*;
 use rsfbclient::SimpleConnection;
 
+use crate::db;
 use crate::error::AppError;
 use crate::models::appointment::{
     Appointment, AppointmentListItem, CreateAppointmentInput,
@@ -272,39 +273,46 @@ pub fn create_appointment(
 
     // Validación de solapamiento.
     let end = ends_at(&input.scheduled_at, duration_min);
-    if has_conflict(
-        conn,
-        input.professional_id,
-        input.patient_id,
-        &input.scheduled_at,
-        &end,
-        None,
-    )? {
-        return Err(AppError::Validation(
-            "Ya existe una cita solapada para este paciente o profesional en ese horario".into(),
-        ));
-    }
 
-    let id = next_id(conn, "GEN_APPOINTMENTS_ID")?;
-    conn.execute(
-        "INSERT INTO APPOINTMENTS
-            (ID, PATIENT_ID, SERVICE_ID, PROFESSIONAL_ID, SCHEDULED_AT,
-             DURATION_MIN, STATUS, NOTES)
-         VALUES (?, ?, ?, ?, ?, ?, 'PROGRAMADA', ?)",
-        (
-            &id,
-            &input.patient_id,
-            &input.service_id,
-            &input.professional_id,
+    // Validación + inserción en una transacción. Sin ella, dos PCs pueden
+    // validar el mismo hueco a la vez y crear las dos citas: el SELECT no ve
+    // el INSERT de la otra PC hasta que confirma.
+    db::tx::in_transaction(conn, |conn| {
+        if has_conflict(
+            conn,
+            input.professional_id,
+            input.patient_id,
             &input.scheduled_at,
-            &duration_min,
-            &input.notes,
-        ),
-    )
-    .map_err(AppError::from)?;
+            &end,
+            None,
+        )? {
+            return Err(AppError::Validation(
+                "Ya existe una cita solapada para este paciente o profesional en ese horario"
+                    .into(),
+            ));
+        }
 
-    get_appointment(conn, id)?
-        .ok_or_else(|| AppError::Internal("Cita creada pero no recuperada".into()))
+        let id = next_id(conn, "GEN_APPOINTMENTS_ID")?;
+        conn.execute(
+            "INSERT INTO APPOINTMENTS
+                (ID, PATIENT_ID, SERVICE_ID, PROFESSIONAL_ID, SCHEDULED_AT,
+                 DURATION_MIN, STATUS, NOTES)
+             VALUES (?, ?, ?, ?, ?, ?, 'PROGRAMADA', ?)",
+            (
+                &id,
+                &input.patient_id,
+                &input.service_id,
+                &input.professional_id,
+                &input.scheduled_at,
+                &duration_min,
+                &input.notes,
+            ),
+        )
+        .map_err(AppError::from)?;
+
+        get_appointment(conn, id)?
+            .ok_or_else(|| AppError::Internal("Cita creada pero no recuperada".into()))
+    })
 }
 
 // ============================== LISTADO =====================================
@@ -392,35 +400,50 @@ pub fn set_appointment_status(
     status: &str,
     notes: Option<&str>,
 ) -> Result<Appointment, AppError> {
-    let current: Option<(String,)> = conn
-        .query_first("SELECT STATUS FROM APPOINTMENTS WHERE ID = ?", (&id,))
-        .map_err(AppError::from)?;
-    let (current,) =
-        current.ok_or_else(|| AppError::NotFound(format!("Cita {id} no encontrada")))?;
-
-    let allowed = match status {
-        "CONFIRMADA" => current == "PROGRAMADA",
-        "EN_ATENCION" => matches!(current.as_str(), "PROGRAMADA" | "CONFIRMADA"),
-        "ATENDIDA" => current == "EN_ATENCION",
-        "NO_ASISTIO" => matches!(current.as_str(), "PROGRAMADA" | "CONFIRMADA" | "EN_ATENCION"),
-        "CANCELADA" => matches!(
-            current.as_str(),
-            "PROGRAMADA" | "CONFIRMADA" | "EN_ATENCION"
-        ),
-        _ => false,
+    // Estados de origen admitidos por cada transición.
+    let from: &[&str] = match status {
+        "CONFIRMADA" => &["PROGRAMADA"],
+        "EN_ATENCION" => &["PROGRAMADA", "CONFIRMADA"],
+        "ATENDIDA" => &["EN_ATENCION"],
+        "NO_ASISTIO" => &["PROGRAMADA", "CONFIRMADA", "EN_ATENCION"],
+        "CANCELADA" => &["PROGRAMADA", "CONFIRMADA", "EN_ATENCION"],
+        _ => &[],
     };
-    if !allowed {
+    if from.is_empty() {
+        return Err(AppError::Validation(format!(
+            "Estado de cita inválido: {status}"
+        )));
+    }
+
+    // Compare-and-set: la transición válida va en el WHERE, así que si otra PC
+    // ya movió la cita, este UPDATE afecta 0 filas en vez de sobrescribirla.
+    // Los estados son un conjunto fijo interno: se interpolan sin riesgo.
+    let allowed = from
+        .iter()
+        .map(|s| format!("'{s}'"))
+        .collect::<Vec<_>>()
+        .join(", ");
+    let sql = format!(
+        "UPDATE APPOINTMENTS SET STATUS = ?, NOTES = COALESCE(?, NOTES),
+         UPDATED_AT = CURRENT_TIMESTAMP
+         WHERE ID = ? AND STATUS IN ({allowed})"
+    );
+    let updated = conn
+        .execute(&sql, (&status, &notes, &id))
+        .map_err(AppError::from)?;
+
+    if updated == 0 {
+        // Para el mensaje, distinguir "no existe" de "cambió en otra PC".
+        let current: Option<(String,)> = conn
+            .query_first("SELECT STATUS FROM APPOINTMENTS WHERE ID = ?", (&id,))
+            .map_err(AppError::from)?;
+        let Some((current,)) = current else {
+            return Err(AppError::NotFound(format!("Cita {id} no encontrada")));
+        };
         return Err(AppError::Validation(format!(
             "Transición de estado inválida: {current} → {status}"
         )));
     }
-
-    conn.execute(
-        "UPDATE APPOINTMENTS SET STATUS = ?, NOTES = COALESCE(?, NOTES),
-         UPDATED_AT = CURRENT_TIMESTAMP WHERE ID = ?",
-        (&status, &notes, &id),
-    )
-    .map_err(AppError::from)?;
 
     get_appointment(conn, id)?
         .ok_or_else(|| AppError::Internal("Cita actualizada pero no recuperada".into()))
@@ -441,154 +464,169 @@ pub fn check_in_appointment(
     id: i32,
     created_by: Option<i32>,
 ) -> Result<crate::models::visit::Visit, AppError> {
-    let appt: Option<(i32, i32, i32, i32, String, Option<i32>)> = conn
-        .query_first(
-            "SELECT a.ID, a.PATIENT_ID, o.ID, a.SERVICE_ID,
-                    a.STATUS, a.PROFESSIONAL_ID
-             FROM APPOINTMENTS a
-             JOIN PATIENTS p ON p.ID = a.PATIENT_ID
-             JOIN OWNERS o ON o.ID = p.OWNER_ID
-             WHERE a.ID = ?",
-            (&id,),
+    // Visita + línea de servicio + claim de la cita en una sola transacción.
+    db::tx::in_transaction(conn, |conn| {
+        let appt: Option<(i32, i32, i32, i32, String, Option<i32>)> = conn
+            .query_first(
+                "SELECT a.ID, a.PATIENT_ID, o.ID, a.SERVICE_ID,
+                        a.STATUS, a.PROFESSIONAL_ID
+                 FROM APPOINTMENTS a
+                 JOIN PATIENTS p ON p.ID = a.PATIENT_ID
+                 JOIN OWNERS o ON o.ID = p.OWNER_ID
+                 WHERE a.ID = ?",
+                (&id,),
+            )
+            .map_err(AppError::from)?;
+        let Some((_appt_id, patient_id, owner_id, service_id, status, professional_id)) = appt
+        else {
+            return Err(AppError::NotFound(format!("Cita {id} no encontrada")));
+        };
+        if status != "PROGRAMADA" && status != "CONFIRMADA" {
+            return Err(AppError::Validation(
+                "Solo se puede hacer check-in de citas PROGRAMADA o CONFIRMADA".into(),
+            ));
+        }
+
+        // Claim de la cita (compare-and-set): solo aplica si sigue PROGRAMADA o
+        // CONFIRMADA. Con dos PCs haciendo check-in a la vez, el segundo espera
+        // (transacción en modo WAIT) y al reevaluar ve 0 filas: no puede crear
+        // dos visitas para la misma cita.
+        let claimed = conn
+            .execute(
+                "UPDATE APPOINTMENTS SET STATUS = 'ATENDIDA', UPDATED_AT = CURRENT_TIMESTAMP
+                 WHERE ID = ? AND STATUS IN ('PROGRAMADA', 'CONFIRMADA')",
+                (&id,),
+            )
+            .map_err(AppError::from)?;
+        if claimed == 0 {
+            return Err(AppError::Validation(
+                "La cita ya fue atendida desde otro puesto de trabajo".into(),
+            ));
+        }
+
+        // Crear la visita (primero sin appointment_id, se vincula tras el INSERT
+        // para evitar problemas de mapeo de tipos en rsfbclient).
+        let priority = "NORMAL";
+        let visit_id = next_id(conn, "GEN_VISITS_ID")?;
+        conn.execute(
+            "INSERT INTO VISITS (ID, PATIENT_ID, OWNER_ID, PRIORITY, STATUS, CREATED_BY)
+             VALUES (?, ?, ?, ?, 'EN_ESPERA', ?)",
+            (
+                &visit_id,
+                &patient_id,
+                &owner_id,
+                &priority,
+                &created_by,
+            ),
         )
         .map_err(AppError::from)?;
-    let Some((_appt_id, patient_id, owner_id, service_id, status, professional_id)) = appt
-    else {
-        return Err(AppError::NotFound(format!("Cita {id} no encontrada")));
-    };
-    if status != "PROGRAMADA" && status != "CONFIRMADA" {
-        return Err(AppError::Validation(
-            "Solo se puede hacer check-in de citas PROGRAMADA o CONFIRMADA".into(),
-        ));
-    }
 
-    // Crear la visita (primero sin appointment_id, se vincula tras el INSERT
-    // para evitar problemas de mapeo de tipos en rsfbclient).
-    let priority = "NORMAL";
-    let visit_id = next_id(conn, "GEN_VISITS_ID")?;
-    conn.execute(
-        "INSERT INTO VISITS (ID, PATIENT_ID, OWNER_ID, PRIORITY, STATUS, CREATED_BY)
-         VALUES (?, ?, ?, ?, 'EN_ESPERA', ?)",
-        (
-            &visit_id,
-            &patient_id,
-            &owner_id,
-            &priority,
-            &created_by,
-        ),
-    )
-    .map_err(AppError::from)?;
+        // Snapshot del servicio: precio e IVA del catálogo.
+        let snap: Option<(f64, Option<f64>)> = conn
+            .query_first(
+                "SELECT CAST(s.PRICE AS DOUBLE PRECISION), CAST(s.TAX_RATE AS DOUBLE PRECISION)
+                 FROM SERVICES s WHERE s.ID = ?",
+                (&service_id,),
+            )
+            .map_err(AppError::from)?;
+        let Some((price, tax_rate)) = snap else {
+            return Err(AppError::NotFound(format!(
+                "Servicio {service_id} no encontrado en el catálogo"
+            )));
+        };
 
-    // Snapshot del servicio: precio e IVA del catálogo.
-    let snap: Option<(f64, Option<f64>)> = conn
-        .query_first(
-            "SELECT CAST(s.PRICE AS DOUBLE PRECISION), CAST(s.TAX_RATE AS DOUBLE PRECISION)
-             FROM SERVICES s WHERE s.ID = ?",
-            (&service_id,),
+        let line_id = next_id(conn, "GEN_VISIT_SERVICES_ID")?;
+        conn.execute(
+            "INSERT INTO VISIT_SERVICES
+                (ID, VISIT_ID, SERVICE_ID, PROFESSIONAL_ID, QUANTITY,
+                 UNIT_PRICE, TAX_RATE, STATUS, NOTES, SEQ)
+             VALUES (?, ?, ?, ?, 1, ?, ?, 'PENDIENTE', ?, 1)",
+            (
+                &line_id,
+                &visit_id,
+                &service_id,
+                &professional_id,
+                &price,
+                &tax_rate,
+                &format!("Desde cita {_appt_id}"),
+            ),
         )
         .map_err(AppError::from)?;
-    let Some((price, tax_rate)) = snap else {
-        return Err(AppError::NotFound(format!(
-            "Servicio {service_id} no encontrado en el catálogo"
-        )));
-    };
 
-    let line_id = next_id(conn, "GEN_VISIT_SERVICES_ID")?;
-    conn.execute(
-        "INSERT INTO VISIT_SERVICES
-            (ID, VISIT_ID, SERVICE_ID, PROFESSIONAL_ID, QUANTITY,
-             UNIT_PRICE, TAX_RATE, STATUS, NOTES, SEQ)
-         VALUES (?, ?, ?, ?, 1, ?, ?, 'PENDIENTE', ?, 1)",
-        (
-            &line_id,
-            &visit_id,
-            &service_id,
-            &professional_id,
-            &price,
-            &tax_rate,
-            &format!("Desde cita {_appt_id}"),
-        ),
-    )
-    .map_err(AppError::from)?;
-
-    // Vincular la visita con la cita y marcar la cita como ATENDIDA.
-    conn.execute(
-        "UPDATE VISITS SET APPOINTMENT_ID = ? WHERE ID = ?",
-        (&id, &visit_id),
-    )
-    .map_err(AppError::from)?;
-    conn.execute(
-        "UPDATE APPOINTMENTS SET STATUS = 'ATENDIDA', UPDATED_AT = CURRENT_TIMESTAMP WHERE ID = ?",
-        (&id,),
-    )
-    .map_err(AppError::from)?;
-
-    // Leer code y arrived_at de la visita recién creada.
-    let visit_header: Option<(String, String)> = conn
-        .query_first(
-            "SELECT CODE, LEFT(CAST(ARRIVED_AT AS VARCHAR(60)), 19)
-             FROM VISITS WHERE ID = ?",
-            (&visit_id,),
+        // Vincular la visita con la cita (el estado ya se fijó en el claim).
+        conn.execute(
+            "UPDATE VISITS SET APPOINTMENT_ID = ? WHERE ID = ?",
+            (&id, &visit_id),
         )
         .map_err(AppError::from)?;
-    let Some((code, arrived_at)) = visit_header else {
-        return Err(AppError::Internal("Visita creada pero no recuperada".into()));
-    };
 
-    let patient_name_row: Option<(String,)> = conn
-        .query_first("SELECT NAME FROM PATIENTS WHERE ID = ?", (&patient_id,))
-        .map_err(AppError::from)?;
-    let patient_name = patient_name_row.map(|(n,)| n).unwrap_or_default();
+        // Leer code y arrived_at de la visita recién creada.
+        let visit_header: Option<(String, String)> = conn
+            .query_first(
+                "SELECT CODE, LEFT(CAST(ARRIVED_AT AS VARCHAR(60)), 19)
+                 FROM VISITS WHERE ID = ?",
+                (&visit_id,),
+            )
+            .map_err(AppError::from)?;
+        let Some((code, arrived_at)) = visit_header else {
+            return Err(AppError::Internal("Visita creada pero no recuperada".into()));
+        };
 
-    let owner_name_row: Option<(String,)> = conn
-        .query_first("SELECT FULL_NAME FROM OWNERS WHERE ID = ?", (&owner_id,))
-        .map_err(AppError::from)?;
-    let owner_name = owner_name_row.map(|(n,)| n).unwrap_or_default();
+        let patient_name_row: Option<(String,)> = conn
+            .query_first("SELECT NAME FROM PATIENTS WHERE ID = ?", (&patient_id,))
+            .map_err(AppError::from)?;
+        let patient_name = patient_name_row.map(|(n,)| n).unwrap_or_default();
 
-    let service_name_row: Option<(String,)> = conn
-        .query_first("SELECT NAME FROM SERVICES WHERE ID = ?", (&service_id,))
-        .map_err(AppError::from)?;
-    let service_name = service_name_row.map(|(n,)| n).unwrap_or_default();
+        let owner_name_row: Option<(String,)> = conn
+            .query_first("SELECT FULL_NAME FROM OWNERS WHERE ID = ?", (&owner_id,))
+            .map_err(AppError::from)?;
+        let owner_name = owner_name_row.map(|(n,)| n).unwrap_or_default();
 
-    let service_code_row: Option<(String,)> = conn
-        .query_first("SELECT CODE FROM SERVICES WHERE ID = ?", (&service_id,))
-        .map_err(AppError::from)?;
-    let service_code = service_code_row.map(|(c,)| c).unwrap_or_default();
+        let service_name_row: Option<(String,)> = conn
+            .query_first("SELECT NAME FROM SERVICES WHERE ID = ?", (&service_id,))
+            .map_err(AppError::from)?;
+        let service_name = service_name_row.map(|(n,)| n).unwrap_or_default();
 
-    let service = crate::models::visit::VisitService {
-        id: line_id,
-        visit_id,
-        service_id,
-        service_name,
-        service_code,
-        category_id: 0,
-        category_name: String::new(),
-        professional_id,
-        professional_name: None,
-        quantity: 1,
-        unit_price: price,
-        tax_rate,
-        status: "PENDIENTE".to_string(),
-        started_at: None,
-        finished_at: None,
-        notes: Some(format!("Desde cita {_appt_id}")),
-        seq: 1,
-    };
+        let service_code_row: Option<(String,)> = conn
+            .query_first("SELECT CODE FROM SERVICES WHERE ID = ?", (&service_id,))
+            .map_err(AppError::from)?;
+        let service_code = service_code_row.map(|(c,)| c).unwrap_or_default();
 
-    Ok(crate::models::visit::Visit {
-        id: visit_id,
-        code,
-        patient_id,
-        patient_name,
-        owner_id,
-        owner_name,
-        appointment_id: Some(id),
-        arrived_at,
-        priority: priority.to_string(),
-        status: "EN_ESPERA".to_string(),
-        notes: Some(format!("Desde cita {_appt_id}")),
-        created_by_name: None,
-        services: vec![service],
+        let service = crate::models::visit::VisitService {
+            id: line_id,
+            visit_id,
+            service_id,
+            service_name,
+            service_code,
+            category_id: 0,
+            category_name: String::new(),
+            professional_id,
+            professional_name: None,
+            quantity: 1,
+            unit_price: price,
+            tax_rate,
+            status: "PENDIENTE".to_string(),
+            started_at: None,
+            finished_at: None,
+            notes: Some(format!("Desde cita {_appt_id}")),
+            seq: 1,
+        };
+
+        Ok(crate::models::visit::Visit {
+            id: visit_id,
+            code,
+            patient_id,
+            patient_name,
+            owner_id,
+            owner_name,
+            appointment_id: Some(id),
+            arrived_at,
+            priority: priority.to_string(),
+            status: "EN_ESPERA".to_string(),
+            notes: Some(format!("Desde cita {_appt_id}")),
+            created_by_name: None,
+            services: vec![service],
+        })
     })
 }
 

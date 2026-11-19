@@ -1,6 +1,7 @@
 use rsfbclient::prelude::*;
 use rsfbclient::SimpleConnection;
 
+use crate::db;
 use crate::error::AppError;
 use crate::models::stay::{
     CheckOutStayInput, CreateStayEventInput, CreateStayInput, Resource, ResourceBoardItem, Stay,
@@ -335,85 +336,90 @@ pub fn create_stay(
         )));
     };
 
-    // El recurso debe existir y estar activo; y tener sitio libre.
-    if let Some(resource_id) = input.resource_id {
-        let resource: Option<(String, i32, bool)> = conn
-            .query_first(
-                "SELECT NAME, CAPACITY, ACTIVE FROM RESOURCES WHERE ID = ?",
-                (&resource_id,),
-            )
-            .map_err(AppError::from)?;
-        let Some((name, capacity, active)) = resource else {
-            return Err(AppError::NotFound(format!(
-                "Recurso {resource_id} no encontrado"
-            )));
-        };
-        if !active {
-            return Err(AppError::Validation(format!(
-                "El recurso «{name}» está inactivo"
-            )));
+    // Verificación de capacidad + inserción en una transacción: con 3 PCs
+    // ingresando pacientes a la vez, contar fuera e insertar después permite
+    // que ambos pasen la validación con el mismo hueco libre.
+    db::tx::in_transaction(conn, |conn| {
+        // El recurso debe existir y estar activo; y tener sitio libre.
+        if let Some(resource_id) = input.resource_id {
+            let resource: Option<(String, i32, bool)> = conn
+                .query_first(
+                    "SELECT NAME, CAPACITY, ACTIVE FROM RESOURCES WHERE ID = ?",
+                    (&resource_id,),
+                )
+                .map_err(AppError::from)?;
+            let Some((name, capacity, active)) = resource else {
+                return Err(AppError::NotFound(format!(
+                    "Recurso {resource_id} no encontrado"
+                )));
+            };
+            if !active {
+                return Err(AppError::Validation(format!(
+                    "El recurso «{name}» está inactivo"
+                )));
+            }
+            let occupied: Option<(i32,)> = conn
+                .query_first(
+                    "SELECT COUNT(*) FROM STAYS WHERE RESOURCE_ID = ? AND STATUS = 'ABIERTA'",
+                    (&resource_id,),
+                )
+                .map_err(AppError::from)?;
+            let occupied = occupied.map(|(v,)| v).unwrap_or(0);
+            if occupied >= capacity {
+                return Err(AppError::Validation(format!(
+                    "El recurso «{name}» no tiene espacio disponible"
+                )));
+            }
         }
-        let occupied: Option<(i32,)> = conn
-            .query_first(
-                "SELECT COUNT(*) FROM STAYS WHERE RESOURCE_ID = ? AND STATUS = 'ABIERTA'",
-                (&resource_id,),
+
+        let id = next_id(conn, "GEN_STAYS_ID")?;
+        let check_in = input.check_in_at.clone().unwrap_or_else(|| "CURRENT_TIMESTAMP".into());
+        let daily_rate = input.daily_rate.unwrap_or(0.0);
+
+        // La fecha de ingreso se enlaza como parámetro o se deja en
+        // CURRENT_TIMESTAMP: Firebird no admite un parámetro dentro de una
+        // expresión, así que cada variante lleva su propia lista de parámetros.
+        if input.check_in_at.is_some() {
+            conn.execute(
+                "INSERT INTO STAYS (ID, PATIENT_ID, OWNER_ID, VISIT_ID, RESOURCE_ID, KIND,
+                                     STATUS, CHECK_IN_AT, DAILY_RATE, NOTES, CREATED_BY)
+                 VALUES (?, ?, ?, ?, ?, ?, 'ABIERTA', ?, ?, ?, ?)",
+                (
+                    &id,
+                    &input.patient_id,
+                    &owner_id,
+                    &input.visit_id,
+                    &input.resource_id,
+                    &kind,
+                    &check_in,
+                    &daily_rate,
+                    &input.notes,
+                    &user_id,
+                ),
             )
-            .map_err(AppError::from)?;
-        let occupied = occupied.map(|(v,)| v).unwrap_or(0);
-        if occupied >= capacity {
-            return Err(AppError::Validation(format!(
-                "El recurso «{name}» no tiene espacio disponible"
-            )));
+        } else {
+            conn.execute(
+                "INSERT INTO STAYS (ID, PATIENT_ID, OWNER_ID, VISIT_ID, RESOURCE_ID, KIND,
+                                     STATUS, CHECK_IN_AT, DAILY_RATE, NOTES, CREATED_BY)
+                 VALUES (?, ?, ?, ?, ?, ?, 'ABIERTA', CURRENT_TIMESTAMP, ?, ?, ?)",
+                (
+                    &id,
+                    &input.patient_id,
+                    &owner_id,
+                    &input.visit_id,
+                    &input.resource_id,
+                    &kind,
+                    &daily_rate,
+                    &input.notes,
+                    &user_id,
+                ),
+            )
         }
-    }
+        .map_err(AppError::from)?;
 
-    let id = next_id(conn, "GEN_STAYS_ID")?;
-    let check_in = input.check_in_at.clone().unwrap_or_else(|| "CURRENT_TIMESTAMP".into());
-    let daily_rate = input.daily_rate.unwrap_or(0.0);
-
-    // La fecha de ingreso se enlaza como parámetro o se deja en
-    // CURRENT_TIMESTAMP: Firebird no admite un parámetro dentro de una
-    // expresión, así que cada variante lleva su propia lista de parámetros.
-    if input.check_in_at.is_some() {
-        conn.execute(
-            "INSERT INTO STAYS (ID, PATIENT_ID, OWNER_ID, VISIT_ID, RESOURCE_ID, KIND,
-                                 STATUS, CHECK_IN_AT, DAILY_RATE, NOTES, CREATED_BY)
-             VALUES (?, ?, ?, ?, ?, ?, 'ABIERTA', ?, ?, ?, ?)",
-            (
-                &id,
-                &input.patient_id,
-                &owner_id,
-                &input.visit_id,
-                &input.resource_id,
-                &kind,
-                &check_in,
-                &daily_rate,
-                &input.notes,
-                &user_id,
-            ),
-        )
-    } else {
-        conn.execute(
-            "INSERT INTO STAYS (ID, PATIENT_ID, OWNER_ID, VISIT_ID, RESOURCE_ID, KIND,
-                                 STATUS, CHECK_IN_AT, DAILY_RATE, NOTES, CREATED_BY)
-             VALUES (?, ?, ?, ?, ?, ?, 'ABIERTA', CURRENT_TIMESTAMP, ?, ?, ?)",
-            (
-                &id,
-                &input.patient_id,
-                &owner_id,
-                &input.visit_id,
-                &input.resource_id,
-                &kind,
-                &daily_rate,
-                &input.notes,
-                &user_id,
-            ),
-        )
-    }
-    .map_err(AppError::from)?;
-
-    get_stay(conn, id)?
-        .ok_or_else(|| AppError::Internal("Estancia creada pero no recuperada".into()))
+        get_stay(conn, id)?
+            .ok_or_else(|| AppError::Internal("Estancia creada pero no recuperada".into()))
+    })
 }
 
 /// Check-out de una estancia: la cierra y libera el recurso.
@@ -436,23 +442,30 @@ pub fn check_out_stay(
 
     // La fecha de salida se enlaza o se deja en CURRENT_TIMESTAMP: cada
     // variante lleva su propia lista de parámetros.
-    if input.check_out_at.is_some() {
+    // El `AND STATUS = 'ABIERTA'` es el compare-and-set: si otra PC ya cerró
+    // la estancia (0 filas afectadas), no se sobrescribe ni se cobra dos veces.
+    let updated = if input.check_out_at.is_some() {
         let check_out = input.check_out_at.clone().unwrap_or_default();
         conn.execute(
             "UPDATE STAYS SET STATUS = 'CERRADA', CHECK_OUT_AT = ?,
                 NOTES = COALESCE(?, NOTES), UPDATED_AT = CURRENT_TIMESTAMP
-             WHERE ID = ?",
+             WHERE ID = ? AND STATUS = 'ABIERTA'",
             (&check_out, &input.notes, &id),
         )
     } else {
         conn.execute(
             "UPDATE STAYS SET STATUS = 'CERRADA', CHECK_OUT_AT = CURRENT_TIMESTAMP,
                 NOTES = COALESCE(?, NOTES), UPDATED_AT = CURRENT_TIMESTAMP
-             WHERE ID = ?",
+             WHERE ID = ? AND STATUS = 'ABIERTA'",
             (&input.notes, &id),
         )
     }
     .map_err(AppError::from)?;
+    if updated == 0 {
+        return Err(AppError::Validation(
+            "La estancia ya no está abierta: otra PC la cerró o canceló".into(),
+        ));
+    }
 
     get_stay(conn, id)?
         .ok_or_else(|| AppError::Internal("Estancia cerrada pero no recuperada".into()))
@@ -460,24 +473,27 @@ pub fn check_out_stay(
 
 /// Cancela una estancia abierta (ingreso mal registrado).
 pub fn cancel_stay(conn: &mut SimpleConnection, id: i32) -> Result<Stay, AppError> {
-    let current: Option<(String,)> = conn
-        .query_first("SELECT STATUS FROM STAYS WHERE ID = ?", (&id,))
+    // Compare-and-set: el estado de origen va en el WHERE, así que dos PCs
+    // cancelando (o una cancelando y otra cerrando) no se pisan.
+    let updated = conn
+        .execute(
+            "UPDATE STAYS SET STATUS = 'CANCELADA', CHECK_OUT_AT = CURRENT_TIMESTAMP,
+                UPDATED_AT = CURRENT_TIMESTAMP
+             WHERE ID = ? AND STATUS = 'ABIERTA'",
+            (&id,),
+        )
         .map_err(AppError::from)?;
-    let Some((status,)) = current else {
-        return Err(AppError::NotFound(format!("Estancia {id} no encontrada")));
-    };
-    if status != "ABIERTA" {
-        return Err(AppError::Validation(
-            "Solo se puede cancelar una estancia abierta".into(),
-        ));
+    if updated == 0 {
+        let current: Option<(String,)> = conn
+            .query_first("SELECT STATUS FROM STAYS WHERE ID = ?", (&id,))
+            .map_err(AppError::from)?;
+        let Some((status,)) = current else {
+            return Err(AppError::NotFound(format!("Estancia {id} no encontrada")));
+        };
+        return Err(AppError::Validation(format!(
+            "Solo se puede cancelar una estancia abierta (está {status})"
+        )));
     }
-    conn.execute(
-        "UPDATE STAYS SET STATUS = 'CANCELADA', CHECK_OUT_AT = CURRENT_TIMESTAMP,
-            UPDATED_AT = CURRENT_TIMESTAMP
-         WHERE ID = ?",
-        (&id,),
-    )
-    .map_err(AppError::from)?;
 
     get_stay(conn, id)?
         .ok_or_else(|| AppError::Internal("Estancia cancelada pero no recuperada".into()))

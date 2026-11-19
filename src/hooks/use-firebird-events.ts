@@ -48,6 +48,16 @@ const invalidateLabResultEvent: InvalidateFn = (qc, patientIds, sampleIds) => {
 };
 
 /**
+ * Invalidación genérica (`db-changed`): el backend la emite cuando no puede
+ * correlacionar un evento con su payload (consulta fallida, primera
+ * notificación tras conectar o lote truncado). No sabemos qué cambió, así que
+ * se marcan todas las queries como obsoletas.
+ */
+const invalidateEverything: InvalidateFn = (qc) => {
+  qc.invalidateQueries();
+};
+
+/**
  * Temporizador por tipo de evento: acumula claves en Sets y agenda un único
  * flush al final de la ventana. Un flush nuevo durante la ventana reutiliza
  * el temporizador ya agendado (no lo retrasa): la ráfaga completa se invalida
@@ -57,6 +67,8 @@ class EventBatcher {
   private samplePatientIds = new Set<number>();
   private resultPatientIds = new Set<number>();
   private resultSampleIds = new Set<number>();
+  /** Hay una invalidación global pendiente en esta ventana. */
+  private generic = false;
   private timer: ReturnType<typeof setTimeout> | null = null;
 
   constructor(private qc: QueryClient) {}
@@ -74,9 +86,26 @@ class EventBatcher {
     this.scheduleFlush();
   }
 
+  /**
+   * Encola una invalidación global. Absorbe lo ya acumulado: si en la misma
+   * ventana llega `db-changed`, invalidar todo cubre los eventos concretos.
+   */
+  pushGeneric() {
+    this.generic = true;
+    this.scheduleFlush();
+  }
+
   /** Vacía lo acumulado, invalidando cada tipo una sola vez. */
   flush = () => {
     this.timer = null;
+    if (this.generic) {
+      this.generic = false;
+      this.samplePatientIds.clear();
+      this.resultPatientIds.clear();
+      this.resultSampleIds.clear();
+      invalidateEverything(this.qc, new Set(), new Set());
+      return;
+    }
     if (this.samplePatientIds.size > 0) {
       invalidateSampleEvent(this.qc, this.samplePatientIds, new Set());
       this.samplePatientIds.clear();
@@ -141,6 +170,14 @@ export function useFirebirdEvents() {
 
     listen<LabResultChangedEvent>("lab-result-changed", (event) => {
       batcher.pushLabResult(event.payload.patientId, event.payload.sampleId);
+    }).then((un) => {
+      if (cancelled) un();
+      else unlisteners.push(un);
+    });
+
+    // Invalidación genérica: el backend no pudo dar un payload fiable.
+    listen("db-changed", () => {
+      batcher.pushGeneric();
     }).then((un) => {
       if (cancelled) un();
       else unlisteners.push(un);

@@ -107,6 +107,15 @@ pub fn run_supervisor_cycle(pool: &DbPool) {
 
 /// Arranca el hilo de supervisión en segundo plano. Vive mientras la app
 /// corra; el proceso se encarga de terminarlo al salir.
+///
+/// Con la base central siguen existiendo **tres supervisores, uno por PC**: la
+/// carpeta vigilada de cada analizador es local (`FOLDER_PATH` es una ruta del
+/// disco de ese puesto) y el driver solo puede leerla desde su máquina. No hace
+/// falta un claim/lease distribuido: `ANALYZER_IMPORT_JOBS` tiene
+/// `UNIQUE (SOURCE_ID, FILE_NAME)`, así que si dos PCs apuntaran a la misma
+/// carpeta compartida el segundo INSERT choca y ese archivo se salta en vez de
+/// importarse dos veces. Lo correcto en la clínica es que cada analizador
+/// escriba en la carpeta del PC al que está conectado.
 pub fn start_supervisor(pool: DbPool) {
     std::thread::spawn(move || loop {
         std::thread::sleep(Duration::from_secs(POLL_INTERVAL_SECS));

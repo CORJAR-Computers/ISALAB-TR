@@ -510,47 +510,87 @@ mantenimiento).
 ### Fase 5 — Eventos, mantenimiento y concurrencia
 
 **Objetivo:** que 3 PCs se vean en vivo y no se pisen.
+**Estado:** implementado (commit `feat(db): remote events and concurrent-safe operations`).
 
-Tareas:
+#### 5.1 Eventos correlacionados y supervisados (`db/events.rs`)
 
-1. `events.rs`:
-   - Suscriptor con reconexión + backoff y logs (hoy `unwrap_or_default()`
-     oculta el fallo).
-   - Payload correlacionado: `POST_EVENT` no lleva datos; en vez de "última fila
-     de `EVENT_LOG`", leer por `EVENT_LOG.ID` capturado antes del `POST_EVENT`
-     (o incluir un `EVENT_LOG` con `REF_ID`+`STATUS` y filtrar por
-     `PATIENT_ID`/`REF_ID` en el cliente). Si no se puede, el handler debe
-     emitir un evento **genérico** de invalidación (la UI refetchea) en lugar de
-     un payload potencialmente incorrecto.
-   - Verificar eventos con 2 PCs: PC A crea muestra → PC B recibe
-     `sample-changed` sin recargar.
-2. `RemoteAuxPort` fijo (3051) + regla de firewall; probar con el firewall
-   activo en las 3 PCs.
-3. Transacciones en operaciones multipaso (riesgo real de datos parciales):
-   - `visits` (visita + servicios), `invoices` (factura + ítems),
-     `appointments` (validar solapamiento + insertar),
-     `stays` (capacidad + insertar), `products` (movimiento + validación de
-     stock), importaciones por lote.
-   - Usar `begin_transaction`/`commit`/`rollback`; nunca devolver al pool una
-     conexión con transacción abierta.
-4. Condiciones de carrera "SELECT y luego INSERT":
-   - Citas solapadas: validar dentro de la transacción y serializar por
-     profesional (tabla de lock o `UPDATE` de un contador con `WITH LOCK`), o
-     aceptar el conflicto y reintentar.
-   - Capacidad de estancias: contar y insertar en la misma transacción.
-   - Transiciones de estado: `UPDATE ... WHERE STATUS = <esperado>` y verificar
-     filas afectadas (compare-and-set) en vez de leer y luego escribir.
-5. `sources::start_supervisor`: si las carpetas vigiladas se comparten entre
-   PCs, añadir claim/lease por archivo (tabla `ANALYZER_IMPORT_JOBS` ya existe)
-   para que dos PCs no procesen el mismo archivo. Si cada carpeta es local a una
-   PC, documentarlo y no compartirla.
-6. `commands/ai.rs`: liberar la conexión del pool **antes** de la llamada HTTP
-   (hoy puede retenerla 30–60 s).
+`POST_EVENT` no transporta datos y leer "la última fila de `EVENT_LOG`" es
+incorrecto con varias PCs: entre el `POST_EVENT` y la consulta, otra PC puede
+insertar otra fila y el payload apuntaría al cambio equivocado. La
+implementación usa el `ID` de `EVENT_LOG` como **marca de agua por listener**:
 
-**Entregable:** commit `feat(db): remote events and concurrent-safe operations`.
+- Cada evento (`SAMPLE_CHANGED`, `LAB_RESULT_CHANGED`) tiene su hilo supervisor,
+  que se suscribe con `listen_event` y, cuando la conexión muere, reintenta con
+  backoff exponencial de 2 s a 60 s. `start_firebird_listeners` ya no falla al
+  arrancar: si el servidor no está disponible, reintenta hasta lograrlo.
+- En cada notificación se leen **todas** las filas nuevas de ese evento
+  (`WHERE EVENT_NAME = ? AND ID > ? ORDER BY ID`, `FIRST 500`) y se emite un
+  evento de Tauri por fila, en orden. `drain_new_rows` concentra esa lógica y
+  tiene pruebas unitarias propias.
+- La primera notificación tras conectar no reemite el histórico: fija la marca
+  en `MAX(EVENT_LOG.ID)` y emite `db-changed`. También se emite `db-changed` si
+  la consulta falla, si el lote se trunca o si una fila no se puede correlacionar
+  (`REF_ID`/`PATIENT_ID` nulos).
+- `db-changed` es una **invalidación genérica**: `use-firebird-events.ts` la
+  escucha e invalida todas las queries de React Query (agrupada en la misma
+  ventana de 150 ms), así la UI nunca aplica un payload dudoso.
 
-**Verificación:** pruebas de 2–3 PCs simultáneas sobre citas, estancias,
-facturas y stock; sin duplicados ni sobrecupo; eventos cruzados en < 1 s.
+#### 5.2 Puerto auxiliar y firewall
+
+`RemoteAuxPort = 3051` fijo en `deploy/firebird/firebird.conf.snippet`, con su
+regla de firewall en el runbook. Firebird abre ese puerto de forma perezosa
+(solo cuando un cliente se suscribe a eventos), así que un 3051 cerrado con el
+servidor ocioso es normal; `scripts/verify-firebird-remote.ps1` lo trata como
+aviso, no como fallo.
+
+#### 5.3 Transacciones en operaciones multipaso (`db/tx.rs`)
+
+`db::tx::in_transaction(conn, |conn| …)` abre una transacción sobre la conexión
+que ya usa el repositorio (las firmas `&mut SimpleConnection` no cambian), hace
+COMMIT si el bloque termina bien y ROLLBACK si devuelve error. Una profundidad
+thread-local permite que una operación anidada (p. ej. el alta de peluquería
+crea una visita) se **una** a la transacción externa en lugar de confirmarla
+antes de tiempo. `DbPool::release` hace un `rollback()` defensivo para que
+ninguna conexión vuelva al pool con una transacción abierta.
+
+Quedan envueltas: `invoices::create` (cabecera + ítems), `visits::create_visit`
+(cabecera + líneas), `appointments::create_appointment` (solapamiento +
+inserción), `stays::create_stay` (capacidad + inserción),
+`products::add_stock_movement` (validación de stock + movimiento) y
+`appointments::check_in_appointment` (visita + línea + claim de la cita).
+
+#### 5.4 Compare-and-set en las transiciones de estado
+
+En vez de "leer el estado y luego escribirlo" (dos PCs pueden leer el mismo
+estado), la transición válida va en el `WHERE` y se comprueban las filas
+afectadas (`execute` devuelve el número de filas):
+
+- `appointments::set_appointment_status` y `appointments::check_in_appointment`
+- `stays::check_out_stay` y `stays::cancel_stay`
+- `invoices::set_status`
+- `visits::set_visit_status`
+
+Si el `UPDATE` afecta 0 filas se relee el estado solo para construir el mensaje
+("La cita ya fue atendida desde otro puesto de trabajo").
+
+#### 5.5 IA y carpetas vigiladas
+
+- `commands/ai.rs`: la conexión vuelve al pool con `drop(pooled)` antes de las
+  llamadas a Groq (60 s en `interpret_lab_results`, 30 s en
+  `test_groq_connection`).
+- `sources::start_supervisor` sigue siendo **uno por PC**: la carpeta vigilada
+  es una ruta del disco de cada puesto. No hace falta claim/lease distribuido;
+  `ANALYZER_IMPORT_JOBS` ya tiene `UNIQUE (SOURCE_ID, FILE_NAME)`, así que si
+  dos PCs apuntaran por error a la misma carpeta compartida, el segundo INSERT
+  choca y el archivo se salta en vez de importarse dos veces.
+
+**Verificación automática:** `cargo test`, `npm test` (con el caso de
+`db-changed`), `tsc --noEmit`, `lint`, `build` y `check:bindings`.
+
+**Verificación manual (pendiente en la clínica):** PC A crea una muestra → PC B
+recibe `sample-changed` sin recargar; dos PCs intentando el mismo check-in,
+cierre de estancia o cobro → solo una gana y la otra ve el conflicto; sin
+duplicados ni sobrecupo.
 
 ---
 

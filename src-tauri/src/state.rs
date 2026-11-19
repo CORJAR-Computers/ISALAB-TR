@@ -4,7 +4,6 @@ use std::sync::Mutex;
 use std::thread::JoinHandle;
 use std::time::Instant;
 
-use rsfbclient::FbError;
 use tauri::{AppHandle, Manager};
 
 use crate::ai_cache::AiCache;
@@ -74,7 +73,7 @@ pub struct AppState {
     /// o al reiniciar la app.
     pub pkcs12_password: Mutex<Option<String>>,
     #[allow(dead_code)]
-    pub listeners: Vec<JoinHandle<Result<(), FbError>>>,
+    pub listeners: Vec<JoinHandle<()>>,
 }
 
 impl AppState {
@@ -108,8 +107,7 @@ impl AppState {
 
         match bootstrap(&db) {
             Ok((pool, schema_version)) => {
-                let listeners = crate::db::events::start_firebird_listeners(app.clone(), &db)
-                    .unwrap_or_default();
+                let listeners = crate::db::events::start_firebird_listeners(app.clone(), &db);
                 Self {
                     pool,
                     db,

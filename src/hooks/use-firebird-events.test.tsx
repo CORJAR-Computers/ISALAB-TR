@@ -152,6 +152,29 @@ describe("useFirebirdEvents (agrupación de invalidaciones)", () => {
     expect(invalidateSpy).toHaveBeenCalledTimes(6); // flush completo de nuevo
   });
 
+  it("db-changed invalida todas las queries en un solo flush", async () => {
+    const { invalidateSpy, wrapper } = makeWrapper();
+    renderHook(() => useFirebirdEvents(), { wrapper });
+
+    await act(async () => {
+      // Una invalidación genérica y dos eventos concretos en la misma ventana:
+      // el genérico absorbe a los concretos (invalidar todo ya los cubre).
+      emit("db-changed", null);
+      emit("sample-changed", PATIENT_PAYLOAD);
+      emit("lab-result-changed", PATIENT_PAYLOAD);
+    });
+
+    expect(invalidateSpy).not.toHaveBeenCalled();
+
+    await act(async () => {
+      vi.advanceTimersByTime(150);
+    });
+
+    // Una sola llamada, sin filtro de clave: todo queda obsoleto.
+    expect(invalidateSpy).toHaveBeenCalledTimes(1);
+    expect(invalidateSpy).toHaveBeenCalledWith();
+  });
+
   it("el unmount cancela el flush pendiente sin invalidar", async () => {
     const { invalidateSpy, wrapper } = makeWrapper();
     const { unmount } = renderHook(() => useFirebirdEvents(), { wrapper });

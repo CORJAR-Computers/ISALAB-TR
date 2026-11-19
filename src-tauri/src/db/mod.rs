@@ -10,6 +10,7 @@ pub mod health;
 pub mod maintenance;
 pub mod migrations;
 pub mod seed;
+pub mod tx;
 
 use std::collections::VecDeque;
 use std::path::Path;
@@ -171,6 +172,18 @@ impl DbPool {
     }
 
     fn release(&self, conn: SimpleConnection) {
+        // Defensa: si una operación multipaso entró en pánico, la transacción
+        // quedó abierta y la profundidad sin restaurar. En Firebird una
+        // transacción colgada retiene locks y frena la recolección de basura,
+        // así que se deshace antes de reciclar la conexión. En el camino normal
+        // (profundidad 0) no se toca: un `rollback()` abriría y cerraría una
+        // transacción vacía por cada comando.
+        let mut conn = conn;
+        if tx::open_depth() > 0 {
+            conn.rollback().ok();
+            tx::clear_depth();
+        }
+
         if let Ok(mut inner) = self.lock() {
             if inner.config.is_some() && inner.idle.len() < POOL_SIZE {
                 inner.idle.push_back(IdleConn {
