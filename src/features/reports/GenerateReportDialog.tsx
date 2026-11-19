@@ -221,7 +221,7 @@ export function GenerateReportDialog({
     carnet: null,
   });
 
-  const [overrideLogoPath, setOverrideLogoPath] = useState<string>("default");
+  const [overrideLogoId, setOverrideLogoId] = useState<number | null>(null);
   const [saveLogoPref, setSaveLogoPref] = useState(false);
 
   const { data: secondaryLogos } = useSecondaryLogos();
@@ -241,7 +241,7 @@ export function GenerateReportDialog({
     const preferred = secondaryLogos?.find(
       (l) => l.id === labPatient.preferredLogoId,
     );
-    setOverrideLogoPath(preferred ? preferred.logoPath : "default");
+    setOverrideLogoId(preferred ? preferred.id : null);
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [selected.lab, labPatient?.preferredLogoId]);
 
@@ -293,10 +293,9 @@ export function GenerateReportDialog({
     try {
       let report: ReportFile;
       if (active === "lab") {
-        const logoPath = overrideLogoPath === "default" ? null : overrideLogoPath;
         report = await lab.mutateAsync({
           sampleId: id,
-          overrideLogoPath: logoPath,
+          overrideLogoId: overrideLogoId,
           saveLogoPreference: saveLogoPref,
         });
       } else if (active === "formula") {
@@ -446,14 +445,17 @@ export function GenerateReportDialog({
                     <Label className="font-semibold text-sm">Logo Secundario (Izquierda ISALAB, Derecha éste)</Label>
                   </div>
                   
-                  <Select value={overrideLogoPath} onValueChange={setOverrideLogoPath}>
+                  <Select
+                    value={overrideLogoId ?? null}
+                    onValueChange={(v) => setOverrideLogoId(v ?? null)}
+                  >
                     <SelectTrigger>
                       <SelectValue placeholder="Seleccionar logo secundario..." />
                     </SelectTrigger>
                     <SelectContent>
-                      <SelectItem value="default">Ninguno (Dejar espacio o usar defecto)</SelectItem>
+                      <SelectItem value={null}>Ninguno (Dejar espacio o usar defecto)</SelectItem>
                       {secondaryLogos?.map(logo => (
-                        <SelectItem key={logo.id} value={logo.logoPath}>{logo.name}</SelectItem>
+                        <SelectItem key={logo.id} value={logo.id}>{logo.name}</SelectItem>
                       ))}
                     </SelectContent>
                   </Select>

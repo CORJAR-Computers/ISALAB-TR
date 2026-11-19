@@ -193,7 +193,7 @@ pub fn save_file(app_data: &Path, cfg: &DbConfig) -> Result<PathBuf, AppError> {
     let password = if cfg.password.is_empty() {
         String::new()
     } else {
-        crypto::encrypt_to_db(&cfg.password)?
+        crypto::encrypt_local(&cfg.password)?
     };
 
     let file = ConnectionFile {
@@ -341,9 +341,17 @@ fn decode_password(stored: &str) -> Result<String, AppError> {
     if !crypto::is_encrypted(stored) {
         return Ok(stored.to_string());
     }
-    crypto::decrypt_from_db(stored)?.ok_or_else(|| {
-        AppError::Internal("La contraseña de la conexión no se pudo descifrar".into())
-    })
+    // El archivo de conexión se cifra con DPAPI del equipo. Si por error se
+    // guardó con el formato compartido (`enc:v2:`), no se puede derivar la
+    // clave antes de abrir la base: se pide reconfigurar la conexión.
+    if crypto::is_local_encrypted(stored) {
+        return crypto::decrypt_local(stored)?.ok_or_else(|| {
+            AppError::Internal("La contraseña de la conexión no se pudo descifrar".into())
+        });
+    }
+    Err(AppError::Internal(
+        "La contraseña de la conexión usa un formato no válido para este archivo".into(),
+    ))
 }
 
 #[cfg(test)]

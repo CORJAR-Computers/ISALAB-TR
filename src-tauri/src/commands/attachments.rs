@@ -1,7 +1,5 @@
-use std::path::PathBuf;
-
 use rsfbclient::prelude::*;
-use tauri::{AppHandle, Manager, State};
+use tauri::State;
 
 use crate::auth::require_vet_or_admin;
 use crate::error::AppError;
@@ -23,24 +21,20 @@ fn mime_for_ext(ext: &str) -> Option<String> {
     })
 }
 
-/// Copia una foto de placa, frotis o electroforesis a la carpeta de datos de
-/// la app (app_data/attachments) y la asocia al resultado. Devuelve el
-/// adjunto creado para refrescar la UI.
+/// Lee un archivo adjunto y lo guarda como BLOB en Firebird. Los tres PCs de
+/// la clínica ven el mismo archivo (no depende de carpetas compartidas).
 #[tauri::command]
 #[specta::specta]
 pub fn attach_result_file(
     state: State<'_, AppState>,
-    app: AppHandle,
     result_id: i32,
     source_path: String,
 ) -> Result<ResultAttachment, AppError> {
     let user = require_vet_or_admin(&state)?;
 
-    let src = PathBuf::from(&source_path);
+    let src = std::path::PathBuf::from(&source_path);
     if !src.exists() {
-        return Err(AppError::Validation(
-            "El archivo seleccionado ya no existe".into(),
-        ));
+        return Err(AppError::Validation("El archivo seleccionado ya no existe".into()));
     }
     let ext = src
         .extension()
@@ -58,18 +52,17 @@ pub fn attach_result_file(
         )));
     };
 
-    // Límite de tamaño para no saturar la carpeta de datos.
-    let size = std::fs::metadata(&src)
-        .map_err(|e| AppError::Internal(format!("No se pudo leer el archivo: {e}")))?
-        .len();
+    // Lee el contenido una sola vez y lo envía al BLOB de la base (misma
+    // transacción que el registro del adjunto).
+    let content = std::fs::read(&src)
+        .map_err(|e| AppError::Internal(format!("No se pudo leer el archivo: {e}")))?;
+    let size = content.len() as u64;
     if size > MAX_ATTACHMENT_BYTES {
-        return Err(AppError::Validation(
-            "El archivo supera el límite de 20 MB".into(),
-        ));
+        return Err(AppError::Validation("El archivo supera el límite de 20 MB".into()));
     }
 
-    // El nombre mostrado se deriva del archivo en el servidor (nunca del
-    // cliente), con saneado y truncado a 255 chars (VARCHAR en la BD).
+    // El nombre mostrado se deriva del archivo en el servidor, con saneado y
+    // truncado a 255 chars (VARCHAR en la BD).
     let file_name = src
         .file_name()
         .and_then(|n| n.to_str())
@@ -85,31 +78,15 @@ pub fn attach_result_file(
         .query_first("SELECT 1 FROM LAB_RESULTS WHERE ID = ?", (&result_id,))
         .map_err(AppError::from)?;
     if result_exists.is_none() {
-        return Err(AppError::NotFound(format!(
-            "Resultado {result_id} no encontrado"
-        )));
+        return Err(AppError::NotFound(format!("Resultado {result_id} no encontrado")));
     }
-
-    let attachments_dir = app
-        .path()
-        .app_data_dir()
-        .map_err(|e| AppError::Internal(format!("Sin carpeta de datos: {e}")))?
-        .join("attachments");
-    std::fs::create_dir_all(&attachments_dir)
-        .map_err(|e| AppError::Internal(format!("No se pudo crear attachments: {e}")))?;
-
-    // Nombre único (uuid) para evitar colisiones y rutas no seguras.
-    let uuid = uuid::Uuid::new_v4().to_string();
-    let dest = attachments_dir.join(format!("{uuid}.{ext}"));
-    std::fs::copy(&src, &dest)
-        .map_err(|e| AppError::Internal(format!("No se pudo copiar el archivo: {e}")))?;
 
     let attachment = attachments_repo::insert(
         pooled.conn(),
         result_id,
         &file_name,
-        &dest.display().to_string(),
         Some(mime),
+        &content,
     )?;
 
     // Auditoría de adjunto añadido.
@@ -119,10 +96,7 @@ pub fn attach_result_file(
             Some(user.id),
             &user.username,
             "RESULT_ATTACHMENT_ADDED",
-            Some(&format!(
-                "Adjunto \"{file_name}\" al resultado {result_id} → {}",
-                dest.display()
-            )),
+            Some(&format!("Adjunto \"{file_name}\" al resultado {result_id} ({size} bytes)")),
         )
         .ok();
     }
@@ -130,7 +104,7 @@ pub fn attach_result_file(
     Ok(attachment)
 }
 
-/// Elimina un adjunto: borra el archivo de la carpeta de datos y su registro.
+/// Elimina un adjunto: borra su registro y el BLOB almacenado en la base.
 #[tauri::command]
 #[specta::specta]
 pub fn delete_result_attachment(state: State<'_, AppState>, id: i32) -> Result<(), AppError> {
@@ -141,10 +115,6 @@ pub fn delete_result_attachment(state: State<'_, AppState>, id: i32) -> Result<(
         return Err(AppError::NotFound(format!("Adjunto {id} no encontrado")));
     };
 
-    let path = PathBuf::from(&att.file_path);
-    if path.exists() {
-        let _ = std::fs::remove_file(&path);
-    }
     attachments_repo::delete(pooled.conn(), id)?;
 
     // Auditoría de adjunto eliminado.
@@ -155,12 +125,26 @@ pub fn delete_result_attachment(state: State<'_, AppState>, id: i32) -> Result<(
             &user.username,
             "RESULT_ATTACHMENT_DELETED",
             Some(&format!(
-                "Adjunto \"{}\" del resultado {}",
-                att.file_name, att.result_id
+                "Adjunto \"{}\" del resultado {} ({} bytes)",
+                att.file_name, att.result_id, att.size_bytes
             )),
         )
         .ok();
     }
 
     Ok(())
+}
+
+/// Devuelve el contenido (BLOB) de un adjunto como `data:` URL listo para el
+/// webview (los tres PCs ven el mismo archivo).
+#[tauri::command]
+#[specta::specta]
+pub fn get_result_attachment_content(
+    state: State<'_, AppState>,
+    id: i32,
+) -> Result<crate::models::attachment::AttachmentContent, AppError> {
+    let _ = require_vet_or_admin(&state)?;
+    let mut pooled = state.pool.acquire()?;
+    attachments_repo::content(pooled.conn(), id)
+        .map_err(|e| AppError::NotFound(format!("Adjunto {id} no disponible: {e}")))
 }

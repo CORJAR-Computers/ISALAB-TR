@@ -33,7 +33,8 @@ export const commands = {
 	 *  por código o nombre, con su destino de navegación en la UI.
 	 */
 	globalSearch: (query: string) => typedError<GlobalSearchResult[], AppError>(__TAURI_INVOKE("global_search", { query })),
-	createLocalBackup: (destPath: string) => typedError<string, AppError>(__TAURI_INVOKE("create_local_backup", { destPath })),
+	exportLocalConfig: (destPath: string) => typedError<string, AppError>(__TAURI_INVOKE("export_local_config", { destPath })),
+	getServerBackupStatus: () => typedError<BackupStatus, AppError>(__TAURI_INVOKE("get_server_backup_status")),
 	/**
 	 *  Guarda el CSV de muestras (mesa de trabajo con filtros actuales) en
 	 *  `dest_path` (elegido con el diálogo de guardar del SO) y devuelve la ruta.
@@ -213,12 +214,15 @@ export const commands = {
 	/**  Fotos antes/después (o documentos) de una visita, más recientes primero. */
 	listVisitAttachments: (visitId: number) => typedError<VisitAttachment[], AppError>(__TAURI_INVOKE("list_visit_attachments", { visitId })),
 	/**
-	 *  Copia una foto (antes/después) o documento a app_data/attachments y la
-	 *  asocia a la visita. Devuelve el adjunto creado para refrescar la UI.
+	 *  Lee un archivo adjunto de visita y lo almacena como BLOB en Firebird.
 	 */
 	addVisitAttachment: (sourcePath: string, input: AddVisitAttachmentInput) => typedError<VisitAttachment, AppError>(__TAURI_INVOKE("add_visit_attachment", { sourcePath, input })),
-	/**  Elimina un adjunto de visita: borra el archivo y su registro. */
+	/**  Elimina un adjunto de visita: borra su registro y el BLOB almacenado en la base. */
 	deleteVisitAttachment: (id: number) => typedError<null, AppError>(__TAURI_INVOKE("delete_visit_attachment", { id })),
+	/**  Devuelve el contenido (BLOB) de un adjunto de visita como AttachmentContent. */
+	getVisitAttachmentContent: (id: number) => typedError<AttachmentContent, AppError>(__TAURI_INVOKE("get_visit_attachment_content", { id })),
+	/**  Abre el adjunto de visita en el visor por defecto del SO. */
+	openVisitAttachment: (id: number) => typedError<null, AppError>(__TAURI_INVOKE("open_visit_attachment", { id })),
 	listSpecies: () => typedError<Species[], AppError>(__TAURI_INVOKE("list_species")),
 	listBreeds: (speciesId: number) => typedError<Breed[], AppError>(__TAURI_INVOKE("list_breeds", { speciesId })),
 	listSampleTypes: () => typedError<SampleType[], AppError>(__TAURI_INVOKE("list_sample_types")),
@@ -482,20 +486,38 @@ export const commands = {
 	getClinicSettings: () => typedError<ClinicSettings, AppError>(__TAURI_INVOKE("get_clinic_settings")),
 	saveClinicSettings: (input: ClinicSettings) => typedError<ClinicSettings, AppError>(__TAURI_INVOKE("save_clinic_settings", { input })),
 	/**
-	 *  Copia el logo seleccionado a la carpeta de datos de la app y devuelve su
-	 *  ruta. De este modo el logo persiste aunque se mueva/borre el original.
+	 *  Almacena el logo seleccionado como BLOB en CLINIC_ASSETS (KIND = LOGO).
+	 *  Devuelve los metadatos del activo (sin el contenido BLOB).
 	 */
-	importClinicLogo: (sourcePath: string) => typedError<string, AppError>(__TAURI_INVOKE("import_clinic_logo", { sourcePath })),
+	importClinicLogo: (sourcePath: string) => typedError<ClinicAsset, AppError>(__TAURI_INVOKE("import_clinic_logo", { sourcePath })),
 	/**
-	 *  Valida y copia un certificado digital PKCS#12 (.p12/.pfx) a la carpeta de
-	 *  datos de la app. Devuelve la ruta persistida para guardarla en la
-	 *  configuración. La contraseña solo se usa para la validación y NUNCA se
-	 *  guarda en la base de datos (se pide de nuevo al firmar).
+	 *  Elimina el logo principal de CLINIC_ASSETS.
 	 */
-	importPkcs12: (sourcePath: string, password: string) => typedError<string, AppError>(__TAURI_INVOKE("import_pkcs12", { sourcePath, password })),
+	deleteClinicLogo: () => typedError<null, AppError>(__TAURI_INVOKE("delete_clinic_logo")),
+	/**
+	 *  Devuelve el contenido (BLOB) del logo principal como bytes.
+	 */
+	getClinicLogoContent: () => typedError<Uint8Array | null, AppError>(__TAURI_INVOKE("get_clinic_logo_content")),
+	/**
+	 *  Valida y almacena un certificado PKCS#12 como BLOB en CLINIC_ASSETS
+	 *  (KIND = CERT_P12). Guarda la contraseña solo en memoria.
+	 */
+	importPkcs12: (sourcePath: string, password: string) => typedError<ClinicAsset, AppError>(__TAURI_INVOKE("import_pkcs12", { sourcePath, password })),
+	/**
+	 *  Elimina el certificado PKCS#12 de CLINIC_ASSETS y de la memoria.
+	 */
+	deletePkcs12: () => typedError<null, AppError>(__TAURI_INVOKE("delete_pkcs12")),
+	/**
+	 *  Devuelve el contenido (BLOB) del certificado PKCS#12 como bytes.
+	 */
+	getPkcs12Content: () => typedError<Uint8Array | null, AppError>(__TAURI_INVOKE("get_pkcs12_content")),
 	listSecondaryLogos: () => typedError<SecondaryLogo[], AppError>(__TAURI_INVOKE("list_secondary_logos")),
 	importSecondaryLogo: (name: string, sourcePath: string) => typedError<SecondaryLogo, AppError>(__TAURI_INVOKE("import_secondary_logo", { name, sourcePath })),
 	deleteSecondaryLogo: (id: number) => typedError<null, AppError>(__TAURI_INVOKE("delete_secondary_logo", { id })),
+	/**
+	 *  Devuelve el contenido (BLOB) de un logo secundario como bytes.
+	 */
+	getSecondaryLogoContent: (id: number) => typedError<Uint8Array | null, AppError>(__TAURI_INVOKE("get_secondary_logo_content", { id })),
 	/**
 	 *  Prueba la conexión con la API de Groq usando la clave configurada.
 	 *  Devuelve `Ok` con un mensaje breve si la clave es válida, o un `AppError`
@@ -523,7 +545,7 @@ export const commands = {
 	mustChangePassword: boolean,
 } | null, AppError>(__TAURI_INVOKE("get_session")),
 	/**  Genera el informe PDF de una muestra (con resultados) y devuelve la ruta. */
-	generateClinicalReport: (sampleId: number, overrideLogoPath: string | null, saveLogoPreference: boolean | null) => typedError<ReportFile, AppError>(__TAURI_INVOKE("generate_clinical_report", { sampleId, overrideLogoPath, saveLogoPreference })),
+	generateClinicalReport: (sampleId: number, overrideLogoId: number | null, saveLogoPreference: boolean | null) => typedError<ReportFile, AppError>(__TAURI_INVOKE("generate_clinical_report", { sampleId, overrideLogoId, saveLogoPreference })),
 	/**  Genera la fórmula médica (receta) de una consulta y devuelve la ruta. */
 	generateFormulaMedica: (consultationId: number) => typedError<ReportFile, AppError>(__TAURI_INVOKE("generate_formula_medica", { consultationId })),
 	/**  Genera el consentimiento informado de una cirugía programada. */
@@ -627,6 +649,8 @@ export const commands = {
 	attachResultFile: (resultId: number, sourcePath: string) => typedError<ResultAttachment, AppError>(__TAURI_INVOKE("attach_result_file", { resultId, sourcePath })),
 	/**  Elimina un adjunto: borra el archivo de la carpeta de datos y su registro. */
 	deleteResultAttachment: (id: number) => typedError<null, AppError>(__TAURI_INVOKE("delete_result_attachment", { id })),
+	/**  Devuelve el contenido (BLOB) de un adjunto como AttachmentContent. */
+	getResultAttachmentContent: (id: number) => typedError<AttachmentContent, AppError>(__TAURI_INVOKE("get_result_attachment_content", { id })),
 	/**
 	 *  Lista el registro de auditoría con paginación y filtros (solo ADMIN).
 	 *  Orden descendente (más reciente primero).
@@ -963,7 +987,8 @@ export type ClinicSettings = {
 	address: string | null,
 	phone: string | null,
 	city: string | null,
-	logoPath: string | null,
+	/**  Logo principal como metadatos de BLOB (NULL = sin logo personalizado). */
+	logo: ClinicAsset | null,
 	/**  IVA por defecto (%). */
 	taxRate: number | null,
 	currency: string,
@@ -972,8 +997,8 @@ export type ClinicSettings = {
 	vetName: string,
 	vetLicense: string | null,
 	groqApiKey: string | null,
-	/**  Ruta al archivo PKCS#12 (.p12/.pfx) para firma digital. */
-	pkcs12Path: string | null,
+	/**  Certificado PKCS#12 como metadatos de BLOB (solo ADMIN lo ve). */
+	certificate: ClinicAsset | null,
 	/**  Contraseña del certificado PKCS#12 (solo en memoria, nunca se persiste). */
 	pkcs12Password: string | null,
 	/**  Servidor SMTP para notificaciones por email (NULL = sin configurar). */
@@ -1994,9 +2019,9 @@ export type ResultAttachment = {
 	resultId: number,
 	/**  Nombre original del archivo (para mostrarlo en la UI). */
 	fileName: string,
-	/**  Ruta persistida en la carpeta de datos de la app (app_data/attachments). */
-	filePath: string,
 	mimeType: string | null,
+	/**  Tamaño del BLOB en bytes (sin leer el contenido). */
+	sizeBytes: number,
 	createdAt: string,
 };
 
@@ -2190,7 +2215,9 @@ export type SaveServiceInput = {
 export type SecondaryLogo = {
 	id: number,
 	name: string,
-	logoPath: string,
+	mimeType: string | null,
+	/**  Tamaño del BLOB en bytes (sin leer el contenido). */
+	sizeBytes: number,
 	createdAt: string,
 };
 
@@ -2467,12 +2494,39 @@ export type VisitAttachment = {
 	id: number,
 	visitId: number,
 	fileName: string,
-	/**  Ruta persistida en app_data/attachments. */
-	filePath: string,
 	mimeType: string | null,
 	/**  BEFORE | AFTER | DOCUMENT */
 	kind: string | null,
+	/**  Tamaño del BLOB en bytes (sin leer el contenido). */
+	sizeBytes: number,
 	createdAt: string,
+};
+
+/**  Contenido de un archivo almacenado como BLOB en Firebird, listo para el webview. */
+export type AttachmentContent = {
+	fileName: string,
+	mimeType: string | null,
+	/**  Tamaño en bytes. */
+	sizeBytes: number,
+	/**  data:<mime>;base64,<...> listo para usar en  o . */
+	dataUrl: string,
+};
+
+/**  Metadatos de un activo único de la clínica (CLINIC_ASSETS). */
+export type ClinicAsset = {
+	/**  LOGO | CERT_P12 */
+	kind: string,
+	fileName: string | null,
+	mimeType: string | null,
+	/**  Tamaño del BLOB en bytes. */
+	sizeBytes: number,
+	updatedAt: string,
+};
+
+/**  Estado del último backup del servidor Firebird. */
+export type BackupStatus = {
+	lastBackupAt: string | null,
+	lastBackupFile: string | null,
 };
 
 /**  Fila del listado de visitas de la cola de recepción (sin líneas). */

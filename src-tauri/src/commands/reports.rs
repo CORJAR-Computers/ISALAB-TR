@@ -1,5 +1,6 @@
 use chrono::{DateTime, Local};
 use rsfbclient::prelude::*;
+use rsfbclient::SimpleConnection;
 use tauri::{AppHandle, Manager, State};
 use tauri_plugin_opener::OpenerExt;
 
@@ -12,9 +13,9 @@ use crate::pdf_templates::{
     ReciboData, ReportSignature, VacunacionData,
 };
 use crate::repositories::{
-    clinical_history as history_repo, invoices as invoices_repo, patient as patient_repo,
-    samples as samples_repo, settings as settings_repo, surgeries as surgeries_repo,
-    vaccines as vaccines_repo,
+    clinic_assets as clinic_assets_repo, clinical_history as history_repo, invoices as invoices_repo,
+    patient as patient_repo, samples as samples_repo, settings as settings_repo,
+    surgeries as surgeries_repo, vaccines as vaccines_repo,
 };
 use crate::state::AppState;
 
@@ -39,28 +40,39 @@ fn now_db(conn: &mut rsfbclient::SimpleConnection) -> Result<String, AppError> {
 }
 
 /// Encabezado de clínica a partir de la configuración.
-fn clinic_header(s: &ClinicSettings) -> ClinicHeader {
-    ClinicHeader {
+/// El logo se lee como BLOB de CLINIC_ASSETS (KIND = LOGO).
+fn clinic_header(
+    conn: &mut SimpleConnection,
+    s: &ClinicSettings,
+) -> Result<ClinicHeader, AppError> {
+    let logo_bytes = clinic_assets_repo::content(conn, "LOGO");
+    Ok(ClinicHeader {
         name: s.clinic_name.clone(),
         nit: s.clinic_nit.clone(),
         address: s.address.clone(),
         phone: s.phone.clone(),
         city: s.city.clone(),
-        logo_path: s.logo_path.clone(),
-    }
+        logo_bytes,
+    })
 }
 
 /// Bloque de firma del veterinario a partir de la configuración.
-/// La contraseña PKCS#12 viene del estado en memoria (nunca de la BD).
-fn report_signature(s: &ClinicSettings, pkcs12_password: Option<String>) -> ReportSignature {
-    ReportSignature {
+/// El certificado PKCS#12 se lee como BLOB de CLINIC_ASSETS (KIND = CERT_P12).
+/// La contraseña viene del estado en memoria (nunca de la BD).
+fn report_signature(
+    conn: &mut SimpleConnection,
+    s: &ClinicSettings,
+    pkcs12_password: Option<String>,
+) -> Result<ReportSignature, AppError> {
+    let pkcs12_bytes = clinic_assets_repo::content(conn, "CERT_P12");
+    Ok(ReportSignature {
         mode: s.signature_mode.clone(),
         vet_name: s.vet_name.clone(),
         vet_license: s.vet_license.clone(),
         signature_image_path: None,
-        pkcs12_path: s.pkcs12_path.clone(),
+        pkcs12_bytes,
         pkcs12_password,
-    }
+    })
 }
 
 /// Lee la contraseña PKCS#12 desde el estado en memoria.
@@ -69,25 +81,19 @@ fn pkcs12_password_from(state: &AppState) -> Option<String> {
 }
 
 /// Firma criptográficamente un PDF ya generado si la clínica usa modo DIGITAL
-/// y tiene certificado + contraseña en memoria. Devuelve Ok sin hacer nada si
-/// no aplica, o un error claro si falta la contraseña.
+/// y tiene certificado + contraseña en memoria. El certificado se materializa
+/// en %TEMP% (no se deja huella en disco tras firmar).
 fn apply_digital_signature(
     state: &AppState,
-    settings: &ClinicSettings,
+    pkcs12_bytes: Option<&[u8]>,
     out_path: &std::path::Path,
     doc_name: &str,
 ) -> Result<(), AppError> {
-    if !settings.signature_mode.eq_ignore_ascii_case("DIGITAL") {
-        return Ok(());
-    }
-    let Some(ref p12) = settings.pkcs12_path else {
+    let Some(p12) = pkcs12_bytes else {
         return Ok(()); // sin certificado → se queda con firma gráfica/visible
     };
-    if !std::path::Path::new(p12).exists() {
-        return Err(AppError::Validation(
-            "El certificado digital PKCS#12 ya no existe. Vuelve a importarlo en Configuración."
-                .into(),
-        ));
+    if p12.is_empty() {
+        return Ok(());
     }
     let password = pkcs12_password_from(state).ok_or_else(|| {
         AppError::Validation(
@@ -95,14 +101,22 @@ fn apply_digital_signature(
         )
     })?;
 
-    crate::pdf_templates::sign_pdf_with_pkcs12(
+    // Escribe el certificado en %TEMP% para que pdf_signer lo lea desde ruta.
+    let tmp_path = std::env::temp_dir().join(format!("isalab_sign_{}.p12", std::process::id()));
+    std::fs::write(&tmp_path, p12)
+        .map_err(|e| AppError::Internal(format!("No se pudo escribir el certificado temporal: {e}")))?;
+
+    let result = crate::pdf_templates::sign_pdf_with_pkcs12(
         out_path,
         out_path,
-        std::path::Path::new(p12),
+        &tmp_path,
         &password,
-        &settings.vet_name,
+        &doc_name,
         doc_name,
-    )
+    );
+
+    let _ = std::fs::remove_file(&tmp_path);
+    result
 }
 
 /// Genera el informe PDF de una muestra (con resultados) y devuelve la ruta.
@@ -112,7 +126,7 @@ pub fn generate_clinical_report(
     state: State<'_, AppState>,
     app: AppHandle,
     sample_id: i32,
-    override_logo_path: Option<String>,
+    override_logo_id: Option<i32>,
     save_logo_preference: Option<bool>,
 ) -> Result<ReportFile, AppError> {
     require_vet_or_admin(&state)?;
@@ -133,23 +147,21 @@ pub fn generate_clinical_report(
     let settings = settings_repo::get(conn)?;
 
     // Handle logo override and preference
-    let mut clinic = clinic_header(&settings);
-    if let Some(ref path) = override_logo_path {
-        clinic.logo_path = Some(path.clone());
+    let mut clinic = clinic_header(conn, &settings)?;
+    if let Some(logo_id) = override_logo_id {
+        if let Some(content) = crate::repositories::logos::content(conn, logo_id) {
+            clinic.logo_bytes = Some(content);
+        }
     }
 
     if save_logo_preference.unwrap_or(false) {
-        if let Some(ref path) = override_logo_path {
-            if let Ok(logos) = crate::repositories::logos::list(conn) {
-                if let Some(logo) = logos.iter().find(|l| l.logo_path == *path) {
-                    // Actualizar en base de datos la preferencia
-                    let _ = conn.execute(
-                        "UPDATE PATIENTS SET PREFERRED_LOGO_ID = ? WHERE ID = ?",
-                        (&logo.id, &patient.id),
-                    );
-                    patient.preferred_logo_id = Some(logo.id);
-                }
-            }
+        if let Some(logo_id) = override_logo_id {
+            // Actualizar en base de datos la preferencia del paciente
+            let _ = conn.execute(
+                "UPDATE PATIENTS SET PREFERRED_LOGO_ID = ? WHERE ID = ?",
+                (&logo_id, &patient.id),
+            );
+            patient.preferred_logo_id = Some(logo_id);
         } else {
             // Si elige el por defecto y pide guardar preferencia, limpiamos el campo
             let _ = conn.execute(
@@ -160,6 +172,9 @@ pub fn generate_clinical_report(
         }
     }
 
+    let signature =
+        report_signature(conn, &settings, pkcs12_password_from(&state))?;
+
     let data = ClinicalReportData {
         clinic,
         patient,
@@ -168,7 +183,7 @@ pub fn generate_clinical_report(
         received_at: sample.received_at.clone(),
         analyzer_name: sample.analyzer_name.clone().unwrap_or_default(),
         results: sample.results,
-        signature: report_signature(&settings, pkcs12_password_from(&state)),
+        signature,
     };
 
     let dir = reports_dir(&app)?;
@@ -177,7 +192,7 @@ pub fn generate_clinical_report(
     crate::pdf_templates::generate_report(&data, &out_path).map_err(AppError::Internal)?;
     apply_digital_signature(
         &state,
-        &settings,
+        data.signature.pkcs12_bytes.as_deref(),
         &out_path,
         "Informe de resultados de laboratorio",
     )?;
@@ -215,21 +230,26 @@ pub fn generate_formula_medica(
     let settings = settings_repo::get(conn)?;
 
     let data = FormulaMedicaData {
-        clinic: clinic_header(&settings),
+        clinic: clinic_header(conn, &settings)?,
         patient,
         owner,
         date: consultation.consultation_date,
         reason: consultation.reason,
         diagnosis: consultation.diagnosis,
         medication: consultation.treatment_plan,
-        signature: report_signature(&settings, pkcs12_password_from(&state)),
+        signature: report_signature(conn, &settings, pkcs12_password_from(&state))?,
     };
 
     let dir = reports_dir(&app)?;
     let file_name = format!("formula-{consultation_id}.pdf");
     let out_path = dir.join(&file_name);
     crate::pdf_templates::generate_formula(&data, &out_path).map_err(AppError::Internal)?;
-    apply_digital_signature(&state, &settings, &out_path, "Fórmula médica veterinaria")?;
+    apply_digital_signature(
+        &state,
+        data.signature.pkcs12_bytes.as_deref(),
+        &out_path,
+        "Fórmula médica veterinaria",
+    )?;
 
     let generated_at = now_db(conn)?;
     Ok(ReportFile {
@@ -266,7 +286,7 @@ pub fn generate_consentimiento(
     let settings = settings_repo::get(conn)?;
 
     let data = ConsentimientoData {
-        clinic: clinic_header(&settings),
+        clinic: clinic_header(conn, &settings)?,
         patient,
         owner,
         attention_code: format!("CIR-{}", surgery.id),
@@ -313,7 +333,7 @@ pub fn generate_recibo_invoice(
     let settings = settings_repo::get(conn)?;
 
     let data = ReciboData {
-        clinic: clinic_header(&settings),
+        clinic: clinic_header(conn, &settings)?,
         invoice,
     };
 
@@ -352,18 +372,23 @@ pub fn generate_certificado_cirugia(
     let settings = settings_repo::get(conn)?;
 
     let data = CirugiaData {
-        clinic: clinic_header(&settings),
+        clinic: clinic_header(conn, &settings)?,
         patient,
         owner,
         surgery,
-        signature: report_signature(&settings, pkcs12_password_from(&state)),
+        signature: report_signature(conn, &settings, pkcs12_password_from(&state))?,
     };
 
     let dir = reports_dir(&app)?;
     let file_name = format!("cirugia-{surgery_id}.pdf");
     let out_path = dir.join(&file_name);
     crate::pdf_templates::generate_cirugia(&data, &out_path).map_err(AppError::Internal)?;
-    apply_digital_signature(&state, &settings, &out_path, "Certificado quirúrgico")?;
+    apply_digital_signature(
+        &state,
+        data.signature.pkcs12_bytes.as_deref(),
+        &out_path,
+        "Certificado quirúrgico",
+    )?;
 
     let generated_at = now_db(conn)?;
     Ok(ReportFile {
@@ -399,7 +424,7 @@ pub fn generate_carnet_vacunacion(
 
     let issued_at = now_db(conn)?;
     let data = VacunacionData {
-        clinic: clinic_header(&settings),
+        clinic: clinic_header(conn, &settings)?,
         patient,
         owner,
         vaccines,

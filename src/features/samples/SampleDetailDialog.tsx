@@ -1,7 +1,6 @@
 import { useEffect, useMemo, useRef, useState } from "react";
 import { openPath } from "@tauri-apps/plugin-opener";
 import { open as openDialog } from "@tauri-apps/plugin-dialog";
-import { convertFileSrc } from "@tauri-apps/api/core";
 import { toast } from "sonner";
 import {
   AlertTriangle,
@@ -9,7 +8,7 @@ import {
   Bot,
   CheckCircle2,
   ClipboardList,
-  ExternalLink,
+  Download,
   FileText,
   FlaskConical,
   HeartPulse,
@@ -180,6 +179,38 @@ export function SampleDetailDialog({
   const [previewAttachment, setPreviewAttachment] =
     useState<ResultAttachment | null>(null);
   const [confirmDelete, setConfirmDelete] = useState(false);
+  /** Caché de data URLs de adjuntos (id → data URL), se llena al abrir la muestra. */
+  const [attachmentDataUrls, setAttachmentDataUrls] = useState<
+    Record<number, string>
+  >({});
+  /** IDs de adjuntos ya precargados (o en vuelo), para no repetir peticiones. */
+  const loadedAttachmentIds = useRef<Set<number>>(new Set());
+
+  /** Precarga el contenido (BLOB) de todos los adjuntos de la muestra para
+   *  poder mostrarlos como data: URL sin depender de rutas locales. */
+  useEffect(() => {
+    if (!open || !sample) return;
+    const allAtts = sample.results.flatMap((r) => r.attachments);
+    const pending: Promise<void>[] = [];
+    for (const att of allAtts) {
+      if (loadedAttachmentIds.current.has(att.id)) continue;
+      loadedAttachmentIds.current.add(att.id);
+      pending.push(
+        (async () => {
+          try {
+            const content = await api.getResultAttachmentContent(att.id);
+            setAttachmentDataUrls((prev) => ({
+              ...prev,
+              [att.id]: content.dataUrl,
+            }));
+          } catch {
+            // Ignorar errores individuales; el adjunto se mostrará sin miniatura.
+          }
+        })(),
+      );
+    }
+    void Promise.all(pending);
+  }, [open, sample]);
 
   // Lleva el contenido del diálogo hasta el bloque de interpretación IA en
   // cuanto aparece, para que el usuario vea el resultado sin buscarlo.
@@ -1469,7 +1500,10 @@ export function SampleDetailDialog({
                                       className="group relative overflow-hidden rounded-md border shadow-xs"
                                     >
                                       <img
-                                        src={convertFileSrc(att.filePath)}
+                                        src={
+                                          attachmentDataUrls[att.id] ??
+                                          `data:image/svg+xml;utf8,<svg xmlns="http://www.w3.org/2000/svg" width="36" height="36"><text x="50%" y="50%" font-size="12" text-anchor="middle" dy=".35em" fill="#999">${att.fileName}</text></svg>`
+                                        }
                                         alt={att.fileName}
                                         className="size-9 object-cover transition-transform group-hover:scale-110"
                                       />
@@ -1699,7 +1733,10 @@ export function SampleDetailDialog({
         <div className="bg-muted/40 flex min-h-48 items-center justify-center rounded-lg p-2">
           {previewAttachment && (
             <img
-              src={convertFileSrc(previewAttachment.filePath)}
+              src={
+                attachmentDataUrls[previewAttachment.id] ??
+                `data:image/svg+xml;utf8,<svg xmlns="http://www.w3.org/2000/svg" width="200" height="150"><text x="50%" y="50%" font-size="14" text-anchor="middle" dy=".35em" fill="#999">${previewAttachment.fileName}</text></svg>`
+              }
               alt={previewAttachment.fileName}
               className="max-h-[55vh] w-auto rounded-md object-contain"
             />
@@ -1710,11 +1747,21 @@ export function SampleDetailDialog({
             {previewAttachment && (
               <Button
                 variant="outline"
-                onClick={() => openPath(previewAttachment.filePath)}
+                onClick={() => {
+                  const url = attachmentDataUrls[previewAttachment.id];
+                  if (url) {
+                    const link = document.createElement("a");
+                    link.href = url;
+                    link.download = previewAttachment.fileName;
+                    document.body.appendChild(link);
+                    link.click();
+                    document.body.removeChild(link);
+                  }
+                }}
                 className="gap-1.5"
               >
-                <ExternalLink className="size-4" />
-                Abrir original
+                <Download className="size-4" />
+                Descargar
               </Button>
             )}
             {canDeleteAttachments && previewAttachment && (

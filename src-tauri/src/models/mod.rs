@@ -1,6 +1,7 @@
 pub mod analyzer;
 pub mod analyzer_source;
 pub mod appointment;
+pub mod attachment;
 pub mod auth;
 pub mod clinical_history;
 pub mod consultation;

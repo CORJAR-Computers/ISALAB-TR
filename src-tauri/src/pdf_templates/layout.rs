@@ -19,7 +19,8 @@ pub struct ReportSignature {
     pub vet_name: String,
     pub vet_license: Option<String>,
     pub signature_image_path: Option<String>,
-    pub pkcs12_path: Option<String>,
+    /// Certificado PKCS#12 como bytes (BLOB de Firebird). NULL = sin certificado.
+    pub pkcs12_bytes: Option<Vec<u8>>,
     /// Contraseña del certificado PKCS#12 (solo para uso interno, nunca se serializa).
     #[serde(skip_serializing_if = "Option::is_none")]
     pub pkcs12_password: Option<String>,

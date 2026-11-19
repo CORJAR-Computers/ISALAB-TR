@@ -26,7 +26,8 @@ pub struct ClinicHeader {
     pub address: Option<String>,
     pub phone: Option<String>,
     pub city: Option<String>,
-    pub logo_path: Option<String>,
+    /// Logo de la clínica como bytes (BLOB de Firebird). NULL = sin logo personalizado.
+    pub logo_bytes: Option<Vec<u8>>,
 }
 
 /// Carga el logo izquierdo de ISALAB: prueba archivos locales de la app o el incrustado.
@@ -91,18 +92,17 @@ pub fn load_watermark_logo() -> Option<RawImage> {
     Some(img)
 }
 
-/// Carga el logo derecho (empresa cliente): primero `clinic.logo_path` y luego archivos en dist.
+/// Carga el logo derecho (empresa cliente): primero `clinic.logo_bytes` (BLOB)
+/// y luego archivos en dist como fallback.
 pub fn load_right_logo(clinic: &ClinicHeader) -> Option<RawImage> {
     let decode = |bytes: &[u8]| -> Option<RawImage> {
         let mut warnings: Vec<PdfWarnMsg> = Vec::new();
         RawImage::decode_from_bytes(bytes, &mut warnings).ok()
     };
 
-    if let Some(path) = clinic.logo_path.as_deref().filter(|p| !p.is_empty()) {
-        if let Ok(bytes) = std::fs::read(path) {
-            if let Some(img) = decode(&bytes) {
-                return Some(img);
-            }
+    if let Some(bytes) = clinic.logo_bytes.as_deref().filter(|b| !b.is_empty()) {
+        if let Some(img) = decode(bytes) {
+            return Some(img);
         }
     }
 

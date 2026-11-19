@@ -55,8 +55,13 @@ x509-cert = "0.2.5"
 # ---- Notificaciones por email (SMTP) ----
 lettre = { version = "0.11", default-features = false, features = ["smtp-transport", "builder", "hostname", "pool", "native-tls"] }
 
-# ---- Cifrado de secretos en repositorio (DPAPI de Windows) ----
+# ---- Cifrado de secretos en repositorio (DPAPI + AEAD) ----
 base64 = "0.22"
+# AEAD de los secretos compartidos de la clínica (Fase 6) y KDF de la clave
+# derivada de la contraseña de conexión: los 3 PCs descifran los mismos valores.
+chacha20poly1305 = "0.10"
+pbkdf2 = "0.12"
+sha2 = "0.10"
 barcoders = "2.0.0"
 [target.'cfg(windows)'.dependencies]
 windows-sys = { version = "0.59", features = ["Win32_Foundation", "Win32_Security_Cryptography"] }

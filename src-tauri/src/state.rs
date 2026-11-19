@@ -105,6 +105,10 @@ impl AppState {
             ),
         };
 
+        // Clave compartida de la clínica: se deriva de la contraseña de conexión
+        // (los tres PCs comparten usuario/clave de Firebird). No se guarda.
+        crate::crypto::set_shared_password(&db.password);
+
         match bootstrap(&db) {
             Ok((pool, schema_version)) => {
                 let listeners = crate::db::events::start_firebird_listeners(app.clone(), &db);

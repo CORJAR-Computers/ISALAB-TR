@@ -5,6 +5,7 @@ pub mod attachments;
 pub mod auth;
 pub mod catalog;
 pub mod clinical_history;
+pub mod clinic_assets;
 pub mod dashboard;
 pub mod grooming;
 pub mod import;

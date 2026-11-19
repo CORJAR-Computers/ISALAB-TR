@@ -475,13 +475,15 @@ pub fn list_grooming_reminders(
 
 // ============================== ADJUNTOS ====================================
 
+use crate::models::attachment::AttachmentContent;
+
 type AttachmentRow = (
     i32,            // id
     i32,            // visit_id
     String,         // file_name
-    String,         // file_path
     Option<String>, // mime_type
     Option<String>, // kind
+    i64,            // size_bytes
     String,         // created_at
 );
 
@@ -490,15 +492,15 @@ fn map_attachment(r: AttachmentRow) -> VisitAttachment {
         id: r.0,
         visit_id: r.1,
         file_name: r.2,
-        file_path: r.3,
-        mime_type: r.4,
-        kind: r.5,
+        mime_type: r.3,
+        kind: r.4,
+        size_bytes: r.5,
         created_at: r.6,
     }
 }
 
 const ATTACHMENT_SELECT: &str = "
-    SELECT ID, VISIT_ID, FILE_NAME, FILE_PATH, MIME_TYPE, KIND,
+    SELECT ID, VISIT_ID, FILE_NAME, MIME_TYPE, KIND, SIZE_BYTES,
            LEFT(CAST(CREATED_AT AS VARCHAR(60)), 19)
     FROM VISIT_ATTACHMENTS";
 
@@ -526,19 +528,38 @@ pub fn get_visit_attachment(
     Ok(row.map(map_attachment))
 }
 
+/// Descarga el contenido del adjunto (BLOB) para mostrarlo o guardarlo.
+pub fn content_visit_attachment(
+    conn: &mut SimpleConnection,
+    id: i32,
+) -> Result<AttachmentContent, AppError> {
+    let row: Option<(String, Option<String>, Option<Vec<u8>>)> = conn
+        .query_first(
+            "SELECT FILE_NAME, MIME_TYPE, CONTENT FROM VISIT_ATTACHMENTS WHERE ID = ?",
+            (&id,),
+        )
+        .map_err(AppError::from)?;
+    let (file_name, mime_type, content) =
+        row.ok_or_else(|| AppError::NotFound("Adjunto no encontrado".into()))?;
+    let bytes = content.ok_or_else(|| {
+        AppError::Internal("El adjunto no tiene contenido almacenado en la base".into())
+    })?;
+    Ok(AttachmentContent::new(file_name, mime_type, bytes))
+}
+
 pub fn insert_visit_attachment(
     conn: &mut SimpleConnection,
     visit_id: i32,
     file_name: &str,
-    file_path: &str,
     mime_type: Option<String>,
     kind: Option<String>,
+    content: &[u8],
 ) -> Result<VisitAttachment, AppError> {
     let id = next_id(conn, "GEN_VISIT_ATTACHMENTS_ID")?;
     conn.execute(
-        "INSERT INTO VISIT_ATTACHMENTS (ID, VISIT_ID, FILE_NAME, FILE_PATH, MIME_TYPE, KIND)
-         VALUES (?, ?, ?, ?, ?, ?)",
-        (&id, &visit_id, &file_name, &file_path, &mime_type, &kind),
+        "INSERT INTO VISIT_ATTACHMENTS (ID, VISIT_ID, FILE_NAME, MIME_TYPE, KIND, CONTENT, SIZE_BYTES)
+         VALUES (?, ?, ?, ?, ?, ?, ?)",
+        (&id, &visit_id, &file_name, &mime_type, &kind, content, content.len() as i32),
     )
     .map_err(AppError::from)?;
 
@@ -820,13 +841,14 @@ mod tests {
             &mut conn,
             visit.id,
             "antes.png",
-            "C:\\app_data\\attachments\\a1.png",
-            Some("image/png".into()),
+            None,
             Some("BEFORE".into()),
+            b"antes-datos",
         )
         .unwrap();
         assert_eq!(att.visit_id, visit.id);
         assert_eq!(att.kind.as_deref(), Some("BEFORE"));
+        assert_eq!(att.size_bytes, 11);
 
         let all = list_visit_attachments(&mut conn, visit.id).unwrap();
         assert_eq!(all.len(), 1);

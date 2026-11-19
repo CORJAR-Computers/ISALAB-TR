@@ -40,7 +40,9 @@ use crate::commands::appointments::{
     cancel_appointment, check_in_appointment, create_appointment, get_appointment,
     list_appointments, set_appointment_status,
 };
-use crate::commands::attachments::{attach_result_file, delete_result_attachment};
+use crate::commands::attachments::{
+    attach_result_file, delete_result_attachment, get_result_attachment_content,
+};
 use crate::commands::auth::{get_session, list_audit_log, login, logout};
 use crate::commands::catalog::{
     create_analyte, list_analytes, list_breeds, list_sample_types, list_species, list_vaccine_types,
@@ -51,12 +53,14 @@ use crate::commands::clinical_history::{
 };
 use crate::commands::dashboard::get_dashboard_stats;
 use crate::commands::db::{
-    create_local_backup, db_health, get_db_connection, save_db_connection, test_db_connection,
+    db_health, export_local_config, get_server_backup_status, get_db_connection,
+    save_db_connection, test_db_connection,
 };
 use crate::commands::exports::{export_results_csv, export_samples_csv};
 use crate::commands::grooming::{
     add_visit_attachment, delete_visit_attachment, finish_grooming_session, get_grooming_session,
-    list_grooming_day, list_grooming_reminders, list_visit_attachments, upsert_grooming_session,
+    get_visit_attachment_content, list_grooming_day, list_grooming_reminders,
+    list_visit_attachments, open_visit_attachment, upsert_grooming_session,
 };
 use crate::commands::import::{import_analyzer_results, preview_analyzer_import};
 use crate::commands::invoices::{
@@ -98,8 +102,10 @@ use crate::commands::services::{
     list_services, save_service, save_service_category, set_service_active,
 };
 use crate::commands::settings::{
-    delete_secondary_logo, get_clinic_branding, get_clinic_settings, import_clinic_logo,
-    import_pkcs12, import_secondary_logo, list_secondary_logos, save_clinic_settings,
+    delete_clinic_logo, delete_pkcs12, delete_secondary_logo, get_clinic_branding,
+    get_clinic_logo_content, get_clinic_settings, get_pkcs12_content, get_secondary_logo_content,
+    import_clinic_logo, import_pkcs12, import_secondary_logo, list_secondary_logos,
+    save_clinic_settings,
 };
 use crate::commands::stays::{
     add_stay_event, cancel_stay, check_out_stay, create_stay, get_stay, list_resource_board,
@@ -138,7 +144,8 @@ pub fn specta_builder() -> Builder<tauri::Wry> {
             save_db_connection,
             test_db_connection,
             global_search,
-            create_local_backup,
+            export_local_config,
+            get_server_backup_status,
             export_samples_csv,
             export_results_csv,
             list_service_categories,
@@ -171,6 +178,8 @@ pub fn specta_builder() -> Builder<tauri::Wry> {
             list_visit_attachments,
             add_visit_attachment,
             delete_visit_attachment,
+            get_visit_attachment_content,
+            open_visit_attachment,
             list_species,
             list_breeds,
             list_sample_types,
@@ -232,6 +241,12 @@ pub fn specta_builder() -> Builder<tauri::Wry> {
             list_secondary_logos,
             import_secondary_logo,
             delete_secondary_logo,
+            get_clinic_logo_content,
+            delete_clinic_logo,
+            get_secondary_logo_content,
+            import_pkcs12,
+            delete_pkcs12,
+            get_pkcs12_content,
             test_groq_connection,
             login,
             logout,
@@ -265,6 +280,7 @@ pub fn specta_builder() -> Builder<tauri::Wry> {
             get_dashboard_stats,
             attach_result_file,
             delete_result_attachment,
+            get_result_attachment_content,
             list_audit_log,
             interpret_lab_results,
             get_patient_lab_trends,
@@ -343,6 +359,10 @@ pub fn specta_builder() -> Builder<tauri::Wry> {
         .typ::<crate::models::grooming::AddVisitAttachmentInput>()
         .typ::<crate::models::grooming::GroomingDayLine>()
         .typ::<crate::models::grooming::GroomingReminder>()
+        // Archivos y certificados como BLOB (Fase 6).
+        .typ::<crate::models::attachment::AttachmentContent>()
+        .typ::<crate::models::settings::ClinicAsset>()
+        .typ::<crate::commands::db::BackupStatus>()
         // Estancia e inventario (fase 6).
         .typ::<crate::models::stay::Resource>()
         .typ::<crate::models::stay::ResourceBoardItem>()

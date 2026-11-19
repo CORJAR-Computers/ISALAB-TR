@@ -92,6 +92,9 @@ import type {
   GroomingDayLine,
   GroomingReminder,
   VisitAttachment,
+  AttachmentContent,
+  ClinicAsset,
+  BackupStatus,
   WorklistData,
   // Estancia e inventario (fase 6).
   Resource,
@@ -133,6 +136,9 @@ export const api = {
     invoke<string>("save_db_connection", { input }),
   testDbConnection: (input: SaveDbConnectionInput) =>
     invoke<DbTestResult>("test_db_connection", { input }),
+  exportLocalConfig: (destPath: string) =>
+    invoke<string>("export_local_config", { destPath }),
+  getServerBackupStatus: () => invoke<BackupStatus>("get_server_backup_status"),
 
   // ---- Catálogos ----
   listSpecies: () => invoke<Species[]>("list_species"),
@@ -237,6 +243,8 @@ export const api = {
     invoke<ResultAttachment>("attach_result_file", { resultId, sourcePath }),
   deleteResultAttachment: (id: number) =>
     invoke<void>("delete_result_attachment", { id }),
+  getResultAttachmentContent: (id: number) =>
+    invoke<AttachmentContent>("get_result_attachment_content", { id }),
 
   // ---- Equipos analizadores y rangos de referencia ----
   listAnalyzers: () => invoke<Analyzer[]>("list_analyzers"),
@@ -280,14 +288,20 @@ export const api = {
   saveClinicSettings: (input: ClinicSettings) =>
     invoke<ClinicSettings>("save_clinic_settings", { input }),
   importClinicLogo: (sourcePath: string) =>
-    invoke<string>("import_clinic_logo", { sourcePath }),
+    invoke<ClinicAsset>("import_clinic_logo", { sourcePath }),
   importPkcs12: (sourcePath: string, password: string) =>
-    invoke<string>("import_pkcs12", { sourcePath, password }),
+    invoke<ClinicAsset>("import_pkcs12", { sourcePath, password }),
   listSecondaryLogos: () => invoke<SecondaryLogo[]>("list_secondary_logos"),
   importSecondaryLogo: (name: string, sourcePath: string) =>
     invoke<SecondaryLogo>("import_secondary_logo", { name, sourcePath }),
   deleteSecondaryLogo: (id: number) =>
     invoke<null>("delete_secondary_logo", { id }),
+  deleteClinicLogo: () => invoke<null>("delete_clinic_logo"),
+  getClinicLogoContent: () => invoke<Uint8Array | null>("get_clinic_logo_content"),
+  getSecondaryLogoContent: (id: number) =>
+    invoke<Uint8Array | null>("get_secondary_logo_content", { id }),
+  deletePkcs12: () => invoke<null>("delete_pkcs12"),
+  getPkcs12Content: () => invoke<Uint8Array | null>("get_pkcs12_content"),
 
   // ---- Autenticación ----
   login: (input: LoginInput) => invoke<SessionUser>("login", { input }),
@@ -332,8 +346,16 @@ export const api = {
   ) => invoke<string>("export_results_csv", { destPath, status, search }),
 
   // ---- Reportes PDF ----
-  generateReport: (sampleId: number, overrideLogoPath?: string | null, saveLogoPreference?: boolean | null) =>
-    invoke<ReportFile>("generate_clinical_report", { sampleId, overrideLogoPath, saveLogoPreference }),
+  generateReport: (
+    sampleId: number,
+    overrideLogoId?: number | null,
+    saveLogoPreference?: boolean | null,
+  ) =>
+    invoke<ReportFile>("generate_clinical_report", {
+      sampleId,
+      overrideLogoId,
+      saveLogoPreference,
+    }),
   generateFormulaMedica: (consultationId: number) =>
     invoke<ReportFile>("generate_formula_medica", { consultationId }),
   generateConsentimiento: (surgeryId: number) =>
@@ -478,6 +500,9 @@ export const api = {
     }),
   deleteVisitAttachment: (id: number) =>
     invoke<void>("delete_visit_attachment", { id }),
+  getVisitAttachmentContent: (id: number) =>
+    invoke<AttachmentContent>("get_visit_attachment_content", { id }),
+  openVisitAttachment: (id: number) => invoke<void>("open_visit_attachment", { id }),
 
   // ---- Estancia (guardería, hospedaje, hospitalización) ----
   listResources: (includeInactive: boolean | null) =>

@@ -4,7 +4,7 @@ import { zodResolver } from "@hookform/resolvers/zod";
 import { z } from "zod";
 import { toast } from "sonner";
 import { open as openFileDialog } from "@tauri-apps/plugin-dialog";
-import { openPath } from "@tauri-apps/plugin-opener";
+import { api } from "@/lib/api";
 import {
   CalendarPlus,
   Camera,
@@ -251,9 +251,9 @@ export function GroomingSessionDialog({
     }
   };
 
-  const openAttachment = async (path: string) => {
+  const openAttachment = async (id: number) => {
     try {
-      await openPath(path);
+      await api.openVisitAttachment(id);
     } catch {
       toast.error("No se pudo abrir el archivo");
     }
@@ -555,7 +555,7 @@ export function GroomingSessionDialog({
                     >
                       <button
                         type="button"
-                        onClick={() => openAttachment(att.filePath)}
+                        onClick={() => openAttachment(att.id)}
                         className="min-w-0 flex-1 truncate text-left hover:underline"
                         title={att.fileName}
                       >

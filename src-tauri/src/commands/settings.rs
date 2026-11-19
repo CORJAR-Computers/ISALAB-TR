@@ -1,12 +1,13 @@
-use std::path::{Path, PathBuf};
+use std::path::Path;
 
-use tauri::{AppHandle, Manager, State};
+use tauri::State;
 
 use crate::auth::{require_admin, require_session};
 use crate::error::AppError;
 use crate::models::settings::{ClinicBranding, ClinicSettings};
 use crate::pdf_templates::validate_pkcs12;
 use crate::repositories::auth as auth_repo;
+use crate::repositories::clinic_assets as clinic_assets_repo;
 use crate::repositories::logos as logos_repo;
 use crate::repositories::settings as settings_repo;
 use crate::state::AppState;
@@ -24,6 +25,7 @@ pub(crate) const REDACTED_SECRET: &str = "••••••••";
 /// Valida que `path` exista y tenga una extensión PKCS#12 aceptada (.p12/.pfx).
 /// Devuelve la extensión en minúsculas si es válida, o un `AppError` de
 /// validación descriptivo en caso contrario.
+#[allow(dead_code)]
 fn validate_pkcs12_source(path: &Path) -> Result<String, AppError> {
     if !path.exists() {
         return Err(AppError::Validation(
@@ -86,8 +88,10 @@ pub fn get_clinic_settings(state: State<'_, AppState>) -> Result<ClinicSettings,
         .map(|_| REDACTED_SECRET.to_string());
     settings.pkcs12_password = None;
 
+    // Para sesiones que no son ADMIN se oculta el certificado (defensa en
+    // profundidad; la UI oculta el formulario de configuración para no-admins).
     if session.role != "ADMIN" {
-        settings.pkcs12_path = None;
+        settings.certificate = None;
     }
 
     Ok(settings)
@@ -117,22 +121,15 @@ pub fn save_clinic_settings(
         input.smtp_password = current.smtp_password;
     }
 
-    // Si llega una contraseña PKCS#12, se valida contra el certificado
-    // configurado y se guarda SOLO en memoria (nunca se persiste).
+    // Si llega una contraseña PKCS#12, se guarda SOLO en memoria (nunca se
+    // persiste). El certificado se importa con `import_pkcs12`.
     if let Some(ref pwd) = input.pkcs12_password {
         if !pwd.is_empty() {
-            if let Some(ref p12) = input.pkcs12_path {
-                crate::pdf_templates::validate_pkcs12(std::path::Path::new(p12), pwd)?;
-                *state
-                    .pkcs12_password
-                    .lock()
-                    .map_err(|_| AppError::Internal("Certificado bloqueado".into()))? =
-                    Some(pwd.clone());
-            } else {
-                return Err(AppError::Validation(
-                    "Se indicó una contraseña PKCS#12 pero no hay certificado configurado. Importa el certificado primero.".into(),
-                ));
-            }
+            *state
+                .pkcs12_password
+                .lock()
+                .map_err(|_| AppError::Internal("Certificado bloqueado".into()))? =
+                Some(pwd.clone());
         }
     }
 
@@ -153,17 +150,16 @@ pub fn save_clinic_settings(
     Ok(result)
 }
 
-/// Copia el logo seleccionado a la carpeta de datos de la app y devuelve su
-/// ruta. De este modo el logo persiste aunque se mueva/borre el original.
+/// Lee el archivo de logo y lo almacena como BLOB en `CLINIC_ASSETS` (KIND =
+/// LOGO). Los tres PCs ven el mismo logo (no depende de carpetas compartidas).
 #[tauri::command]
 #[specta::specta]
 pub fn import_clinic_logo(
     state: State<'_, AppState>,
-    app: AppHandle,
     source_path: String,
-) -> Result<String, AppError> {
+) -> Result<crate::models::settings::ClinicAsset, AppError> {
     let admin = require_admin(&state)?;
-    let src = PathBuf::from(&source_path);
+    let src = std::path::PathBuf::from(&source_path);
     if !src.exists() {
         return Err(AppError::Validation(
             "El archivo de logo seleccionado ya no existe".into(),
@@ -177,7 +173,6 @@ pub fn import_clinic_logo(
         .unwrap_or("")
         .to_lowercase();
     if !LOGO_EXTENSIONS.contains(&ext.as_str()) {
-        // Sin extensión se muestra "()" (vacío); con extensión, "(.ext)".
         let ext_label = if ext.is_empty() {
             "()".to_string()
         } else {
@@ -188,17 +183,30 @@ pub fn import_clinic_logo(
         )));
     }
 
-    let assets_dir = app
-        .path()
-        .app_data_dir()
-        .map_err(|e| AppError::Internal(format!("Sin carpeta de datos: {e}")))?
-        .join("assets");
-    std::fs::create_dir_all(&assets_dir)
-        .map_err(|e| AppError::Internal(format!("No se pudo crear assets: {e}")))?;
+    let mime = match ext.as_str() {
+        "png" => "image/png",
+        "jpg" | "jpeg" => "image/jpeg",
+        "webp" => "image/webp",
+        _ => "application/octet-stream",
+    };
 
-    let dest = assets_dir.join(format!("clinic-logo.{ext}"));
-    std::fs::copy(&src, &dest)
-        .map_err(|e| AppError::Internal(format!("No se pudo copiar el logo: {e}")))?;
+    let content = std::fs::read(&src)
+        .map_err(|e| AppError::Internal(format!("No se pudo leer el logo: {e}")))?;
+
+    let file_name = src
+        .file_name()
+        .and_then(|n| n.to_str())
+        .map(|n| n.trim().to_string())
+        .unwrap_or_else(|| "clinic-logo".to_string());
+
+    let mut pooled = state.pool.acquire()?;
+    let asset = clinic_assets_repo::upsert(
+        pooled.conn(),
+        "LOGO",
+        Some(&file_name),
+        Some(mime),
+        &content,
+    )?;
 
     // Auditoría de importación de logo.
     if let Ok(mut audit_conn) = state.pool.acquire() {
@@ -207,12 +215,44 @@ pub fn import_clinic_logo(
             Some(admin.id),
             &admin.username,
             "LOGO_IMPORTED",
-            Some(&format!("Logo: {}", dest.display())),
+            Some(&format!("Logo: {} ({} bytes)", file_name, content.len())),
         )
         .ok();
     }
 
-    Ok(dest.display().to_string())
+    Ok(asset)
+}
+
+/// Elimina el logo principal de `CLINIC_ASSETS`.
+#[tauri::command]
+#[specta::specta]
+pub fn delete_clinic_logo(state: State<'_, AppState>) -> Result<(), AppError> {
+    let admin = require_admin(&state)?;
+    let mut pooled = state.pool.acquire()?;
+    clinic_assets_repo::delete(pooled.conn(), "LOGO")?;
+
+    if let Ok(mut audit_conn) = state.pool.acquire() {
+        auth_repo::log_audit(
+            audit_conn.conn(),
+            Some(admin.id),
+            &admin.username,
+            "LOGO_DELETED",
+            Some("Logo principal eliminado".into()),
+        )
+        .ok();
+    }
+    Ok(())
+}
+
+/// Devuelve el contenido (BLOB) del logo principal como `data:` URL.
+#[tauri::command]
+#[specta::specta]
+pub fn get_clinic_logo_content(
+    state: State<'_, AppState>,
+) -> Result<Option<Vec<u8>>, AppError> {
+    require_session(&state)?;
+    let mut pooled = state.pool.acquire()?;
+    Ok(clinic_assets_repo::content(pooled.conn(), "LOGO"))
 }
 
 #[tauri::command]
@@ -229,12 +269,11 @@ pub fn list_secondary_logos(
 #[specta::specta]
 pub fn import_secondary_logo(
     state: State<'_, AppState>,
-    app: AppHandle,
     name: String,
     source_path: String,
 ) -> Result<crate::models::logo::SecondaryLogo, AppError> {
     let admin = require_admin(&state)?;
-    let src = PathBuf::from(&source_path);
+    let src = std::path::PathBuf::from(&source_path);
     if !src.exists() {
         return Err(AppError::Validation(
             "El archivo de logo seleccionado ya no existe".into(),
@@ -246,7 +285,6 @@ pub fn import_secondary_logo(
         .unwrap_or("")
         .to_lowercase();
     if !LOGO_EXTENSIONS.contains(&ext.as_str()) {
-        // Sin extensión se muestra "()" (vacío); con extensión, "(.ext)".
         let ext_label = if ext.is_empty() {
             "()".to_string()
         } else {
@@ -257,24 +295,18 @@ pub fn import_secondary_logo(
         )));
     }
 
-    let assets_dir = app
-        .path()
-        .app_data_dir()
-        .map_err(|e| AppError::Internal(format!("Sin carpeta de datos: {e}")))?
-        .join("assets")
-        .join("logos");
-    std::fs::create_dir_all(&assets_dir)
-        .map_err(|e| AppError::Internal(format!("No se pudo crear assets/logos: {e}")))?;
+    let mime = match ext.as_str() {
+        "png" => "image/png",
+        "jpg" | "jpeg" => "image/jpeg",
+        "webp" => "image/webp",
+        _ => "application/octet-stream",
+    };
 
-    // Generar un nombre único para evitar colisiones
-    let uuid = uuid::Uuid::new_v4().to_string();
-    let dest = assets_dir.join(format!("{}.{}", uuid, ext));
-
-    std::fs::copy(&src, &dest)
-        .map_err(|e| AppError::Internal(format!("No se pudo copiar el logo: {e}")))?;
+    let content = std::fs::read(&src)
+        .map_err(|e| AppError::Internal(format!("No se pudo leer el logo: {e}")))?;
 
     let mut pooled = state.pool.acquire()?;
-    let logo = logos_repo::insert(pooled.conn(), &name, &dest.display().to_string())?;
+    let logo = logos_repo::insert(pooled.conn(), &name, Some(mime), &content)?;
 
     if let Ok(mut audit_conn) = state.pool.acquire() {
         auth_repo::log_audit(
@@ -282,7 +314,7 @@ pub fn import_secondary_logo(
             Some(admin.id),
             &admin.username,
             "SECONDARY_LOGO_IMPORTED",
-            Some(&format!("Logo: {} - {}", name, dest.display())),
+            Some(&format!("Logo: {} ({} bytes)", name, content.len())),
         )
         .ok();
     }
@@ -296,12 +328,7 @@ pub fn delete_secondary_logo(state: State<'_, AppState>, id: i32) -> Result<(), 
     let admin = require_admin(&state)?;
     let mut pooled = state.pool.acquire()?;
 
-    // Buscar para obtener la ruta y eliminar el archivo
     if let Some(logo) = logos_repo::get(pooled.conn(), id)? {
-        let path = PathBuf::from(&logo.logo_path);
-        if path.exists() {
-            let _ = std::fs::remove_file(path);
-        }
         logos_repo::delete(pooled.conn(), id)?;
 
         if let Ok(mut audit_conn) = state.pool.acquire() {
@@ -319,65 +346,141 @@ pub fn delete_secondary_logo(state: State<'_, AppState>, id: i32) -> Result<(), 
     Ok(())
 }
 
-/// Valida y copia un certificado digital PKCS#12 (.p12/.pfx) a la carpeta de
-/// datos de la app. Devuelve la ruta persistida para guardarla en la
-/// configuración. La contraseña solo se usa para la validación y NUNCA se
-/// guarda en la base de datos (se pide de nuevo al firmar).
+/// Devuelve el contenido (BLOB) de un logo secundario como `data:` URL.
+#[tauri::command]
+#[specta::specta]
+pub fn get_secondary_logo_content(
+    state: State<'_, AppState>,
+    id: i32,
+) -> Result<Option<Vec<u8>>, AppError> {
+    require_session(&state)?;
+    let mut pooled = state.pool.acquire()?;
+    Ok(logos_repo::content(pooled.conn(), id))
+}
+
+/// Importa un certificado PKCS#12 (.p12/.pfx) como BLOB en `CLINIC_ASSETS`
+/// (KIND = CERT_P12). Valida el contenedor y guarda la contraseña solo en
+/// memoria (state).
 #[tauri::command]
 #[specta::specta]
 pub fn import_pkcs12(
     state: State<'_, AppState>,
-    app: AppHandle,
     source_path: String,
     password: String,
-) -> Result<String, AppError> {
+) -> Result<crate::models::settings::ClinicAsset, AppError> {
     let admin = require_admin(&state)?;
-    let src = PathBuf::from(&source_path);
-    let ext = validate_pkcs12_source(&src)?;
+    let src = std::path::PathBuf::from(&source_path);
+    if !src.exists() {
+        return Err(AppError::Validation(
+            "El archivo de certificado seleccionado ya no existe".into(),
+        ));
+    }
+    let ext = src
+        .extension()
+        .and_then(|e| e.to_str())
+        .unwrap_or("")
+        .to_lowercase();
+    if !PKCS12_EXTENSIONS.contains(&ext.as_str()) {
+        let ext_label = if ext.is_empty() {
+            "()".to_string()
+        } else {
+            format!("(.{ext})")
+        };
+        return Err(AppError::Validation(format!(
+            "Formato no soportado {ext_label}. Usa .p12 o .pfx."
+        )));
+    }
 
-    // Validación real: descifra el PKCS#12 con la contraseña y extrae metadatos.
-    validate_pkcs12(&src, &password)?;
-    // La contraseña queda en memoria para poder firmar reportes; nunca en BD.
+    let content = std::fs::read(&src)
+        .map_err(|e| AppError::Internal(format!("No se pudo leer el certificado: {e}")))?;
+
+    // Valida que sea un PKCS#12 válido con la contraseña dada (materializa
+    // en %TEMP% porque validate_pkcs12 lee desde ruta de archivo).
+    let tmp_path = std::env::temp_dir().join(format!("isalab_pkcs12_{}.tmp", admin.id));
+    std::fs::write(&tmp_path, &content)
+        .map_err(|e| AppError::Internal(format!("No se pudo escribir el temporal: {e}")))?;
+    let validation = validate_pkcs12(&tmp_path, &password)
+        .map_err(|e| {
+            let _ = std::fs::remove_file(&tmp_path);
+            e
+        })?;
+    let _ = std::fs::remove_file(&tmp_path);
+
+    let file_name = src
+        .file_name()
+        .and_then(|n| n.to_str())
+        .map(|n| n.trim().to_string())
+        .unwrap_or_else(|| "certificado.p12".to_string());
+
+    let mime = "application/x-pkcs12";
+
+    let mut pooled = state.pool.acquire()?;
+    let asset = clinic_assets_repo::upsert(
+        pooled.conn(),
+        "CERT_P12",
+        Some(&file_name),
+        Some(mime),
+        &content,
+    )?;
+
+    // Guarda la contraseña solo en memoria (nunca en BD).
     *state
         .pkcs12_password
         .lock()
-        .map_err(|_| AppError::Internal("Certificado bloqueado".into()))? = Some(password);
+        .map_err(|_| AppError::Internal("Certificado bloqueado".into()))? =
+        Some(password);
 
-    let assets_dir = app
-        .path()
-        .app_data_dir()
-        .map_err(|e| AppError::Internal(format!("Sin carpeta de datos: {e}")))?
-        .join("assets");
-    std::fs::create_dir_all(&assets_dir)
-        .map_err(|e| AppError::Internal(format!("No se pudo crear assets: {e}")))?;
-
-    let dest = assets_dir.join(format!("clinic-certificate.{ext}"));
-
-    // Elimina certificados previos con otra extensión (.p12/.pfx) para no
-    // dejar archivos huérfanos en la carpeta de datos.
-    for prev_ext in PKCS12_EXTENSIONS {
-        let prev = assets_dir.join(format!("clinic-certificate.{prev_ext}"));
-        if prev.exists() && prev != dest {
-            let _ = std::fs::remove_file(&prev);
-        }
-    }
-
-    std::fs::copy(&src, &dest)
-        .map_err(|e| AppError::Internal(format!("No se pudo copiar el certificado: {e}")))?;
-
-    // Auditoría de importación de certificado.
+    // Auditoría.
     if let Ok(mut audit_conn) = state.pool.acquire() {
         auth_repo::log_audit(
             audit_conn.conn(),
             Some(admin.id),
             &admin.username,
-            "CERTIFICATE_IMPORTED",
-            Some(&format!("PKCS#12: {}", dest.display())),
+            "PKCS12_IMPORTED",
+            Some(&format!(
+                "Certificado: {} (titular: {})",
+                file_name, validation.info.holder_name
+            )),
         )
         .ok();
     }
 
-    Ok(dest.display().to_string())
+    Ok(asset)
+}
+
+/// Elimina el certificado PKCS#12 de `CLINIC_ASSETS` y de la memoria.
+#[tauri::command]
+#[specta::specta]
+pub fn delete_pkcs12(state: State<'_, AppState>) -> Result<(), AppError> {
+    let admin = require_admin(&state)?;
+    let mut pooled = state.pool.acquire()?;
+    clinic_assets_repo::delete(pooled.conn(), "CERT_P12")?;
+
+    *state
+        .pkcs12_password
+        .lock()
+        .map_err(|_| AppError::Internal("Certificado bloqueado".into()))? = None;
+
+    if let Ok(mut audit_conn) = state.pool.acquire() {
+        auth_repo::log_audit(
+            audit_conn.conn(),
+            Some(admin.id),
+            &admin.username,
+            "PKCS12_DELETED",
+            Some("Certificado PKCS#12 eliminado".into()),
+        )
+        .ok();
+    }
+    Ok(())
+}
+
+/// Devuelve el contenido (BLOB) del certificado PKCS#12 para firmar.
+#[tauri::command]
+#[specta::specta]
+pub fn get_pkcs12_content(state: State<'_, AppState>) -> Result<Option<Vec<u8>>, AppError> {
+    let _ = require_admin(&state)?;
+    let mut pooled = state.pool.acquire()?;
+    Ok(clinic_assets_repo::content(pooled.conn(), "CERT_P12"))
 }
 
 #[cfg(test)]

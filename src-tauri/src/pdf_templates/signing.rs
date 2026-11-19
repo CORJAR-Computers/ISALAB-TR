@@ -59,10 +59,26 @@ fn fmt_date(secs: u64) -> String {
 pub fn validate_pkcs12(p12_path: &Path, password: &str) -> Result<ValidationReport, AppError> {
     let data = std::fs::read(p12_path)
         .map_err(|e| AppError::Validation(format!("No se pudo leer el archivo PKCS#12: {e}")))?;
+    validate_pkcs12_from_bytes(&data, password)
+}
 
+/// Valida un contenedor PKCS#12 desde bytes en memoria (útil cuando el
+/// certificado se almacena como BLOB en Firebird y no hay ruta de archivo).
+pub fn validate_pkcs12_bytes(
+    pkcs12_bytes: &[u8],
+    password: &str,
+) -> Result<ValidationReport, AppError> {
+    validate_pkcs12_from_bytes(pkcs12_bytes, password)
+}
+
+/// Lógica compartida de validación PKCS#12 a partir de los bytes del contenedor.
+fn validate_pkcs12_from_bytes(
+    data: &[u8],
+    password: &str,
+) -> Result<ValidationReport, AppError> {
     // El parseo descifra el contenedor: si la contraseña es incorrecta,
     // `from_pkcs12` falla. Es la validación real del certificado.
-    let ks = p12_keystore::KeyStore::from_pkcs12(&data, password).map_err(|e| {
+    let ks = p12_keystore::KeyStore::from_pkcs12(data, password).map_err(|e| {
         AppError::Validation(format!("PKCS#12 inválido o contraseña incorrecta: {e}"))
     })?;
 

@@ -2,9 +2,11 @@ use serde::{Deserialize, Serialize};
 use specta::Type;
 use tauri::{Manager, State};
 
+use rsfbclient::prelude::*;
 use crate::db::config::{self, DbConfig, DbMode, DbStatus, DEFAULT_PORT};
 use crate::db::{health, migrations};
 use crate::error::AppError;
+use crate::repositories::settings as settings_repo;
 use crate::state::AppState;
 
 #[derive(Debug, Clone, Serialize, Deserialize, Type)]
@@ -217,64 +219,88 @@ fn connection_from_input(input: &SaveDbConnectionInput, current: &DbConfig) -> D
     }
 }
 
+/// Exporta la configuración local no sensible a un archivo JSON (sin secretos,
+/// sin certificados). Se usa para llevar la configuración de un PC a otro o
+/// como respaldo documental de los ajustes de la clínica.
 #[tauri::command]
 #[specta::specta]
-pub fn create_local_backup(
-    app: tauri::AppHandle,
+pub fn export_local_config(
     state: State<'_, AppState>,
     dest_path: String,
 ) -> Result<String, AppError> {
-    // Exige sesión de ADMIN: el backup recorre toda la carpeta de datos de la
-    // app (configuración local, clave de IA cifrada con DPAPI, certificado
-    // PKCS#12) y no debe ser invocable sin autenticación.
     crate::auth::require_admin(&state)?;
-    use std::fs::File;
-    use std::io::{Read, Write};
-    use walkdir::WalkDir;
-    use zip::write::SimpleFileOptions;
-    use zip::ZipWriter;
+    let mut pooled = state.pool.acquire()?;
+    let settings = settings_repo::get(pooled.conn())?;
 
-    let app_data_dir = app
-        .path()
-        .app_data_dir()
-        .map_err(|e| AppError::Internal(e.to_string()))?;
+    // Construye un JSON solo con campos públicos (sin secretos ni certificados).
+    let export = serde_json::json!({
+        "clinic_name": settings.clinic_name,
+        "clinic_nit": settings.clinic_nit,
+        "address": settings.address,
+        "phone": settings.phone,
+        "city": settings.city,
+        "tax_rate": settings.tax_rate,
+        "currency": settings.currency,
+        "signature_mode": settings.signature_mode,
+        "vet_name": settings.vet_name,
+        "vet_license": settings.vet_license,
+        "smtp_host": settings.smtp_host,
+        "smtp_port": settings.smtp_port,
+        "smtp_tls": settings.smtp_tls,
+        "smtp_username": settings.smtp_username,
+        "smtp_from": settings.smtp_from,
+        "tagline": settings.tagline,
+        "grooming_default_duration": settings.grooming_default_duration,
+        "reception_ticket_prefix": settings.reception_ticket_prefix,
+        "logo": settings.logo,
+        "certificate": settings.certificate,
+    });
 
-    let file = File::create(&dest_path)
-        .map_err(|e| AppError::Internal(format!("Error creando archivo zip: {}", e)))?;
-    let mut zip = ZipWriter::new(file);
-    let options = SimpleFileOptions::default().compression_method(zip::CompressionMethod::Deflated);
+    let json = serde_json::to_string_pretty(&export)
+        .map_err(|e| AppError::Internal(format!("No se pudo serializar la configuración: {e}")))?;
 
-    let it = WalkDir::new(&app_data_dir)
-        .into_iter()
-        .filter_map(|e| e.ok());
-
-    for entry in it {
-        let path = entry.path();
-        let name = path.strip_prefix(&app_data_dir).map_err(|e| {
-            AppError::Internal(format!("Error procesando ruta {}: {}", path.display(), e))
-        })?;
-        let name_str = name.to_string_lossy().replace("\\", "/");
-
-        if path.is_file() {
-            if name_str.ends_with(".lock") {
-                continue; // Saltar locks temporales
-            }
-            zip.start_file(name_str, options)
-                .map_err(|e| AppError::Internal(e.to_string()))?;
-            let mut f = File::open(path).map_err(|e| AppError::Internal(e.to_string()))?;
-            let mut buffer = Vec::new();
-            f.read_to_end(&mut buffer)
-                .map_err(|e| AppError::Internal(e.to_string()))?;
-            zip.write_all(&buffer)
-                .map_err(|e| AppError::Internal(e.to_string()))?;
-        } else if !name.as_os_str().is_empty() {
-            zip.add_directory(name_str, options)
-                .map_err(|e| AppError::Internal(e.to_string()))?;
-        }
-    }
-
-    zip.finish()
-        .map_err(|e| AppError::Internal(e.to_string()))?;
+    std::fs::write(&dest_path, json)
+        .map_err(|e| AppError::Internal(format!("No se pudo escribir el archivo: {e}")))?;
 
     Ok(dest_path)
+}
+
+/// Estado del último backup del servidor Firebird.
+#[derive(Debug, Clone, Serialize, Deserialize, Type)]
+#[serde(rename_all = "camelCase")]
+pub struct BackupStatus {
+    pub last_backup_at: Option<String>,
+    pub last_backup_file: Option<String>,
+}
+
+/// Devuelve el estado del último backup del servidor Firebird.
+/// Lee las claves `ops.last_backup_at` y `ops.last_backup_file` de la tabla OPS.
+#[tauri::command]
+#[specta::specta]
+pub fn get_server_backup_status(
+    state: State<'_, AppState>,
+) -> Result<BackupStatus, AppError> {
+    let mut pooled = state.pool.acquire()?;
+    let conn = pooled.conn();
+
+    let last_backup_at: Option<String> = conn
+        .query_first(
+            "SELECT VALUE_TEXT FROM OPS WHERE KEY_NAME = 'ops.last_backup_at'",
+            (),
+        )
+        .map_err(AppError::from)?
+        .and_then(|(v,)| v);
+
+    let last_backup_file: Option<String> = conn
+        .query_first(
+            "SELECT VALUE_TEXT FROM OPS WHERE KEY_NAME = 'ops.last_backup_file'",
+            (),
+        )
+        .map_err(AppError::from)?
+        .and_then(|(v,)| v);
+
+    Ok(BackupStatus {
+        last_backup_at,
+        last_backup_file,
+    })
 }

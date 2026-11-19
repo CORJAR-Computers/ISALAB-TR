@@ -1,24 +1,27 @@
+use std::collections::HashMap;
+
 use rsfbclient::prelude::*;
 use rsfbclient::SimpleConnection;
 
+use crate::crypto;
 use crate::error::AppError;
-use crate::models::settings::{ClinicBranding, ClinicSettings};
+use crate::models::settings::{ClinicAsset, ClinicBranding, ClinicSettings};
+use crate::repositories::clinic_assets;
 
-/// Mapa de clave → valor de la tabla CLINIC_SETTINGS.
-const SETTING_KEYS: [(&str, &str); 22] = [
+/// Claves que siguen siendo planas en CLINIC_SETTINGS (sin el logo ni el
+/// certificado, que ahora viven en CLINIC_ASSETS).
+const SETTING_KEYS: [(&str, &str); 20] = [
     ("clinic.name", "clinic_name"),
     ("clinic.nit", "clinic_nit"),
     ("clinic.address", "address"),
     ("clinic.phone", "phone"),
     ("clinic.city", "city"),
-    ("clinic.logo_path", "logo_path"),
     ("invoice.tax_rate", "tax_rate"),
     ("invoice.currency", "currency"),
     ("report.signature_mode", "signature_mode"),
     ("report.vet_name", "vet_name"),
     ("report.vet_license", "vet_license"),
     ("ai.groq_api_key", "groq_api_key"),
-    ("report.pkcs12_path", "pkcs12_path"),
     ("smtp.host", "smtp_host"),
     ("smtp.port", "smtp_port"),
     ("smtp.tls", "smtp_tls"),
@@ -28,8 +31,17 @@ const SETTING_KEYS: [(&str, &str); 22] = [
     ("clinic.tagline", "tagline"),
     ("grooming.default_duration", "grooming_default_duration"),
     ("reception.ticket_prefix", "reception_ticket_prefix"),
-    // pkcs12_password NUNCA se persiste en base de datos
 ];
+
+/// Claves secretas (AEAD compartido). Se cifran con la clave derivada de la
+/// contraseña de conexión a Firebird, no con DPAPI del equipo.
+const SECRET_KEYS: [(&str, &str); 2] = [
+    ("ai.groq_api_key", "groq_api_key"),
+    ("smtp.password", "smtp_password"),
+];
+
+/// Salt de derivación de la clave AEAD, guardado en CLINIC_SETTINGS.
+const SALT_KEY: &str = "crypto.salt";
 
 fn value(conn: &mut SimpleConnection, key: &str) -> Result<Option<String>, AppError> {
     let row: Option<(Option<String>,)> = conn
@@ -41,6 +53,27 @@ fn value(conn: &mut SimpleConnection, key: &str) -> Result<Option<String>, AppEr
     Ok(row.and_then(|(v,)| v).filter(|x| !x.is_empty()))
 }
 
+/// Salt de la clave AEAD compartida. Se crea en la primera lectura si no existe.
+fn shared_salt(conn: &mut SimpleConnection) -> Result<Vec<u8>, AppError> {
+    if let Some(hex) = value(conn, SALT_KEY)? {
+        if let Some(bytes) = crypto::hex_decode(&hex) {
+            return Ok(bytes);
+        }
+    }
+    let salt = crypto::random_salt();
+    let hex = crypto::hex_encode(&salt);
+    conn.execute(
+        "UPDATE OR INSERT INTO CLINIC_SETTINGS (KEY_NAME, VALUE_TEXT, DESCRIPTION)
+         VALUES (?, ?, 'Salt para derivar la clave AEAD de los secretos compartidos')
+         MATCHING (KEY_NAME)",
+        (SALT_KEY, &hex),
+    )
+    .map_err(AppError::from)?;
+    Ok(salt.to_vec())
+}
+
+/// Lee todos los ajustes y, tras ellos, los metadatos de los activos (logo /
+/// certificado) de CLINIC_ASSETS.
 pub fn get(conn: &mut SimpleConnection) -> Result<ClinicSettings, AppError> {
     let mut s = ClinicSettings::default();
 
@@ -64,7 +97,6 @@ pub fn get(conn: &mut SimpleConnection) -> Result<ClinicSettings, AppError> {
             "address" => s.address = v.filter(|x| !x.is_empty()),
             "phone" => s.phone = v.filter(|x| !x.is_empty()),
             "city" => s.city = v.filter(|x| !x.is_empty()),
-            "logo_path" => s.logo_path = v.filter(|x| !x.is_empty()),
             "tax_rate" => {
                 if let Some(val) = v {
                     s.tax_rate = val.parse().unwrap_or(19.0);
@@ -90,34 +122,6 @@ pub fn get(conn: &mut SimpleConnection) -> Result<ClinicSettings, AppError> {
                 }
             }
             "vet_license" => s.vet_license = v.filter(|x| !x.is_empty()),
-            "groq_api_key" => {
-                if let Some(stored) = v {
-                    match crate::crypto::decrypt_from_db(&stored) {
-                        Ok(Some(plain)) => s.groq_api_key = Some(plain),
-                        Ok(None) => {
-                            // Valor legacy en texto plano (versión previa):
-                            // se re-cifra al vuelo para endurecer el
-                            // almacenamiento sin migración manual. Si el
-                            // re-cifrado falla aquí, se devuelve el valor y el
-                            // siguiente guardado lo cifrará definitivamente.
-                            if let Ok(enc) = crate::crypto::encrypt_to_db(&stored) {
-                                let _ = conn.execute(
-                                    "UPDATE CLINIC_SETTINGS SET VALUE_TEXT = ? WHERE KEY_NAME = ?",
-                                    (&enc, "ai.groq_api_key"),
-                                );
-                            }
-                            s.groq_api_key = Some(stored);
-                        }
-                        Err(_) => {
-                            // No se puede descifrar (p. ej. BD movida a otro
-                            // usuario de Windows): no exponer el valor. El
-                            // usuario reconfigura la clave en Ajustes.
-                            s.groq_api_key = None;
-                        }
-                    }
-                }
-            }
-            "pkcs12_path" => s.pkcs12_path = v.filter(|x| !x.is_empty()),
             "smtp_host" => s.smtp_host = v.filter(|x| !x.is_empty()),
             "smtp_port" => {
                 if let Some(val) = v {
@@ -126,15 +130,6 @@ pub fn get(conn: &mut SimpleConnection) -> Result<ClinicSettings, AppError> {
             }
             "smtp_tls" => s.smtp_tls = v.filter(|x| !x.is_empty()),
             "smtp_username" => s.smtp_username = v.filter(|x| !x.is_empty()),
-            "smtp_password" => {
-                if let Some(stored) = v {
-                    match crate::crypto::decrypt_from_db(&stored) {
-                        Ok(Some(plain)) => s.smtp_password = Some(plain),
-                        Ok(None) => s.smtp_password = Some(stored),
-                        Err(_) => s.smtp_password = None,
-                    }
-                }
-            }
             "smtp_from" => s.smtp_from = v.filter(|x| !x.is_empty()),
             "tagline" => s.tagline = v.filter(|x| !x.is_empty()),
             "grooming_default_duration" => {
@@ -148,6 +143,51 @@ pub fn get(conn: &mut SimpleConnection) -> Result<ClinicSettings, AppError> {
             _ => {}
         }
     }
+
+    // Secretos con AEAD compartido (requieren salt).
+    let salt = shared_salt(conn)?;
+    for (key, field) in SECRET_KEYS {
+        if let Some(stored) = value(conn, key)? {
+            match crypto::decrypt_shared(&stored, &salt) {
+                Ok(Some(plain)) => {
+                    let _ = match field {
+                        "groq_api_key" => s.groq_api_key = Some(plain),
+                        "smtp_password" => s.smtp_password = Some(plain),
+                        _ => {}
+                    };
+                }
+                Ok(None) => {
+                    // Legacy en texto plano (no debería ocurrir tras la migración
+                    // a v2, pero se tolera): no se re-cifra automáticamente aquí
+                    // porque el salt podría no existir aún. El siguiente save lo
+                    // dejará cifrado.
+                    let _ = match field {
+                        "groq_api_key" => s.groq_api_key = Some(stored.clone()),
+                        "smtp_password" => s.smtp_password = Some(stored.clone()),
+                        _ => {}
+                    };
+                }
+                Err(_) => {
+                    // No se puede descifrar (contraseña de DB rotada): no exponer.
+                    let _ = match field {
+                        "groq_api_key" => s.groq_api_key = None,
+                        "smtp_password" => s.smtp_password = None,
+                        _ => {}
+                    };
+                }
+            }
+        }
+    }
+
+    // Logo y certificado como metadatos de CLINIC_ASSETS (sin el contenido BLOB).
+    let assets = clinic_assets::list(conn)?;
+    let mut by_kind: HashMap<String, &ClinicAsset> = HashMap::new();
+    for a in &assets {
+        by_kind.insert(a.kind.clone(), a);
+    }
+    s.logo = by_kind.get("LOGO").map(|a| (**a).clone());
+    s.certificate = by_kind.get("CERT_P12").map(|a| (**a).clone());
+
     Ok(s)
 }
 
@@ -165,23 +205,24 @@ pub fn get_branding(conn: &mut SimpleConnection) -> Result<ClinicBranding, AppEr
 }
 
 /// Upsert de cada clave (preserva DESCRIPTION y las claves desconocidas).
+///
+/// `logo` y `certificate` se ignoran aquí: se gestionan con comandos
+/// dedicados (`import_clinic_logo`, `delete_clinic_logo`, etc.) que escriben
+/// en `CLINIC_ASSETS`.
 pub fn save(
     conn: &mut SimpleConnection,
     input: &ClinicSettings,
 ) -> Result<ClinicSettings, AppError> {
     let tax = format!("{:.2}", input.tax_rate);
+    let salt = shared_salt(conn)?;
 
-    // La clave de IA se cifra con DPAPI ANTES de tocar la BD: si el cifrado
-    // falla, abortamos sin haber persistido ningún cambio (evita guardar un
-    // ajuste a medias). Los vacíos se tratan como "sin clave".
+    // Secretos con AEAD compartido (cifran ANTES de tocar la BD).
     let groq_encrypted: Option<String> = match input.groq_api_key.as_deref() {
-        Some(k) if !k.trim().is_empty() => Some(crate::crypto::encrypt_to_db(k)?),
+        Some(k) if !k.trim().is_empty() => Some(crypto::encrypt_shared(k, &salt)?),
         _ => None,
     };
-
-    // Igual para la contraseña SMTP (DPAPI antes de persistir).
     let smtp_encrypted: Option<String> = match input.smtp_password.as_deref() {
-        Some(p) if !p.trim().is_empty() => Some(crate::crypto::encrypt_to_db(p)?),
+        Some(p) if !p.trim().is_empty() => Some(crypto::encrypt_shared(p, &salt)?),
         _ => None,
     };
 
@@ -193,14 +234,12 @@ pub fn save(
             "address" => input.address.clone(),
             "phone" => input.phone.clone(),
             "city" => input.city.clone(),
-            "logo_path" => input.logo_path.clone(),
             "tax_rate" => Some(tax.clone()),
             "currency" => Some(input.currency.clone()),
             "signature_mode" => Some(input.signature_mode.clone()),
             "vet_name" => Some(input.vet_name.clone()),
             "vet_license" => input.vet_license.clone(),
             "groq_api_key" => groq_encrypted.clone(),
-            "pkcs12_path" => input.pkcs12_path.clone(),
             "smtp_host" => input.smtp_host.clone(),
             "smtp_port" => input.smtp_port.map(|p| p.to_string()),
             "smtp_tls" => input.smtp_tls.clone(),
@@ -259,6 +298,8 @@ mod tests {
         assert_eq!(settings.currency, "COP");
         assert_eq!(settings.signature_mode, "GRAPHIC");
         assert!(settings.groq_api_key.is_none());
+        assert!(settings.logo.is_none());
+        assert!(settings.certificate.is_none());
         cleanup_test_db(&db_path);
     }
 
@@ -272,14 +313,14 @@ mod tests {
             address: Some("Calle 10 # 5-20".to_string()),
             phone: Some("300 555 1234".to_string()),
             city: Some("Medellín".to_string()),
-            logo_path: None,
+            logo: None,
             tax_rate: 16.0,
             currency: "USD".to_string(),
             signature_mode: "GRAPHIC".to_string(),
             vet_name: "Dr. Carlos López".to_string(),
             vet_license: Some("MVZ-12345".to_string()),
             groq_api_key: Some("gsk_test_key".to_string()),
-            pkcs12_path: None,
+            certificate: None,
             pkcs12_password: None,
             smtp_host: Some("smtp.gmail.com".to_string()),
             smtp_port: Some(587),
@@ -360,14 +401,14 @@ mod tests {
             address: None,
             phone: None,
             city: None,
-            logo_path: None,
+            logo: None,
             tax_rate: 0.0,
             currency: "COP".to_string(),
             signature_mode: "GRAPHIC".to_string(),
             vet_name: "".to_string(),
             vet_license: None,
             groq_api_key: None,
-            pkcs12_path: None,
+            certificate: None,
             pkcs12_password: None,
             smtp_host: None,
             smtp_port: None,
@@ -465,7 +506,7 @@ mod tests {
         };
         save(&mut conn, &input).unwrap();
 
-        // En la BD el valor está cifrado: no contiene el texto plano.
+        // En la BD el valor está cifrado con AEAD compartido: no contiene el texto plano.
         let row: Option<(Option<String>,)> = conn
             .query_first(
                 "SELECT VALUE_TEXT FROM CLINIC_SETTINGS WHERE KEY_NAME = 'ai.groq_api_key'",
@@ -473,7 +514,7 @@ mod tests {
             )
             .unwrap();
         let stored = row.unwrap().0.unwrap();
-        assert!(crate::crypto::is_encrypted(&stored));
+        assert!(crate::crypto::is_shared_encrypted(&stored));
         assert!(!stored.contains("gsk_super_secret_key"));
 
         // Y get() lo descifra de vuelta sin pérdida.
@@ -487,7 +528,7 @@ mod tests {
     }
 
     #[test]
-    fn test_legacy_plaintext_key_is_migrated_on_read() {
+    fn test_legacy_plaintext_key_is_returned_as_is() {
         let (mut conn, db_path) = setup();
 
         // Simula una instalación previa: la clave guardada en texto plano.
@@ -498,13 +539,22 @@ mod tests {
         )
         .unwrap();
 
-        // get() devuelve el valor y migra la fila a cifrado.
+        // get() devuelve el valor plano (no lo migra automáticamente; el
+        // siguiente save lo cifrará con AEAD compartido).
         let fetched = get(&mut conn).unwrap();
         assert_eq!(
             fetched.groq_api_key.as_deref(),
             Some("gsk_legacy_plaintext")
         );
 
+        // Un save posterior sí lo cifra con AEAD.
+        let input = ClinicSettings {
+            clinic_name: "Legacy".to_string(),
+            clinic_nit: "123".to_string(),
+            groq_api_key: Some("gsk_legacy_plaintext".to_string()),
+            ..Default::default()
+        };
+        save(&mut conn, &input).unwrap();
         let row: Option<(Option<String>,)> = conn
             .query_first(
                 "SELECT VALUE_TEXT FROM CLINIC_SETTINGS WHERE KEY_NAME = 'ai.groq_api_key'",
@@ -512,7 +562,7 @@ mod tests {
             )
             .unwrap();
         let stored = row.unwrap().0.unwrap();
-        assert!(crate::crypto::is_encrypted(&stored));
+        assert!(crate::crypto::is_shared_encrypted(&stored));
         assert!(!stored.contains("gsk_legacy_plaintext"));
 
         cleanup_test_db(&db_path);

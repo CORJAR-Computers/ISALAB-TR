@@ -118,11 +118,11 @@ pub struct VisitAttachment {
     pub id: i32,
     pub visit_id: i32,
     pub file_name: String,
-    /// Ruta persistida en app_data/attachments.
-    pub file_path: String,
     pub mime_type: Option<String>,
     /// BEFORE | AFTER | DOCUMENT
     pub kind: Option<String>,
+    /// Tamaño del BLOB en bytes (sin leer el contenido).
+    pub size_bytes: i64,
     pub created_at: String,
 }
 

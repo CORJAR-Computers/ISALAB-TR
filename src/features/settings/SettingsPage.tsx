@@ -1,12 +1,10 @@
-import { useEffect, useState } from "react";
+import { useEffect, useRef, useState } from "react";
 import { useForm } from "react-hook-form";
 import { zodResolver } from "@hookform/resolvers/zod";
 import { z } from "zod";
 import { toast } from "sonner";
-import { convertFileSrc } from "@tauri-apps/api/core";
 import { open, save as saveDialog } from "@tauri-apps/plugin-dialog";
 import { Building2, CreditCard, FileKey2, ImageUp, Loader2, PenLine, Save, X, Bot, DatabaseBackup, Wifi, ShieldAlert, Mail } from "lucide-react";
-import { invoke } from "@tauri-apps/api/core";
 import { usePermissions } from "@/hooks/use-permissions";
 import { Button } from "@/components/ui/button";
 import {
@@ -55,14 +53,12 @@ const schema = z.object({
   address: z.string().optional(),
   phone: z.string().optional(),
   city: z.string().optional(),
-  logoPath: z.string().optional(),
   taxRate: z.coerce.number().min(0).max(100, "IVA entre 0 y 100"),
   currency: z.string().min(1, "Moneda obligatoria"),
   signatureMode: z.enum(["GRAPHIC", "DIGITAL"]),
   vetName: z.string().optional(),
   vetLicense: z.string().optional(),
   groqApiKey: z.string().optional(),
-  pkcs12Path: z.string().optional(),
   pkcs12Password: z.string().optional(),
   tagline: z.string().optional(),
   groomingDuration: z.string().optional(),
@@ -93,6 +89,11 @@ export function SettingsPage() {
   const [testingGroq, setTestingGroq] = useState(false);
   const [testingSmtp, setTestingSmtp] = useState(false);
   const [importingPkcs12, setImportingPkcs12] = useState(false);
+  const [logoContentUrl, setLogoContentUrl] = useState<string | null>(null);
+  const [secondaryLogoContentUrls, setSecondaryLogoContentUrls] = useState<
+    Record<number, string>
+  >({});
+  const loadedLogoIds = useRef<Set<number>>(new Set());
   const testSmtpMutation = useTestSmtpConnection();
 
   const form = useForm<z.input<typeof schema>, unknown, z.output<typeof schema>>({
@@ -103,14 +104,12 @@ export function SettingsPage() {
       address: "",
       phone: "",
       city: "",
-      logoPath: "",
       taxRate: 19,
       currency: "COP",
       signatureMode: "GRAPHIC",
       vetName: "",
       vetLicense: "",
       groqApiKey: "",
-      pkcs12Path: "",
       pkcs12Password: "",
       smtpHost: "",
       smtpPort: undefined,
@@ -133,7 +132,6 @@ export function SettingsPage() {
         address: settings.address ?? "",
         phone: settings.phone ?? "",
         city: settings.city ?? "",
-        logoPath: settings.logoPath ?? "",
         taxRate: settings.taxRate ?? 19,
         currency: settings.currency,
         signatureMode:
@@ -141,7 +139,6 @@ export function SettingsPage() {
         vetName: settings.vetName ?? "",
         vetLicense: settings.vetLicense ?? "",
         groqApiKey: settings.groqApiKey ?? "",
-        pkcs12Path: settings.pkcs12Path ?? "",
         pkcs12Password: "",
         smtpHost: settings.smtpHost ?? "",
         smtpPort: settings.smtpPort ?? undefined,
@@ -171,10 +168,9 @@ export function SettingsPage() {
         ],
       });
       if (!selected || Array.isArray(selected)) return;
-      const stored = await importLogo.mutateAsync(selected);
-      form.setValue("logoPath", stored, { shouldDirty: true });
+      await importLogo.mutateAsync(selected);
       toast.success("Logo seleccionado", {
-        description: "Guarda la configuración para aplicarlo a los reportes.",
+        description: "El logo se almacena en la base de datos y estará disponible en todos los PCs.",
       });
     } catch (e) {
       toast.error("No se pudo cargar el logo", {
@@ -184,7 +180,7 @@ export function SettingsPage() {
   };
 
   const clearLogo = () => {
-    form.setValue("logoPath", "", { shouldDirty: true });
+    toast.info("Usa 'Eliminar logo' para quitar el logo principal.");
   };
 
   const pickSecondaryLogo = async () => {
@@ -221,7 +217,46 @@ export function SettingsPage() {
     }
   };
 
-  const logoPreview = form.watch("logoPath");
+  /** Precarga el contenido del logo principal como data URL para la vista previa. */
+  useEffect(() => {
+    if (!settings) return;
+    (async () => {
+      const bytes = await api.getClinicLogoContent();
+      if (bytes) {
+        const base64 = btoa(String.fromCharCode(...bytes));
+        setLogoContentUrl(`data:image/png;base64,${base64}`);
+      } else {
+        setLogoContentUrl(null);
+      }
+    })();
+  }, [settings]);
+
+  /** Precarga el contenido de los logos secundarios como data URL. */
+  useEffect(() => {
+    if (!secondaryLogos) return;
+    const pending: Promise<void>[] = [];
+    for (const logo of secondaryLogos) {
+      if (loadedLogoIds.current.has(logo.id)) continue;
+      loadedLogoIds.current.add(logo.id);
+      pending.push(
+        (async () => {
+          try {
+            const bytes = await api.getSecondaryLogoContent(logo.id);
+            if (bytes) {
+              const base64 = btoa(String.fromCharCode(...bytes));
+              setSecondaryLogoContentUrls((prev) => ({
+                ...prev,
+                [logo.id]: `data:image/png;base64,${base64}`,
+              }));
+            }
+          } catch {
+            // Ignorar errores individuales.
+          }
+        })(),
+      );
+    }
+    void Promise.all(pending);
+  }, [secondaryLogos]);
 
   const onSubmit = async (values: Values) => {
     const input: ClinicSettings = {
@@ -230,14 +265,12 @@ export function SettingsPage() {
       address: toNullable(values.address),
       phone: toNullable(values.phone),
       city: toNullable(values.city),
-      logoPath: toNullable(values.logoPath),
       taxRate: values.taxRate,
       currency: values.currency.trim(),
       signatureMode: values.signatureMode,
       vetName: values.vetName?.trim() ?? "",
       vetLicense: toNullable(values.vetLicense),
       groqApiKey: toNullable(values.groqApiKey),
-      pkcs12Path: toNullable(values.pkcs12Path),
       // La contraseña solo viaja al backend para validarla y guardarla en
       // memoria; nunca se persiste. Se limpia tras guardar.
       pkcs12Password: toNullable(values.pkcs12Password),
@@ -297,9 +330,8 @@ export function SettingsPage() {
         return;
       }
       const stored = await api.importPkcs12(selected, password);
-      form.setValue("pkcs12Path", stored, { shouldDirty: true });
       toast.success("Certificado importado", {
-        description: "Guarda la configuración para aplicar la firma digital.",
+        description: `Almacenado como "${stored.fileName ?? stored.kind}". Guarda la configuración para aplicar la firma digital.`,
       });
     } catch (e) {
       toast.error("No se pudo importar el certificado", {
@@ -311,7 +343,7 @@ export function SettingsPage() {
   };
 
   const clearPkcs12 = () => {
-    form.setValue("pkcs12Path", "", { shouldDirty: true });
+    toast.info("Usa 'Eliminar certificado' para quitar el PKCS#12.");
   };
 
   const testGroq = async () => {
@@ -358,8 +390,8 @@ export function SettingsPage() {
       if (!selected) return;
 
       setBackingUp(true);
-      const destPath = await invoke<string>("create_local_backup", { destPath: selected });
-      toast.success("Copia de seguridad creada con éxito", {
+      const destPath = await api.exportLocalConfig(selected);
+      toast.success("Configuración exportada con éxito", {
         description: `Guardado en: ${destPath}`,
       });
     } catch (e) {
@@ -543,9 +575,9 @@ export function SettingsPage() {
                 <FormLabel>Logo de la clínica</FormLabel>
                 <div className="mt-2 flex flex-wrap items-center gap-4">
                   <div className="bg-muted/40 flex h-20 w-36 shrink-0 items-center justify-center overflow-hidden rounded-lg border">
-                    {logoPreview ? (
+                    {logoContentUrl ? (
                       <img
-                        src={convertFileSrc(logoPreview)}
+                        src={logoContentUrl}
                         alt="Logo de la clínica"
                         className="max-h-full max-w-full object-contain"
                       />
@@ -571,7 +603,7 @@ export function SettingsPage() {
                         )}
                         Seleccionar logo…
                       </Button>
-                      {logoPreview && (
+                      {logoContentUrl && (
                         <Button
                           type="button"
                           variant="ghost"
@@ -611,7 +643,10 @@ export function SettingsPage() {
                     <div key={logo.id} className="relative group border rounded-lg p-2 flex flex-col items-center gap-2 bg-muted/20">
                       <div className="h-16 w-full flex items-center justify-center">
                         <img
-                          src={convertFileSrc(logo.logoPath)}
+                          src={
+                            secondaryLogoContentUrls[logo.id] ??
+                            `data:image/svg+xml;utf8,<svg xmlns="http://www.w3.org/2000/svg" width="64" height="48"><text x="50%" y="50%" font-size="10" text-anchor="middle" dy=".35em" fill="#999">${logo.name}</text></svg>`
+                          }
                           alt={logo.name}
                           className="max-h-full max-w-full object-contain"
                         />

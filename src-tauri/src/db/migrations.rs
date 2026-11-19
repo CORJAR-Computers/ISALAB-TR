@@ -138,6 +138,14 @@ pub const MIGRATIONS: &[(&str, &str)] = &[
         "0033_products",
         include_str!("../../migrations/0033_products.sql"),
     ),
+    (
+        "0034_attachment_blobs",
+        include_str!("../../migrations/0034_attachment_blobs.sql"),
+    ),
+    (
+        "0035_ops_table",
+        include_str!("../../migrations/0035_ops_table.sql"),
+    ),
 ];
 
 /// Indica si una migración de datos de demostración debe aplicarse.
@@ -417,7 +425,7 @@ fn split_statements(sql: &str) -> Result<Vec<String>, AppError> {
         if line.is_empty() {
             continue;
         }
-        if line.starts_with("--") {
+        if line.starts_with("--") || line.starts_with("//") {
             continue;
         }
         // Directiva de terminador: "SET TERM ^ ;" o "SET TERM ^" (3 tokens,

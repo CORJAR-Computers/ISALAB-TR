@@ -9,9 +9,9 @@ pub struct ResultAttachment {
     pub result_id: i32,
     /// Nombre original del archivo (para mostrarlo en la UI).
     pub file_name: String,
-    /// Ruta persistida en la carpeta de datos de la app (app_data/attachments).
-    pub file_path: String,
     pub mime_type: Option<String>,
+    /// Tamaño del BLOB en bytes (sin leer el contenido).
+    pub size_bytes: i64,
     pub created_at: String,
 }
 

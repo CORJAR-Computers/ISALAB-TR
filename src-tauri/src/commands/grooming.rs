@@ -1,7 +1,6 @@
-use std::path::PathBuf;
-
+use base64::Engine;
 use rsfbclient::prelude::*;
-use tauri::{AppHandle, Manager, State};
+use tauri::State;
 
 use crate::auth::{require_groom, require_session};
 use crate::error::AppError;
@@ -127,23 +126,19 @@ pub fn list_visit_attachments(
     grooming_repo::list_visit_attachments(pooled.conn(), visit_id)
 }
 
-/// Copia una foto (antes/después) o documento a app_data/attachments y la
-/// asocia a la visita. Devuelve el adjunto creado para refrescar la UI.
+/// Lee un archivo adjunto de visita y lo guarda como BLOB en Firebird.
 #[tauri::command]
 #[specta::specta]
 pub fn add_visit_attachment(
     state: State<'_, AppState>,
-    app: AppHandle,
     source_path: String,
     input: AddVisitAttachmentInput,
 ) -> Result<VisitAttachment, AppError> {
     let user = require_groom(&state)?;
 
-    let src = PathBuf::from(&source_path);
+    let src = std::path::PathBuf::from(&source_path);
     if !src.exists() {
-        return Err(AppError::Validation(
-            "El archivo seleccionado ya no existe".into(),
-        ));
+        return Err(AppError::Validation("El archivo seleccionado ya no existe".into()));
     }
     let ext = src
         .extension()
@@ -169,13 +164,12 @@ pub fn add_visit_attachment(
         )));
     };
 
-    let size = std::fs::metadata(&src)
-        .map_err(|e| AppError::Internal(format!("No se pudo leer el archivo: {e}")))?
-        .len();
+    // Lee el contenido una sola vez y lo envía al BLOB de la base.
+    let content = std::fs::read(&src)
+        .map_err(|e| AppError::Internal(format!("No se pudo leer el archivo: {e}")))?;
+    let size = content.len() as u64;
     if size > MAX_ATTACHMENT_BYTES {
-        return Err(AppError::Validation(
-            "El archivo supera el límite de 20 MB".into(),
-        ));
+        return Err(AppError::Validation("El archivo supera el límite de 20 MB".into()));
     }
 
     let file_name = src
@@ -200,32 +194,16 @@ pub fn add_visit_attachment(
         .query_first("SELECT 1 FROM VISITS WHERE ID = ?", (&input.visit_id,))
         .map_err(AppError::from)?;
     if visit_exists.is_none() {
-        return Err(AppError::NotFound(format!(
-            "Visita {} no encontrada",
-            input.visit_id
-        )));
+        return Err(AppError::NotFound(format!("Visita {} no encontrada", input.visit_id)));
     }
-
-    let attachments_dir = app
-        .path()
-        .app_data_dir()
-        .map_err(|e| AppError::Internal(format!("Sin carpeta de datos: {e}")))?
-        .join("attachments");
-    std::fs::create_dir_all(&attachments_dir)
-        .map_err(|e| AppError::Internal(format!("No se pudo crear attachments: {e}")))?;
-
-    let uuid = uuid::Uuid::new_v4().to_string();
-    let dest = attachments_dir.join(format!("{uuid}.{ext}"));
-    std::fs::copy(&src, &dest)
-        .map_err(|e| AppError::Internal(format!("No se pudo copiar el archivo: {e}")))?;
 
     let attachment = grooming_repo::insert_visit_attachment(
         pooled.conn(),
         input.visit_id,
         &file_name,
-        &dest.display().to_string(),
         Some(mime),
         kind,
+        &content,
     )?;
 
     log_groom_audit(
@@ -233,16 +211,12 @@ pub fn add_visit_attachment(
         Some(user.id),
         &user.username,
         "VISIT_ATTACHMENT_ADDED",
-        &format!(
-            "Adjunto \"{file_name}\" ({}) a la visita {}",
-            input.kind.as_deref().unwrap_or("DOCUMENT"),
-            input.visit_id
-        ),
+        &format!("Adjunto \"{file_name}\" ({size} bytes) a la visita {}", input.visit_id),
     );
     Ok(attachment)
 }
 
-/// Elimina un adjunto de visita: borra el archivo y su registro.
+/// Elimina un adjunto de visita: borra su registro y el BLOB almacenado en la base.
 #[tauri::command]
 #[specta::specta]
 pub fn delete_visit_attachment(state: State<'_, AppState>, id: i32) -> Result<(), AppError> {
@@ -253,10 +227,6 @@ pub fn delete_visit_attachment(state: State<'_, AppState>, id: i32) -> Result<()
         return Err(AppError::NotFound(format!("Adjunto {id} no encontrado")));
     };
 
-    let path = PathBuf::from(&att.file_path);
-    if path.exists() {
-        let _ = std::fs::remove_file(&path);
-    }
     grooming_repo::delete_visit_attachment(pooled.conn(), id)?;
 
     log_groom_audit(
@@ -264,7 +234,62 @@ pub fn delete_visit_attachment(state: State<'_, AppState>, id: i32) -> Result<()
         Some(user.id),
         &user.username,
         "VISIT_ATTACHMENT_DELETED",
-        &format!("Adjunto \"{}\" de la visita {}", att.file_name, att.visit_id),
+        &format!(
+            "Adjunto \"{}\" de la visita {} ({} bytes)",
+            att.file_name, att.visit_id, att.size_bytes
+        ),
     );
+    Ok(())
+}
+
+/// Devuelve el contenido (BLOB) de un adjunto de visita como `data:` URL.
+#[tauri::command]
+#[specta::specta]
+pub fn get_visit_attachment_content(
+    state: State<'_, AppState>,
+    id: i32,
+) -> Result<crate::models::attachment::AttachmentContent, AppError> {
+    let _ = require_session(&state)?;
+    let mut pooled = state.pool.acquire()?;
+    grooming_repo::content_visit_attachment(pooled.conn(), id)
+        .map_err(|e| AppError::NotFound(format!("Adjunto {id} no disponible: {e}")))
+}
+
+/// Abre el archivo adjunto de visita en el visor por defecto del SO
+/// (materializa el BLOB en %TEMP% y lo lanza).
+#[tauri::command]
+#[specta::specta]
+pub fn open_visit_attachment(
+    state: State<'_, AppState>,
+    id: i32,
+) -> Result<(), AppError> {
+    let _ = require_session(&state)?;
+    let mut pooled = state.pool.acquire()?;
+    let content = grooming_repo::content_visit_attachment(pooled.conn(), id)
+        .map_err(|e| AppError::NotFound(format!("Adjunto {id} no disponible: {e}")))?;
+
+    let tmp_dir = std::env::temp_dir();
+    let tmp_path = tmp_dir.join(format!("isalab_visit_{}_{}", id, content.file_name));
+
+    // data_url es "data:mime;base64,<bytes>"; decodificamos a bytes crudos.
+    let b64 = content
+        .data_url
+        .split(',')
+        .nth(1)
+        .unwrap_or("");
+    let bytes = base64::engine::general_purpose::STANDARD
+        .decode(b64)
+        .map_err(|e| AppError::Internal(format!("Base64 inválido: {e}")))?;
+    std::fs::write(&tmp_path, &bytes)
+        .map_err(|e| AppError::Internal(format!("No se pudo escribir el temporal: {e}")))?;
+
+    let _ = std::process::Command::new("cmd")
+        .args(["/C", "start", "", &tmp_path.to_string_lossy()])
+        .spawn()
+        .map_err(|e| AppError::Internal(format!("No se pudo lanzar el visor: {e}")))?;
+
+    // Limpieza best-effort del temporal (se ignora si el visor lo usa aún).
+    let _ = std::fs::remove_file(&tmp_path);
+
     Ok(())
 }

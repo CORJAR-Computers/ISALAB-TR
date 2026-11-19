@@ -8,7 +8,8 @@ use crate::repositories::next_id;
 pub(crate) type SecondaryLogoRow = (
     i32,
     String,
-    String,
+    Option<String>,
+    i64,
     String, // created_at
 );
 
@@ -16,15 +17,16 @@ pub(crate) fn map_secondary_logo(r: SecondaryLogoRow) -> SecondaryLogo {
     SecondaryLogo {
         id: r.0,
         name: r.1,
-        logo_path: r.2,
-        created_at: r.3,
+        mime_type: r.2,
+        size_bytes: r.3,
+        created_at: r.4,
     }
 }
 
 pub fn list(conn: &mut SimpleConnection) -> Result<Vec<SecondaryLogo>, AppError> {
     let rows: Vec<SecondaryLogoRow> = conn
         .query(
-            "SELECT ID, NAME, LOGO_PATH, CAST(CREATED_AT AS VARCHAR(30)) FROM SECONDARY_LOGOS ORDER BY NAME",
+            "SELECT ID, NAME, MIME_TYPE, SIZE_BYTES, CAST(CREATED_AT AS VARCHAR(30)) FROM SECONDARY_LOGOS ORDER BY NAME",
             (),
         )
         .map_err(AppError::from)?;
@@ -34,18 +36,21 @@ pub fn list(conn: &mut SimpleConnection) -> Result<Vec<SecondaryLogo>, AppError>
 pub fn insert(
     conn: &mut SimpleConnection,
     name: &str,
-    logo_path: &str,
+    mime_type: Option<&str>,
+    content: &[u8],
 ) -> Result<SecondaryLogo, AppError> {
     let id = next_id(conn, "GEN_SECONDARY_LOGOS_SEQ")?;
     conn.execute(
-        "INSERT INTO SECONDARY_LOGOS (ID, NAME, LOGO_PATH) VALUES (?, ?, ?)",
-        (&id, name, logo_path),
+        "INSERT INTO SECONDARY_LOGOS (ID, NAME, MIME_TYPE, CONTENT, SIZE_BYTES)
+         VALUES (?, ?, ?, ?, ?)",
+        (&id, name, mime_type, content, content.len() as i32),
     )
     .map_err(AppError::from)?;
 
     let row: Option<SecondaryLogoRow> = conn
         .query_first(
-            "SELECT ID, NAME, LOGO_PATH, CAST(CREATED_AT AS VARCHAR(30)) FROM SECONDARY_LOGOS WHERE ID = ?",
+            "SELECT ID, NAME, MIME_TYPE, SIZE_BYTES, CAST(CREATED_AT AS VARCHAR(30))
+             FROM SECONDARY_LOGOS WHERE ID = ?",
             (&id,),
         )
         .map_err(AppError::from)?;
@@ -57,11 +62,21 @@ pub fn insert(
 pub fn get(conn: &mut SimpleConnection, id: i32) -> Result<Option<SecondaryLogo>, AppError> {
     let row: Option<SecondaryLogoRow> = conn
         .query_first(
-            "SELECT ID, NAME, LOGO_PATH, CAST(CREATED_AT AS VARCHAR(30)) FROM SECONDARY_LOGOS WHERE ID = ?",
+            "SELECT ID, NAME, MIME_TYPE, SIZE_BYTES, CAST(CREATED_AT AS VARCHAR(30))
+             FROM SECONDARY_LOGOS WHERE ID = ?",
             (&id,),
         )
         .map_err(AppError::from)?;
     Ok(row.map(map_secondary_logo))
+}
+
+/// Descarga el contenido (BLOB) de un logo secundario por ID.
+pub fn content(conn: &mut SimpleConnection, id: i32) -> Option<Vec<u8>> {
+    let row: Option<(Option<Vec<u8>>,)> = conn
+        .query_first("SELECT CONTENT FROM SECONDARY_LOGOS WHERE ID = ?", (&id,))
+        .ok()
+        .flatten();
+    row.and_then(|(o,)| o)
 }
 
 pub fn delete(conn: &mut SimpleConnection, id: i32) -> Result<(), AppError> {

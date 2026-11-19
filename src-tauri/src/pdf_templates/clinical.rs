@@ -69,18 +69,13 @@ pub fn generate_report(data: &ClinicalReportData, out_path: &Path) -> Result<(),
 
     // Si el modo es DIGITAL, agregar bloque de firma digital con metadatos reales del certificado
     if data.signature.mode.eq_ignore_ascii_case("DIGITAL") {
-        if let Some(ref pkcs12_path) = data.signature.pkcs12_path {
-            let path = std::path::Path::new(pkcs12_path);
+        if let Some(ref pkcs12_bytes) = data.signature.pkcs12_bytes {
             let password = data.signature.pkcs12_password.as_deref().unwrap_or("");
-            if path.exists() {
-                // Metadatos reales del certificado (parseo PKCS#12)
-                if let Ok(info) = extract_pkcs12_info_for_pdf(path, password) {
-                    draw_digital_signature_block(&mut pdf, &info);
-                } else {
-                    // Firma visible genérica si no se puede leer el certificado
-                    draw_generic_digital_signature(&mut pdf, &data.signature);
-                }
+            // Metadatos reales del certificado (parseo PKCS#12 desde bytes)
+            if let Ok(info) = extract_pkcs12_info_for_pdf(pkcs12_bytes, password) {
+                draw_digital_signature_block(&mut pdf, &info);
             } else {
+                // Firma visible genérica si no se puede leer el certificado
                 draw_generic_digital_signature(&mut pdf, &data.signature);
             }
         } else {
@@ -166,11 +161,13 @@ struct Pkcs12CertInfo {
 
 /// Extrae los metadatos reales del certificado PKCS#12 para el bloque de firma
 /// (parseo real con p12-keystore + x509-cert, ver `pdf_templates::signing`).
+/// Extrae los metadatos reales del certificado PKCS#12 para el bloque de firma
+/// (parseo real con p12-keystore + x509-cert, ver `pdf_templates::signing`).
 fn extract_pkcs12_info_for_pdf(
-    path: &std::path::Path,
+    pkcs12_bytes: &[u8],
     password: &str,
 ) -> Result<Pkcs12CertInfo, String> {
-    let report = crate::pdf_templates::signing::validate_pkcs12(path, password)
+    let report = crate::pdf_templates::signing::validate_pkcs12_bytes(pkcs12_bytes, password)
         .map_err(|e| e.to_string())?;
 
     Ok(Pkcs12CertInfo {
