@@ -1,5 +1,5 @@
 import { useEffect, useMemo, useState } from "react";
-import { Plus, Receipt, Search } from "lucide-react";
+import { Banknote, Plus, Receipt, Search } from "lucide-react";
 import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
@@ -20,28 +20,33 @@ import {
 } from "@/components/ui/table";
 import { Skeleton } from "@/components/ui/skeleton";
 import { useInvoiceCounts, useInvoices } from "@/hooks/use-queries";
-import { INVOICE_STATUS, PAYMENT_METHOD_LABEL } from "@/lib/status";
+import { PAYMENT_STATUS } from "@/lib/status";
 import { cn, formatCOP, formatDateTime } from "@/lib/utils";
 import { InvoiceDetailDialog } from "./InvoiceDetailDialog";
 import { NewInvoiceDialog } from "./NewInvoiceDialog";
+import { PaymentDialog } from "./PaymentDialog";
 import { usePermissions } from "@/hooks/use-permissions";
 import { useUiStore } from "@/stores/ui-store";
 
 const STATUS_TABS: Array<{ value: string | null; label: string }> = [
   { value: null, label: "Todas" },
-  { value: "EMITIDA", label: "Emitidas" },
+  { value: "PENDIENTE", label: "Pendientes" },
+  { value: "ABONADA", label: "Abonadas" },
   { value: "PAGADA", label: "Pagadas" },
   { value: "ANULADA", label: "Anuladas" },
 ];
+
+const COLUMN_COUNT = 10;
 
 export function InvoicesPage() {
   const [status, setStatus] = useState<string | null>(null);
   const [search, setSearch] = useState("");
   const [newOpen, setNewOpen] = useState(false);
   const [detailId, setDetailId] = useState<number | null>(null);
+  const [payingId, setPayingId] = useState<number | null>(null);
   const { data: invoices, isLoading, isError } = useInvoices(status, search);
   const { data: all } = useInvoiceCounts();
-  const { isVetOrAdmin } = usePermissions();
+  const { canBill } = usePermissions();
   const entityRequest = useUiStore((s) => s.entityRequest);
   const consumeEntityRequest = useUiStore((s) => s.consumeEntityRequest);
 
@@ -53,11 +58,12 @@ export function InvoicesPage() {
     }
   }, [entityRequest, consumeEntityRequest]);
 
-  // Contadores reales por estado (independientes de filtros/búsqueda).
+  // Contadores reales por estado de cobro (independientes de filtros/búsqueda).
   const counts = useMemo(() => {
     const c: Record<string, number> = {
       TOTAL: 0,
-      EMITIDA: 0,
+      PENDIENTE: 0,
+      ABONADA: 0,
       PAGADA: 0,
       ANULADA: 0,
     };
@@ -68,31 +74,56 @@ export function InvoicesPage() {
     return c;
   }, [all]);
 
-  const paidTotal = useMemo(
-    () =>
-      (invoices ?? [])
-        .filter((i) => i.status === "PAGADA")
-        .reduce((acc, i) => acc + (i.total ?? 0), 0),
-    [invoices],
-  );
+  // Totales del listado visible: facturado (sin anuladas), cobrado y saldo.
+  const totals = useMemo(() => {
+    let billed = 0;
+    let collected = 0;
+    let pending = 0;
+    for (const i of invoices ?? []) {
+      if (i.paymentStatus === "ANULADA") continue;
+      billed += i.total ?? 0;
+      collected += i.paidAmount ?? 0;
+      pending += i.balance ?? 0;
+    }
+    return { billed, collected, pending };
+  }, [invoices]);
 
   return (
     <div className="space-y-5">
       <div className="flex flex-wrap items-start justify-between gap-3">
         <div>
-          <h2 className="text-xl font-semibold tracking-tight">
-            Facturación
-          </h2>
+          <h2 className="text-xl font-semibold tracking-tight">Facturación</h2>
           <p className="text-muted-foreground text-sm">
-            Emisión de facturas con IVA, métodos de pago y estados de cobro.
+            Emisión de facturas con IVA, abonos, métodos de pago y saldos.
           </p>
         </div>
-        {isVetOrAdmin && (
+        {canBill && (
           <Button onClick={() => setNewOpen(true)}>
             <Plus className="size-4" />
             Nueva factura
           </Button>
         )}
+      </div>
+
+      <div className="grid gap-3 sm:grid-cols-3">
+        <Card className="gap-0 p-3">
+          <p className="text-muted-foreground text-xs">Facturado (visible)</p>
+          <p className="text-lg font-semibold tabular-nums">
+            {formatCOP(totals.billed)}
+          </p>
+        </Card>
+        <Card className="gap-0 p-3">
+          <p className="text-muted-foreground text-xs">Cobrado</p>
+          <p className="text-lg font-semibold tabular-nums">
+            {formatCOP(totals.collected)}
+          </p>
+        </Card>
+        <Card className="gap-0 p-3">
+          <p className="text-muted-foreground text-xs">Saldo pendiente</p>
+          <p className="text-lg font-semibold tabular-nums">
+            {formatCOP(totals.pending)}
+          </p>
+        </Card>
       </div>
 
       <div className="flex flex-col gap-3 lg:flex-row lg:items-center">
@@ -139,7 +170,7 @@ export function InvoicesPage() {
           <CardDescription>
             {isLoading
               ? "Cargando…"
-              : `${invoices?.length ?? 0} factura${(invoices?.length ?? 0) === 1 ? "" : "s"} · ${formatCOP(paidTotal)} cobrados`}
+              : `${invoices?.length ?? 0} factura${(invoices?.length ?? 0) === 1 ? "" : "s"} · ${formatCOP(totals.pending)} por cobrar`}
           </CardDescription>
         </CardHeader>
         <CardContent className="p-0">
@@ -152,6 +183,8 @@ export function InvoicesPage() {
                 <TableHead>Fecha</TableHead>
                 <TableHead className="text-center">Conceptos</TableHead>
                 <TableHead className="text-right">Total</TableHead>
+                <TableHead className="text-right">Abonado</TableHead>
+                <TableHead className="text-right">Saldo</TableHead>
                 <TableHead>Estado</TableHead>
                 <TableHead className="text-right">Acción</TableHead>
               </TableRow>
@@ -160,7 +193,7 @@ export function InvoicesPage() {
               {isLoading &&
                 Array.from({ length: 5 }).map((_, i) => (
                   <TableRow key={i}>
-                    <TableCell colSpan={8} className="h-12">
+                    <TableCell colSpan={COLUMN_COUNT} className="h-12">
                       <Skeleton className="h-8 w-full" />
                     </TableCell>
                   </TableRow>
@@ -168,7 +201,10 @@ export function InvoicesPage() {
 
               {!isLoading && isError && (
                 <TableRow>
-                  <TableCell colSpan={8} className="text-muted-foreground h-16 text-center">
+                  <TableCell
+                    colSpan={COLUMN_COUNT}
+                    className="text-muted-foreground h-16 text-center"
+                  >
                     No se pudieron cargar las facturas.
                   </TableCell>
                 </TableRow>
@@ -176,7 +212,10 @@ export function InvoicesPage() {
 
               {!isLoading && invoices?.length === 0 && (
                 <TableRow>
-                  <TableCell colSpan={8} className="text-muted-foreground h-24 text-center">
+                  <TableCell
+                    colSpan={COLUMN_COUNT}
+                    className="text-muted-foreground h-24 text-center"
+                  >
                     {search
                       ? "Ninguna factura coincide con la búsqueda."
                       : "Sin facturas. Usa “Nueva factura” para emitir la primera."}
@@ -185,10 +224,12 @@ export function InvoicesPage() {
               )}
 
               {invoices?.map((i) => {
-                const st = INVOICE_STATUS[i.status] ?? {
-                  label: i.status,
+                const st = PAYMENT_STATUS[i.paymentStatus] ?? {
+                  label: i.paymentStatus,
                   variant: "secondary" as const,
                 };
+                const hasBalance =
+                  i.paymentStatus !== "ANULADA" && (i.balance ?? 0) > 0.01;
                 return (
                   <TableRow
                     key={i.id}
@@ -215,29 +256,46 @@ export function InvoicesPage() {
                     <TableCell className="text-right font-semibold tabular-nums">
                       {formatCOP(i.total ?? 0)}
                     </TableCell>
-                    <TableCell>
-                      <div className="flex flex-col gap-0.5">
-                        <Badge variant={st.variant}>{st.label}</Badge>
-                        {i.paymentMethod && (
-                          <span className="text-muted-foreground text-[11px]">
-                            {PAYMENT_METHOD_LABEL[i.paymentMethod] ??
-                              i.paymentMethod}
-                          </span>
+                    <TableCell className="text-right text-muted-foreground tabular-nums">
+                      {formatCOP(i.paidAmount ?? 0)}
+                    </TableCell>
+                    <TableCell className="text-right tabular-nums">
+                      <span
+                        className={cn(
+                          hasBalance && "text-destructive font-medium",
                         )}
-                      </div>
+                      >
+                        {formatCOP(i.balance ?? 0)}
+                      </span>
+                    </TableCell>
+                    <TableCell>
+                      <Badge variant={st.variant}>{st.label}</Badge>
                     </TableCell>
                     <TableCell className="text-right">
-                      <Button
-                        variant="ghost"
-                        size="sm"
-                        onClick={(e) => {
-                          e.stopPropagation();
-                          setDetailId(i.id);
-                        }}
-                      >
-                        <Receipt className="size-3.5" />
-                        Ver
-                      </Button>
+                      {hasBalance && canBill ? (
+                        <Button
+                          size="sm"
+                          onClick={(e) => {
+                            e.stopPropagation();
+                            setPayingId(i.id);
+                          }}
+                        >
+                          <Banknote className="size-3.5" />
+                          Cobrar
+                        </Button>
+                      ) : (
+                        <Button
+                          variant="ghost"
+                          size="sm"
+                          onClick={(e) => {
+                            e.stopPropagation();
+                            setDetailId(i.id);
+                          }}
+                        >
+                          <Receipt className="size-3.5" />
+                          Ver
+                        </Button>
+                      )}
                     </TableCell>
                   </TableRow>
                 );
@@ -251,6 +309,10 @@ export function InvoicesPage() {
       <InvoiceDetailDialog
         invoiceId={detailId}
         onOpenChange={(open) => !open && setDetailId(null)}
+      />
+      <PaymentDialog
+        invoiceId={payingId}
+        onOpenChange={(open) => !open && setPayingId(null)}
       />
     </div>
   );

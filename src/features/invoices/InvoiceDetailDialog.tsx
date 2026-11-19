@@ -1,5 +1,12 @@
+import { useState } from "react";
 import { toast } from "sonner";
-import { Ban, CheckCircle2, Loader2, Receipt, MessageCircle } from "lucide-react";
+import {
+  Ban,
+  Banknote,
+  Loader2,
+  MessageCircle,
+  Receipt,
+} from "lucide-react";
 import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
 import {
@@ -20,11 +27,18 @@ import {
   TableHeader,
   TableRow,
 } from "@/components/ui/table";
-import { useInvoice, useSetInvoiceStatus } from "@/hooks/use-queries";
+import {
+  useInvoice,
+  useInvoiceBalance,
+  useInvoicePayments,
+  useSetInvoiceStatus,
+} from "@/hooks/use-queries";
+import { usePermissions } from "@/hooks/use-permissions";
 import { getErrorMessage } from "@/lib/api";
-import { INVOICE_STATUS, PAYMENT_METHOD_LABEL } from "@/lib/status";
+import { PAYMENT_STATUS } from "@/lib/status";
 import { formatCOP, formatDateTime } from "@/lib/utils";
 import { sendWhatsAppMessage } from "@/lib/whatsapp";
+import { PaymentDialog } from "./PaymentDialog";
 
 export function InvoiceDetailDialog({
   invoiceId,
@@ -34,15 +48,33 @@ export function InvoiceDetailDialog({
   onOpenChange: (open: boolean) => void;
 }) {
   const { data: invoice, isLoading } = useInvoice(invoiceId);
+  const { data: balance } = useInvoiceBalance(invoiceId);
+  const { data: payments } = useInvoicePayments(invoiceId);
   const setStatus = useSetInvoiceStatus();
+  const { canBill } = usePermissions();
+  const [paying, setPaying] = useState(false);
 
-  const changeStatus = async (status: string, label: string) => {
+  const activePayments = (payments ?? []).filter(
+    (p) => p.status === "APLICADO",
+  );
+  const hasPayments = activePayments.length > 0;
+  const paymentStatus = balance?.paymentStatus ?? invoice?.status ?? "";
+  const statusInfo = PAYMENT_STATUS[paymentStatus] ?? {
+    label: paymentStatus,
+    variant: "secondary" as const,
+  };
+  const canCharge =
+    canBill &&
+    (paymentStatus === "PENDIENTE" || paymentStatus === "ABONADA");
+  const canAnulate = paymentStatus !== "ANULADA" && !hasPayments;
+
+  const anulate = async () => {
     if (!invoice) return;
     try {
-      await setStatus.mutateAsync({ id: invoice.id, status });
-      toast.success(`Factura ${label.toLowerCase()}`);
+      await setStatus.mutateAsync({ id: invoice.id, status: "ANULADA" });
+      toast.success("Factura anulada");
     } catch (e) {
-      toast.error("No se pudo actualizar la factura", {
+      toast.error("No se pudo anular la factura", {
         description: getErrorMessage(e),
       });
     }
@@ -51,7 +83,8 @@ export function InvoiceDetailDialog({
   const handleWhatsApp = () => {
     if (!invoice?.ownerPhone || !invoice?.ownerName) {
       toast.error("Falta información", {
-        description: "La factura no tiene un número de teléfono del propietario registrado.",
+        description:
+          "La factura no tiene un número de teléfono del propietario registrado.",
       });
       return;
     }
@@ -60,169 +93,213 @@ export function InvoiceDetailDialog({
   };
 
   return (
-    <Dialog open={invoiceId != null} onOpenChange={onOpenChange}>
-      <DialogContent className="max-h-[90vh] overflow-y-auto sm:max-w-xl">
-        <DialogHeader>
-          <DialogTitle className="flex items-center gap-2">
-            <Receipt className="size-4 text-primary" />
-            Factura {invoice?.invoiceNumber ?? "…"}
-          </DialogTitle>
-          <DialogDescription>
-            {invoice && (
-              <>
-                Emitida el {formatDateTime(invoice.issueDate)} ·{" "}
-                {invoice.patientName ? `Paciente ${invoice.patientName} · ` : ""}
-                {invoice.ownerName}
-              </>
-            )}
-          </DialogDescription>
-        </DialogHeader>
-
-        {isLoading && !invoice && (
-          <div className="space-y-3">
-            <Skeleton className="h-32 w-full" />
-            <Skeleton className="h-24 w-full" />
-          </div>
-        )}
-
-        {invoice && (
-          <div className="space-y-4">
-            <div className="flex flex-wrap items-center gap-2">
-              <Badge
-                variant={
-                  INVOICE_STATUS[invoice.status]?.variant ?? "secondary"
-                }
-              >
-                {INVOICE_STATUS[invoice.status]?.label ?? invoice.status}
-              </Badge>
-              {invoice.paymentMethod && (
-                <Badge variant="outline">
-                  {PAYMENT_METHOD_LABEL[invoice.paymentMethod] ??
-                    invoice.paymentMethod}
-                </Badge>
+    <>
+      <Dialog open={invoiceId != null} onOpenChange={onOpenChange}>
+        <DialogContent className="max-h-[90vh] overflow-y-auto sm:max-w-xl">
+          <DialogHeader>
+            <DialogTitle className="flex items-center gap-2">
+              <Receipt className="size-4 text-primary" />
+              Factura {invoice?.invoiceNumber ?? "…"}
+            </DialogTitle>
+            <DialogDescription>
+              {invoice && (
+                <>
+                  Emitida el {formatDateTime(invoice.issueDate)} ·{" "}
+                  {invoice.patientName ? `Paciente ${invoice.patientName} · ` : ""}
+                  {invoice.ownerName}
+                </>
               )}
-              {invoice.notes && (
-                <span className="text-muted-foreground text-xs">
-                  {invoice.notes}
-                </span>
-              )}
+            </DialogDescription>
+          </DialogHeader>
+
+          {isLoading && !invoice && (
+            <div className="space-y-3">
+              <Skeleton className="h-32 w-full" />
+              <Skeleton className="h-24 w-full" />
             </div>
+          )}
 
-            <div className="overflow-hidden rounded-lg border">
-              <Table>
-                <TableHeader>
-                  <TableRow className="hover:bg-transparent">
-                    <TableHead>Concepto</TableHead>
-                    <TableHead className="text-center">Cant.</TableHead>
-                    <TableHead className="text-right">P. unitario</TableHead>
-                    <TableHead className="text-right">Subtotal</TableHead>
-                  </TableRow>
-                </TableHeader>
-                <TableBody>
-                  {invoice.items.map((it) => (
-                    <TableRow key={it.id}>
-                      <TableCell>{it.description}</TableCell>
-                      <TableCell className="text-center tabular-nums">
-                        {it.quantity}
-                      </TableCell>
-                      <TableCell className="text-right tabular-nums">
-                        {formatCOP(it.unitPrice ?? 0)}
-                      </TableCell>
-                      <TableCell className="text-right font-medium tabular-nums">
-                        {formatCOP(it.lineTotal ?? 0)}
-                      </TableCell>
+          {invoice && (
+            <div className="space-y-4">
+              <div className="flex flex-wrap items-center gap-2">
+                <Badge variant={statusInfo.variant}>{statusInfo.label}</Badge>
+                {invoice.notes && (
+                  <span className="text-muted-foreground text-xs">
+                    {invoice.notes}
+                  </span>
+                )}
+              </div>
+
+              <div className="overflow-hidden rounded-lg border">
+                <Table>
+                  <TableHeader>
+                    <TableRow className="hover:bg-transparent">
+                      <TableHead>Concepto</TableHead>
+                      <TableHead className="text-center">Cant.</TableHead>
+                      <TableHead className="text-right">P. unitario</TableHead>
+                      <TableHead className="text-right">Subtotal</TableHead>
                     </TableRow>
-                  ))}
-                </TableBody>
-              </Table>
-            </div>
+                  </TableHeader>
+                  <TableBody>
+                    {invoice.items.map((it) => (
+                      <TableRow key={it.id}>
+                        <TableCell>{it.description}</TableCell>
+                        <TableCell className="text-center tabular-nums">
+                          {it.quantity}
+                        </TableCell>
+                        <TableCell className="text-right tabular-nums">
+                          {formatCOP(it.unitPrice ?? 0)}
+                        </TableCell>
+                        <TableCell className="text-right font-medium tabular-nums">
+                          {formatCOP(it.lineTotal ?? 0)}
+                        </TableCell>
+                      </TableRow>
+                    ))}
+                  </TableBody>
+                </Table>
+              </div>
 
-            <div className="ml-auto w-full max-w-64 space-y-1 text-sm">
-              <div className="flex justify-between text-muted-foreground">
-                <span>Subtotal</span>
-                <span className="tabular-nums">
-                  {formatCOP(invoice.subtotal ?? 0)}
-                </span>
+              <div className="ml-auto w-full max-w-64 space-y-1 text-sm">
+                <div className="flex justify-between text-muted-foreground">
+                  <span>Subtotal</span>
+                  <span className="tabular-nums">
+                    {formatCOP(invoice.subtotal ?? 0)}
+                  </span>
+                </div>
+                <div className="flex justify-between text-muted-foreground">
+                  <span>IVA ({invoice.taxRate ?? 0}%)</span>
+                  <span className="tabular-nums">
+                    {formatCOP(invoice.taxAmount ?? 0)}
+                  </span>
+                </div>
+                <Separator />
+                <div className="flex justify-between text-base font-semibold">
+                  <span>Total</span>
+                  <span className="text-primary tabular-nums">
+                    {formatCOP(invoice.total ?? 0)}
+                  </span>
+                </div>
+                {balance && (
+                  <>
+                    <div className="flex justify-between text-muted-foreground">
+                      <span>Abonado</span>
+                      <span className="tabular-nums">
+                        {formatCOP(balance.paidAmount)}
+                      </span>
+                    </div>
+                    <div className="flex justify-between font-semibold">
+                      <span>Saldo</span>
+                      <span className="tabular-nums">
+                        {formatCOP(balance.balance)}
+                      </span>
+                    </div>
+                  </>
+                )}
               </div>
-              <div className="flex justify-between text-muted-foreground">
-                <span>IVA ({invoice.taxRate ?? 0}%)</span>
-                <span className="tabular-nums">
-                  {formatCOP(invoice.taxAmount ?? 0)}
-                </span>
-              </div>
-              <Separator />
-              <div className="flex justify-between text-base font-semibold">
-                <span>Total</span>
-                <span className="text-primary tabular-nums">
-                  {formatCOP(invoice.total ?? 0)}
-                </span>
-              </div>
-            </div>
 
-            <DialogFooter>
-              {invoice.status === "EMITIDA" && (
-                <Button
-                  variant="outline"
-                  className="text-destructive"
-                  disabled={setStatus.isPending}
-                  onClick={() => changeStatus("ANULADA", "Anulada")}
-                >
-                  {setStatus.isPending ? (
-                    <Loader2 className="size-4 animate-spin" />
-                  ) : (
-                    <Ban className="size-4" />
+              <div className="space-y-2">
+                <div className="flex items-center justify-between">
+                  <h4 className="text-sm font-semibold">Pagos</h4>
+                  {activePayments.length > 0 && (
+                    <span className="text-muted-foreground text-xs">
+                      {activePayments.length} recepci
+                      {activePayments.length === 1 ? "ón" : "ones"}
+                    </span>
                   )}
-                  Anular
-                </Button>
-              )}
-              {invoice.status === "PAGADA" && (
-                <Button
-                  variant="ghost"
-                  className="text-destructive"
-                  disabled={setStatus.isPending}
-                  onClick={() => changeStatus("ANULADA", "Anulada")}
-                >
-                  {setStatus.isPending ? (
-                    <Loader2 className="size-4 animate-spin" />
-                  ) : (
-                    <Ban className="size-4" />
-                  )}
-                  Anular
-                </Button>
-              )}
-              {invoice.status !== "PAGADA" && invoice.status !== "ANULADA" && (
-                <Button
-                  className="text-success"
-                  disabled={setStatus.isPending}
-                  onClick={() => changeStatus("PAGADA", "Pagada")}
-                >
-                  {setStatus.isPending ? (
-                    <Loader2 className="size-4 animate-spin" />
-                  ) : (
-                    <CheckCircle2 className="size-4" />
-                  )}
-                  Marcar como pagada
-                </Button>
-              )}
-              {invoice.status !== "ANULADA" && (
-                <Button
-                  variant="outline"
-                  className="gap-2 bg-green-50 text-green-700 hover:bg-green-100 hover:text-green-800 border-green-200 dark:bg-green-900/20 dark:text-green-400 dark:border-green-900/50 dark:hover:bg-green-900/40"
-                  onClick={handleWhatsApp}
-                >
-                  <MessageCircle className="size-4" />
-                  Enviar por WhatsApp
-                </Button>
-              )}
-              {invoice.status === "ANULADA" && (
-                <Button variant="outline" onClick={() => onOpenChange(false)}>
-                  Cerrar
-                </Button>
-              )}
-            </DialogFooter>
-          </div>
-        )}
-      </DialogContent>
-    </Dialog>
+                </div>
+                {!payments || payments.length === 0 ? (
+                  <p className="text-muted-foreground rounded-lg border px-3 py-3 text-center text-sm">
+                    Esta factura no tiene abonos registrados.
+                  </p>
+                ) : (
+                  <div className="divide-y rounded-lg border">
+                    {payments.map((p) => (
+                      <div
+                        key={p.id}
+                        className="flex flex-wrap items-center justify-between gap-2 px-3 py-2 text-sm"
+                      >
+                        <div className="min-w-0">
+                          <p className="font-mono text-xs font-semibold">
+                            {p.code}
+                            {p.status === "ANULADO" && (
+                              <Badge
+                                variant="destructive"
+                                className="ml-2 text-[10px]"
+                              >
+                                Anulado
+                              </Badge>
+                            )}
+                          </p>
+                          <p className="text-muted-foreground truncate text-xs">
+                            {formatDateTime(p.receivedAt)} ·{" "}
+                            {p.lines
+                              .map((l) => l.methodName)
+                              .join(" + ") || "—"}
+                            {p.createdByName ? ` · ${p.createdByName}` : ""}
+                          </p>
+                        </div>
+                        <span className="font-semibold tabular-nums">
+                          {formatCOP(p.total)}
+                        </span>
+                      </div>
+                    ))}
+                  </div>
+                )}
+                {hasPayments && (
+                  <p className="text-muted-foreground text-xs">
+                    Una factura con pagos activos no puede anularse; primero
+                    anula los pagos.
+                  </p>
+                )}
+              </div>
+
+              <DialogFooter>
+                {canAnulate && (
+                  <Button
+                    variant="outline"
+                    className="text-destructive"
+                    disabled={setStatus.isPending}
+                    onClick={anulate}
+                  >
+                    {setStatus.isPending ? (
+                      <Loader2 className="size-4 animate-spin" />
+                    ) : (
+                      <Ban className="size-4" />
+                    )}
+                    Anular
+                  </Button>
+                )}
+                {canCharge && (
+                  <Button onClick={() => setPaying(true)}>
+                    <Banknote className="size-4" />
+                    Registrar pago
+                  </Button>
+                )}
+                {paymentStatus !== "ANULADA" && (
+                  <Button
+                    variant="outline"
+                    className="gap-2 border-green-200 bg-green-50 text-green-700 hover:bg-green-100 hover:text-green-800 dark:border-green-900/50 dark:bg-green-900/20 dark:text-green-400 dark:hover:bg-green-900/40"
+                    onClick={handleWhatsApp}
+                  >
+                    <MessageCircle className="size-4" />
+                    Enviar por WhatsApp
+                  </Button>
+                )}
+                {paymentStatus === "ANULADA" && (
+                  <Button variant="outline" onClick={() => onOpenChange(false)}>
+                    Cerrar
+                  </Button>
+                )}
+              </DialogFooter>
+            </div>
+          )}
+        </DialogContent>
+      </Dialog>
+
+      <PaymentDialog
+        invoiceId={paying ? invoiceId : null}
+        onOpenChange={(open) => !open && setPaying(false)}
+      />
+    </>
   );
 }

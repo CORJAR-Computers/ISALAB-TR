@@ -150,6 +150,13 @@ pub fn setup_test_db() -> (SimpleConnection, PathBuf) {
 
     // Limpiar datos de prueba de la migración 0005 (son para demo, no para tests)
     let cleanup_statements = [
+        "DELETE FROM CASH_SESSION_TOTALS",
+        "DELETE FROM CASH_COUNT_LINES",
+        "DELETE FROM CASH_MOVEMENTS",
+        "DELETE FROM PAYMENT_ALLOCATIONS",
+        "DELETE FROM PAYMENT_LINES",
+        "DELETE FROM PAYMENTS",
+        "DELETE FROM CASH_SESSIONS",
         "DELETE FROM INVOICE_ITEMS",
         "DELETE FROM INVOICES",
         "DELETE FROM SURGERIES",

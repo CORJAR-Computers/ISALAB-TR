@@ -48,10 +48,16 @@ pub struct InvoiceListItem {
     pub patient_name: Option<String>,
     pub issue_date: String,
     pub total: f64,
-    /// EMITIDA | PAGADA | ANULADA
+    /// EMITIDA | PAGADA | ANULADA (estado histórico)
     pub status: String,
     pub payment_method: Option<String>,
     pub item_count: i32,
+    /// Suma de abonos aplicados.
+    pub paid_amount: f64,
+    /// TOTAL - pagado (nunca negativo).
+    pub balance: f64,
+    /// PENDIENTE | ABONADA | PAGADA | ANULADA
+    pub payment_status: String,
 }
 
 #[derive(Debug, Clone, Serialize, Deserialize, Type)]

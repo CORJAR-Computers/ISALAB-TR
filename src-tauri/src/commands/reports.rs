@@ -9,13 +9,14 @@ use crate::error::AppError;
 use crate::models::report::ReportFile;
 use crate::models::settings::ClinicSettings;
 use crate::pdf_templates::{
-    CirugiaData, ClinicHeader, ClinicalReportData, ConsentimientoData, FormulaMedicaData,
-    ReciboData, ReportSignature, VacunacionData,
+    CashCloseData, CirugiaData, ClinicHeader, ClinicalReportData, ConsentimientoData,
+    FormulaMedicaData, ReciboData, ReportSignature, VacunacionData,
 };
 use crate::repositories::{
-    clinic_assets as clinic_assets_repo, clinical_history as history_repo, invoices as invoices_repo,
-    patient as patient_repo, samples as samples_repo, settings as settings_repo,
-    surgeries as surgeries_repo, vaccines as vaccines_repo,
+    cash as cash_repo, clinic_assets as clinic_assets_repo,
+    clinical_history as history_repo, invoices as invoices_repo, patient as patient_repo,
+    samples as samples_repo, settings as settings_repo, surgeries as surgeries_repo,
+    vaccines as vaccines_repo,
 };
 use crate::state::AppState;
 
@@ -347,6 +348,56 @@ pub fn generate_recibo_invoice(
         path: out_path.display().to_string(),
         file_name,
         sample_code: data.invoice.invoice_number.clone(),
+        generated_at,
+    })
+}
+
+/// Genera el PDF de cierre de caja (arqueo, totales por método y movimientos).
+#[tauri::command]
+#[specta::specta]
+pub fn generate_cash_close_pdf(
+    state: State<'_, AppState>,
+    app: AppHandle,
+    session_id: i32,
+) -> Result<ReportFile, AppError> {
+    require_session(&state)?;
+    let mut pooled = state.pool.acquire()?;
+    let conn = pooled.conn();
+
+    let summary = cash_repo::summary(conn, session_id)?;
+    if summary.session.status != "CERRADA" {
+        return Err(AppError::Validation(
+            "Solo se puede imprimir el cierre de una caja cerrada".into(),
+        ));
+    }
+    let settings = settings_repo::get(conn)?;
+
+    let data = CashCloseData {
+        clinic: clinic_header(conn, &settings)?,
+        session: summary.session,
+        expected_cash: summary.expected_cash,
+        counted_cash: summary.counted_cash.unwrap_or(0.0),
+        difference: summary.difference.unwrap_or(0.0),
+        total_billed: summary.total_billed,
+        total_collected: summary.total_collected,
+        cash_in: summary.cash_in,
+        cash_out: summary.cash_out,
+        payments_count: summary.payments_count,
+        methods: summary.methods,
+        movements: summary.movements,
+        count_lines: summary.count_lines,
+    };
+
+    let dir = reports_dir(&app)?;
+    let file_name = format!("cierre-caja-{}.pdf", data.session.code);
+    let out_path = dir.join(&file_name);
+    crate::pdf_templates::generate_cash_close(&data, &out_path).map_err(AppError::Internal)?;
+
+    let generated_at = now_db(conn)?;
+    Ok(ReportFile {
+        path: out_path.display().to_string(),
+        file_name,
+        sample_code: format!("CIERRE {}", data.session.code),
         generated_at,
     })
 }

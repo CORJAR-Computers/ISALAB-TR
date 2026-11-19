@@ -53,6 +53,9 @@ const VaccinesPage = lazy(() =>
 const InvoicesPage = lazy(() =>
   import("@/features/invoices/InvoicesPage").then((m) => ({ default: m.InvoicesPage })),
 );
+const CashPage = lazy(() =>
+  import("@/features/cash/CashPage").then((m) => ({ default: m.CashPage })),
+);
 const ReportsPage = lazy(() =>
   import("@/features/reports/ReportsPage").then((m) => ({ default: m.ReportsPage })),
 );
@@ -261,6 +264,7 @@ export default function App() {
               {view === "surgeries" && <SurgeriesPage />}
               {view === "vaccines" && <VaccinesPage />}
               {view === "invoices" && <InvoicesPage />}
+              {view === "cash" && <CashPage />}
               {view === "reports" && <ReportsPage />}
               {view === "qc" && <QcPage />}
               {view === "services" && <ServicesPage />}

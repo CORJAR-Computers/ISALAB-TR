@@ -103,6 +103,21 @@ export {
   useCreateInvoice,
   useSetInvoiceStatus,
 } from "./use-invoices";
+export {
+  usePaymentMethods,
+  useInvoiceBalance,
+  useInvoicePayments,
+  useOpenCashSession,
+  useOpenCash,
+  useRegisterPayment,
+} from "./use-payments";
+export {
+  useCashSummary,
+  useCashMovements,
+  useCashSessions,
+  useAddCashMovement,
+  useCloseCash,
+} from "./use-cash";
 export { useGlobalSearch } from "./use-search";
 export {
   useLabOrders,
@@ -165,6 +180,7 @@ export {
   useGenerateFormulaMedica,
   useGenerateConsentimiento,
   useGenerateReciboInvoice,
+  useGenerateCashClosePdf,
   useGenerateCertificadoCirugia,
   useGenerateCarnetVacunacion,
 } from "./use-reports";

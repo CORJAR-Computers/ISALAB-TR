@@ -636,6 +636,30 @@ export const commands = {
 } | null, AppError>(__TAURI_INVOKE("get_invoice", { id })),
 	/**  Cambia el estado de una factura (EMITIDA→PAGADA/ANULADA, PAGADA→ANULADA). */
 	setInvoiceStatus: (id: number, status: string) => typedError<Invoice, AppError>(__TAURI_INVOKE("set_invoice_status", { id, status })),
+	/**  Catálogo de métodos de pago (para el diálogo de cobro). */
+	listPaymentMethods: (includeInactive: boolean | null) => typedError<PaymentMethod[], AppError>(__TAURI_INVOKE("list_payment_methods", { includeInactive })),
+	/**  Registra una recepción (abono o pago total) con formas de pago mixtas. */
+	registerPayment: (input: RegisterPaymentInput) => typedError<Payment, AppError>(__TAURI_INVOKE("register_payment", { input })),
+	/**  Saldo derivado de una factura (total, abonado, saldo y estado de cobro). */
+	getInvoiceBalance: (invoiceId: number) => typedError<InvoiceBalance, AppError>(__TAURI_INVOKE("get_invoice_balance", { invoiceId })),
+	/**  Historial de pagos aplicados a una factura. */
+	listInvoicePayments: (invoiceId: number) => typedError<Payment[], AppError>(__TAURI_INVOKE("list_invoice_payments", { invoiceId })),
+	/**  Sesión de caja abierta actual, o `None` si no hay ninguna. */
+	getOpenCashSession: () => typedError<CashSession | null, AppError>(__TAURI_INVOKE("get_open_cash_session")),
+	/**  Abre la caja con su base inicial. Falla si ya hay una abierta. */
+	openCashSession: (openingFloat: number, notes: string | null) => typedError<CashSession, AppError>(__TAURI_INVOKE("open_cash_session", { openingFloat, notes })),
+	/**  Registra un gasto, retiro o ajuste en la caja abierta. */
+	addCashMovement: (input: AddCashMovementInput) => typedError<CashMovement, AppError>(__TAURI_INVOKE("add_cash_movement", { input })),
+	/**  Movimientos de una sesión (por defecto, la caja abierta). */
+	listCashMovements: (sessionId: number | null) => typedError<CashMovement[], AppError>(__TAURI_INVOKE("list_cash_movements", { sessionId })),
+	/**  Resumen de una sesión: cifras, métodos, movimientos y arqueo. */
+	getCashSessionSummary: (sessionId: number | null) => typedError<CashSessionSummary, AppError>(__TAURI_INVOKE("get_cash_session_summary", { sessionId })),
+	/**  Cierra la caja abierta con el arqueo por denominación. */
+	closeCashSession: (input: CloseCashInput) => typedError<CashSessionSummary, AppError>(__TAURI_INVOKE("close_cash_session", { input })),
+	/**  Historial de sesiones de caja, más reciente primero. */
+	listCashSessions: (limit: number | null) => typedError<CashSession[], AppError>(__TAURI_INVOKE("list_cash_sessions", { limit })),
+	/**  Genera el PDF de cierre de caja (arqueo, totales por método y movimientos). */
+	generateCashClosePdf: (sessionId: number) => typedError<ReportFile, AppError>(__TAURI_INVOKE("generate_cash_close_pdf", { sessionId })),
 	/**
 	 *  Métricas del panel de control: contadores, agenda de próximas citas y
 	 *  cirugías, refuerzos de vacunación y últimas muestras.
@@ -1570,10 +1594,16 @@ export type InvoiceListItem = {
 	patientName: string | null,
 	issueDate: string,
 	total: number | null,
-	/**  EMITIDA | PAGADA | ANULADA */
+	/**  EMITIDA | PAGADA | ANULADA (estado histórico) */
 	status: string,
 	paymentMethod: string | null,
 	itemCount: number,
+	/**  Suma de abonos aplicados. */
+	paidAmount: number,
+	/**  TOTAL - pagado (nunca negativo). */
+	balance: number,
+	/**  PENDIENTE | ABONADA | PAGADA | ANULADA */
+	paymentStatus: string,
 };
 
 /**  Orden de laboratorio completa con sus pruebas y muestras accesionadas. */
@@ -2630,6 +2660,178 @@ export type WorklistSample = {
 	resultCount: number,
 	/**  Nº de resultados fuera de rango (ALTO/BAJO) — alerta visual. */
 	abnormalCount: number,
+};
+
+/**  Sesión de caja (apertura/cierre). Solo puede haber una ABIERTA. */
+export type CashSession = {
+	id: number,
+	/**  CAJ-00000001… */
+	code: string,
+	/**  YYYY-MM-DD HH:MM:SS */
+	openedAt: string,
+	openedBy: number,
+	openedByName: string | null,
+	openingFloat: number,
+	/**  ABIERTA | CERRADA */
+	status: string,
+	closedAt: string | null,
+	closedByName: string | null,
+	expectedCash: number | null,
+	countedCash: number | null,
+	difference: number | null,
+	totalBilled: number | null,
+	totalCollected: number | null,
+	notes: string | null,
+};
+
+export type AddCashMovementInput = {
+	/**  GASTO | RETIRO | AJUSTE */
+	kind: string,
+	/**  Siempre positivo; el backend aplica el signo según el tipo. */
+	amount: number,
+	reason: string,
+};
+
+/**  Línea de arqueo por denominación. */
+export type CashCountLine = {
+	denomination: number,
+	quantity: number,
+	subtotal: number,
+};
+
+export type CashCountInput = {
+	denomination: number,
+	quantity: number,
+};
+
+/**  Total cobrado por método de pago dentro de una sesión. */
+export type CashMethodTotal = {
+	methodCode: string,
+	methodName: string,
+	amount: number,
+};
+
+/**  Movimiento manual o automático de caja. */
+export type CashMovement = {
+	id: number,
+	cashSessionId: number,
+	/**  PAGO_EFECTIVO | GASTO | RETIRO | DEVOLUCION | AJUSTE */
+	kind: string,
+	/**  Firmado: los ingresos son positivos y los egresos negativos. */
+	amount: number,
+	paymentId: number | null,
+	reason: string | null,
+	createdByName: string | null,
+	/**  YYYY-MM-DD HH:MM:SS */
+	createdAt: string,
+};
+
+/**  Resumen completo de una sesión: cifras, movimientos y arqueo. */
+export type CashSessionSummary = {
+	session: CashSession,
+	openingFloat: number,
+	expectedCash: number,
+	countedCash: number | null,
+	difference: number | null,
+	totalBilled: number,
+	totalCollected: number,
+	/**  Suma de ingresos de caja (pagos en efectivo y ajustes positivos). */
+	cashIn: number,
+	/**  Suma de egresos de caja (gastos, retiros, devoluciones y ajustes negativos). */
+	cashOut: number,
+	paymentsCount: number,
+	methods: CashMethodTotal[],
+	movements: CashMovement[],
+	countLines: CashCountLine[],
+};
+
+/**  Cierre de caja: arqueo por denominación y notas opcionales. */
+export type CloseCashInput = {
+	countLines: CashCountInput[],
+	notes: string | null,
+};
+
+export type CreatePaymentAllocationInput = {
+	invoiceId: number,
+	amount: number,
+};
+
+export type CreatePaymentLineInput = {
+	methodCode: string,
+	amount: number,
+	reference: string | null,
+};
+
+/**  Saldo derivado de una factura (no se almacena en INVOICES). */
+export type InvoiceBalance = {
+	invoiceId: number,
+	invoiceNumber: string,
+	total: number,
+	paidAmount: number,
+	balance: number,
+	/**  PENDIENTE | ABONADA | PAGADA | ANULADA */
+	paymentStatus: string,
+	/**  Estado histórico de la factura (EMITIDA | PAGADA | ANULADA). */
+	status: string,
+};
+
+/**  Recepción de pago completa, con líneas y facturas aplicadas. */
+export type Payment = {
+	id: number,
+	/**  REC-000001… */
+	code: string,
+	ownerId: number,
+	ownerName: string,
+	patientId: number | null,
+	patientName: string | null,
+	cashSessionId: number | null,
+	/**  YYYY-MM-DD HH:MM:SS */
+	receivedAt: string,
+	total: number,
+	/**  APLICADO | ANULADO */
+	status: string,
+	notes: string | null,
+	createdByName: string | null,
+	lines: PaymentLine[],
+	allocations: PaymentAllocation[],
+};
+
+/**  Aplicación de (parte de) una recepción a una factura. */
+export type PaymentAllocation = {
+	id: number,
+	invoiceId: number,
+	invoiceNumber: string,
+	amount: number,
+};
+
+/**  Línea de una recepción: un método y su importe. */
+export type PaymentLine = {
+	id: number,
+	methodCode: string,
+	methodName: string,
+	/**  EFECTIVO | ELECTRONICO | OTRO */
+	methodKind: string,
+	amount: number,
+	reference: string | null,
+};
+
+/**  Método de pago configurable (efectivo, transferencia, tarjeta…). */
+export type PaymentMethod = {
+	code: string,
+	name: string,
+	/**  EFECTIVO | ELECTRONICO | OTRO */
+	kind: string,
+	requiresReference: boolean,
+	active: boolean,
+	sortOrder: number,
+};
+
+export type RegisterPaymentInput = {
+	ownerId: number,
+	patientId: number | null,
+	notes: string | null,
+	lines: CreatePaymentLineInput[],
+	allocations: CreatePaymentAllocationInput[],
 };
 
 /* Tauri Specta runtime */

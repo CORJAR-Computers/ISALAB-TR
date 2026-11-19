@@ -18,6 +18,7 @@ export type View =
   | "surgeries"
   | "vaccines"
   | "invoices"
+  | "cash"
   | "reports"
   | "qc"
   | "services"

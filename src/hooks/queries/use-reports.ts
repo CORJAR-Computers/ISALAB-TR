@@ -55,6 +55,14 @@ export function useGenerateCertificadoCirugia() {
   });
 }
 
+export function useGenerateCashClosePdf() {
+  const qc = useQueryClient();
+  return useMutation({
+    mutationFn: (sessionId: number) => api.generateCashClosePdf(sessionId),
+    onSuccess: () => qc.invalidateQueries({ queryKey: ["reports"] }),
+  });
+}
+
 export function useGenerateCarnetVacunacion() {
   const qc = useQueryClient();
   return useMutation({

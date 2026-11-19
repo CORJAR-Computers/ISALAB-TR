@@ -44,6 +44,10 @@ use crate::commands::attachments::{
     attach_result_file, delete_result_attachment, get_result_attachment_content,
 };
 use crate::commands::auth::{get_session, list_audit_log, login, logout};
+use crate::commands::cash::{
+    add_cash_movement, close_cash_session, get_cash_session_summary, get_open_cash_session,
+    list_cash_movements, list_cash_sessions, open_cash_session,
+};
 use crate::commands::catalog::{
     create_analyte, list_analytes, list_breeds, list_sample_types, list_species, list_vaccine_types,
 };
@@ -78,6 +82,9 @@ use crate::commands::patients::{
     create_patient, get_patient, get_patient_by_code, get_patient_lab_trends, list_owners,
     list_patients,
 };
+use crate::commands::payments::{
+    get_invoice_balance, list_invoice_payments, list_payment_methods, register_payment,
+};
 use crate::commands::products::{
     add_stock_movement, get_product, list_products, list_stock_movements, save_product,
     set_product_active,
@@ -88,8 +95,8 @@ use crate::commands::qc::{
 };
 use crate::commands::reports::{
     generate_carnet_vacunacion, generate_certificado_cirugia, generate_clinical_report,
-    generate_consentimiento, generate_formula_medica, generate_recibo_invoice,
-    generate_sample_labels, list_reports, open_report_file,
+    generate_cash_close_pdf, generate_consentimiento, generate_formula_medica,
+    generate_recibo_invoice, generate_sample_labels, list_reports, open_report_file,
 };
 use crate::commands::samples::{
     count_samples, create_sample, delete_lab_result, get_sample, get_worklist, list_sample_events,
@@ -277,6 +284,18 @@ pub fn specta_builder() -> Builder<tauri::Wry> {
             count_invoices,
             get_invoice,
             set_invoice_status,
+            list_payment_methods,
+            register_payment,
+            get_invoice_balance,
+            list_invoice_payments,
+            get_open_cash_session,
+            open_cash_session,
+            add_cash_movement,
+            list_cash_movements,
+            get_cash_session_summary,
+            close_cash_session,
+            list_cash_sessions,
+            generate_cash_close_pdf,
             get_dashboard_stats,
             attach_result_file,
             delete_result_attachment,
@@ -378,6 +397,23 @@ pub fn specta_builder() -> Builder<tauri::Wry> {
         .typ::<crate::models::product::StockMovement>()
         .typ::<crate::models::product::SaveProductInput>()
         .typ::<crate::models::product::CreateStockMovementInput>()
+        // Cobros, abonos y caja (fase 7).
+        .typ::<crate::models::payment::PaymentMethod>()
+        .typ::<crate::models::payment::PaymentLine>()
+        .typ::<crate::models::payment::PaymentAllocation>()
+        .typ::<crate::models::payment::Payment>()
+        .typ::<crate::models::payment::InvoiceBalance>()
+        .typ::<crate::models::payment::CreatePaymentLineInput>()
+        .typ::<crate::models::payment::CreatePaymentAllocationInput>()
+        .typ::<crate::models::payment::RegisterPaymentInput>()
+        .typ::<crate::models::cash::CashSession>()
+        .typ::<crate::models::cash::CashMovement>()
+        .typ::<crate::models::cash::CashMethodTotal>()
+        .typ::<crate::models::cash::CashCountLine>()
+        .typ::<crate::models::cash::CashSessionSummary>()
+        .typ::<crate::models::cash::AddCashMovementInput>()
+        .typ::<crate::models::cash::CashCountInput>()
+        .typ::<crate::models::cash::CloseCashInput>()
 }
 
 #[cfg_attr(mobile, tauri::mobile_entry_point)]
@@ -549,3 +585,4 @@ mod window_fit_tests {
         );
     }
 }
+

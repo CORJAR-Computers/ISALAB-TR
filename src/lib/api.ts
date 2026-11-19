@@ -112,6 +112,15 @@ import type {
   SaveProductInput,
   CreateStockMovementInput,
   SaveDbConnectionInput,
+  AddCashMovementInput,
+  CashMovement,
+  CashSession,
+  CashSessionSummary,
+  CloseCashInput,
+  InvoiceBalance,
+  Payment,
+  PaymentMethod,
+  RegisterPaymentInput,
 } from "@/bindings";
 
 /** Extrae el mensaje legible de un AppError serializado por Tauri. */
@@ -399,6 +408,33 @@ export const api = {
   getInvoice: (id: number) => invoke<Invoice | null>("get_invoice", { id }),
   setInvoiceStatus: (id: number, status: string) =>
     invoke<Invoice>("set_invoice_status", { id, status }),
+  listPaymentMethods: (includeInactive?: boolean | null) =>
+    invoke<PaymentMethod[]>("list_payment_methods", {
+      includeInactive: includeInactive ?? false,
+    }),
+  registerPayment: (input: RegisterPaymentInput) =>
+    invoke<Payment>("register_payment", { input }),
+  getInvoiceBalance: (invoiceId: number) =>
+    invoke<InvoiceBalance>("get_invoice_balance", { invoiceId }),
+  listInvoicePayments: (invoiceId: number) =>
+    invoke<Payment[]>("list_invoice_payments", { invoiceId }),
+
+  // ---- Caja ----
+  getOpenCashSession: () => invoke<CashSession | null>("get_open_cash_session"),
+  openCashSession: (openingFloat: number, notes: string | null) =>
+    invoke<CashSession>("open_cash_session", { openingFloat, notes }),
+  addCashMovement: (input: AddCashMovementInput) =>
+    invoke<CashMovement>("add_cash_movement", { input }),
+  listCashMovements: (sessionId: number | null) =>
+    invoke<CashMovement[]>("list_cash_movements", { sessionId }),
+  getCashSessionSummary: (sessionId: number | null) =>
+    invoke<CashSessionSummary>("get_cash_session_summary", { sessionId }),
+  closeCashSession: (input: CloseCashInput) =>
+    invoke<CashSessionSummary>("close_cash_session", { input }),
+  listCashSessions: (limit: number | null) =>
+    invoke<CashSession[]>("list_cash_sessions", { limit }),
+  generateCashClosePdf: (sessionId: number) =>
+    invoke<ReportFile>("generate_cash_close_pdf", { sessionId }),
 
   // ---- Órdenes de laboratorio ----
   createLabOrder: (input: CreateLabOrderInput) =>

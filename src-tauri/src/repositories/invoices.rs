@@ -7,16 +7,25 @@ use crate::models::invoice::{CreateInvoiceInput, Invoice, InvoiceItem, InvoiceLi
 use crate::repositories::next_id;
 
 pub(crate) type InvoiceListItemRow = (
-    i32,
-    String,
-    String,
-    Option<String>,
-    String,
-    f64,
-    String,
-    Option<String>,
-    i32,
+    i32,            // id
+    String,         // invoice_number
+    String,         // owner_name
+    Option<String>, // patient_name
+    String,         // issue_date
+    f64,            // total
+    String,         // status
+    Option<String>, // payment_method
+    i32,            // item_count
+    f64,            // paid_amount
+    f64,            // balance
+    String,         // payment_status
 );
+
+/// Subconsulta de abonos aplicados: suma solo asignaciones de pagos vigentes.
+const PAID_SUBQUERY: &str = "COALESCE((SELECT CAST(SUM(a.AMOUNT) AS DOUBLE PRECISION)
+        FROM PAYMENT_ALLOCATIONS a
+        JOIN PAYMENTS pa ON pa.ID = a.PAYMENT_ID
+        WHERE a.INVOICE_ID = i.ID AND pa.STATUS = 'APLICADO'), 0)";
 
 /// Columnas de una factura con propietario/paciente unidos.
 const INVOICE_SELECT: &str = "
@@ -211,8 +220,9 @@ pub fn create(
     })
 }
 
-/// Listado de facturas con filtros opcionales por estado y búsqueda
-/// (número, propietario o paciente).
+/// Listado de facturas con filtro por estado de cobro (`paymentStatus`) o por
+/// estado histórico (`status`), más búsqueda libre (número, propietario o
+/// paciente). El saldo y el estado de cobro se derivan en SQL.
 pub fn list(
     conn: &mut SimpleConnection,
     status: Option<&str>,
@@ -222,24 +232,46 @@ pub fn list(
         .map(|s| format!("%{}%", s.trim()))
         .filter(|s| !s.trim_matches('%').is_empty());
 
-    let sql = "
-        SELECT i.ID, i.INVOICE_NUMBER, o.FULL_NAME, p.NAME,
-               LEFT(CAST(i.ISSUE_DATE AS VARCHAR(60)), 19),
-               CAST(i.TOTAL AS DOUBLE PRECISION),
-               i.STATUS, i.PAYMENT_METHOD,
-               (SELECT COUNT(*) FROM INVOICE_ITEMS ii WHERE ii.INVOICE_ID = i.ID)
-        FROM INVOICES i
-        JOIN OWNERS o ON o.ID = i.OWNER_ID
-        LEFT JOIN PATIENTS p ON p.ID = i.PATIENT_ID
-        WHERE (? IS NULL OR i.STATUS = ?)
-          AND (? IS NULL
-               OR UPPER(i.INVOICE_NUMBER) LIKE UPPER(?)
-               OR UPPER(o.FULL_NAME) LIKE UPPER(?)
-               OR UPPER(COALESCE(p.NAME, '')) LIKE UPPER(?))
-        ORDER BY i.ISSUE_DATE DESC, i.ID DESC";
+    let sql = format!(
+        "SELECT y.ID, y.INVOICE_NUMBER, o.FULL_NAME, p.NAME, y.ISSUE_DATE,
+                y.TOTAL, y.STATUS, y.PAYMENT_METHOD,
+                (SELECT COUNT(*) FROM INVOICE_ITEMS ii WHERE ii.INVOICE_ID = y.ID),
+                y.PAID, y.BALANCE, y.PAYMENT_STATUS
+         FROM (
+             SELECT x.ID, x.INVOICE_NUMBER, x.OWNER_ID, x.PATIENT_ID,
+                    x.ISSUE_DATE, x.TOTAL, x.STATUS, x.PAYMENT_METHOD, x.PAID,
+                    CASE WHEN x.TOTAL - x.PAID < 0 THEN 0
+                         ELSE x.TOTAL - x.PAID END AS BALANCE,
+                    CASE
+                        WHEN x.STATUS = 'ANULADA' THEN 'ANULADA'
+                        WHEN x.TOTAL - x.PAID <= 0.01 THEN 'PAGADA'
+                        WHEN x.PAID > 0.01 THEN 'ABONADA'
+                        ELSE 'PENDIENTE'
+                    END AS PAYMENT_STATUS
+             FROM (
+                 SELECT i.ID, i.INVOICE_NUMBER, i.OWNER_ID, i.PATIENT_ID,
+                        LEFT(CAST(i.ISSUE_DATE AS VARCHAR(60)), 19) AS ISSUE_DATE,
+                        CAST(i.TOTAL AS DOUBLE PRECISION) AS TOTAL,
+                        i.STATUS, i.PAYMENT_METHOD,
+                        {PAID_SUBQUERY} AS PAID
+                 FROM INVOICES i
+             ) x
+         ) y
+         JOIN OWNERS o ON o.ID = y.OWNER_ID
+         LEFT JOIN PATIENTS p ON p.ID = y.PATIENT_ID
+         WHERE (? IS NULL OR y.PAYMENT_STATUS = ? OR y.STATUS = ?)
+           AND (? IS NULL
+                OR UPPER(y.INVOICE_NUMBER) LIKE UPPER(?)
+                OR UPPER(o.FULL_NAME) LIKE UPPER(?)
+                OR UPPER(COALESCE(p.NAME, '')) LIKE UPPER(?))
+         ORDER BY y.ISSUE_DATE DESC, y.ID DESC"
+    );
 
     let rows: Vec<InvoiceListItemRow> = conn
-        .query(sql, (&status, &status, &like, &like, &like, &like))
+        .query(
+            &sql,
+            (&status, &status, &status, &like, &like, &like, &like),
+        )
         .map_err(AppError::from)?;
 
     Ok(rows
@@ -254,6 +286,9 @@ pub fn list(
             status: r.6,
             payment_method: r.7,
             item_count: r.8,
+            paid_amount: r.9,
+            balance: r.10,
+            payment_status: r.11,
         })
         .collect())
 }
@@ -401,6 +436,9 @@ mod tests {
             "EMITIDA".into(),
             Some("EFECTIVO".into()),
             3,
+            50000.0,
+            128500.0,
+            "ABONADA".into(),
         );
 
         assert_eq!(row.0, 1);
@@ -409,6 +447,7 @@ mod tests {
         assert_eq!(row.3.as_deref(), Some("Luna"));
         assert!((row.5 - 178500.0).abs() < f64::EPSILON);
         assert_eq!(row.8, 3); // item_count
+        assert_eq!(row.11, "ABONADA");
     }
 }
 
@@ -585,12 +624,27 @@ mod integration_tests {
 pub fn count_by_status(
     conn: &mut SimpleConnection,
 ) -> Result<Vec<crate::models::status_count::StatusCount>, AppError> {
-    let rows: Vec<(String, i32)> = conn
-        .query(
-            "SELECT STATUS, COUNT(*) FROM INVOICES GROUP BY STATUS ORDER BY STATUS",
-            (),
-        )
-        .map_err(AppError::from)?;
+    // Cuenta por estado de cobro derivado, no por el estado histórico: la UI
+    // usa estas pestañas (Pendientes / Abonadas / Pagadas / Anuladas).
+    let sql = format!(
+        "SELECT PAYMENT_STATUS, COUNT(*)
+         FROM (
+             SELECT CASE
+                        WHEN x.STATUS = 'ANULADA' THEN 'ANULADA'
+                        WHEN x.TOTAL - x.PAID <= 0.01 THEN 'PAGADA'
+                        WHEN x.PAID > 0.01 THEN 'ABONADA'
+                        ELSE 'PENDIENTE'
+                    END AS PAYMENT_STATUS
+             FROM (
+                 SELECT i.STATUS, CAST(i.TOTAL AS DOUBLE PRECISION) AS TOTAL,
+                        {PAID_SUBQUERY} AS PAID
+                 FROM INVOICES i
+             ) x
+         )
+         GROUP BY PAYMENT_STATUS
+         ORDER BY PAYMENT_STATUS"
+    );
+    let rows: Vec<(String, i32)> = conn.query(&sql, ()).map_err(AppError::from)?;
     Ok(rows
         .into_iter()
         .map(|(status, count)| crate::models::status_count::StatusCount { status, count })

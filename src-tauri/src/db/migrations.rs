@@ -146,6 +146,10 @@ pub const MIGRATIONS: &[(&str, &str)] = &[
         "0035_ops_table",
         include_str!("../../migrations/0035_ops_table.sql"),
     ),
+    (
+        "0036_payments_cash",
+        include_str!("../../migrations/0036_payments_cash.sql"),
+    ),
 ];
 
 /// Indica si una migración de datos de demostración debe aplicarse.

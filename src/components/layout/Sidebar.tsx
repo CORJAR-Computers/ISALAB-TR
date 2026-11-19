@@ -5,6 +5,7 @@ import { useUiStore, type View } from "@/stores/ui-store";
 import { usePermissions } from "@/hooks/use-permissions";
 import {
   Activity,
+  Banknote,
   BedDouble,
   CalendarClock,
   FlaskConical,
@@ -34,7 +35,7 @@ type NavItem = {
   icon: typeof Users;
   adminOnly?: boolean;
   /** Capacidad del rol exigida para ver la entrada (fase 6). */
-  capability?: "canStay" | "canInventory" | "canGroom" | "canReceive";
+  capability?: "canStay" | "canInventory" | "canGroom" | "canReceive" | "canBill";
 };
 
 type NavSection = {
@@ -103,6 +104,7 @@ const SECTIONS: NavSection[] = [
     label: "Administración",
     items: [
       { view: "invoices", label: "Facturación", icon: Receipt },
+      { view: "cash", label: "Caja", icon: Banknote, capability: "canBill" },
       { view: "reports", label: "Reportes PDF", icon: FileText },
       { view: "services", label: "Catálogo de servicios", icon: LayoutList, adminOnly: true },
       { view: "users", label: "Usuarios", icon: Shield, adminOnly: true },
@@ -139,6 +141,7 @@ export function Sidebar() {
     canInventory: perms.canInventory,
     canGroom: perms.canGroom,
     canReceive: perms.canReceive,
+    canBill: perms.canBill,
   };
 
   const [openSections, setOpenSections] = useState<string[]>(INITIAL_OPEN);

@@ -252,11 +252,43 @@ export const INVOICE_STATUS: Record<
   ANULADA: { label: "Anulada", variant: "destructive" },
 };
 
+/** Estado de cobro derivado de la factura (abonos aplicados). */
+export const PAYMENT_STATUS: Record<
+  string,
+  { label: string; variant: BadgeVariant }
+> = {
+  PENDIENTE: { label: "Pendiente", variant: "warning" },
+  ABONADA: { label: "Abonada", variant: "default" },
+  PAGADA: { label: "Pagada", variant: "success" },
+  ANULADA: { label: "Anulada", variant: "destructive" },
+};
+
 export const PAYMENT_METHOD_LABEL: Record<string, string> = {
   EFECTIVO: "Efectivo",
   TRANSFERENCIA: "Transferencia",
   TARJETA_CREDITO: "Tarjeta crédito",
   TARJETA_DEBITO: "Tarjeta débito",
+  NEQUI: "Nequi",
+  DAVIPLATA: "Daviplata",
+  OTRO: "Otro",
+};
+
+/** Estados de una sesión de caja (migración 0036). */
+export const CASH_SESSION_STATUS: Record<
+  string,
+  { label: string; variant: BadgeVariant }
+> = {
+  ABIERTA: { label: "Abierta", variant: "success" },
+  CERRADA: { label: "Cerrada", variant: "secondary" },
+};
+
+/** Tipos de movimiento de caja. */
+export const CASH_MOVEMENT_KIND: Record<string, string> = {
+  PAGO_EFECTIVO: "Pago en efectivo",
+  GASTO: "Gasto",
+  RETIRO: "Retiro",
+  DEVOLUCION: "Devolución",
+  AJUSTE: "Ajuste",
 };
 
 export const LAB_ORDER_STATUS: Record<
