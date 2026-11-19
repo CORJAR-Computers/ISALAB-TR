@@ -1,7 +1,7 @@
 # Plan de implementación — Motor de recordatorios y protocolos preventivos
 
 **Estado:** propuesta (no implementada)
-**Base:** schema 0035 · `VACCINES.NEXT_DOSE_AT`, `GROOMING_SESSIONS.NEXT_SUGGESTED_AT`, `STAYS`, SMTP (`mail.rs`) y `wa.me` (`src/lib/whatsapp.ts`) ya existen.
+**Base:** schema 0038 (tras abonos/caja y receta) · `VACCINES.NEXT_DOSE_AT`, `GROOMING_SESSIONS.NEXT_SUGGESTED_AT`, `STAYS`, SMTP (`mail.rs`) y `wa.me` (`src/lib/whatsapp.ts`) ya existen.
 **Objetivo:** convertir datos que hoy solo se muestran (refuerzos vencidos, próximo baño, estancia abierta) en una **bandeja diaria de trabajo** con contacto registrado, mensajes listos y protocolos preventivos por especie/edad.
 
 ---
@@ -40,8 +40,9 @@
 ## 2. Modelo de datos
 
 Migración **`0039_reminders.sql`**, que incluye esquema y seed en el mismo archivo.
-Orden acordado: abonos/caja (`0036`), receta (`0037`–`0038`) y recordatorios (`0039`).
-Si cambia el orden de implementación, renumerar los tres planes antes de crear la migración.
+Orden acordado: abonos/caja (`0036`), receta (`0037`–`0038`), recordatorios (`0039`),
+lotes/vencimientos (`0040`) y cartera (`0041`). Si cambia el orden de implementación,
+renumerar los cinco planes antes de crear la migración.
 
 ### 2.1 Protocolos
 
@@ -373,7 +374,7 @@ Total MVP: **~3 semanas**, en commits por fase con migración y CI verde.
 - [ ] Una estancia abierta con salida prevista genera aviso; sin fecha, no.
 - [ ] Un paciente inactivo no genera recordatorios.
 - [ ] Si se elimina la fuente, el recordatorio se descarta en el siguiente refresh.
-- [ ] Migración probada desde una BD en 0035.
+- [ ] Migración probada desde una BD en 0038.
 
 ### Fase B
 

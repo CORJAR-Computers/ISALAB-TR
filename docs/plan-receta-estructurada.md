@@ -1,12 +1,13 @@
 # Plan de implementación — Receta estructurada, catálogo de fármacos y dispensación
 
 **Estado:** propuesta (no implementada)
-**Base:** schema 0035 · consultas con `TREATMENT_PLAN` libre, `PRODUCTS`/`STOCK_MOVEMENTS`, `INVOICE_ITEMS` sin producto, RBAC por capacidades, PDFs de fórmula y etiquetas.
+**Base:** schema 0036 · consultas con `TREATMENT_PLAN` libre, `PRODUCTS`/`STOCK_MOVEMENTS`, `INVOICE_ITEMS` sin producto, RBAC por capacidades, PDFs de fórmula y etiquetas.
 **Objetivo:** sustituir la receta en texto libre por una receta con fármacos del catálogo, dosis calculada por peso, verificación de alergias y dispensación trazable contra inventario.
 
 > **Numeración reservada:** `0037_prescriptions.sql` y, si se usa el seed de demo,
-> `0038_seed_drugs_demo.sql`. Orden acordado: abonos/caja (`0036`), receta (`0037`–`0038`)
-> y recordatorios (`0039`). Si cambia el orden, renumerar antes de crear la migración.
+> `0038_seed_drugs_demo.sql`. Orden acordado: abonos/caja (`0036`), receta (`0037`–`0038`),
+> recordatorios (`0039`), lotes/vencimientos (`0040`) y cartera (`0041`). Si cambia el
+> orden, renumerar los cinco planes antes de crear la migración.
 
 ---
 
@@ -466,7 +467,7 @@ Total MVP: **~4 semanas**.
 | Rust (Firebird real) | Cálculo exacto y redondeo; rango de dosis; alergia por fármaco, principio activo y texto; override auditado; snapshots inmutables; dispensación transaccional; stock insuficiente; doble dispensación; factura y totales; anulación; RBAC por capacidad. |
 | Frontend (Vitest) | Calculadora (kg, mg, tabletas, mL); formato de dosis; alertas y bloqueo; estados de receta; totales del diálogo de dispensación. |
 | E2E (Playwright) | Consulta con peso → receta con dos fármacos → alerta de alergia → override → PDF → dispensar → stock y factura → etiquetas. |
-| Migración | BD en 0035 → 0037 conserva consultas, productos, facturas y stock; rollback no requerido. |
+| Migración | BD en 0036 → 0037 conserva consultas, productos, facturas y stock; rollback no requerido. |
 
 ---
 

@@ -1,12 +1,13 @@
 # Plan de implementación — Abonos, pagos mixtos y cierre de caja
 
-**Estado:** propuesta (no implementada)
+**Estado:** fases A (esquema, pagos y saldos), B (UI de cobros) y C (caja: gastos/retiros, arqueo, cierre, PDF y vista) implementadas sobre `0036`; fase D (dashboard, reportes y anulación de pagos) pendiente.
 **Base:** schema 0035 · `INVOICES` con un único `PAYMENT_METHOD` y estados `EMITIDA/PAGADA/ANULADA`, cobro total desde el detalle o `checkout_visit`, sin recepciones de pago ni caja.
 **Objetivo:** registrar cobros parciales y mixtos con trazabilidad, calcular saldos por factura y cerrar la caja diaria con arqueo y diferencia.
 
 > **Numeración reservada:** `0036_payments_cash.sql`. Orden acordado: abonos/caja
-> (`0036`), receta (`0037`–`0038`) y recordatorios (`0039`). Si cambia el orden de
-> implementación, renumerar los tres planes antes de crear la migración.
+> (`0036`), receta (`0037`–`0038`), recordatorios (`0039`), lotes/vencimientos (`0040`) y
+> cartera (`0041`). Si cambia el orden de implementación, renumerar los cinco planes antes
+> de crear la migración.
 
 ---
 
@@ -144,11 +145,13 @@ CREATE TABLE CASH_SESSIONS (
     TOTAL_BILLED  D_AMOUNT,
     TOTAL_COLLECTED D_AMOUNT,
     NOTES         D_NOTES,
-    -- Solo puede existir una caja ABIERTA: índice único sobre 1/NULL.
-    OPEN_KEY      COMPUTED BY (CASE WHEN STATUS = 'ABIERTA' THEN 1 ELSE NULL END)
+    -- 1 solo para la caja ABIERTA; NULL para las cerradas. Lo mantiene un
+    -- trigger. Firebird no permite indexar columnas COMPUTED BY, por eso es
+    -- una columna normal con índice único (los NULL múltiples sí se permiten).
+    OPEN_SLOT     INTEGER
 );
 CREATE GENERATOR GEN_CASH_SESSIONS_ID;
-CREATE UNIQUE INDEX UX_CASH_SESSIONS_OPEN ON CASH_SESSIONS (OPEN_KEY);
+CREATE UNIQUE INDEX UX_CASH_SESSIONS_OPEN ON CASH_SESSIONS (OPEN_SLOT);
 
 CREATE TABLE CASH_MOVEMENTS (
     ID              D_PK NOT NULL PRIMARY KEY,
@@ -253,7 +256,7 @@ register_payment(input):
 
 ### 3.3 Caja
 
-- Solo puede haber **una sesión ABIERTA** (índice único sobre `OPEN_KEY`).
+- Solo puede haber **una sesión ABIERTA** (índice único sobre `OPEN_SLOT`).
 - Todo pago nuevo exige sesión abierta; si no hay, la UI ofrece abrirla con base inicial.
 - Movimientos manuales permitidos: `GASTO`, `RETIRO`, `AJUSTE` (con motivo); requieren
   capacidad de facturación.
@@ -465,7 +468,7 @@ Total MVP: **~4 semanas**.
 | Riesgo | Mitigación |
 | --- | --- |
 | Doble cobro por concurrencia | Transacción + bloqueo de factura / compare-and-set del saldo. |
-| Caja abierta duplicada en varias PCs | Índice único sobre `OPEN_KEY`; la segunda apertura falla con mensaje claro. |
+| Caja abierta duplicada en varias PCs | Índice único sobre `OPEN_SLOT`; la segunda apertura falla con mensaje claro. |
 | Diferencia de caja por redondeo | Tolerancia de 0.01 y comparación explícita; nunca autoajustar sin motivo. |
 | Anulación después del cierre | Solo ADMIN, con movimiento de ajuste en la caja actual y auditoría. |
 | Histórico sin caja | Backfill de pagos con `CASH_SESSION_ID NULL`; no se reconstruyen arqueos. |
