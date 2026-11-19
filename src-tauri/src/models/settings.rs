@@ -25,7 +25,7 @@ pub struct ClinicAsset {
     pub kind: String,
     pub file_name: Option<String>,
     pub mime_type: Option<String>,
-    pub size_bytes: i64,
+    pub size_bytes: i32,
     pub updated_at: String,
 }
 

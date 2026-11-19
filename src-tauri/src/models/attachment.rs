@@ -12,7 +12,7 @@ use specta::Type;
 pub struct AttachmentContent {
     pub file_name: String,
     pub mime_type: Option<String>,
-    pub size_bytes: i64,
+    pub size_bytes: i32,
     /// `data:<mime>;base64,<...>` listo para usar en el webview.
     pub data_url: String,
 }
@@ -28,7 +28,7 @@ impl AttachmentContent {
             .clone()
             .or_else(|| mime_for_file_name(&file_name))
             .unwrap_or_else(|| "application/octet-stream".to_string());
-        let size_bytes = content.len() as i64;
+        let size_bytes = content.len().try_into().unwrap_or(i32::MAX);
         let data_url = format!("data:{mime};base64,{}", STANDARD.encode(&content));
         Self {
             file_name,

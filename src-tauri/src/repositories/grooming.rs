@@ -483,7 +483,7 @@ type AttachmentRow = (
     String,         // file_name
     Option<String>, // mime_type
     Option<String>, // kind
-    i64,            // size_bytes
+    i32,            // size_bytes (columna INTEGER)
     String,         // created_at
 );
 

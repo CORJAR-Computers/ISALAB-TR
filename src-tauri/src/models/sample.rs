@@ -11,7 +11,7 @@ pub struct ResultAttachment {
     pub file_name: String,
     pub mime_type: Option<String>,
     /// Tamaño del BLOB en bytes (sin leer el contenido).
-    pub size_bytes: i64,
+    pub size_bytes: i32,
     pub created_at: String,
 }
 

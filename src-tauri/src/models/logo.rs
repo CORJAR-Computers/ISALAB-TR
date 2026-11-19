@@ -8,7 +8,7 @@ pub struct SecondaryLogo {
     pub name: String,
     pub mime_type: Option<String>,
     /// Tamaño del BLOB en bytes (sin leer el contenido).
-    pub size_bytes: i64,
+    pub size_bytes: i32,
     pub created_at: String,
 }
 

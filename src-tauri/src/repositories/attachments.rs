@@ -13,7 +13,7 @@ pub(crate) type ResultAttachmentRow = (
     i32,            // result_id
     String,         // file_name
     Option<String>, // mime_type
-    i64,            // size_bytes
+    i32,            // size_bytes (columna INTEGER)
     String,         // created_at
 );
 
@@ -227,7 +227,7 @@ mod integration_tests {
 
         let content = content(&mut conn, att.id).unwrap();
         assert_eq!(content.file_name, "placa.png");
-        assert_eq!(content.size_bytes, bytes.len() as i64);
+        assert_eq!(content.size_bytes, bytes.len() as i32);
         assert!(content.data_url.starts_with("data:image/png;base64,"));
 
         test_helpers::cleanup_test_db(&db_path);

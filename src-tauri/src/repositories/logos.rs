@@ -9,7 +9,7 @@ pub(crate) type SecondaryLogoRow = (
     i32,
     String,
     Option<String>,
-    i64,
+    i32,    // size_bytes (columna INTEGER)
     String, // created_at
 );
 
