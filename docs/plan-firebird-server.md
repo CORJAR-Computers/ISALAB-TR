@@ -1,6 +1,7 @@
 # ISALAB — Plan: Firebird 5 Server para 3 PCs
 
-**Estado:** propuesto — pendiente de aprobación
+**Estado:** en ejecución — Fases 0–5 completadas (última: fase 5, `df2e474`).
+Pendientes las fases 6–8 (archivos/secretos/backup, empaquetado y corte).
 **Base:** v1.1.0 (schema 0033)
 **Objetivo:** pasar de **Firebird 5 Embedded** (una base local por PC) a
 **Firebird 5 Server** (una base central, tres clientes Tauri por red).
@@ -846,12 +847,15 @@ tipado. Manual: red, firewall, eventos y archivos.
 
 ## 11. Commits sugeridos
 
-1. `feat(db): connect to Firebird 5 server over TCP` (Fase 3)
-2. `feat(db): run schema migrations from an admin runner` (Fase 4)
-3. `feat(db): remote events and concurrent-safe operations` (Fase 5)
+1. `feat(db): connect to Firebird 5 server over TCP` (Fase 3) — `a4c260b`
+2. `feat(db): run schema migrations from an admin runner` (Fase 4) — `cfd907d`
+3. `feat(db): remote events and concurrent-safe operations` (Fase 5) — `df2e474`
 4. `feat(files): share attachments and server-side backups` (Fase 6)
 5. `build: ship Firebird client runtime and server docs` (Fase 7)
 6. `docs(ops): firebird server cutover runbook` (Fase 8)
+
+El despliegue operativo de las fases 1–2 se entregó aparte en
+`bc3739d` (`docs(ops): add Firebird deployment files and runbook`).
 
 Cada commit con: `cargo test`, `npm test`, `tsc --noEmit`, `npm run lint`,
 `npm run build` en verde.
