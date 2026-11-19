@@ -50,7 +50,6 @@ import {
 } from "@/hooks/use-queries";
 import { useUsers } from "@/hooks/use-queries";
 import { getErrorMessage } from "@/lib/api";
-import { api } from "@/lib/api";
 import {
   GROOMING_BEHAVIOR_LABEL,
   GROOMING_BATH_LABEL,

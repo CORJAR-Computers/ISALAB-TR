@@ -35,7 +35,10 @@ import { Skeleton } from "@/components/ui/skeleton";
 import { Separator } from "@/components/ui/separator";
 import {
   useClinicSettings,
+  useDeleteClinicLogo,
+  useDeletePkcs12,
   useImportClinicLogo,
+  useImportPkcs12,
   useSaveClinicSettings,
   useSecondaryLogos,
   useImportSecondaryLogo,
@@ -80,6 +83,9 @@ export function SettingsPage() {
   const { data: settings, isLoading } = useClinicSettings();
   const save = useSaveClinicSettings();
   const importLogo = useImportClinicLogo();
+  const deleteLogo = useDeleteClinicLogo();
+  const importPkcs12 = useImportPkcs12();
+  const deletePkcs12 = useDeletePkcs12();
   const { data: secondaryLogos } = useSecondaryLogos();
   const importSecondaryLogo = useImportSecondaryLogo();
   const deleteSecondaryLogo = useDeleteSecondaryLogo();
@@ -88,7 +94,6 @@ export function SettingsPage() {
   const [backingUp, setBackingUp] = useState(false);
   const [testingGroq, setTestingGroq] = useState(false);
   const [testingSmtp, setTestingSmtp] = useState(false);
-  const [importingPkcs12, setImportingPkcs12] = useState(false);
   const [logoContentUrl, setLogoContentUrl] = useState<string | null>(null);
   const [secondaryLogoContentUrls, setSecondaryLogoContentUrls] = useState<
     Record<number, string>
@@ -179,8 +184,18 @@ export function SettingsPage() {
     }
   };
 
-  const clearLogo = () => {
-    toast.info("Usa 'Eliminar logo' para quitar el logo principal.");
+  const clearLogo = async () => {
+    if (!window.confirm("¿Seguro que deseas eliminar el logo de la clínica?")) return;
+    try {
+      await deleteLogo.mutateAsync();
+      toast.success("Logo eliminado", {
+        description: "Los reportes volverán a usar el logo de ISALAB.",
+      });
+    } catch (e) {
+      toast.error("No se pudo eliminar el logo", {
+        description: getErrorMessage(e),
+      });
+    }
   };
 
   const pickSecondaryLogo = async () => {
@@ -268,6 +283,8 @@ export function SettingsPage() {
       taxRate: values.taxRate,
       currency: values.currency.trim(),
       signatureMode: values.signatureMode,
+      logo: settings?.logo ?? null,
+      certificate: settings?.certificate ?? null,
       vetName: values.vetName?.trim() ?? "",
       vetLicense: toNullable(values.vetLicense),
       groqApiKey: toNullable(values.groqApiKey),
@@ -320,16 +337,17 @@ export function SettingsPage() {
       });
       if (!selected || Array.isArray(selected)) return;
 
-      setImportingPkcs12(true);
       const password = form.getValues("pkcs12Password") ?? "";
       if (!password) {
         toast.error("Falta la contraseña del certificado", {
           description: "Ingresa la contraseña del .p12 antes de importarlo.",
         });
-        setImportingPkcs12(false);
         return;
       }
-      const stored = await api.importPkcs12(selected, password);
+      const stored = await importPkcs12.mutateAsync({
+        sourcePath: selected,
+        password,
+      });
       toast.success("Certificado importado", {
         description: `Almacenado como "${stored.fileName ?? stored.kind}". Guarda la configuración para aplicar la firma digital.`,
       });
@@ -337,13 +355,21 @@ export function SettingsPage() {
       toast.error("No se pudo importar el certificado", {
         description: getErrorMessage(e),
       });
-    } finally {
-      setImportingPkcs12(false);
     }
   };
 
-  const clearPkcs12 = () => {
-    toast.info("Usa 'Eliminar certificado' para quitar el PKCS#12.");
+  const clearPkcs12 = async () => {
+    if (!window.confirm("¿Seguro que deseas eliminar el certificado digital?")) return;
+    try {
+      await deletePkcs12.mutateAsync();
+      toast.success("Certificado eliminado", {
+        description: "Los reportes volverán a usar el modo de firma configurado.",
+      });
+    } catch (e) {
+      toast.error("No se pudo eliminar el certificado", {
+        description: getErrorMessage(e),
+      });
+    }
   };
 
   const testGroq = async () => {
@@ -609,6 +635,7 @@ export function SettingsPage() {
                           variant="ghost"
                           size="sm"
                           onClick={clearLogo}
+                          disabled={deleteLogo.isPending}
                         >
                           <X className="size-4" />
                           Quitar
@@ -830,54 +857,51 @@ export function SettingsPage() {
                   </FormItem>
                 )}
               />
-              <FormField
-                control={form.control}
-                name="pkcs12Path"
-                render={({ field }) => (
-                  <FormItem className="sm:col-span-2">
-                    <FormLabel>Certificado digital (.p12/.pfx)</FormLabel>
-                    <div className="flex flex-wrap items-center gap-2">
-                      <Button
-                        type="button"
-                        variant="outline"
-                        size="sm"
-                        onClick={pickPkcs12}
-                        disabled={importingPkcs12}
-                      >
-                        {importingPkcs12 ? (
-                          <Loader2 className="animate-spin" />
-                        ) : (
-                          <FileKey2 className="size-4" />
-                        )}
-                        {field.value ? "Reemplazar certificado…" : "Importar certificado…"}
-                      </Button>
-                      {field.value && (
-                        <Button
-                          type="button"
-                          variant="ghost"
-                          size="sm"
-                          onClick={clearPkcs12}
-                        >
-                          <X className="size-4" />
-                          Quitar
-                        </Button>
-                      )}
-                    </div>
-                    {field.value && (
-                      <p className="text-muted-foreground font-mono text-xs break-all">
-                        {field.value}
-                      </p>
+              <div className="space-y-2 sm:col-span-2">
+                <FormLabel>Certificado digital (.p12/.pfx)</FormLabel>
+                <div className="flex flex-wrap items-center gap-2">
+                  <Button
+                    type="button"
+                    variant="outline"
+                    size="sm"
+                    onClick={pickPkcs12}
+                    disabled={importPkcs12.isPending}
+                  >
+                    {importPkcs12.isPending ? (
+                      <Loader2 className="animate-spin" />
+                    ) : (
+                      <FileKey2 className="size-4" />
                     )}
-                    <FormDescription>
-                      El archivo se copia a la carpeta de la app; la ruta se
-                      guarda en la configuración. Los reportes se firman
-                      criptográficamente (PAdES, Ley 527 de 1999) con este
-                      certificado.
-                    </FormDescription>
-                    <FormMessage />
-                  </FormItem>
+                    {settings?.certificate
+                      ? "Reemplazar certificado…"
+                      : "Importar certificado…"}
+                  </Button>
+                  {settings?.certificate && (
+                    <Button
+                      type="button"
+                      variant="ghost"
+                      size="sm"
+                      onClick={clearPkcs12}
+                      disabled={deletePkcs12.isPending}
+                    >
+                      <X className="size-4" />
+                      Quitar
+                    </Button>
+                  )}
+                </div>
+                {settings?.certificate && (
+                  <p className="text-muted-foreground font-mono text-xs break-all">
+                    {settings.certificate.fileName ?? settings.certificate.kind}
+                    {settings.certificate.sizeBytes > 0
+                      ? ` · ${Math.max(1, Math.round(settings.certificate.sizeBytes / 1024))} KB`
+                      : ""}
+                  </p>
                 )}
-              />
+                <p className="text-muted-foreground text-sm">
+                  El certificado se almacena en la base de datos y se usa para
+                  firmar los reportes (PAdES, Ley 527 de 1999).
+                </p>
+              </div>
             </CardContent>
           </Card>
 

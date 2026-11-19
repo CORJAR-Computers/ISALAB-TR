@@ -8,8 +8,8 @@ export function useReports() {
 export function useGenerateReport() {
   const qc = useQueryClient();
   return useMutation({
-    mutationFn: ({ sampleId, overrideLogoPath, saveLogoPreference }: { sampleId: number, overrideLogoPath?: string | null, saveLogoPreference?: boolean | null }) =>
-      api.generateReport(sampleId, overrideLogoPath, saveLogoPreference),
+    mutationFn: ({ sampleId, overrideLogoId, saveLogoPreference }: { sampleId: number, overrideLogoId?: number | null, saveLogoPreference?: boolean | null }) =>
+      api.generateReport(sampleId, overrideLogoId, saveLogoPreference),
     onSuccess: () => qc.invalidateQueries({ queryKey: ["reports"] }),
   });
 }

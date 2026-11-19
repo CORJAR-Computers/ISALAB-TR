@@ -630,7 +630,7 @@ export function SampleDetailDialog({
   const generatePdf = async () => {
     if (!sample) return;
     try {
-      const report = await generate.mutateAsync({ sampleId: sample.id, overrideLogoPath: null, saveLogoPreference: false });
+      const report = await generate.mutateAsync({ sampleId: sample.id, overrideLogoId: null, saveLogoPreference: false });
       toast.success(`Informe ${report.fileName} generado`, {
         description: "Se abrirá con el visor de PDF del sistema.",
       });

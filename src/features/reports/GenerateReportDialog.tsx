@@ -446,16 +446,18 @@ export function GenerateReportDialog({
                   </div>
                   
                   <Select
-                    value={overrideLogoId ?? null}
-                    onValueChange={(v) => setOverrideLogoId(v ?? null)}
+                    value={overrideLogoId != null ? String(overrideLogoId) : "none"}
+                    onValueChange={(v) =>
+                      setOverrideLogoId(v === "none" ? null : Number(v))
+                    }
                   >
                     <SelectTrigger>
                       <SelectValue placeholder="Seleccionar logo secundario..." />
                     </SelectTrigger>
                     <SelectContent>
-                      <SelectItem value={null}>Ninguno (Dejar espacio o usar defecto)</SelectItem>
+                      <SelectItem value="none">Ninguno (Dejar espacio o usar defecto)</SelectItem>
                       {secondaryLogos?.map(logo => (
-                        <SelectItem key={logo.id} value={logo.id}>{logo.name}</SelectItem>
+                        <SelectItem key={logo.id} value={String(logo.id)}>{logo.name}</SelectItem>
                       ))}
                     </SelectContent>
                   </Select>

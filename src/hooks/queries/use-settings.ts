@@ -33,8 +33,35 @@ export function useSaveClinicSettings() {
 }
 
 export function useImportClinicLogo() {
+  const qc = useQueryClient();
   return useMutation({
     mutationFn: (sourcePath: string) => api.importClinicLogo(sourcePath),
+    onSuccess: () => qc.invalidateQueries({ queryKey: ["clinic-settings"] }),
+  });
+}
+
+export function useDeleteClinicLogo() {
+  const qc = useQueryClient();
+  return useMutation({
+    mutationFn: api.deleteClinicLogo,
+    onSuccess: () => qc.invalidateQueries({ queryKey: ["clinic-settings"] }),
+  });
+}
+
+export function useImportPkcs12() {
+  const qc = useQueryClient();
+  return useMutation({
+    mutationFn: ({ sourcePath, password }: { sourcePath: string; password: string }) =>
+      api.importPkcs12(sourcePath, password),
+    onSuccess: () => qc.invalidateQueries({ queryKey: ["clinic-settings"] }),
+  });
+}
+
+export function useDeletePkcs12() {
+  const qc = useQueryClient();
+  return useMutation({
+    mutationFn: api.deletePkcs12,
+    onSuccess: () => qc.invalidateQueries({ queryKey: ["clinic-settings"] }),
   });
 }
 
