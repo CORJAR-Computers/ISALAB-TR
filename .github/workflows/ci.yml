@@ -24,6 +24,12 @@ jobs:
   frontend:
     name: Frontend (React)
     runs-on: ubuntu-latest
+    env:
+      # La clínica opera en hora de Colombia (UTC-5) y los runners corren en UTC.
+      # Con TZ=UTC un uso accidental de toISOString() para fechas "de hoy" en
+      # Vitest pasaría siempre, y el bug solo aparecería a las 19:00 en la
+      # clínica. Fijando la zona aquí, la suite corre en la zona del usuario.
+      TZ: America/Bogota
     steps:
       - uses: actions/checkout@v7
       - name: Setup Node.js
@@ -152,6 +158,11 @@ jobs:
   e2e:
     name: E2E Smoke (Playwright)
     runs-on: ubuntu-latest
+    env:
+      # Igual que en el job de frontend: los specs de fecha y los códigos
+      # consecutivos (V-AAAA-NNNN) se derivan del día LOCAL del equipo. En UTC
+      # no detectarían una regresión a fecha UTC; en la zona de la clínica sí.
+      TZ: America/Bogota
     steps:
       - uses: actions/checkout@v7
       - name: Setup Node.js
