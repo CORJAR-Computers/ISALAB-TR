@@ -14,8 +14,10 @@ pub const LEFT_LOGO_XOBJECT: &str = "ISALAB-LEFT-LOGO";
 pub const RIGHT_LOGO_XOBJECT: &str = "ISALAB-RIGHT-LOGO";
 pub const WATERMARK_LOGO_XOBJECT: &str = "ISALAB-WATERMARK-LOGO";
 
-/// Logo por defecto incrustado en el binario (logo_sidebar.png de la raíz).
-pub const DEFAULT_LOGO: &[u8] = include_bytes!("../../../logo_sidebar.png");
+/// Logo por defecto incrustado en el binario (Logo_Sidebar.png de la raíz).
+/// La capitalización debe coincidir con el archivo versionado: en Windows da
+/// igual, pero en Linux/macOS el build falla si no existe tal cual.
+pub const DEFAULT_LOGO: &[u8] = include_bytes!("../../../Logo_Sidebar.png");
 
 /// Datos de la clínica para el encabezado del informe.
 #[derive(Debug, Clone, Serialize, Deserialize, Type)]
