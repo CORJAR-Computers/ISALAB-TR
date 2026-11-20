@@ -29,6 +29,7 @@ import {
   TableRow,
 } from "@/components/ui/table";
 import { Skeleton } from "@/components/ui/skeleton";
+import { QueryErrorState } from "@/components/query-error-state";
 import {
   useConsultationCounts,
   useConsultations,
@@ -56,10 +57,8 @@ export function ConsultationsPage() {
   const setActivePatient = useUiStore((s) => s.setActivePatient);
   const { isVetOrAdmin } = usePermissions();
 
-  const { data: consultations, isLoading, isError } = useConsultations(
-    status,
-    search,
-  );
+  const { data: consultations, isLoading, isError, error, refetch } =
+    useConsultations(status, search);
   const { data: all } = useConsultationCounts();
   const setStatusMutation = useSetConsultationStatus();
 
@@ -185,8 +184,13 @@ export function ConsultationsPage() {
 
               {!isLoading && isError && (
                 <TableRow>
-                  <TableCell colSpan={6} className="text-muted-foreground h-16 text-center">
-                    No se pudo cargar la agenda de consultas.
+                  <TableCell colSpan={6} className="p-0">
+                    <QueryErrorState
+                      what="la agenda de consultas"
+                      compact
+                      error={error}
+                      onRetry={() => void refetch()}
+                    />
                   </TableCell>
                 </TableRow>
               )}

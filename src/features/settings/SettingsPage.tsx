@@ -33,6 +33,7 @@ import {
   SelectValue,
 } from "@/components/ui/select";
 import { Skeleton } from "@/components/ui/skeleton";
+import { QueryErrorState } from "@/components/query-error-state";
 import { Separator } from "@/components/ui/separator";
 import {
   useClinicSettings,
@@ -81,7 +82,8 @@ const toNullable = (v: unknown) =>
   typeof v === "string" && v.trim() !== "" ? v.trim() : null;
 
 export function SettingsPage() {
-  const { data: settings, isLoading } = useClinicSettings();
+  const { data: settings, isLoading, isError, error, refetch } =
+    useClinicSettings();
   const save = useSaveClinicSettings();
   const importLogo = useImportClinicLogo();
   const deleteLogo = useDeleteClinicLogo();
@@ -432,6 +434,16 @@ export function SettingsPage() {
       setBackingUp(false);
     }
   };
+
+  if (isError) {
+    return (
+      <QueryErrorState
+        what="la configuración de la clínica"
+        error={error}
+        onRetry={() => void refetch()}
+      />
+    );
+  }
 
   if (isLoading && !settings) {
     return (

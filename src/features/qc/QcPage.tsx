@@ -45,6 +45,7 @@ import {
 } from "@/components/ui/table";
 import { Textarea } from "@/components/ui/textarea";
 import { Skeleton } from "@/components/ui/skeleton";
+import { QueryErrorState } from "@/components/query-error-state";
 import {
   useAnalyzers,
   useAnalytes,
@@ -173,7 +174,13 @@ const emptyMaterial = (analyzerId: number): QcMaterialInput => ({
 
 export function QcPage() {
   const { isVetOrAdmin } = usePermissions();
-  const { data: materials = [], isLoading } = useQcMaterials();
+  const {
+    data: materials = [],
+    isLoading,
+    isError,
+    error,
+    refetch,
+  } = useQcMaterials();
   const { data: analyzers = [] } = useAnalyzers();
   const { data: analytes = [] } = useAnalytes();
   const { data: qcStatus = [] } = useQcAnalyzerStatus();
@@ -367,7 +374,15 @@ export function QcPage() {
           </CardHeader>
           <CardContent className="max-h-[60vh] space-y-2 overflow-y-auto p-3">
             {isLoading && <Skeleton className="h-16 w-full" />}
-            {materials.length === 0 && !isLoading && (
+            {isError && (
+              <QueryErrorState
+                what="los materiales de control"
+                compact
+                error={error}
+                onRetry={() => void refetch()}
+              />
+            )}
+            {materials.length === 0 && !isLoading && !isError && (
               <p className="text-muted-foreground p-4 text-center text-sm">
                 No hay materiales de control. Crea uno para empezar a registrar
                 corridas QC.

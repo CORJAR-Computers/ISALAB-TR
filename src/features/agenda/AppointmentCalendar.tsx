@@ -4,6 +4,7 @@ import { Button } from "@/components/ui/button";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Badge } from "@/components/ui/badge";
 import { Skeleton } from "@/components/ui/skeleton";
+import { QueryErrorState } from "@/components/query-error-state";
 import {
   useAppointments,
   useCheckInAppointment,
@@ -61,12 +62,13 @@ export function AppointmentCalendar() {
 
   const checkIn = useCheckInAppointment();
 
-  const { data: appointments = [], isLoading } = useAppointments(
-    null,
-    null,
-    null,
-    true,
-  );
+  const {
+    data: appointments = [],
+    isLoading,
+    isError,
+    error,
+    refetch,
+  } = useAppointments(null, null, null, true);
 
   // Citas que caen en la semana visible.
   const weekAppts = useMemo(() => {
@@ -136,6 +138,14 @@ export function AppointmentCalendar() {
           )}
         </div>
       </div>
+
+      {isError && (
+        <QueryErrorState
+          what="la agenda de citas"
+          error={error}
+          onRetry={() => void refetch()}
+        />
+      )}
 
       <Card>
         <CardHeader>

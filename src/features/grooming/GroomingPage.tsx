@@ -9,6 +9,7 @@ import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Skeleton } from "@/components/ui/skeleton";
+import { QueryErrorState } from "@/components/query-error-state";
 import {
   useAppointments,
   useGroomingDay,
@@ -48,8 +49,20 @@ export function GroomingPage() {
     (c) => c.code.toUpperCase() === "PELUQUERIA",
   );
 
-  const { data: lines = [], isLoading: loadingLines } = useGroomingDay(date);
-  const { data: appointments = [], isLoading: loadingAppts } = useAppointments(
+  const {
+    data: lines = [],
+    isLoading: loadingLines,
+    isError: linesError,
+    error: linesErrorObj,
+    refetch: refetchLines,
+  } = useGroomingDay(date);
+  const {
+    data: appointments = [],
+    isLoading: loadingAppts,
+    isError: apptsError,
+    error: apptsErrorObj,
+    refetch: refetchAppts,
+  } = useAppointments(
     date,
     null,
     null,
@@ -147,6 +160,13 @@ export function GroomingPage() {
               <Skeleton className="h-12 w-full" />
               <Skeleton className="h-12 w-full" />
             </div>
+          ) : linesError ? (
+            <QueryErrorState
+              what="las sesiones de peluquería"
+              compact
+              error={linesErrorObj}
+              onRetry={() => void refetchLines()}
+            />
           ) : lines.length === 0 ? (
             <p className="text-muted-foreground py-6 text-center text-sm">
               No hay sesiones de peluquería para este día.
@@ -222,6 +242,13 @@ export function GroomingPage() {
         <CardContent>
           {loadingAppts ? (
             <Skeleton className="h-12 w-full" />
+          ) : apptsError ? (
+            <QueryErrorState
+              what="las citas de peluquería"
+              compact
+              error={apptsErrorObj}
+              onRetry={() => void refetchAppts()}
+            />
           ) : groomingAppointments.length === 0 ? (
             <p className="text-muted-foreground py-4 text-center text-sm">
               Sin citas de peluquería para este día.

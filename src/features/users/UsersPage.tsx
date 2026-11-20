@@ -21,6 +21,7 @@ import {
 } from "@/components/ui/card";
 import { Badge } from "@/components/ui/badge";
 import { Skeleton } from "@/components/ui/skeleton";
+import { QueryErrorState } from "@/components/query-error-state";
 import {
   Table,
   TableBody,
@@ -250,7 +251,7 @@ function CreateUserDialog({
 
 export function UsersPage() {
   const [createOpen, setCreateOpen] = useState(false);
-  const { data: users, isLoading } = useUsers();
+  const { data: users, isLoading, isError, error, refetch } = useUsers();
   const session = useSessionStore((s) => s.session);
   const openChangePassword = useSessionStore((s) => s.openChangePassword);
   const { isAdmin } = usePermissions();
@@ -325,7 +326,13 @@ export function UsersPage() {
         </p>
       </div>
 
-      {isLoading && !users ? (
+      {isError ? (
+        <QueryErrorState
+          what="los usuarios del sistema"
+          error={error}
+          onRetry={() => void refetch()}
+        />
+      ) : isLoading && !users ? (
         <Skeleton className="h-40 w-full" />
       ) : (
         <div className="rounded-lg border">

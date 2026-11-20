@@ -32,6 +32,7 @@ import {
   CardTitle,
 } from "@/components/ui/card";
 import { Skeleton } from "@/components/ui/skeleton";
+import { QueryErrorState } from "@/components/query-error-state";
 import {
   useDashboardStats,
   useSetConsultationStatus,
@@ -176,29 +177,13 @@ export function DashboardPage() {
   // mensaje ni forma de reintentar.
   if (isError) {
     return (
-      <Card className="mx-auto max-w-xl">
-        <CardHeader>
-          <CardTitle className="flex items-center gap-2 text-base">
-            <AlertTriangle className="text-destructive size-4.5" />
-            No se pudo cargar el panel de control
-          </CardTitle>
-          <CardDescription>
-            Revisa la conexión con la base de datos e inténtalo de nuevo.
-          </CardDescription>
-        </CardHeader>
-        <CardContent className="space-y-4">
-          <p
-            role="alert"
-            className="bg-muted/50 text-muted-foreground rounded-lg border p-3 font-mono text-xs break-words"
-          >
-            {getErrorMessage(error)}
-          </p>
-          <Button onClick={() => void refetch()} className="gap-2">
-            <Loader2 className="size-4" />
-            Reintentar
-          </Button>
-        </CardContent>
-      </Card>
+      <QueryErrorState
+        what="el panel de control"
+        hint="Revisa la conexión con la base de datos e inténtalo de nuevo."
+        error={error}
+        onRetry={() => void refetch()}
+        className="mx-auto max-w-xl"
+      />
     );
   }
 

@@ -14,6 +14,7 @@ import { Badge } from "@/components/ui/badge";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
 import { Skeleton } from "@/components/ui/skeleton";
+import { QueryErrorState } from "@/components/query-error-state";
 import {
   Select,
   SelectContent,
@@ -88,7 +89,7 @@ export function AuditLogPage() {
 
   const hasActiveFilters = filterUsername || filterAction || filterDateFrom || filterDateTo;
 
-  const { data: entries, isLoading } = useAuditLog(
+  const { data: entries, isLoading, isError, error, refetch } = useAuditLog(
     page,
     PAGE_SIZE,
     filterParams.username,
@@ -275,7 +276,13 @@ export function AuditLogPage() {
         </div>
       )}
 
-      {isLoading && !entries ? (
+      {isError ? (
+        <QueryErrorState
+          what="el registro de auditoría"
+          error={error}
+          onRetry={() => void refetch()}
+        />
+      ) : isLoading && !entries ? (
         <Skeleton className="h-60 w-full" />
       ) : (
         <div className="rounded-lg border">

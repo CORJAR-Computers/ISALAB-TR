@@ -25,6 +25,7 @@ import {
   TableRow,
 } from "@/components/ui/table";
 import { Skeleton } from "@/components/ui/skeleton";
+import { QueryErrorState } from "@/components/query-error-state";
 import {
   useResourceBoard,
   useResources,
@@ -49,11 +50,20 @@ export function StaysPage() {
   const [resourceDialogOpen, setResourceDialogOpen] = useState(false);
   const [editingResource, setEditingResource] = useState<Resource | null>(null);
 
-  const { data: board = [], isLoading: loadingBoard } = useResourceBoard();
+  const {
+    data: board = [],
+    isLoading: loadingBoard,
+    isError: boardError,
+    error: boardErrorObj,
+    refetch: refetchBoard,
+  } = useResourceBoard();
   const { data: resources = [] } = useResources(true);
   const {
     data: stays = [],
     isLoading: loadingStays,
+    isError: staysError,
+    error: staysErrorObj,
+    refetch: refetchStays,
   } = useStays(
     statusFilter === "TODAS" ? null : statusFilter,
     kindFilter === "TODAS" ? null : kindFilter,
@@ -166,6 +176,13 @@ export function StaysPage() {
               <Skeleton className="h-16 w-full" />
               <Skeleton className="h-16 w-full" />
             </div>
+          ) : boardError ? (
+            <QueryErrorState
+              what="la ocupación de recursos"
+              compact
+              error={boardErrorObj}
+              onRetry={() => void refetchBoard()}
+            />
           ) : board.length === 0 ? (
             <p className="text-muted-foreground py-6 text-center text-sm">
               No hay recursos registrados. Un administrador puede crearlos
@@ -273,6 +290,13 @@ export function StaysPage() {
               <Skeleton className="h-10 w-full" />
               <Skeleton className="h-10 w-full" />
             </div>
+          ) : staysError ? (
+            <QueryErrorState
+              what="las estancias"
+              compact
+              error={staysErrorObj}
+              onRetry={() => void refetchStays()}
+            />
           ) : stays.length === 0 ? (
             <p className="text-muted-foreground py-6 text-center text-sm">
               No hay estancias con esos filtros.

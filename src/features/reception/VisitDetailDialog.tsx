@@ -1,7 +1,6 @@
 import { useMemo, useState } from "react";
 import { toast } from "sonner";
 import {
-  AlertTriangle,
   Banknote,
   Check,
   CirclePlay,
@@ -38,6 +37,7 @@ import {
 } from "@/hooks/use-queries";
 import { usePermissions } from "@/hooks/use-permissions";
 import { getErrorMessage } from "@/lib/api";
+import { QueryErrorState } from "@/components/query-error-state";
 import { VISIT_SERVICE_STATUS, VISIT_STATUS } from "@/lib/status";
 import { cn, formatCOP } from "@/lib/utils";
 import { CheckoutDialog } from "./CheckoutDialog";
@@ -105,19 +105,12 @@ export function VisitDetailDialog({
         {isError ? (
           // Sin este estado, un fallo de la consulta dejaba el diálogo con los
           // skeletons de carga para siempre (sin mensaje ni reintento).
-          <div className="space-y-3 py-8 text-center">
-            <AlertTriangle className="text-destructive mx-auto size-8" />
-            <p className="text-sm font-semibold">No se pudo cargar la visita</p>
-            <p
-              role="alert"
-              className="text-muted-foreground mx-auto max-w-md text-xs break-words"
-            >
-              {getErrorMessage(error)}
-            </p>
-            <Button variant="outline" size="sm" onClick={() => void refetch()}>
-              Reintentar
-            </Button>
-          </div>
+          <QueryErrorState
+            what="la visita"
+            compact
+            error={error}
+            onRetry={() => void refetch()}
+          />
         ) : isLoading || !visit ? (
           <div className="space-y-3">
             <Skeleton className="h-8 w-1/2" />

@@ -10,6 +10,7 @@ import {
   CardTitle,
 } from "@/components/ui/card";
 import { Skeleton } from "@/components/ui/skeleton";
+import { QueryErrorState } from "@/components/query-error-state";
 import { Badge } from "@/components/ui/badge";
 import { useClinicalHistory, usePatientLabOrders, usePatients } from "@/hooks/use-queries";
 import { LAB_ORDER_STATUS } from "@/lib/status";
@@ -35,10 +36,20 @@ export function ClinicalHistoryPage() {
   const [visitOpen, setVisitOpen] = useState(false);
   const { isVetOrAdmin } = usePermissions();
 
-  const { data: patients = [], isLoading: loadingPatients } =
-    usePatients(search);
-  const { data: history, isLoading: loadingHistory } =
-    useClinicalHistory(activePatientId);
+  const {
+    data: patients = [],
+    isLoading: loadingPatients,
+    isError: patientsError,
+    error: patientsErrorObj,
+    refetch: refetchPatients,
+  } = usePatients(search);
+  const {
+    data: history,
+    isLoading: loadingHistory,
+    isError: historyError,
+    error: historyErrorObj,
+    refetch: refetchHistory,
+  } = useClinicalHistory(activePatientId);
 
   // ---- Sin paciente seleccionado: selector compacto ----
   if (!activePatientId) {
@@ -70,7 +81,15 @@ export function ClinicalHistoryPage() {
               Array.from({ length: 4 }).map((_, i) => (
                 <Skeleton key={i} className="m-1 h-11 w-full" />
               ))}
-            {!loadingPatients && patients.length === 0 && (
+            {patientsError && (
+              <QueryErrorState
+                what="los pacientes"
+                compact
+                error={patientsErrorObj}
+                onRetry={() => void refetchPatients()}
+              />
+            )}
+            {!loadingPatients && !patientsError && patients.length === 0 && (
               <p className="text-muted-foreground px-3 py-8 text-center text-sm">
                 {search
                   ? "Sin coincidencias."
@@ -109,6 +128,16 @@ export function ClinicalHistoryPage() {
         <Skeleton className="h-40 w-full" />
         <Skeleton className="h-80 w-full" />
       </div>
+    );
+  }
+
+  if (historyError) {
+    return (
+      <QueryErrorState
+        what="el historial del paciente"
+        error={historyErrorObj}
+        onRetry={() => void refetchHistory()}
+      />
     );
   }
 
@@ -204,7 +233,13 @@ export function ClinicalHistoryPage() {
 
 /** Últimas órdenes de laboratorio del paciente, con foco en las pendientes. */
 function PatientLabOrdersSection({ patientId }: { patientId: number }) {
-  const { data: orders = [], isLoading } = usePatientLabOrders(patientId);
+  const {
+    data: orders = [],
+    isLoading,
+    isError,
+    error,
+    refetch,
+  } = usePatientLabOrders(patientId);
   const navigate = useUiStore((s) => s.navigate);
   const requestEntity = useUiStore((s) => s.requestEntity);
 
@@ -237,7 +272,15 @@ function PatientLabOrdersSection({ patientId }: { patientId: number }) {
       </CardHeader>
       <CardContent className="p-3">
         {isLoading && <Skeleton className="h-16 w-full" />}
-        {!isLoading && shown.length === 0 && (
+        {isError && (
+          <QueryErrorState
+            what="las órdenes de laboratorio"
+            compact
+            error={error}
+            onRetry={() => void refetch()}
+          />
+        )}
+        {!isLoading && !isError && shown.length === 0 && (
           <p className="text-muted-foreground py-3 text-center text-sm">
             Sin órdenes de laboratorio registradas para este paciente.
           </p>

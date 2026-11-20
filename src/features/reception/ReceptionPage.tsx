@@ -1,6 +1,5 @@
 import { useEffect, useMemo, useState } from "react";
 import {
-  AlertTriangle,
   ClipboardPlus,
   DoorOpen,
   Search,
@@ -22,6 +21,7 @@ import {
 } from "@/hooks/use-queries";
 import { usePermissions } from "@/hooks/use-permissions";
 import { getErrorMessage } from "@/lib/api";
+import { QueryErrorState } from "@/components/query-error-state";
 import { VISIT_STATUS } from "@/lib/status";
 import { cn, formatCOP, localDateISO } from "@/lib/utils";
 import { toast } from "sonner";
@@ -212,27 +212,11 @@ export function ReceptionPage() {
               en una clínica, "no hay visitas" y "la base no responde" son
               cosas muy distintas. */}
           {isError && (
-            <Card className="border-destructive/30">
-              <CardContent className="space-y-3 py-8 text-center">
-                <AlertTriangle className="text-destructive mx-auto size-8" />
-                <p className="text-sm font-semibold">
-                  No se pudo cargar la cola de visitas
-                </p>
-                <p
-                  role="alert"
-                  className="text-muted-foreground mx-auto max-w-md text-xs break-words"
-                >
-                  {getErrorMessage(error)}
-                </p>
-                <Button
-                  variant="outline"
-                  size="sm"
-                  onClick={() => void refetch()}
-                >
-                  Reintentar
-                </Button>
-              </CardContent>
-            </Card>
+            <QueryErrorState
+              what="la cola de visitas"
+              error={error}
+              onRetry={() => void refetch()}
+            />
           )}
 
           {!isLoading && !isError && (visits ?? []).length === 0 && (
