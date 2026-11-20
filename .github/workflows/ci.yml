@@ -116,8 +116,17 @@ jobs:
       - name: Prune Firebird to embedded subset
         run: node scripts/prune-firebird.mjs firebird5
 
+      # Toolchain fijado a propósito. `@stable` flota: cuando sale una versión
+      # nueva de rustfmt, reformatea el backend sin que cambie una línea de
+      # código y `cargo fmt --check` se pone rojo solo (pasó en ec0a595).
+      # 1.100.0 es la versión con la que está formateado el backend
+      # (rustfmt 1.11.0); subirla es un cambio deliberado que se acompaña de
+      # `cargo fmt` en el mismo commit, nunca de un rojo inesperado.
       - name: Install Rust
         uses: dtolnay/rust-toolchain@stable
+        with:
+          toolchain: 1.100.0
+          components: rustfmt, clippy
 
       - name: Cache cargo registry
         uses: actions/cache@v6
@@ -240,8 +249,17 @@ jobs:
         with:
           node-version: 24
           cache: 'npm'
+      # Toolchain fijado a propósito. `@stable` flota: cuando sale una versión
+      # nueva de rustfmt, reformatea el backend sin que cambie una línea de
+      # código y `cargo fmt --check` se pone rojo solo (pasó en ec0a595).
+      # 1.100.0 es la versión con la que está formateado el backend
+      # (rustfmt 1.11.0); subirla es un cambio deliberado que se acompaña de
+      # `cargo fmt` en el mismo commit, nunca de un rojo inesperado.
       - name: Install Rust
         uses: dtolnay/rust-toolchain@stable
+        with:
+          toolchain: 1.100.0
+          components: rustfmt, clippy
       - name: Cache cargo registry
         uses: actions/cache@v6
         with:
