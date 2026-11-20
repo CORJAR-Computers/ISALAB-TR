@@ -582,7 +582,10 @@ pub fn void(
                 )
                 .map_err(AppError::from)?;
             let cash = cash.map(|(v,)| v).unwrap_or(0.0);
-            if cash > MONEY_EPSILON {
+            // Todo el efectivo registrado se devuelve, aunque sea un céntimo:
+            // con `> MONEY_EPSILON` una recepción de 0,01 quedaba sin reverso y
+            // la caja se quedaba un céntimo por encima de lo real.
+            if cash > 0.0 {
                 let movement_id = next_id(conn, "GEN_CASH_MOVEMENTS_ID")?;
                 let detail = format!("Anulación {code}: {reason}");
                 conn.execute(

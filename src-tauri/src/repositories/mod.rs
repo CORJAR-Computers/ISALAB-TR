@@ -29,6 +29,10 @@ pub mod users;
 pub mod vaccines;
 pub mod visits;
 
+/// Property tests de caja, abonos y anulación (solo `cargo test`).
+#[cfg(test)]
+mod billing_props;
+
 use rsfbclient::prelude::*;
 use rsfbclient::SimpleConnection;
 
