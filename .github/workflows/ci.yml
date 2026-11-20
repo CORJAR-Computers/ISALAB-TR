@@ -44,6 +44,7 @@ jobs:
       # comandos nuevos).
       - name: Check bindings.ts is up to date
         run: npm run check:bindings
+      # `lint` cubre src/ y e2e/ (incluye las reglas de eslint-plugin-playwright).
       - name: Run ESLint
         run: npm run lint
       - name: Run Vitest
@@ -164,6 +165,11 @@ jobs:
           timeout_minutes: 10
           max_attempts: 3
           command: npm ci
+      # Los specs se lintean también aquí (además de en el job Frontend): el
+      # plugin de Playwright prohíbe page.waitForTimeout y test.only, que es
+      # justo lo que rompería este job sin avisar.
+      - name: Lint E2E specs
+        run: npm run lint:e2e
       - name: Remove unused Google Chrome apt source
         # El mirror de Chrome (preinstalado en la imagen) publica índices
         # continuamente y provoca "Hash Sum mismatch" intermitente en
@@ -182,6 +188,12 @@ jobs:
             sudo apt-get update
             npx playwright install-deps chromium
             npx playwright install chromium
+      # El mock IPC (e2e/ipc-mock.script.js) lanza un error ante un comando
+      # sin handler; este paso verifica que todo comando invocable por la UI
+      # tenga handler o esté en la allowlist explícita
+      # (e2e/ipc-mock.allowlist.mjs). `npm test` lo corre también vía pretest.
+      - name: Check E2E IPC mock covers all UI commands
+        run: npm run check:e2e-mock
       - name: Run E2E smoke tests
         # La UI corre en el dev server de Vite con el IPC de Tauri mockeado
         # (e2e/ipc-mock.script.js): valida login, dashboard y el flujo

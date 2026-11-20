@@ -32,20 +32,28 @@ async function login(page: Page) {
   ).toBeVisible();
 }
 
-/** Cierra la pila de diálogos con su X (Escape solo cierra el superior). */
+/**
+ * Cierra la pila de diálogos: Escape cierra el superior y, si ese diálogo no
+ * reacciona (o la capa está en animación de salida y el clic no llega), su X.
+ * Se espera al desmontaje con aserciones que reintentan, nunca con una pausa
+ * fija (`playwright/no-wait-for-timeout` lo prohíbe).
+ */
 async function closeDialogs(page: Page) {
-  for (let i = 0; i < 4; i += 1) {
-    const dialogs = page.getByRole("dialog");
-    if ((await dialogs.count()) === 0) return;
-    const close = dialogs.last().locator('[data-slot="dialog-close"]');
-    if ((await close.count()) > 0) {
-      await close.click();
-    } else {
-      await page.keyboard.press("Escape");
-    }
-    await page.waitForTimeout(200);
+  const dialogs = page.getByRole("dialog");
+  for (let i = 0; i < 6 && (await dialogs.count()) > 0; i += 1) {
+    const open = await dialogs.count();
+    await page.keyboard.press("Escape");
+    await expect
+      .poll(() => dialogs.count(), { timeout: 3_000 })
+      .toBeLessThan(open)
+      .catch(async () => {
+        const close = dialogs.last().locator('[data-slot="dialog-close"]');
+        if ((await close.count()) > 0) {
+          await close.first().click({ timeout: 2_000 });
+        }
+      });
   }
-  await expect(page.getByRole("dialog")).toHaveCount(0);
+  await expect(dialogs).toHaveCount(0);
 }
 
 /** Navega a una vista: expande su sección del sidebar si está cerrada. */
