@@ -238,9 +238,11 @@ fn run_case(
         let balance = payments::invoice_balance(conn, index as i32 + 1)
             .map_err(|e| TestCaseError::fail(format!("no se pudo leer la factura: {e}")))?;
         let expected_balance = invoice.total_cents - invoice.paid_cents;
-        let expected_status = if expected_balance == 0 {
+        // El backend compara saldos con tolerancia de un céntimo (plan-abonos-caja
+        // §3.4): un residuo de 0.01 cuenta como cobrado y un abono de 0.01 como cero.
+        let expected_status = if expected_balance <= 1 {
             "PAGADA"
-        } else if invoice.paid_cents > 0 {
+        } else if invoice.paid_cents > 1 {
             "ABONADA"
         } else {
             "PENDIENTE"
