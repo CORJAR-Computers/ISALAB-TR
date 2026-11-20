@@ -11,7 +11,7 @@ import { Badge } from "@/components/ui/badge";
 import { useClinicBranding } from "@/hooks/use-queries";
 import { useUiStore } from "@/stores/ui-store";
 import logoSidebar from "@/assets/logo_sidebar.png";
-import { useEffect, useState } from "react";
+
 import {
   Cpu,
   Database,
@@ -22,7 +22,7 @@ import {
   ShieldCheck,
   Sparkles,
 } from "lucide-react";
-import { getAppVersion } from "@/lib/app-version";
+import { useAppVersion } from "@/hooks/use-app-version";
 
 interface AboutDialogProps {
   /** true mientras la comprobación manual de actualizaciones está en curso. */
@@ -36,17 +36,8 @@ export function AboutDialog({ checking = false, onCheckUpdate }: AboutDialogProp
   const setAboutOpen = useUiStore((s) => s.setAboutOpen);
   const { data: branding } = useClinicBranding();
   const tagline = branding?.tagline || "Clínica Veterinaria";
-  const [appVersion, setAppVersion] = useState<string | null>(null);
-
-  useEffect(() => {
-    let cancelled = false;
-    void getAppVersion().then((v) => {
-      if (!cancelled) setAppVersion(v);
-    });
-    return () => {
-      cancelled = true;
-    };
-  }, []);
+  // Misma fuente que el pie del sidebar: menú y Acerca de nunca divergen.
+  const appVersion = useAppVersion();
 
   return (
     <Dialog open={aboutOpen} onOpenChange={setAboutOpen}>

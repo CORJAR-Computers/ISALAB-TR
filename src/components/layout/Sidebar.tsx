@@ -27,6 +27,7 @@ import {
 } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { useClinicBranding } from "@/hooks/use-queries";
+import { useAppVersion } from "@/hooks/use-app-version";
 import logoSidebar from "@/assets/logo_sidebar.png";
 
 type NavItem = {
@@ -132,6 +133,8 @@ export function Sidebar() {
   const { isAdmin } = perms;
   const { data: branding } = useClinicBranding();
   const tagline = branding?.tagline || "Clínica Veterinaria";
+  // Versión real instalada: la misma que muestra el diálogo Acerca de.
+  const appVersion = useAppVersion();
 
   // Mapa de capacidades para filtrar las entradas del menú. Incluye todas
   // las declaradas en `NavItem.capability` para que ninguna quede oculta
@@ -307,7 +310,7 @@ export function Sidebar() {
                 Acerca de ISALAB
               </p>
               <p className="text-muted-foreground truncate text-[11px]">
-                CORJAR Computers · v2.0
+                CORJAR Computers{appVersion ? ` · v${appVersion}` : ""}
               </p>
             </div>
             <Info className="size-4 shrink-0 text-muted-foreground group-hover:text-primary transition-colors" />

@@ -12,12 +12,19 @@ let cached: string | null = null;
  * Tauri (navegador en `vite dev`, tests, preview), cae al valor de
  * package.json inyectado por Vite.
  */
+/** Versión de package.json inyectada por Vite (respaldo sin runtime Tauri). */
+function fallbackVersion(): string {
+  return typeof __APP_VERSION__ === "string" ? __APP_VERSION__ : "0.0.0";
+}
+
 export async function getAppVersion(): Promise<string> {
   if (cached) return cached;
   try {
-    cached = await getVersion();
+    // El runtime puede responder vacío (p. ej. un mock de IPC o un plugin
+    // ausente): en ese caso también se usa el respaldo de package.json.
+    cached = (await getVersion()) || fallbackVersion();
   } catch {
-    cached = __APP_VERSION__ ?? "0.0.0";
+    cached = fallbackVersion();
   }
   return cached;
 }

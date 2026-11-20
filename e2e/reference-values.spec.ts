@@ -1,5 +1,6 @@
 import { test, expect, type Page, type Locator } from "@playwright/test";
 import { fileURLToPath } from "node:url";
+import { gotoView } from "./navigation";
 
 /**
  * Valores de referencia veterinarios (Settings → Analizadores).
@@ -40,10 +41,7 @@ async function login(page: Page) {
  * CardTitle), no un elemento heading.
  */
 async function gotoAnalyzersCard(page: Page): Promise<Locator> {
-  await page
-    .locator("aside")
-    .getByRole("button", { name: "Configuración", exact: true })
-    .click();
+  await gotoView(page, "Configuración");
   const card = page
     .locator("[data-slot='card']")
     .filter({ hasText: "Equipos de laboratorio" })

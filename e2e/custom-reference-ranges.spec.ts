@@ -1,5 +1,6 @@
 import { test, expect, type Page } from "@playwright/test";
 import { fileURLToPath } from "node:url";
+import { gotoView } from "./navigation";
 
 /**
  * Flujo completo del rango de referencia definido por el veterinario
@@ -37,7 +38,7 @@ async function login(page: Page) {
 
 /** Crea la muestra (Rocky / Suero / GENERAL) y abre el detalle. */
 async function createSample(page: Page) {
-  await page.getByRole("button", { name: "Muestras & Laboratorio" }).click();
+  await gotoView(page, "Muestras & Laboratorio");
   await page.getByRole("button", { name: "Nueva toma de muestra" }).click();
   const newSample = page.getByRole("dialog");
   await expect(

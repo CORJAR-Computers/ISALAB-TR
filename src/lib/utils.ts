@@ -14,6 +14,32 @@ export function formatCOP(value: number): string {
   }).format(value);
 }
 
+/**
+ * Fecha local (YYYY-MM-DD) de un instante.
+ *
+ * Nunca usa la fecha UTC (`toISOString`): el backend fecha con la hora local
+ * del equipo (Firebird `CURRENT_TIMESTAMP`/`CURRENT_DATE`), así que la UI debe
+ * filtrar con el mismo criterio. En Colombia (UTC-5) después de las 19:00 la
+ * fecha UTC ya es la del día siguiente.
+ *
+ * `timeZone` permite fijar la zona (p. ej. en pruebas); por defecto usa la del
+ * sistema.
+ */
+export function localDateISO(
+  date: Date = new Date(),
+  timeZone?: string,
+): string {
+  const parts = new Intl.DateTimeFormat("en-CA", {
+    timeZone,
+    year: "numeric",
+    month: "2-digit",
+    day: "2-digit",
+  }).formatToParts(date);
+  const part = (type: string) =>
+    parts.find((p) => p.type === type)?.value ?? "";
+  return `${part("year")}-${part("month")}-${part("day")}`;
+}
+
 /** Formatea una fecha/hora "YYYY-MM-DD HH:MM:SS" o "YYYY-MM-DD" a formato local. */
 export function formatDateTime(value?: string | null): string {
   if (!value) return "—";

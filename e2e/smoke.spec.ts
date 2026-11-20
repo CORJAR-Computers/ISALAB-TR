@@ -1,5 +1,6 @@
 import { test, expect, type Page } from "@playwright/test";
 import { fileURLToPath } from "node:url";
+import { gotoView } from "./navigation";
 
 /**
  * Smoke test E2E: login → dashboard → flujo completo de una muestra
@@ -29,7 +30,7 @@ async function login(page: Page) {
 test("clic fuera del modal no inhabilita sus botones", async ({ page }) => {
   await login(page);
 
-  await page.getByRole("button", { name: "Muestras & Laboratorio" }).click();
+  await gotoView(page, "Muestras & Laboratorio");
   await page.getByRole("button", { name: "Nueva toma de muestra" }).click();
 
   const dialog = page.getByRole("dialog");
@@ -69,9 +70,7 @@ test("login → dashboard → flujo completo de muestra", async ({ page }) => {
   await expect(page.getByText("Muestras en proceso")).toBeVisible();
 
   // ---------- Mesa de muestras (vacía) ----------
-  await page
-    .getByRole("button", { name: "Muestras & Laboratorio" })
-    .click();
+  await gotoView(page, "Muestras & Laboratorio");
   await expect(
     page.getByRole("heading", { name: "Muestras & Laboratorio" }).first(),
   ).toBeVisible();

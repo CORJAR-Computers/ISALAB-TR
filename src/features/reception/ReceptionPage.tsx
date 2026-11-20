@@ -18,7 +18,7 @@ import {
 import { usePermissions } from "@/hooks/use-permissions";
 import { getErrorMessage } from "@/lib/api";
 import { VISIT_STATUS } from "@/lib/status";
-import { cn, formatCOP } from "@/lib/utils";
+import { cn, formatCOP, localDateISO } from "@/lib/utils";
 import { toast } from "sonner";
 import { PatientQuickCreateButton } from "@/features/patients/PatientQuickCreateButton";
 import { NewVisitDialog } from "./NewVisitDialog";
@@ -36,7 +36,9 @@ const QUEUE_TABS: Array<{ status: string | null; label: string }> = [
 ];
 
 export function ReceptionPage() {
-  const today = useMemo(() => new Date().toISOString().slice(0, 10), []);
+  // Fecha local, igual que el backend: con `toISOString` la cola apuntaba al
+  // día siguiente a partir de las 19:00 en Colombia (UTC-5).
+  const today = useMemo(() => localDateISO(), []);
   const [dateFilter, setDateFilter] = useState<string>(today);
   const [statusFilter, setStatusFilter] = useState<string | null>("EN_ESPERA");
   const [search, setSearch] = useState("");

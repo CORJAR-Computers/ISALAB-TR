@@ -1,5 +1,5 @@
 import { describe, it, expect } from 'vitest'
-import { formatCOP, formatDate, formatAge, cn, formatDateTime } from './utils'
+import { formatCOP, formatDate, formatAge, cn, formatDateTime, localDateISO } from './utils'
 
 describe('formatCOP', () => {
   it('formats a whole number as Colombian Pesos', () => {
@@ -72,6 +72,37 @@ describe('formatAge', () => {
   it('returns years for older animals', () => {
     const result = formatAge('2020-01-01')
     expect(result).toMatch(/\d/)
+  })
+})
+
+describe('localDateISO', () => {
+  it('usa la fecha local aunque la UTC ya sea la del día siguiente', () => {
+    // 2026-01-16 01:00 UTC = 2026-01-15 20:00 en Colombia (UTC-5): el bug que
+    // hacía que la cola de recepción apuntara al día siguiente.
+    const afterSevenPm = new Date('2026-01-16T01:00:00Z')
+    expect(afterSevenPm.toISOString().slice(0, 10)).toBe('2026-01-16')
+    expect(localDateISO(afterSevenPm, 'America/Bogota')).toBe('2026-01-15')
+  })
+
+  it('cambia de día a medianoche local, no a medianoche UTC', () => {
+    // 04:59 UTC sigue siendo el 15 en Bogotá; 05:00 UTC ya es el 16.
+    expect(
+      localDateISO(new Date('2026-01-16T04:59:00Z'), 'America/Bogota'),
+    ).toBe('2026-01-15')
+    expect(
+      localDateISO(new Date('2026-01-16T05:00:00Z'), 'America/Bogota'),
+    ).toBe('2026-01-16')
+  })
+
+  it('devuelve YYYY-MM-DD con ceros a la izquierda', () => {
+    expect(localDateISO(new Date('2026-03-05T12:00:00Z'), 'UTC')).toBe(
+      '2026-03-05',
+    )
+  })
+
+  it('por defecto usa la zona del sistema', () => {
+    // Construido con el constructor local: 23:30 del 15 de enero.
+    expect(localDateISO(new Date(2026, 0, 15, 23, 30))).toBe('2026-01-15')
   })
 })
 

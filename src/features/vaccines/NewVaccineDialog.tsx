@@ -72,7 +72,10 @@ export function NewVaccineDialog({
   patientId?: number | null;
 }) {
   const createVaccine = useCreateVaccine();
-  const { data: vaccineTypes = [] } = useVaccineTypes();
+  const { data: vaccineTypesData } = useVaccineTypes();
+  // El default de desestructuración no cubre `null` (p. ej. si el backend
+  // responde sin catálogo): normalizar aquí evita romper el useMemo de abajo.
+  const vaccineTypes = useMemo(() => vaccineTypesData ?? [], [vaccineTypesData]);
   const [search, setSearch] = useState("");
   // Con paciente fijado (historial clínico) no hace falta buscar pacientes.
   const { data: patients = [], isLoading: loadingPatients } = usePatients(

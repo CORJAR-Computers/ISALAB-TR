@@ -1,5 +1,6 @@
 import { test, expect, type Page } from "@playwright/test";
 import { fileURLToPath } from "node:url";
+import { gotoView as gotoViewItem } from "./navigation";
 
 /**
  * Test de viewport: portátiles de 14".
@@ -39,12 +40,12 @@ async function login(page: Page, width: number, height: number) {
   ).toBeVisible();
 }
 
-/** Ir a una vista evitando la colisión sidebar/TopBar ("Configuración"). */
+/**
+ * Ir a una vista expandiendo su sección del sidebar cuando está colapsada.
+ * El sidebar arranca con todas las secciones cerradas.
+ */
 async function gotoView(page: Page, nav: string) {
-  await page
-    .locator("aside")
-    .getByRole("button", { name: nav, exact: true })
-    .click();
+  await gotoViewItem(page, nav);
 }
 
 /** La página no debe desbordar el documento horizontalmente. */

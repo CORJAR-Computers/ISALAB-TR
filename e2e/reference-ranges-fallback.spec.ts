@@ -1,5 +1,6 @@
 import { test, expect, type Page } from "@playwright/test";
 import { fileURLToPath } from "node:url";
+import { gotoView } from "./navigation";
 
 /**
  * Regresión: rangos de referencia para muestras asignadas a un equipo.
@@ -42,7 +43,7 @@ test("muestra en MINDRAY muestra los rangos del catálogo GENERAL", async ({
   await login(page);
 
   // Crear una muestra asignada al MINDRAY B2800 (equipo sin rangos propios).
-  await page.getByRole("button", { name: "Muestras & Laboratorio" }).click();
+  await gotoView(page, "Muestras & Laboratorio");
   await page.getByRole("button", { name: "Nueva toma de muestra" }).click();
   const newSample = page.getByRole("dialog");
   await expect(
