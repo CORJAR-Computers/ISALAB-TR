@@ -66,8 +66,8 @@ nativo en el runner self-hosted → firma minisign del instalador
 (`tauri signer sign`) → generación de `latest.json` (notas desde
 `.github/updater-notes.md`, con validación de versión) → **GitHub Release
 en borrador** con el instalador, el `.sig` y el manifiesto. Si la máquina
-del runner está apagada: fallback cross-compile con `workflow_dispatch`
-(input `tag`).
+del runner está apagada, o el runner falla (ver §10): fallback cross-compile
+con `workflow_dispatch` (input `tag`).
 
 ## 5. Draft: revisión pre-publicación
 
@@ -160,3 +160,92 @@ gh release download v1.2.0 --pattern "latest.json" && cat latest.json
 gh release edit v1.2.0 --draft=false
 npm run verify-updater
 ```
+
+## 10. Runner self-hosted de release (`isalab-release-win`)
+
+Máquina `SERVCORJAR` (Windows), servicio
+`actions.runner.CORJAR-Computers-ISALAB-TR.isalab-release-win`, directorio
+`D:\actions-runner`, etiquetas `self-hosted, Windows, X64, isalab-release`.
+Solo lo usa `release.yml` (tags y nunca PRs); el runner no está expuesto a
+código de terceros.
+
+### Requisitos de la máquina
+
+| Requisito | Por qué |
+|---|---|
+| Git for Windows **con Git Bash** y `<Git>\bin` accesible | Las acciones compuestas (`dtolnay/rust-toolchain` entre ellas) declaran `shell: bash` |
+| Node 24+ y npm | `npm ci`, `npx tauri build` |
+| Rust (rustup) con target `x86_64-pc-windows-msvc` y Build Tools C++ | compilación nativa del instalador |
+| Escritura en `_work` y `src-tauri\target` | build y caché de cargo |
+
+### Síntoma y causa de `bash: command not found`
+
+Un push de tag falla en `Build & Release` a los pocos segundos, en el paso
+`Install Rust`:
+
+```
+##[error]bash: command not found
+```
+
+`dtolnay/rust-toolchain@stable` es una acción compuesta y sus pasos internos
+ejecutan `shell: bash`. El instalador de Git para Windows, con la opción por
+defecto («Git from the command line and also from 3rd-party software»), añade
+al PATH **solo** `<Git>\cmd` (donde vive `git.exe`), no `<Git>\bin` (donde vive
+`bash.exe`). El runner corre como servicio, así que hereda el PATH de máquina:
+`git` resuelve y `bash` no.
+
+```powershell
+[Environment]::GetEnvironmentVariable('Path','Machine') -split ';' | Select-String 'Git'
+# D:\Git\cmd          <- bash.exe NO está en esta carpeta
+Test-Path 'D:\Git\bin\bash.exe'   # True: Git Bash está instalado, solo falta en el PATH
+```
+
+### Corrección aplicada (en el repo)
+
+`release.yml` ejecuta, antes de `Install Rust` y solo en runners self-hosted de
+Windows, el paso **`Expose Git Bash on PATH`**: localiza `bash.exe` partiendo
+de la ubicación de `git.exe` (con las rutas estándar de Git for Windows como
+alternativa), lo añade al PATH del job con `GITHUB_PATH` e imprime
+`bash --version`. Así el workflow no depende de cómo esté configurada la
+máquina, y si no hubiera Git Bash el job falla con un mensaje explícito en vez
+de con el error opaco de la acción.
+
+El mismo paso está en `runner-smoke.yml`, que sirve para comprobarlo sin
+publicar nada:
+
+```bash
+gh workflow run runner-smoke.yml
+gh run list --workflow=runner-smoke.yml --limit 1
+```
+
+### Refuerzo opcional en la máquina
+
+Para que `<Git>\bin` esté disponible en cualquier workflow o acción futura
+(sobrevive a cambios de `release.yml`). Requiere administrador y **reiniciar el
+servicio**, porque un proceso en marcha no hereda el PATH nuevo:
+
+```powershell
+[Environment]::SetEnvironmentVariable('Path',
+  [Environment]::GetEnvironmentVariable('Path','Machine') + ';D:\Git\bin', 'Machine')
+Restart-Service 'actions.runner.CORJAR-Computers-ISALAB-TR.isalab-release-win'
+```
+
+No es necesario para que el release funcione: el paso del workflow ya cubre ese
+caso.
+
+### Mientras el runner no esté disponible: el fallback es la vía normal
+
+Si la máquina está apagada o el runner sigue roto, **no** hace falta arreglarlo
+para publicar. El job `release-fallback` cross-compila desde `ubuntu-latest`
+con cargo-xwin y produce el mismo trío de assets (instalador NSIS, `.sig` y
+`latest.json`), sin firma Authenticode de SignPath:
+
+```bash
+gh workflow run release.yml -f tag=v1.2.0
+```
+
+El run del tag que falló no deja nada a medias: muere antes de
+`Create GitHub Release`, así que no existe borrador y el fallback crea el suyo
+con `skipIfReleaseExists: true` (ese flag solo evita pisar un borrador que ya
+existiera). Revisar después con `gh run list --workflow=release.yml` y seguir
+en §5.
