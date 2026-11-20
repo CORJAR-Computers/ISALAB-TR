@@ -329,7 +329,9 @@ pub fn get_stats(conn: &mut SimpleConnection) -> Result<DashboardStats, AppError
 
 /// Ingresos del mes en curso por categoría de servicio (facturas PAGADA con
 /// líneas vinculadas al catálogo vía INVOICE_ITEMS.SERVICE_ID).
-fn list_revenue_by_category(conn: &mut SimpleConnection) -> Result<Vec<RevenueByCategory>, AppError> {
+fn list_revenue_by_category(
+    conn: &mut SimpleConnection,
+) -> Result<Vec<RevenueByCategory>, AppError> {
     let rows: Vec<(i32, String, f64)> = conn
         .query(
             "SELECT s.CATEGORY_ID, c.NAME,

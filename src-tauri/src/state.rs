@@ -142,10 +142,7 @@ impl AppState {
                 // El motivo queda en el log además del banner: si la clínica
                 // reporta "no abre", aquí está el error real con contexto.
                 let message = config_error.unwrap_or_else(|| e.to_string());
-                crate::logging::error(
-                    "db",
-                    &format!("fallo al inicializar la base: {message}"),
-                );
+                crate::logging::error("db", &format!("fallo al inicializar la base: {message}"));
                 Self {
                     pool: DbPool::empty(),
                     db,

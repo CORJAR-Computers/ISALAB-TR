@@ -87,7 +87,11 @@ pub fn set_product_active(
         Some(user.id),
         &user.username,
         "PRODUCT_STATUS",
-        &format!("Producto {} · {}", product.code, if active { "activo" } else { "inactivo" }),
+        &format!(
+            "Producto {} · {}",
+            product.code,
+            if active { "activo" } else { "inactivo" }
+        ),
     );
     Ok(product)
 }

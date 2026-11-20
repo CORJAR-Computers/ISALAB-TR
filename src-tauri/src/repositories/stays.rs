@@ -190,7 +190,9 @@ pub fn save_resource(
 ) -> Result<Resource, AppError> {
     let name = input.name.trim();
     if name.is_empty() {
-        return Err(AppError::Validation("El nombre del recurso es requerido".into()));
+        return Err(AppError::Validation(
+            "El nombre del recurso es requerido".into(),
+        ));
     }
     let kind = input.kind.trim().to_uppercase();
     if !RESOURCE_KINDS.contains(&kind.as_str()) {
@@ -213,14 +215,7 @@ pub fn save_resource(
                 "UPDATE RESOURCES SET NAME = ?, KIND = ?, CAPACITY = ?, ACTIVE = ?,
                     NOTES = ?, UPDATED_AT = CURRENT_TIMESTAMP
                  WHERE ID = ?",
-                (
-                    &name,
-                    &kind,
-                    &capacity,
-                    &active,
-                    &input.notes,
-                    &id,
-                ),
+                (&name, &kind, &capacity, &active, &input.notes, &id),
             )
             .map_err(AppError::from)?;
             id
@@ -327,7 +322,10 @@ pub fn create_stay(
 
     // Paciente y propietario.
     let patient: Option<(i32, String)> = conn
-        .query_first("SELECT ID, OWNER_ID FROM PATIENTS WHERE ID = ?", (&input.patient_id,))
+        .query_first(
+            "SELECT ID, OWNER_ID FROM PATIENTS WHERE ID = ?",
+            (&input.patient_id,),
+        )
         .map_err(AppError::from)?;
     let Some((_, owner_id)) = patient else {
         return Err(AppError::NotFound(format!(
@@ -373,7 +371,10 @@ pub fn create_stay(
         }
 
         let id = next_id(conn, "GEN_STAYS_ID")?;
-        let check_in = input.check_in_at.clone().unwrap_or_else(|| "CURRENT_TIMESTAMP".into());
+        let check_in = input
+            .check_in_at
+            .clone()
+            .unwrap_or_else(|| "CURRENT_TIMESTAMP".into());
         let daily_rate = input.daily_rate.unwrap_or(0.0);
 
         // La fecha de ingreso se enlaza como parámetro o se deja en

@@ -19,8 +19,14 @@ fn log_visit_audit(
     detail: &str,
 ) {
     if let Ok(mut pooled) = state.pool.acquire() {
-        crate::repositories::auth::log_audit(pooled.conn(), user_id, username, action, Some(detail))
-            .ok();
+        crate::repositories::auth::log_audit(
+            pooled.conn(),
+            user_id,
+            username,
+            action,
+            Some(detail),
+        )
+        .ok();
     }
 }
 
@@ -162,12 +168,7 @@ pub fn update_visit_service_status(
 ) -> Result<VisitService, AppError> {
     let user = require_receive(&state)?;
     let mut pooled = state.pool.acquire()?;
-    let line = visits_repo::update_visit_service_status(
-        pooled.conn(),
-        visit_id,
-        line_id,
-        &input,
-    )?;
+    let line = visits_repo::update_visit_service_status(pooled.conn(), visit_id, line_id, &input)?;
 
     log_visit_audit(
         &state,

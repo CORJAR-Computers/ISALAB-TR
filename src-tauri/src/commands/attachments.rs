@@ -34,7 +34,9 @@ pub fn attach_result_file(
 
     let src = std::path::PathBuf::from(&source_path);
     if !src.exists() {
-        return Err(AppError::Validation("El archivo seleccionado ya no existe".into()));
+        return Err(AppError::Validation(
+            "El archivo seleccionado ya no existe".into(),
+        ));
     }
     let ext = src
         .extension()
@@ -58,7 +60,9 @@ pub fn attach_result_file(
         .map_err(|e| AppError::Internal(format!("No se pudo leer el archivo: {e}")))?;
     let size = content.len() as u64;
     if size > MAX_ATTACHMENT_BYTES {
-        return Err(AppError::Validation("El archivo supera el límite de 20 MB".into()));
+        return Err(AppError::Validation(
+            "El archivo supera el límite de 20 MB".into(),
+        ));
     }
 
     // El nombre mostrado se deriva del archivo en el servidor, con saneado y
@@ -78,16 +82,13 @@ pub fn attach_result_file(
         .query_first("SELECT 1 FROM LAB_RESULTS WHERE ID = ?", (&result_id,))
         .map_err(AppError::from)?;
     if result_exists.is_none() {
-        return Err(AppError::NotFound(format!("Resultado {result_id} no encontrado")));
+        return Err(AppError::NotFound(format!(
+            "Resultado {result_id} no encontrado"
+        )));
     }
 
-    let attachment = attachments_repo::insert(
-        pooled.conn(),
-        result_id,
-        &file_name,
-        Some(mime),
-        &content,
-    )?;
+    let attachment =
+        attachments_repo::insert(pooled.conn(), result_id, &file_name, Some(mime), &content)?;
 
     // Auditoría de adjunto añadido.
     if let Ok(mut audit_conn) = state.pool.acquire() {
@@ -96,7 +97,9 @@ pub fn attach_result_file(
             Some(user.id),
             &user.username,
             "RESULT_ATTACHMENT_ADDED",
-            Some(&format!("Adjunto \"{file_name}\" al resultado {result_id} ({size} bytes)")),
+            Some(&format!(
+                "Adjunto \"{file_name}\" al resultado {result_id} ({size} bytes)"
+            )),
         )
         .ok();
     }

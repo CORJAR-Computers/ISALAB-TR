@@ -3,9 +3,7 @@ use rsfbclient::SimpleConnection;
 
 use crate::db;
 use crate::error::AppError;
-use crate::models::appointment::{
-    Appointment, AppointmentListItem, CreateAppointmentInput,
-};
+use crate::models::appointment::{Appointment, AppointmentListItem, CreateAppointmentInput};
 use crate::repositories::next_id;
 
 /// Estados válidos de una cita (migración 0028).
@@ -250,7 +248,10 @@ pub fn create_appointment(
 
     // Paciente debe existir.
     let patient: Option<(i32,)> = conn
-        .query_first("SELECT OWNER_ID FROM PATIENTS WHERE ID = ?", (&input.patient_id,))
+        .query_first(
+            "SELECT OWNER_ID FROM PATIENTS WHERE ID = ?",
+            (&input.patient_id,),
+        )
         .map_err(AppError::from)?;
     let Some((_owner_id,)) = patient else {
         return Err(AppError::NotFound(format!(
@@ -339,14 +340,7 @@ pub fn list_appointments(
     let rows: Vec<AppointmentListRow> = conn
         .query(
             &sql,
-            (
-                &date_opt,
-                &date_opt,
-                &status,
-                &status,
-                &prof_opt,
-                &prof_opt,
-            ),
+            (&date_opt, &date_opt, &status, &status, &prof_opt, &prof_opt),
         )
         .map_err(AppError::from)?;
 
@@ -384,7 +378,10 @@ pub fn list_upcoming_appointments(
 }
 
 /// Cita completa o `None`.
-pub fn get_appointment(conn: &mut SimpleConnection, id: i32) -> Result<Option<Appointment>, AppError> {
+pub fn get_appointment(
+    conn: &mut SimpleConnection,
+    id: i32,
+) -> Result<Option<Appointment>, AppError> {
     let row: Option<AppointmentRow> = conn
         .query_first(&format!("{APPOINTMENT_SELECT} WHERE a.ID = ?"), (&id,))
         .map_err(AppError::from)?;
@@ -450,10 +447,7 @@ pub fn set_appointment_status(
 }
 
 /// Anula una cita (CANCELADA) si aún no fue atendida.
-pub fn cancel_appointment(
-    conn: &mut SimpleConnection,
-    id: i32,
-) -> Result<Appointment, AppError> {
+pub fn cancel_appointment(conn: &mut SimpleConnection, id: i32) -> Result<Appointment, AppError> {
     set_appointment_status(conn, id, "CANCELADA", None)
 }
 
@@ -511,13 +505,7 @@ pub fn check_in_appointment(
         conn.execute(
             "INSERT INTO VISITS (ID, PATIENT_ID, OWNER_ID, PRIORITY, STATUS, CREATED_BY)
              VALUES (?, ?, ?, ?, 'EN_ESPERA', ?)",
-            (
-                &visit_id,
-                &patient_id,
-                &owner_id,
-                &priority,
-                &created_by,
-            ),
+            (&visit_id, &patient_id, &owner_id, &priority, &created_by),
         )
         .map_err(AppError::from)?;
 
@@ -569,7 +557,9 @@ pub fn check_in_appointment(
             )
             .map_err(AppError::from)?;
         let Some((code, arrived_at)) = visit_header else {
-            return Err(AppError::Internal("Visita creada pero no recuperada".into()));
+            return Err(AppError::Internal(
+                "Visita creada pero no recuperada".into(),
+            ));
         };
 
         let patient_name_row: Option<(String,)> = conn
@@ -667,11 +657,7 @@ mod tests {
     #[test]
     fn test_create_appointment_code_and_status() {
         let (mut conn, db_path) = setup();
-        let appt = create_appointment(
-            &mut conn,
-            &appt_input(1, 1, "2026-12-01 10:00:00"),
-        )
-        .unwrap();
+        let appt = create_appointment(&mut conn, &appt_input(1, 1, "2026-12-01 10:00:00")).unwrap();
 
         assert!(appt.code.starts_with("C-"));
         assert_eq!(appt.status, "PROGRAMADA");
@@ -684,11 +670,7 @@ mod tests {
     #[test]
     fn test_appointment_status_machine() {
         let (mut conn, db_path) = setup();
-        let appt = create_appointment(
-            &mut conn,
-            &appt_input(1, 1, "2026-12-01 10:00:00"),
-        )
-        .unwrap();
+        let appt = create_appointment(&mut conn, &appt_input(1, 1, "2026-12-01 10:00:00")).unwrap();
 
         // PROGRAMADA → CONFIRMADA → EN_ATENCION → ATENDIDA
         let a = set_appointment_status(&mut conn, appt.id, "CONFIRMADA", None).unwrap();
@@ -706,11 +688,7 @@ mod tests {
     #[test]
     fn test_appointment_cancel() {
         let (mut conn, db_path) = setup();
-        let appt = create_appointment(
-            &mut conn,
-            &appt_input(1, 1, "2026-12-01 10:00:00"),
-        )
-        .unwrap();
+        let appt = create_appointment(&mut conn, &appt_input(1, 1, "2026-12-01 10:00:00")).unwrap();
 
         let a = cancel_appointment(&mut conn, appt.id).unwrap();
         assert_eq!(a.status, "CANCELADA");
@@ -721,26 +699,16 @@ mod tests {
     fn test_appointment_conflict_same_patient() {
         let (mut conn, db_path) = setup();
         // Cita a las 10:00, duración 30 min (10:00-10:30).
-        create_appointment(
-            &mut conn,
-            &appt_input(1, 1, "2026-12-01 10:00:00"),
-        )
-        .unwrap();
+        create_appointment(&mut conn, &appt_input(1, 1, "2026-12-01 10:00:00")).unwrap();
 
         // Misma paciente, intervalo que se cruza (10:15-10:45): conflicto.
-        let err = create_appointment(
-            &mut conn,
-            &appt_input(1, 1, "2026-12-01 10:15:00"),
-        )
-        .unwrap_err();
+        let err =
+            create_appointment(&mut conn, &appt_input(1, 1, "2026-12-01 10:15:00")).unwrap_err();
         assert!(matches!(err, AppError::Validation(_)));
 
         // Paciente diferente, mismo horario: sin conflicto.
-        let appt2 = create_appointment(
-            &mut conn,
-            &appt_input(2, 1, "2026-12-01 10:00:00"),
-        )
-        .unwrap();
+        let appt2 =
+            create_appointment(&mut conn, &appt_input(2, 1, "2026-12-01 10:00:00")).unwrap();
         assert_eq!(appt2.patient_id, 2);
         test_helpers::cleanup_test_db(&db_path);
     }
@@ -789,11 +757,7 @@ mod tests {
     #[test]
     fn test_check_in_appointment_creates_visit() {
         let (mut conn, db_path) = setup();
-        let appt = create_appointment(
-            &mut conn,
-            &appt_input(1, 1, "2026-12-01 10:00:00"),
-        )
-        .unwrap();
+        let appt = create_appointment(&mut conn, &appt_input(1, 1, "2026-12-01 10:00:00")).unwrap();
 
         let visit = check_in_appointment(&mut conn, appt.id, None).unwrap();
 
@@ -813,16 +777,8 @@ mod tests {
     #[test]
     fn test_list_appointments_filters() {
         let (mut conn, db_path) = setup();
-        create_appointment(
-            &mut conn,
-            &appt_input(1, 1, "2026-12-01 10:00:00"),
-        )
-        .unwrap();
-        create_appointment(
-            &mut conn,
-            &appt_input(2, 1, "2026-12-01 11:00:00"),
-        )
-        .unwrap();
+        create_appointment(&mut conn, &appt_input(1, 1, "2026-12-01 10:00:00")).unwrap();
+        create_appointment(&mut conn, &appt_input(2, 1, "2026-12-01 11:00:00")).unwrap();
 
         let all = list_appointments(&mut conn, None, None, None).unwrap();
         assert_eq!(all.len(), 2);
@@ -836,4 +792,3 @@ mod tests {
         test_helpers::cleanup_test_db(&db_path);
     }
 }
-

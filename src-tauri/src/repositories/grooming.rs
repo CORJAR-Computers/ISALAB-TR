@@ -304,7 +304,12 @@ pub fn finish_grooming_session(
             "UPDATE GROOMING_SESSIONS SET FINISHED_AT = ?, NEXT_SUGGESTED_AT = ?,
                 NOTES = COALESCE(?, NOTES), UPDATED_AT = CURRENT_TIMESTAMP
              WHERE VISIT_SERVICE_ID = ?",
-            (&input.finished_at, &input.next_suggested_at, &input.notes, &visit_service_id),
+            (
+                &input.finished_at,
+                &input.next_suggested_at,
+                &input.notes,
+                &visit_service_id,
+            ),
         )
         .map_err(AppError::from)?;
     } else {
@@ -458,7 +463,15 @@ pub fn list_grooming_reminders(
     Ok(rows
         .into_iter()
         .map(
-            |(session_id, visit_service_id, patient_name, owner_name, service_name, next_suggested_at, groomer_name)| {
+            |(
+                session_id,
+                visit_service_id,
+                patient_name,
+                owner_name,
+                service_name,
+                next_suggested_at,
+                groomer_name,
+            )| {
                 crate::models::grooming::GroomingReminder {
                     session_id,
                     visit_service_id,

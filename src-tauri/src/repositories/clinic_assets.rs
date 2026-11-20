@@ -36,10 +36,7 @@ pub fn list(conn: &mut SimpleConnection) -> Result<Vec<ClinicAsset>, AppError> {
     Ok(rows.into_iter().map(map_clinic_asset).collect())
 }
 
-pub fn get(
-    conn: &mut SimpleConnection,
-    kind: &str,
-) -> Result<Option<ClinicAsset>, AppError> {
+pub fn get(conn: &mut SimpleConnection, kind: &str) -> Result<Option<ClinicAsset>, AppError> {
     let row: Option<ClinicAssetRow> = conn
         .query_first(
             "SELECT ID, KIND, FILE_NAME, MIME_TYPE, SIZE_BYTES,
@@ -88,8 +85,7 @@ pub fn upsert(
     )
     .map_err(AppError::from)?;
 
-    get(conn, kind)?
-        .ok_or_else(|| AppError::Internal("Activo no encontrado tras upsert".into()))
+    get(conn, kind)?.ok_or_else(|| AppError::Internal("Activo no encontrado tras upsert".into()))
 }
 
 pub fn delete(conn: &mut SimpleConnection, kind: &str) -> Result<(), AppError> {
@@ -148,10 +144,7 @@ mod tests {
         upsert(&mut conn, "CERT_P12", Some("cert.p12"), None, b"cert-bytes").unwrap();
 
         assert_eq!(list(&mut conn).unwrap().len(), 2);
-        assert_eq!(
-            content(&mut conn, "CERT_P12").unwrap(),
-            b"cert-bytes"
-        );
+        assert_eq!(content(&mut conn, "CERT_P12").unwrap(), b"cert-bytes");
 
         test_helpers::cleanup_test_db(&db_path);
     }

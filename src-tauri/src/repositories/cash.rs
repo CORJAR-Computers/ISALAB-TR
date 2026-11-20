@@ -229,10 +229,7 @@ struct SessionFigures {
     methods: Vec<CashMethodTotal>,
 }
 
-fn figures(
-    conn: &mut SimpleConnection,
-    session: &CashSession,
-) -> Result<SessionFigures, AppError> {
+fn figures(conn: &mut SimpleConnection, session: &CashSession) -> Result<SessionFigures, AppError> {
     let totals: Option<(f64, f64, f64)> = conn
         .query_first(
             "SELECT CAST(COALESCE(SUM(CASE WHEN AMOUNT > 0 THEN AMOUNT ELSE 0 END), 0)
@@ -432,10 +429,7 @@ pub fn add_movement(
     })
 }
 
-fn get_movement(
-    conn: &mut SimpleConnection,
-    id: i32,
-) -> Result<Option<CashMovement>, AppError> {
+fn get_movement(conn: &mut SimpleConnection, id: i32) -> Result<Option<CashMovement>, AppError> {
     let row: Option<MovementRow> = conn
         .query_first(
             "SELECT m.ID, m.CASH_SESSION_ID, m.KIND,

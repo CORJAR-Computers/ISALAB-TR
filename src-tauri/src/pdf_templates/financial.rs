@@ -262,10 +262,7 @@ pub fn generate_cash_close(data: &CashCloseData, out_path: &Path) -> Result<(), 
         &mut pdf,
         &[
             ("Apertura", s.opened_at.clone()),
-            (
-                "Cierre",
-                s.closed_at.clone().unwrap_or_else(|| "—".into()),
-            ),
+            ("Cierre", s.closed_at.clone().unwrap_or_else(|| "—".into())),
             (
                 "Abierta por",
                 s.opened_by_name.clone().unwrap_or_else(|| "—".into()),

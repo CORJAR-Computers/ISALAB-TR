@@ -247,9 +247,7 @@ pub fn delete_clinic_logo(state: State<'_, AppState>) -> Result<(), AppError> {
 /// Devuelve el contenido (BLOB) del logo principal como `data:` URL.
 #[tauri::command]
 #[specta::specta]
-pub fn get_clinic_logo_content(
-    state: State<'_, AppState>,
-) -> Result<Option<Vec<u8>>, AppError> {
+pub fn get_clinic_logo_content(state: State<'_, AppState>) -> Result<Option<Vec<u8>>, AppError> {
     require_session(&state)?;
     let mut pooled = state.pool.acquire()?;
     Ok(clinic_assets_repo::content(pooled.conn(), "LOGO"))
@@ -399,11 +397,10 @@ pub fn import_pkcs12(
     let tmp_path = std::env::temp_dir().join(format!("isalab_pkcs12_{}.tmp", admin.id));
     std::fs::write(&tmp_path, &content)
         .map_err(|e| AppError::Internal(format!("No se pudo escribir el temporal: {e}")))?;
-    let validation = validate_pkcs12(&tmp_path, &password)
-        .map_err(|e| {
-            let _ = std::fs::remove_file(&tmp_path);
-            e
-        })?;
+    let validation = validate_pkcs12(&tmp_path, &password).map_err(|e| {
+        let _ = std::fs::remove_file(&tmp_path);
+        e
+    })?;
     let _ = std::fs::remove_file(&tmp_path);
 
     let file_name = src
@@ -427,8 +424,7 @@ pub fn import_pkcs12(
     *state
         .pkcs12_password
         .lock()
-        .map_err(|_| AppError::Internal("Certificado bloqueado".into()))? =
-        Some(password);
+        .map_err(|_| AppError::Internal("Certificado bloqueado".into()))? = Some(password);
 
     // Auditoría.
     if let Ok(mut audit_conn) = state.pool.acquire() {

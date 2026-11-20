@@ -13,10 +13,9 @@ use crate::pdf_templates::{
     FormulaMedicaData, ReciboData, ReportSignature, VacunacionData,
 };
 use crate::repositories::{
-    cash as cash_repo, clinic_assets as clinic_assets_repo,
-    clinical_history as history_repo, invoices as invoices_repo, patient as patient_repo,
-    samples as samples_repo, settings as settings_repo, surgeries as surgeries_repo,
-    vaccines as vaccines_repo,
+    cash as cash_repo, clinic_assets as clinic_assets_repo, clinical_history as history_repo,
+    invoices as invoices_repo, patient as patient_repo, samples as samples_repo,
+    settings as settings_repo, surgeries as surgeries_repo, vaccines as vaccines_repo,
 };
 use crate::state::AppState;
 
@@ -104,16 +103,12 @@ fn apply_digital_signature(
 
     // Escribe el certificado en %TEMP% para que pdf_signer lo lea desde ruta.
     let tmp_path = std::env::temp_dir().join(format!("isalab_sign_{}.p12", std::process::id()));
-    std::fs::write(&tmp_path, p12)
-        .map_err(|e| AppError::Internal(format!("No se pudo escribir el certificado temporal: {e}")))?;
+    std::fs::write(&tmp_path, p12).map_err(|e| {
+        AppError::Internal(format!("No se pudo escribir el certificado temporal: {e}"))
+    })?;
 
     let result = crate::pdf_templates::sign_pdf_with_pkcs12(
-        out_path,
-        out_path,
-        &tmp_path,
-        &password,
-        &doc_name,
-        doc_name,
+        out_path, out_path, &tmp_path, &password, &doc_name, doc_name,
     );
 
     let _ = std::fs::remove_file(&tmp_path);
@@ -173,8 +168,7 @@ pub fn generate_clinical_report(
         }
     }
 
-    let signature =
-        report_signature(conn, &settings, pkcs12_password_from(&state))?;
+    let signature = report_signature(conn, &settings, pkcs12_password_from(&state))?;
 
     let data = ClinicalReportData {
         clinic,

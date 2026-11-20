@@ -27,7 +27,6 @@ use tauri_specta::{collect_commands, Builder};
 mod mail;
 
 use crate::commands::ai::{interpret_lab_results, test_groq_connection};
-use crate::commands::diagnostics::{export_diagnostics, log_frontend};
 use crate::commands::analyzer_sources::{
     delete_analyzer_import_job, delete_analyzer_source, list_analyzer_import_jobs,
     list_analyzer_sources, list_failed_analyzer_imports, poll_analyzer_source,
@@ -59,9 +58,10 @@ use crate::commands::clinical_history::{
 };
 use crate::commands::dashboard::get_dashboard_stats;
 use crate::commands::db::{
-    db_health, export_local_config, get_server_backup_status, get_db_connection,
+    db_health, export_local_config, get_db_connection, get_server_backup_status,
     save_db_connection, test_db_connection,
 };
+use crate::commands::diagnostics::{export_diagnostics, log_frontend};
 use crate::commands::exports::{export_results_csv, export_samples_csv};
 use crate::commands::grooming::{
     add_visit_attachment, delete_visit_attachment, finish_grooming_session, get_grooming_session,
@@ -97,8 +97,8 @@ use crate::commands::qc::{
     list_qc_runs, list_qc_targets, record_qc_run, save_qc_material,
 };
 use crate::commands::reports::{
-    generate_carnet_vacunacion, generate_certificado_cirugia, generate_clinical_report,
-    generate_cash_close_pdf, generate_consentimiento, generate_formula_medica,
+    generate_carnet_vacunacion, generate_cash_close_pdf, generate_certificado_cirugia,
+    generate_clinical_report, generate_consentimiento, generate_formula_medica,
     generate_recibo_invoice, generate_sample_labels, list_reports, open_report_file,
 };
 use crate::commands::samples::{
@@ -606,4 +606,3 @@ mod window_fit_tests {
         );
     }
 }
-

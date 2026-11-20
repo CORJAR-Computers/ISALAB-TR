@@ -11,13 +11,8 @@ use crate::repositories::next_id;
 /// Categorías de producto admitidas.
 pub const PRODUCT_CATEGORIES: [&str; 4] = ["ALIMENTO", "MEDICAMENTO", "ACCESORIO", "INSUMO"];
 /// Tipos de movimiento de inventario.
-pub const STOCK_MOVEMENT_KINDS: [&str; 5] = [
-    "ENTRADA",
-    "SALIDA",
-    "CONSUMO",
-    "DEVOLUCION",
-    "AJUSTE",
-];
+pub const STOCK_MOVEMENT_KINDS: [&str; 5] =
+    ["ENTRADA", "SALIDA", "CONSUMO", "DEVOLUCION", "AJUSTE"];
 
 type ProductRow = (
     i32,            // id
@@ -145,9 +140,7 @@ pub fn list_products(
         .into_iter()
         .map(|r| {
             let stock = r.11;
-            let product = map_product((
-                r.0, r.1, r.2, r.3, r.4, r.5, r.6, r.7, r.8, r.9, r.10,
-            ));
+            let product = map_product((r.0, r.1, r.2, r.3, r.4, r.5, r.6, r.7, r.8, r.9, r.10));
             let low_stock = product.active && product.min_stock > 0 && stock <= product.min_stock;
             ProductStockItem {
                 stock_value: stock as f64 * product.cost_price,
@@ -160,10 +153,7 @@ pub fn list_products(
 }
 
 /// Producto del catálogo por id.
-pub fn get_product(
-    conn: &mut SimpleConnection,
-    id: i32,
-) -> Result<Option<Product>, AppError> {
+pub fn get_product(conn: &mut SimpleConnection, id: i32) -> Result<Option<Product>, AppError> {
     let row: Option<ProductRow> = conn
         .query_first(
             "SELECT ID, CODE, NAME, CATEGORY, UNIT,
@@ -185,11 +175,15 @@ pub fn save_product(
 ) -> Result<Product, AppError> {
     let code = input.code.trim().to_uppercase();
     if code.is_empty() {
-        return Err(AppError::Validation("El código del producto es requerido".into()));
+        return Err(AppError::Validation(
+            "El código del producto es requerido".into(),
+        ));
     }
     let name = input.name.trim();
     if name.is_empty() {
-        return Err(AppError::Validation("El nombre del producto es requerido".into()));
+        return Err(AppError::Validation(
+            "El nombre del producto es requerido".into(),
+        ));
     }
     let category = input.category.trim().to_uppercase();
     if !PRODUCT_CATEGORIES.contains(&category.as_str()) {
@@ -278,8 +272,7 @@ pub fn set_product_active(
         (&active, &id),
     )
     .map_err(AppError::from)?;
-    get_product(conn, id)?
-        .ok_or_else(|| AppError::NotFound(format!("Producto {id} no encontrado")))
+    get_product(conn, id)?.ok_or_else(|| AppError::NotFound(format!("Producto {id} no encontrado")))
 }
 
 // ============================== MOVIMIENTOS ==================================
@@ -698,7 +691,9 @@ mod tests {
 
         let inactive = set_product_active(&mut conn, product.id, false).unwrap();
         assert!(!inactive.active);
-        assert!(list_products(&mut conn, None, None, false).unwrap().is_empty());
+        assert!(list_products(&mut conn, None, None, false)
+            .unwrap()
+            .is_empty());
         assert_eq!(list_products(&mut conn, None, None, true).unwrap().len(), 1);
 
         cleanup_test_db(&db_path);

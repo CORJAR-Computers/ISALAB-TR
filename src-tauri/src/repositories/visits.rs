@@ -88,9 +88,7 @@ fn list_services_of_visit(
 ) -> Result<Vec<VisitService>, AppError> {
     let rows: Vec<VisitServiceRow> = conn
         .query(
-            &format!(
-                "{VISIT_SERVICE_SELECT} WHERE vs.VISIT_ID = ? ORDER BY vs.SEQ, vs.ID"
-            ),
+            &format!("{VISIT_SERVICE_SELECT} WHERE vs.VISIT_ID = ? ORDER BY vs.SEQ, vs.ID"),
             (&visit_id,),
         )
         .map_err(AppError::from)?;
@@ -284,9 +282,7 @@ pub fn list_visits(
     )> = conn
         .query(
             sql,
-            (
-                &date, &date, &status, &status, &like, &like, &like, &like,
-            ),
+            (&date, &date, &status, &status, &like, &like, &like, &like),
         )
         .map_err(AppError::from)?;
 
@@ -555,7 +551,10 @@ fn insert_visit_service(
 
     let _ = (s_name, category_id, category_name); // usados por el mapeo de abajo
     let rows: Vec<VisitServiceRow> = conn
-        .query(&format!("{VISIT_SERVICE_SELECT} WHERE vs.ID = ?"), (&line_id,))
+        .query(
+            &format!("{VISIT_SERVICE_SELECT} WHERE vs.ID = ?"),
+            (&line_id,),
+        )
         .map_err(AppError::from)?;
     rows.into_iter()
         .next()
@@ -593,11 +592,8 @@ pub fn remove_visit_service(
         )));
     }
 
-    conn.execute(
-        "DELETE FROM VISIT_SERVICES WHERE ID = ?",
-        (&line_id,),
-    )
-    .map_err(AppError::from)?;
+    conn.execute("DELETE FROM VISIT_SERVICES WHERE ID = ?", (&line_id,))
+        .map_err(AppError::from)?;
     Ok(())
 }
 
@@ -660,7 +656,10 @@ pub fn update_visit_service_status(
     .map_err(AppError::from)?;
 
     let rows: Vec<VisitServiceRow> = conn
-        .query(&format!("{VISIT_SERVICE_SELECT} WHERE vs.ID = ?"), (&line_id,))
+        .query(
+            &format!("{VISIT_SERVICE_SELECT} WHERE vs.ID = ?"),
+            (&line_id,),
+        )
         .map_err(AppError::from)?;
     rows.into_iter()
         .next()
@@ -702,10 +701,7 @@ pub fn checkout_visit(
 
     // Guard: una factura por visita.
     let already: Option<(i32,)> = conn
-        .query_first(
-            "SELECT ID FROM INVOICES WHERE VISIT_ID = ?",
-            (&visit_id,),
-        )
+        .query_first("SELECT ID FROM INVOICES WHERE VISIT_ID = ?", (&visit_id,))
         .map_err(AppError::from)?;
     if already.is_some() {
         return Err(AppError::Validation(
@@ -869,7 +865,10 @@ mod tests {
         // El total estimado del listado suma las líneas activas.
         let list = list_visits(&mut conn, None, None, None).unwrap();
         let item = list.iter().find(|v| v.id == visit.id).unwrap();
-        assert_eq!(item.services_summary, "Consulta general + Perfil básico de laboratorio");
+        assert_eq!(
+            item.services_summary,
+            "Consulta general + Perfil básico de laboratorio"
+        );
         assert!((item.estimated_total - 120000.0).abs() < 0.01);
         test_helpers::cleanup_test_db(&db_path);
     }
@@ -953,11 +952,8 @@ mod tests {
         assert!(matches!(err, AppError::Validation(_)));
 
         // Servicio inactivo rechazado.
-        conn.execute(
-            "UPDATE SERVICES SET IS_ACTIVE = FALSE WHERE ID = 5",
-            (),
-        )
-        .unwrap();
+        conn.execute("UPDATE SERVICES SET IS_ACTIVE = FALSE WHERE ID = 5", ())
+            .unwrap();
         let err = add_visit_service(&mut conn, visit.id, &svc(5, 1)).unwrap_err();
         assert!(matches!(err, AppError::Validation(_)));
         conn.execute("UPDATE SERVICES SET IS_ACTIVE = TRUE WHERE ID = 5", ())
@@ -1015,8 +1011,10 @@ mod tests {
     fn test_checkout_per_service_tax_rate() {
         let (mut conn, db_path) = setup();
         // Servicio con IVA propio (19%) y otro sin IVA (0%).
-        conn.execute("UPDATE SERVICES SET TAX_RATE = 19 WHERE ID = 1", ()).unwrap();
-        conn.execute("UPDATE SERVICES SET TAX_RATE = 0 WHERE ID = 9", ()).unwrap();
+        conn.execute("UPDATE SERVICES SET TAX_RATE = 19 WHERE ID = 1", ())
+            .unwrap();
+        conn.execute("UPDATE SERVICES SET TAX_RATE = 0 WHERE ID = 9", ())
+            .unwrap();
 
         let input = CreateVisitInput {
             patient_id: 1,

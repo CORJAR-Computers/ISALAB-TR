@@ -3,8 +3,8 @@ use tauri::State;
 use crate::auth::{require_admin, require_session, require_stay};
 use crate::error::AppError;
 use crate::models::stay::{
-    CheckOutStayInput, CreateStayEventInput, CreateStayInput, Resource, ResourceBoardItem, Stay,
-    StayEvent, StayListItem, SaveResourceInput,
+    CheckOutStayInput, CreateStayEventInput, CreateStayInput, Resource, ResourceBoardItem,
+    SaveResourceInput, Stay, StayEvent, StayListItem,
 };
 use crate::repositories::auth as auth_repo;
 use crate::repositories::stays as stays_repo;
@@ -37,9 +37,7 @@ pub fn list_resources(
 /// Tablero de estancias: recursos con su ocupación actual.
 #[tauri::command]
 #[specta::specta]
-pub fn list_resource_board(
-    state: State<'_, AppState>,
-) -> Result<Vec<ResourceBoardItem>, AppError> {
+pub fn list_resource_board(state: State<'_, AppState>) -> Result<Vec<ResourceBoardItem>, AppError> {
     require_session(&state)?;
     let mut pooled = state.pool.acquire()?;
     stays_repo::list_resource_board(pooled.conn())
@@ -97,10 +95,7 @@ pub fn get_stay(state: State<'_, AppState>, id: i32) -> Result<Option<Stay>, App
 /// Ingreso de una estancia (guardería, hospedaje u hospitalización).
 #[tauri::command]
 #[specta::specta]
-pub fn create_stay(
-    state: State<'_, AppState>,
-    input: CreateStayInput,
-) -> Result<Stay, AppError> {
+pub fn create_stay(state: State<'_, AppState>, input: CreateStayInput) -> Result<Stay, AppError> {
     let user = require_stay(&state)?;
     let mut pooled = state.pool.acquire()?;
     let stay = stays_repo::create_stay(pooled.conn(), &input, Some(user.id))?;

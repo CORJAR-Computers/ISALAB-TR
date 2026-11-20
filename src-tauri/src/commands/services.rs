@@ -110,10 +110,16 @@ pub fn save_service(
     let mut pooled = state.pool.acquire()?;
     let service = services_repo::save_service(pooled.conn(), &input)?;
 
-    log_service_audit(&state, Some(user.id), &user.username, "SERVICE", &format!(
-        "Servicio {} ({}) · precio {} · duración {} min",
-        service.code, service.name, service.price, service.duration_min
-    ));
+    log_service_audit(
+        &state,
+        Some(user.id),
+        &user.username,
+        "SERVICE",
+        &format!(
+            "Servicio {} ({}) · precio {} · duración {} min",
+            service.code, service.name, service.price, service.duration_min
+        ),
+    );
     Ok(service)
 }
 

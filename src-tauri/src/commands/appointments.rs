@@ -17,8 +17,14 @@ fn log_appt_audit(
     detail: &str,
 ) {
     if let Ok(mut pooled) = state.pool.acquire() {
-        crate::repositories::auth::log_audit(pooled.conn(), user_id, username, action, Some(detail))
-            .ok();
+        crate::repositories::auth::log_audit(
+            pooled.conn(),
+            user_id,
+            username,
+            action,
+            Some(detail),
+        )
+        .ok();
     }
 }
 
@@ -45,7 +51,10 @@ pub fn list_appointments(
 /// Ficha completa de una cita.
 #[tauri::command]
 #[specta::specta]
-pub fn get_appointment(state: State<'_, AppState>, id: i32) -> Result<Option<Appointment>, AppError> {
+pub fn get_appointment(
+    state: State<'_, AppState>,
+    id: i32,
+) -> Result<Option<Appointment>, AppError> {
     require_session(&state)?;
     let mut pooled = state.pool.acquire()?;
     appt_repo::get_appointment(pooled.conn(), id)
@@ -85,7 +94,12 @@ pub fn set_appointment_status(
 ) -> Result<Appointment, AppError> {
     let user = require_receive(&state)?;
     let mut pooled = state.pool.acquire()?;
-    let appt = appt_repo::set_appointment_status(pooled.conn(), id, &input.status, input.notes.as_deref())?;
+    let appt = appt_repo::set_appointment_status(
+        pooled.conn(),
+        id,
+        &input.status,
+        input.notes.as_deref(),
+    )?;
 
     log_appt_audit(
         &state,

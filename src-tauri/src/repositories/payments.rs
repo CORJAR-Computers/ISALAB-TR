@@ -139,9 +139,7 @@ pub fn list_by_invoice(
         .map_err(AppError::from)?;
 
     ids.into_iter()
-        .map(|(id,)| {
-            get(conn, id)?.ok_or_else(|| AppError::Internal("Pago no recuperado".into()))
-        })
+        .map(|(id,)| get(conn, id)?.ok_or_else(|| AppError::Internal("Pago no recuperado".into())))
         .collect()
 }
 
@@ -190,10 +188,7 @@ fn paid_amount(conn: &mut SimpleConnection, invoice_id: i32) -> Result<f64, AppE
 /// vigentes: `PAGADA` si el saldo llegó a cero y `EMITIDA` si no. Nunca toca
 /// una factura anulada. Es el único lugar donde se decide ese estado, para que
 /// registrar y anular un pago no puedan divergir.
-fn recompute_invoice_status(
-    conn: &mut SimpleConnection,
-    invoice_id: i32,
-) -> Result<(), AppError> {
+fn recompute_invoice_status(conn: &mut SimpleConnection, invoice_id: i32) -> Result<(), AppError> {
     let row: Option<(String, f64)> = conn
         .query_first(
             "SELECT STATUS, CAST(TOTAL AS DOUBLE PRECISION) FROM INVOICES WHERE ID = ?",
@@ -737,11 +732,13 @@ pub fn billing_report(
         )
         .map_err(AppError::from)?
         .into_iter()
-        .map(|(method_code, method_name, amount): (String, String, f64)| BillingMethodTotal {
-            method_code,
-            method_name,
-            amount,
-        })
+        .map(
+            |(method_code, method_name, amount): (String, String, f64)| BillingMethodTotal {
+                method_code,
+                method_name,
+                amount,
+            },
+        )
         .collect();
 
     Ok(BillingReport {
@@ -804,10 +801,7 @@ mod tests {
     }
 
     fn allocation(invoice_id: i32, amount: f64) -> CreatePaymentAllocationInput {
-        CreatePaymentAllocationInput {
-            invoice_id,
-            amount,
-        }
+        CreatePaymentAllocationInput { invoice_id, amount }
     }
 
     fn input(
@@ -831,7 +825,11 @@ mod tests {
 
         let payment = register(
             &mut conn,
-            &input(1, vec![line("EFECTIVO", 40000.0)], vec![allocation(1, 40000.0)]),
+            &input(
+                1,
+                vec![line("EFECTIVO", 40000.0)],
+                vec![allocation(1, 40000.0)],
+            ),
             Some(1),
         )
         .unwrap();
@@ -857,7 +855,11 @@ mod tests {
 
         register(
             &mut conn,
-            &input(1, vec![line("EFECTIVO", 40000.0)], vec![allocation(1, 40000.0)]),
+            &input(
+                1,
+                vec![line("EFECTIVO", 40000.0)],
+                vec![allocation(1, 40000.0)],
+            ),
             Some(1),
         )
         .unwrap();
@@ -934,8 +936,14 @@ mod tests {
         )
         .unwrap();
 
-        assert_eq!(invoice_balance(&mut conn, 1).unwrap().payment_status, "PAGADA");
-        assert_eq!(invoice_balance(&mut conn, 2).unwrap().payment_status, "PAGADA");
+        assert_eq!(
+            invoice_balance(&mut conn, 1).unwrap().payment_status,
+            "PAGADA"
+        );
+        assert_eq!(
+            invoice_balance(&mut conn, 2).unwrap().payment_status,
+            "PAGADA"
+        );
 
         cleanup_test_db(&db_path);
     }
@@ -985,7 +993,11 @@ mod tests {
 
         let result = register(
             &mut conn,
-            &input(1, vec![line("EFECTIVO", 50000.0)], vec![allocation(1, 50000.0)]),
+            &input(
+                1,
+                vec![line("EFECTIVO", 50000.0)],
+                vec![allocation(1, 50000.0)],
+            ),
             Some(1),
         );
 
@@ -1006,7 +1018,11 @@ mod tests {
 
         let result = register(
             &mut conn,
-            &input(1, vec![line("EFECTIVO", 50000.0)], vec![allocation(1, 50000.0)]),
+            &input(
+                1,
+                vec![line("EFECTIVO", 50000.0)],
+                vec![allocation(1, 50000.0)],
+            ),
             Some(1),
         );
 
@@ -1152,11 +1168,18 @@ mod tests {
 
         let payment = register(
             &mut conn,
-            &input(1, vec![line("EFECTIVO", 40000.0)], vec![allocation(1, 40000.0)]),
+            &input(
+                1,
+                vec![line("EFECTIVO", 40000.0)],
+                vec![allocation(1, 40000.0)],
+            ),
             Some(1),
         )
         .unwrap();
-        assert_eq!(invoice_balance(&mut conn, 1).unwrap().payment_status, "ABONADA");
+        assert_eq!(
+            invoice_balance(&mut conn, 1).unwrap().payment_status,
+            "ABONADA"
+        );
 
         let voided = void(&mut conn, payment.id, "Importe digitado por error", Some(1)).unwrap();
         assert_eq!(voided.status, "ANULADO");
@@ -1204,7 +1227,10 @@ mod tests {
         let (count, amount) = count_cash_movements(&mut conn, payment.id);
         assert_eq!(count, 1);
         assert!((amount + 60000.0).abs() < 0.01);
-        assert_eq!(invoice_balance(&mut conn, 1).unwrap().payment_status, "PENDIENTE");
+        assert_eq!(
+            invoice_balance(&mut conn, 1).unwrap().payment_status,
+            "PENDIENTE"
+        );
 
         cleanup_test_db(&db_path);
     }
@@ -1215,14 +1241,21 @@ mod tests {
         insert_invoice(&mut conn, 1, 1, 50000.0);
         let payment = register(
             &mut conn,
-            &input(1, vec![line("EFECTIVO", 50000.0)], vec![allocation(1, 50000.0)]),
+            &input(
+                1,
+                vec![line("EFECTIVO", 50000.0)],
+                vec![allocation(1, 50000.0)],
+            ),
             Some(1),
         )
         .unwrap();
 
         let result = void(&mut conn, payment.id, "   ", Some(1));
         assert!(matches!(result, Err(AppError::Validation(_))));
-        assert_eq!(invoice_balance(&mut conn, 1).unwrap().payment_status, "PAGADA");
+        assert_eq!(
+            invoice_balance(&mut conn, 1).unwrap().payment_status,
+            "PAGADA"
+        );
 
         cleanup_test_db(&db_path);
     }
@@ -1233,7 +1266,11 @@ mod tests {
         insert_invoice(&mut conn, 1, 1, 100000.0);
         let payment = register(
             &mut conn,
-            &input(1, vec![line("EFECTIVO", 100000.0)], vec![allocation(1, 100000.0)]),
+            &input(
+                1,
+                vec![line("EFECTIVO", 100000.0)],
+                vec![allocation(1, 100000.0)],
+            ),
             Some(1),
         )
         .unwrap();
@@ -1254,7 +1291,10 @@ mod tests {
         let result = void(&mut conn, payment.id, "Cobro equivocado", Some(1));
         assert!(matches!(result, Err(AppError::Validation(_))));
         // Nada cambió: el pago sigue vigente y la factura pagada.
-        assert_eq!(invoice_balance(&mut conn, 1).unwrap().payment_status, "PAGADA");
+        assert_eq!(
+            invoice_balance(&mut conn, 1).unwrap().payment_status,
+            "PAGADA"
+        );
         assert_eq!(count_cash_movements(&mut conn, payment.id).0, 0);
 
         cleanup_test_db(&db_path);
@@ -1266,7 +1306,11 @@ mod tests {
         insert_invoice(&mut conn, 1, 1, 50000.0);
         let payment = register(
             &mut conn,
-            &input(1, vec![line("EFECTIVO", 50000.0)], vec![allocation(1, 50000.0)]),
+            &input(
+                1,
+                vec![line("EFECTIVO", 50000.0)],
+                vec![allocation(1, 50000.0)],
+            ),
             Some(1),
         )
         .unwrap();
@@ -1304,7 +1348,11 @@ mod tests {
 
         register(
             &mut conn,
-            &input(1, vec![line("EFECTIVO", 40000.0)], vec![allocation(1, 40000.0)]),
+            &input(
+                1,
+                vec![line("EFECTIVO", 40000.0)],
+                vec![allocation(1, 40000.0)],
+            ),
             Some(1),
         )
         .unwrap();

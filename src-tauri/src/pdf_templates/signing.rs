@@ -72,10 +72,7 @@ pub fn validate_pkcs12_bytes(
 }
 
 /// Lógica compartida de validación PKCS#12 a partir de los bytes del contenedor.
-fn validate_pkcs12_from_bytes(
-    data: &[u8],
-    password: &str,
-) -> Result<ValidationReport, AppError> {
+fn validate_pkcs12_from_bytes(data: &[u8], password: &str) -> Result<ValidationReport, AppError> {
     // El parseo descifra el contenedor: si la contraseña es incorrecta,
     // `from_pkcs12` falla. Es la validación real del certificado.
     let ks = p12_keystore::KeyStore::from_pkcs12(data, password).map_err(|e| {

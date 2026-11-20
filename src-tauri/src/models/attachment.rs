@@ -19,11 +19,7 @@ pub struct AttachmentContent {
 
 impl AttachmentContent {
     /// Construye la respuesta a partir del BLOB y sus metadatos.
-    pub fn new(
-        file_name: String,
-        mime_type: Option<String>,
-        content: Vec<u8>,
-    ) -> Self {
+    pub fn new(file_name: String, mime_type: Option<String>, content: Vec<u8>) -> Self {
         let mime = mime_type
             .clone()
             .or_else(|| mime_for_file_name(&file_name))

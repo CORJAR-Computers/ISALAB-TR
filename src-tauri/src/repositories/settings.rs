@@ -137,9 +137,7 @@ pub fn get(conn: &mut SimpleConnection) -> Result<ClinicSettings, AppError> {
                     s.grooming_default_duration = val.parse().ok();
                 }
             }
-            "reception_ticket_prefix" => {
-                s.reception_ticket_prefix = v.filter(|x| !x.is_empty())
-            }
+            "reception_ticket_prefix" => s.reception_ticket_prefix = v.filter(|x| !x.is_empty()),
             _ => {}
         }
     }
@@ -247,9 +245,7 @@ pub fn save(
             "smtp_password" => smtp_encrypted.clone(),
             "smtp_from" => input.smtp_from.clone(),
             "tagline" => input.tagline.clone(),
-            "grooming_default_duration" => {
-                input.grooming_default_duration.map(|d| d.to_string())
-            }
+            "grooming_default_duration" => input.grooming_default_duration.map(|d| d.to_string()),
             "reception_ticket_prefix" => input.reception_ticket_prefix.clone(),
             _ => None,
         };
@@ -335,7 +331,10 @@ mod tests {
 
         let saved = save(&mut conn, &input).unwrap();
         assert_eq!(saved.clinic_name, "Pet Health Clinic");
-        assert_eq!(saved.tagline.as_deref(), Some("Clínica Veterinaria Integral"));
+        assert_eq!(
+            saved.tagline.as_deref(),
+            Some("Clínica Veterinaria Integral")
+        );
         assert_eq!(saved.grooming_default_duration, Some(45));
         assert_eq!(saved.reception_ticket_prefix.as_deref(), Some("T"));
         assert_eq!(saved.smtp_host.as_deref(), Some("smtp.gmail.com"));
@@ -489,7 +488,10 @@ mod tests {
 
         let branding = get_branding(&mut conn).unwrap();
         assert_eq!(branding.clinic_name, "Patitas Felices");
-        assert_eq!(branding.tagline.as_deref(), Some("Clínica Veterinaria Integral"));
+        assert_eq!(
+            branding.tagline.as_deref(),
+            Some("Clínica Veterinaria Integral")
+        );
 
         cleanup_test_db(&db_path);
     }

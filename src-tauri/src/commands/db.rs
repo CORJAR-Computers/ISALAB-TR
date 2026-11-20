@@ -2,12 +2,12 @@ use serde::{Deserialize, Serialize};
 use specta::Type;
 use tauri::{Manager, State};
 
-use rsfbclient::prelude::*;
 use crate::db::config::{self, DbConfig, DbMode, DbStatus, DEFAULT_PORT};
 use crate::db::{health, migrations};
 use crate::error::AppError;
 use crate::repositories::settings as settings_repo;
 use crate::state::AppState;
+use rsfbclient::prelude::*;
 
 #[derive(Debug, Clone, Serialize, Deserialize, Type)]
 #[serde(rename_all = "camelCase")]
@@ -277,9 +277,7 @@ pub struct BackupStatus {
 /// Lee las claves `ops.last_backup_at` y `ops.last_backup_file` de la tabla OPS.
 #[tauri::command]
 #[specta::specta]
-pub fn get_server_backup_status(
-    state: State<'_, AppState>,
-) -> Result<BackupStatus, AppError> {
+pub fn get_server_backup_status(state: State<'_, AppState>) -> Result<BackupStatus, AppError> {
     let mut pooled = state.pool.acquire()?;
     let conn = pooled.conn();
 

@@ -112,13 +112,11 @@ pub fn get_cash_session_summary(
     let mut pooled = state.pool.acquire()?;
     let id = match session_id {
         Some(id) => id,
-        None => {
-            cash_repo::get_open_session(pooled.conn())?
-                .map(|s| s.id)
-                .ok_or_else(|| {
-                    AppError::Validation("No hay una caja abierta. Abre la caja primero.".into())
-                })?
-        }
+        None => cash_repo::get_open_session(pooled.conn())?
+            .map(|s| s.id)
+            .ok_or_else(|| {
+                AppError::Validation("No hay una caja abierta. Abre la caja primero.".into())
+            })?,
     };
     cash_repo::summary(pooled.conn(), id)
 }

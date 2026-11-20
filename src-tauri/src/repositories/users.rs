@@ -6,13 +6,7 @@ use crate::error::AppError;
 use crate::models::auth::{CreateUserInput, SessionUser, UserListItem};
 
 /// Roles permitidos por el CHECK de la tabla USERS (migración 0026).
-pub const ROLES: [&str; 5] = [
-    "ADMIN",
-    "VETERINARIO",
-    "AUXILIAR",
-    "RECEPCION",
-    "PELUQUERO",
-];
+pub const ROLES: [&str; 5] = ["ADMIN", "VETERINARIO", "AUXILIAR", "RECEPCION", "PELUQUERO"];
 
 /// Mínimo de caracteres para las contraseñas.
 pub const MIN_PASSWORD_LEN: usize = 6;

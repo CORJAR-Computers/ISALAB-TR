@@ -79,10 +79,7 @@ pub fn save_category(
         .map_err(AppError::from)?;
     } else {
         let dup: Option<(i32,)> = conn
-            .query_first(
-                "SELECT ID FROM SERVICE_CATEGORIES WHERE CODE = ?",
-                (&code,),
-            )
+            .query_first("SELECT ID FROM SERVICE_CATEGORIES WHERE CODE = ?", (&code,))
             .map_err(AppError::from)?;
         if dup.is_some() {
             return Err(AppError::Validation(format!(
@@ -103,10 +100,7 @@ pub fn save_category(
         Some(id) => id,
         None => {
             let (id,): (i32,) = conn
-                .query_first(
-                    "SELECT ID FROM SERVICE_CATEGORIES WHERE CODE = ?",
-                    (&code,),
-                )
+                .query_first("SELECT ID FROM SERVICE_CATEGORIES WHERE CODE = ?", (&code,))
                 .map_err(AppError::from)?
                 .ok_or_else(|| {
                     AppError::Internal("Categoría guardada pero ID no recuperado".into())
@@ -246,15 +240,9 @@ pub fn list_services(
 }
 
 /// Obtiene un servicio por ID.
-pub fn get_service(
-    conn: &mut SimpleConnection,
-    id: i32,
-) -> Result<Option<Service>, AppError> {
+pub fn get_service(conn: &mut SimpleConnection, id: i32) -> Result<Option<Service>, AppError> {
     let row: Option<ServiceRow> = conn
-        .query_first(
-            &format!("{SERVICE_SELECT} WHERE s.ID = ?"),
-            (&id,),
-        )
+        .query_first(&format!("{SERVICE_SELECT} WHERE s.ID = ?"), (&id,))
         .map_err(AppError::from)?;
     Ok(row.map(map_service))
 }
@@ -266,10 +254,14 @@ fn validate_service(
     exclude_id: Option<i32>,
 ) -> Result<(), AppError> {
     if input.code.trim().is_empty() {
-        return Err(AppError::Validation("El código del servicio es obligatorio".into()));
+        return Err(AppError::Validation(
+            "El código del servicio es obligatorio".into(),
+        ));
     }
     if input.name.trim().is_empty() {
-        return Err(AppError::Validation("El nombre del servicio es obligatorio".into()));
+        return Err(AppError::Validation(
+            "El nombre del servicio es obligatorio".into(),
+        ));
     }
     if input.duration_min <= 0 {
         return Err(AppError::Validation(
@@ -277,7 +269,9 @@ fn validate_service(
         ));
     }
     if input.price < 0.0 {
-        return Err(AppError::Validation("El precio no puede ser negativo".into()));
+        return Err(AppError::Validation(
+            "El precio no puede ser negativo".into(),
+        ));
     }
     if let Some(rate) = input.tax_rate {
         if !(0.0..=100.0).contains(&rate) {
@@ -296,7 +290,9 @@ fn validate_service(
         Some(id) => conn
             .query_first(&dup_sql, (&code, &id))
             .map_err(AppError::from)?,
-        None => conn.query_first(&dup_sql, (&code,)).map_err(AppError::from)?,
+        None => conn
+            .query_first(&dup_sql, (&code,))
+            .map_err(AppError::from)?,
     };
     if dup.is_some() {
         return Err(AppError::Validation(format!(

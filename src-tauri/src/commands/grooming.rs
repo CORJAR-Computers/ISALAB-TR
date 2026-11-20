@@ -138,7 +138,9 @@ pub fn add_visit_attachment(
 
     let src = std::path::PathBuf::from(&source_path);
     if !src.exists() {
-        return Err(AppError::Validation("El archivo seleccionado ya no existe".into()));
+        return Err(AppError::Validation(
+            "El archivo seleccionado ya no existe".into(),
+        ));
     }
     let ext = src
         .extension()
@@ -169,7 +171,9 @@ pub fn add_visit_attachment(
         .map_err(|e| AppError::Internal(format!("No se pudo leer el archivo: {e}")))?;
     let size = content.len() as u64;
     if size > MAX_ATTACHMENT_BYTES {
-        return Err(AppError::Validation("El archivo supera el límite de 20 MB".into()));
+        return Err(AppError::Validation(
+            "El archivo supera el límite de 20 MB".into(),
+        ));
     }
 
     let file_name = src
@@ -194,7 +198,10 @@ pub fn add_visit_attachment(
         .query_first("SELECT 1 FROM VISITS WHERE ID = ?", (&input.visit_id,))
         .map_err(AppError::from)?;
     if visit_exists.is_none() {
-        return Err(AppError::NotFound(format!("Visita {} no encontrada", input.visit_id)));
+        return Err(AppError::NotFound(format!(
+            "Visita {} no encontrada",
+            input.visit_id
+        )));
     }
 
     let attachment = grooming_repo::insert_visit_attachment(
@@ -211,7 +218,10 @@ pub fn add_visit_attachment(
         Some(user.id),
         &user.username,
         "VISIT_ATTACHMENT_ADDED",
-        &format!("Adjunto \"{file_name}\" ({size} bytes) a la visita {}", input.visit_id),
+        &format!(
+            "Adjunto \"{file_name}\" ({size} bytes) a la visita {}",
+            input.visit_id
+        ),
     );
     Ok(attachment)
 }
@@ -259,10 +269,7 @@ pub fn get_visit_attachment_content(
 /// (materializa el BLOB en %TEMP% y lo lanza).
 #[tauri::command]
 #[specta::specta]
-pub fn open_visit_attachment(
-    state: State<'_, AppState>,
-    id: i32,
-) -> Result<(), AppError> {
+pub fn open_visit_attachment(state: State<'_, AppState>, id: i32) -> Result<(), AppError> {
     let _ = require_session(&state)?;
     let mut pooled = state.pool.acquire()?;
     let content = grooming_repo::content_visit_attachment(pooled.conn(), id)
@@ -272,11 +279,7 @@ pub fn open_visit_attachment(
     let tmp_path = tmp_dir.join(format!("isalab_visit_{}_{}", id, content.file_name));
 
     // data_url es "data:mime;base64,<bytes>"; decodificamos a bytes crudos.
-    let b64 = content
-        .data_url
-        .split(',')
-        .nth(1)
-        .unwrap_or("");
+    let b64 = content.data_url.split(',').nth(1).unwrap_or("");
     let bytes = base64::engine::general_purpose::STANDARD
         .decode(b64)
         .map_err(|e| AppError::Internal(format!("Base64 inválido: {e}")))?;

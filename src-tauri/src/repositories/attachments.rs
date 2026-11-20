@@ -107,7 +107,14 @@ pub fn insert(
         "INSERT INTO RESULT_ATTACHMENTS
              (ID, RESULT_ID, FILE_NAME, MIME_TYPE, CONTENT, SIZE_BYTES)
          VALUES (?, ?, ?, ?, ?, ?)",
-        (&id, &result_id, file_name, &mime_type, content, content.len() as i32),
+        (
+            &id,
+            &result_id,
+            file_name,
+            &mime_type,
+            content,
+            content.len() as i32,
+        ),
     )
     .map_err(AppError::from)?;
 

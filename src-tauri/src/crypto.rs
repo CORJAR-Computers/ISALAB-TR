@@ -137,10 +137,7 @@ pub fn hex_decode(text: &str) -> Option<Vec<u8>> {
 
 /// Deriva (y cachea) la clave AEAD a partir de la contraseña y el salt.
 fn derive_shared_key(salt: &[u8]) -> [u8; 32] {
-    let cached = SHARED_KEY_CACHE
-        .lock()
-        .map(|g| *g)
-        .unwrap_or(None);
+    let cached = SHARED_KEY_CACHE.lock().map(|g| *g).unwrap_or(None);
     if let Some((cached_salt, key)) = cached {
         if cached_salt.as_slice() == salt {
             return key;
@@ -320,9 +317,8 @@ mod imp {
     }
 
     pub fn decrypt(blob: &[u8]) -> Result<String, AppError> {
-        String::from_utf8(blob.to_vec()).map_err(|_| {
-            AppError::Internal("El valor descifrado no es texto UTF-8 válido".into())
-        })
+        String::from_utf8(blob.to_vec())
+            .map_err(|_| AppError::Internal("El valor descifrado no es texto UTF-8 válido".into()))
     }
 }
 
@@ -361,14 +357,8 @@ mod tests {
         let a = encrypt_shared(SECRET, &SALT).unwrap();
         let b = encrypt_shared(SECRET, &SALT).unwrap();
         assert_ne!(a, b);
-        assert_eq!(
-            decrypt_shared(&a, &SALT).unwrap().as_deref(),
-            Some(SECRET)
-        );
-        assert_eq!(
-            decrypt_shared(&b, &SALT).unwrap().as_deref(),
-            Some(SECRET)
-        );
+        assert_eq!(decrypt_shared(&a, &SALT).unwrap().as_deref(), Some(SECRET));
+        assert_eq!(decrypt_shared(&b, &SALT).unwrap().as_deref(), Some(SECRET));
     }
 
     #[test]

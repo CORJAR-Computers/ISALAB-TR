@@ -118,13 +118,15 @@ fn list_patient_charges(
         .map_err(AppError::from)?;
     Ok(rows
         .into_iter()
-        .map(|(invoice_id, invoice_number, issue_date, total, status)| PatientChargeSummary {
-            invoice_id,
-            invoice_number,
-            issue_date,
-            total,
-            status,
-        })
+        .map(
+            |(invoice_id, invoice_number, issue_date, total, status)| PatientChargeSummary {
+                invoice_id,
+                invoice_number,
+                issue_date,
+                total,
+                status,
+            },
+        )
         .collect())
 }
 
@@ -992,7 +994,10 @@ mod tests {
 
         let history = get_clinical_history(&mut conn, patient_id).unwrap();
         assert_eq!(history.visits.len(), 1);
-        assert_eq!(history.visits[0].services_summary, "Consulta general + Baño");
+        assert_eq!(
+            history.visits[0].services_summary,
+            "Consulta general + Baño"
+        );
         assert!((history.visits[0].estimated_total - 110000.0).abs() < 0.01);
         assert_eq!(history.grooming_sessions.len(), 1);
         assert_eq!(history.grooming_sessions[0].service_name, "Baño");
