@@ -3,7 +3,11 @@
 // Se inyecta con page.addInitScript ANTES de que cargue la app: define
 // window.__TAURI_INTERNALS__ (que es lo que usa @tauri-apps/api/core#invoke)
 // y responde los comandos del flujo smoke con un estado en memoria.
-// Los comandos fuera del flujo devuelven null sin romper la app.
+// Un comando sin handler NO devuelve null: devolver null hacía que la página
+// pintara un estado vacío y el test pasara sin cubrir la llamada. Ahora lanza
+// un error legible para que falle el spec que lo ejerce; si los E2E no deben
+// ejercitarlo, se declara en e2e/ipc-mock.allowlist.mjs (lo verifica
+// `npm run check:e2e-mock`).
 //
 // Script en JS plano de navegador (sin imports): se ejecuta en la página.
 (() => {
@@ -103,16 +107,36 @@
   let nextSampleId = 1;
   let nextResultId = 1;
 
+  // ---------- Fecha local (sin años fijos) ----------
+  // El mock sella con la fecha local del equipo, igual que el backend
+  // (CURRENT_TIMESTAMP de Firebird). Ningún año se escribe a mano: los códigos
+  // M-AAAA-NNNN / V-AAAA-NNNN y los sellos se derivan del reloj, que los tests
+  // de frontera fijan con page.clock (e2e/date-boundaries.spec.ts).
+  const pad2 = (n) => String(n).padStart(2, "0");
+  const localDate = (d = new Date()) =>
+    `${d.getFullYear()}-${pad2(d.getMonth() + 1)}-${pad2(d.getDate())}`;
+  const stampAt = (d) =>
+    `${localDate(d)} ${pad2(d.getHours())}:${pad2(d.getMinutes())}:${pad2(d.getSeconds())}`;
+  const stamp = () => stampAt(new Date());
+  const currentYear = () => new Date().getFullYear();
+  /** Sello de hace `days` días (a la hora indicada) para los datos sembrados. */
+  const daysAgo = (days, hours = 9, minutes = 0) => {
+    const d = new Date();
+    d.setDate(d.getDate() - days);
+    d.setHours(hours, minutes, 0, 0);
+    return stampAt(d);
+  };
+
   // Historial y notificaciones sembrados para la primera muestra del flujo
   // (la que crea el smoke test recibe id 1). Ejercitan los EventRow y
   // NotificationRow de los diálogos apilados del detalle.
   const sampleEvents = [
-    { id: 1, sampleId: 1, eventType: "REJECTED", username: "admin", reason: "Tubo sin etiquetar", createdAt: "2026-09-07 10:15:00" },
-    { id: 2, sampleId: 1, eventType: "REOPENED", username: "admin", reason: null, createdAt: "2026-09-07 11:40:00" },
+    { id: 1, sampleId: 1, eventType: "REJECTED", username: "admin", reason: "Tubo sin etiquetar", createdAt: daysAgo(2, 10, 15) },
+    { id: 2, sampleId: 1, eventType: "REOPENED", username: "admin", reason: null, createdAt: daysAgo(2, 11, 40) },
   ];
   const notificationsLog = [
-    { id: 1, resultId: null, sampleId: 1, channel: "EMAIL", recipientName: "Juan Pérez", recipientAddress: "juan.perez@example.com", status: "SENT", sentAt: "2026-09-07 12:05:00", ackedAt: null, ackedBy: null, note: null, createdAt: "2026-09-07 12:05:00" },
-    { id: 2, resultId: null, sampleId: 1, channel: "MANUAL", recipientName: null, recipientAddress: null, status: "ACKNOWLEDGED", sentAt: null, ackedAt: "2026-09-07 12:20:00", ackedBy: "Dra. Ana Pérez", note: null, createdAt: "2026-09-07 12:20:00" },
+    { id: 1, resultId: null, sampleId: 1, channel: "EMAIL", recipientName: "Juan Pérez", recipientAddress: "juan.perez@example.com", status: "SENT", sentAt: daysAgo(2, 12, 5), ackedAt: null, ackedBy: null, note: null, createdAt: daysAgo(2, 12, 5) },
+    { id: 2, resultId: null, sampleId: 1, channel: "MANUAL", recipientName: null, recipientAddress: null, status: "ACKNOWLEDGED", sentAt: null, ackedAt: daysAgo(2, 12, 20), ackedBy: "Dra. Ana Pérez", note: null, createdAt: daysAgo(2, 12, 20) },
   ];
 
   // Especies del catálogo (ids 1/2/3 = canino/felino/equino, como el seed).
@@ -130,7 +154,7 @@
   ];
 
   const pad4 = (n) => String(n).padStart(4, "0");
-  const sampleCode = () => `M-2026-${pad4(nextSampleId)}`;
+  const sampleCode = () => `M-${currentYear()}-${pad4(nextSampleId)}`;
   const patientById = (id) => patients.find((p) => p.id === id);
   const sampleTypeById = (id) => sampleTypes.find((t) => t.id === id);
   const sampleById = (id) => samples.find((s) => s.id === id);
@@ -174,12 +198,70 @@
   // Reproduce las reglas del backend que ejercitan los E2E: una sola caja
   // abierta, abonos que descuentan saldo, movimientos de caja solo por la
   // parte en efectivo y visitas que se facturan al hacer el checkout.
-  const pad2 = (n) => String(n).padStart(2, "0");
-  const stamp = () => {
-    const d = new Date();
-    return `${d.getFullYear()}-${pad2(d.getMonth() + 1)}-${pad2(d.getDate())} ${pad2(d.getHours())}:${pad2(d.getMinutes())}:${pad2(d.getSeconds())}`;
-  };
   const round2 = (n) => Math.round(n * 100) / 100;
+
+  // ----- Usuarios, roles y capacidades (espejo de src-tauri/src/auth.rs) ---
+  // El mock de login devuelve el rol REAL del usuario: antes respondía siempre
+  // ADMIN, así que los E2E no podían observar ni el filtrado del menú por rol
+  // ni los 403 del backend. Las capacidades replican `capabilities_for_role`
+  // (su paridad con src/hooks/use-permissions.ts la comprueba
+  // src/hooks/use-permissions.test.ts).
+  const mockUsers = [
+    { id: 1, username: "admin", password: "admin123", fullName: "Administrador", role: "ADMIN" },
+    { id: 2, username: "mv.perez", password: "vet123", fullName: "Dra. Ana Pérez", role: "VETERINARIO" },
+    { id: 3, username: "recepcion", password: "recepcion123", fullName: "Laura Gómez", role: "RECEPCION" },
+    { id: 4, username: "auxiliar", password: "auxiliar123", fullName: "Carlos Ruiz", role: "AUXILIAR" },
+    { id: 5, username: "peluquero", password: "peluquero123", fullName: "Diego Santos", role: "PELUQUERO" },
+  ];
+
+  const NO_CAPABILITIES = {
+    receive: false,
+    clinical: false,
+    groom: false,
+    bill: false,
+    stay: false,
+    inventory: false,
+    admin: false,
+  };
+  const CAPABILITIES_BY_ROLE = {
+    ADMIN: { receive: true, clinical: true, groom: true, bill: true, stay: true, inventory: true, admin: true },
+    VETERINARIO: { receive: true, clinical: true, groom: false, bill: true, stay: true, inventory: false, admin: false },
+    AUXILIAR: { receive: true, clinical: false, groom: true, bill: true, stay: true, inventory: true, admin: false },
+    RECEPCION: { receive: true, clinical: false, groom: false, bill: true, stay: true, inventory: true, admin: false },
+    PELUQUERO: { receive: false, clinical: false, groom: true, bill: false, stay: false, inventory: false, admin: false },
+  };
+  const capabilitiesOf = (role) => CAPABILITIES_BY_ROLE[role] ?? NO_CAPABILITIES;
+
+  // Usuario de la sesión activa (login/logout lo mantienen).
+  let sessionUser = null;
+
+  // Mismos mensajes que los require_* de auth.rs, para que la UI y los tests
+  // vean el rechazo tal como lo produce el backend.
+  const requireCapability = (capability, message) => {
+    if (!capabilitiesOf(sessionUser?.role ?? "GUEST")[capability]) {
+      throw { type: "Forbidden", data: message };
+    }
+  };
+  const requireAdmin = () =>
+    requireCapability(
+      "admin",
+      "Solo el administrador puede realizar esta acción",
+    );
+  const requireVetOrAdmin = () =>
+    requireCapability(
+      "clinical",
+      "Se requieren permisos de Veterinario o Administrador para esta acción",
+    );
+  const requireReceive = () =>
+    requireCapability(
+      "receive",
+      "Se requiere rol de Recepción, Auxiliar, Veterinario o Administrador",
+    );
+  const requireBill = () =>
+    requireCapability(
+      "bill",
+      "Se requiere capacidad de facturación (Recepción, Auxiliar, Veterinario o Administrador)",
+    );
 
   const owners = [
     {
@@ -274,7 +356,7 @@
         username: "admin",
         action: "LOGIN",
         details: null,
-        createdAt: "2026-09-08 08:00:00",
+        createdAt: daysAgo(1, 8, 0),
       },
       {
         id: 2,
@@ -282,7 +364,7 @@
         username: "admin",
         action: "SETTINGS_CHANGED",
         details: "Datos de la clínica actualizados",
-        createdAt: "2026-09-08 08:15:00",
+        createdAt: daysAgo(1, 8, 15),
       },
     ],
     push(action, details = null) {
@@ -710,20 +792,30 @@
 
   // ---------- Handlers por comando Tauri ----------
   const handlers = {
-    get_session: () => null,
+    get_session: () => (sessionUser ? { ...sessionUser } : null),
     login: (args) => {
       const { username, password } = args.input ?? {};
       if (!username || !password)
         throw { type: "Validation", data: "Credenciales inválidas" };
-      return {
-        id: 1,
-        username,
-        fullName: "Administrador",
-        role: "ADMIN",
+      // Rol real del usuario: el menú y los botones se filtran por sus
+      // capacidades, y los handlers de abajo rechazan lo que no le toca.
+      const user = mockUsers.find((u) => u.username === username);
+      if (!user || user.password !== password) {
+        throw { type: "Validation", data: "Usuario o contraseña incorrectos" };
+      }
+      sessionUser = {
+        id: user.id,
+        username: user.username,
+        fullName: user.fullName,
+        role: user.role,
         mustChangePassword: false,
       };
+      return { ...sessionUser };
     },
-    logout: () => null,
+    logout: () => {
+      sessionUser = null;
+      return null;
+    },
     db_health: () => ({
       ok: true,
       message: "ok",
@@ -740,7 +832,8 @@
       for (let i = 6; i >= 0; i -= 1) {
         const d = new Date();
         d.setDate(d.getDate() - i);
-        const key = d.toISOString().slice(0, 10);
+        // Fecha LOCAL: con toISOString la tendencia se desfasa de noche.
+        const key = localDate(d);
         weeklyVolume.push({
           date: key,
           count: samples.filter((s) => s.receivedAt.slice(0, 10) === key).length,
@@ -832,6 +925,7 @@
         ? referenceRanges.filter((r) => r.analyzerId === args.analyzerId)
         : referenceRanges,
     create_analyte: (args) => {
+      requireVetOrAdmin();
       const { code, name, unit, method, description } = args.input ?? {};
       if (!code || !name)
         throw { type: "Validation", data: "Código y nombre son obligatorios" };
@@ -850,6 +944,7 @@
       return analyte;
     },
     create_reference_range: (args) => {
+      requireVetOrAdmin();
       const input = args.input ?? {};
       const a = analytes.find((x) => x.id === input.analyteId);
       const s = speciesById(input.speciesId);
@@ -877,6 +972,7 @@
       return range;
     },
     update_reference_range: (args) => {
+      requireVetOrAdmin();
       const r = referenceRanges.find((x) => x.id === args.id);
       if (!r) throw { type: "NotFound", data: "Rango no encontrado" };
       const input = args.input ?? {};
@@ -898,11 +994,13 @@
       r.notes = input.notes ?? null;
       return { ...r };
     },
-    list_analyzers: () =>
-      analyzers.map((a) => ({
+    list_analyzers: () => {
+      requireVetOrAdmin();
+      return analyzers.map((a) => ({
         ...a,
         rangeCount: referenceRanges.filter((r) => r.analyzerId === a.id).length,
-      })),
+      }));
+    },
     list_patients: (args) => {
       const q = (args.search ?? "").toLowerCase();
       if (!q) return patients;
@@ -934,6 +1032,7 @@
     list_sample_notifications: (args) =>
       notificationsLog.filter((n) => n.sampleId === args.sampleId),
     create_sample: (args) => {
+      requireVetOrAdmin();
       const input = args.input;
       const p = patientById(input.patientId);
       const t = sampleTypeById(input.sampleTypeId);
@@ -957,6 +1056,7 @@
       return sample;
     },
     register_lab_result: (args) => {
+      requireVetOrAdmin();
       const s = sampleById(args.input.sampleId);
       if (!s) throw { type: "NotFound", data: "Muestra no encontrada" };
       const a = analytes.find((x) => x.id === args.input.analyteId);
@@ -988,6 +1088,7 @@
     },
     // Carga por lotes (grilla del detalle): reemplaza valores y elimina vaciados.
     register_lab_results: (args) => {
+      requireVetOrAdmin();
       const s = sampleById(args.input.sampleId);
       if (!s) throw { type: "NotFound", data: "Muestra no encontrada" };
       const saved = [];
@@ -1035,18 +1136,21 @@
       return saved;
     },
     delete_lab_result: (args) => {
+      requireVetOrAdmin();
       const s = sampleById(args.sampleId);
       if (!s) throw { type: "NotFound", data: "Muestra no encontrada" };
       s.results = s.results.filter((r) => r.analyteId !== args.analyteId);
       return null;
     },
     set_sample_status: (args) => {
+      requireVetOrAdmin();
       const s = sampleById(args.id);
       if (!s) throw { type: "NotFound", data: "Muestra no encontrada" };
       s.status = args.status;
       return { ...s, results: [...s.results] };
     },
     generate_sample_labels: (args) => {
+      requireVetOrAdmin();
       const ids = args.sampleIds ?? [];
       for (const id of ids) {
         if (!sampleById(id))
@@ -1055,7 +1159,7 @@
       return {
         path: `C:/mock/etiquetas-${ids.join("-")}.pdf`,
         fileName: `ISALAB_Etiquetas_${ids.join("-")}.pdf`,
-        sampleCode: "M-2026-0001",
+        sampleCode: `M-${currentYear()}-0001`,
         generatedAt: new Date().toISOString().slice(0, 19).replace("T", " "),
       };
     },
@@ -1147,7 +1251,7 @@
             kind: "sample",
             id: s.id,
             title: p?.name ?? "?",
-            subtitle: `${s.sampleTypeName} · ${s.status}`, // eslint-disable-line
+            subtitle: `${s.sampleTypeName} · ${s.status}`,
             code: s.code,
           });
         }
@@ -1183,29 +1287,41 @@
       pkcs12Path: null,
       pkcs12Password: null,
     }),
-    save_clinic_settings: (args) => args.input,
-    import_clinic_logo: (args) => args.sourcePath,
+    save_clinic_settings: (args) => {
+      requireAdmin();
+      return args.input;
+    },
+    import_clinic_logo: (args) => {
+      requireAdmin();
+      return args.sourcePath;
+    },
     list_secondary_logos: () => [
       {
         id: 1,
         name: "Logo Falso",
         logoPath: "C:/logos/falso.png",
-        createdAt: "2026-08-01 10:00:00",
+        createdAt: daysAgo(20, 10, 0),
       },
       {
         id: 2,
         name: "Proyecto X",
         logoPath: "C:/logos/proyecto-x.png",
-        createdAt: "2026-08-02 11:00:00",
+        createdAt: daysAgo(19, 11, 0),
       },
     ],
-    import_secondary_logo: (args) => ({
-      id: 3,
-      name: args.input.name,
-      logoPath: args.input.sourcePath,
-      createdAt: "2026-08-03 12:00:00",
-    }),
-    delete_secondary_logo: () => null,
+    import_secondary_logo: (args) => {
+      requireAdmin();
+      return {
+        id: 3,
+        name: args.input.name,
+        logoPath: args.input.sourcePath,
+        createdAt: daysAgo(18, 12, 0),
+      };
+    },
+    delete_secondary_logo: () => {
+      requireAdmin();
+      return null;
+    },
     // ----- Catálogos y páginas del resto de la app (estados vacíos) -------
     // Necesarios para el test de viewport 1366x768, que navega por TODAS las
     // vistas: cada página debe montar sin datos y sin excepciones.
@@ -1215,27 +1331,20 @@
       { id: 2, speciesId: 1, name: "Criollo" },
     ],
     list_owners: () => owners,
-    list_users: () => [
-      {
-        id: 1,
-        username: "admin",
-        fullName: "Administrador",
-        role: "ADMIN",
+    list_users: () => {
+      requireAdmin();
+      return mockUsers.map((u, idx) => ({
+        id: u.id,
+        username: u.username,
+        fullName: u.fullName,
+        role: u.role,
         active: true,
         mustChangePassword: false,
-        createdAt: "2026-08-01 08:00:00",
-      },
-      {
-        id: 2,
-        username: "mv.perez",
-        fullName: "Dra. Ana Pérez",
-        role: "VETERINARIO",
-        active: true,
-        mustChangePassword: false,
-        createdAt: "2026-08-02 09:30:00",
-      },
-    ],
+        createdAt: daysAgo(30 - idx, 8, 0),
+      }));
+    },
     list_audit_log: (args = {}) => {
+      requireAdmin();
       let rows = [...auditLog.entries].sort((a, b) => b.id - a.id);
       if (args.username) {
         const q = String(args.username).toLowerCase();
@@ -1260,6 +1369,26 @@
       { id: 4, code: "LEPTO", name: "Leptospirosis" },
       { id: 5, code: "TOS_PERRERAS", name: "Tos de las perreras" },
     ],
+    // ----- Vistas sin datos modelados (los E2E solo verifican que montan) --
+    // Citas, peluquería, estancias, recursos, inventario y marca: el mock
+    // devuelve colecciones vacías para que las páginas pinten su estado vacío
+    // en vez de un error. Si algún spec empieza a ejercitarlas, se modela el
+    // estado aquí (no en la allowlist).
+    list_appointments: () => [],
+    list_grooming_day: () => [],
+    list_grooming_reminders: () => [],
+    list_stays: () => [],
+    list_resources: () => [],
+    list_resource_board: () => [],
+    list_products: () => [],
+    list_stock_movements: () => [],
+    get_clinic_branding: () => ({
+      clinicName: "Clínica Veterinaria Central",
+      tagline: null,
+    }),
+    get_clinic_logo_content: () => null,
+    get_secondary_logo_content: () => null,
+
     // ---- Facturación, pagos y reportes de dinero ----
     list_invoices: (args) => {
       let list = money.invoices.map(toInvoiceListItem);
@@ -1290,6 +1419,7 @@
       return inv ? toInvoice(inv) : null;
     },
     create_invoice: (args) => {
+      requireVetOrAdmin();
       const input = args.input ?? {};
       return toInvoice(
         pushInvoice({
@@ -1303,6 +1433,7 @@
       );
     },
     set_invoice_status: (args) => {
+      requireVetOrAdmin();
       const inv = invoiceById(args.id);
       if (!inv) throw { type: "NotFound", data: "Factura no encontrada" };
       if (args.status !== "ANULADA") {
@@ -1349,8 +1480,14 @@
         .map(toPayment),
     list_payment_methods: (args) =>
       paymentMethods.filter((m) => (args.includeInactive ? true : m.active)),
-    register_payment: (args) => registerPayment(args.input ?? {}),
-    void_payment: (args) => voidPayment(args.paymentId, args.reason),
+    register_payment: (args) => {
+      requireBill();
+      return registerPayment(args.input ?? {});
+    },
+    void_payment: (args) => {
+      requireBill();
+      return voidPayment(args.paymentId, args.reason);
+    },
     get_billing_report: (args) => {
       const from = args.from ?? "0000-01-01";
       const to = args.to ?? "9999-12-31";
@@ -1384,6 +1521,7 @@
       };
     },
     generate_recibo_invoice: (args) => {
+      requireVetOrAdmin();
       const inv = invoiceById(args.invoiceId);
       if (!inv) throw { type: "NotFound", data: "Factura no encontrada" };
       return {
@@ -1400,6 +1538,7 @@
       return session ? toCashSession(session) : null;
     },
     open_cash_session: (args) => {
+      requireBill();
       if (openSession()) {
         throw { type: "Validation", data: "Ya hay una caja abierta" };
       }
@@ -1424,6 +1563,7 @@
       return toCashSession(session);
     },
     add_cash_movement: (args) => {
+      requireBill();
       const session = openSession();
       if (!session) {
         throw { type: "Validation", data: "No hay una caja abierta" };
@@ -1447,6 +1587,7 @@
       return session ? buildSummary(session) : null;
     },
     close_cash_session: (args) => {
+      requireBill();
       const session = openSession();
       if (!session) {
         throw { type: "Validation", data: "No hay una caja abierta" };
@@ -1493,7 +1634,10 @@
 
     // ---- Recepción de pacientes (visitas) ----
     list_service_categories: () => serviceCategories,
-    list_all_service_categories: () => serviceCategories,
+    list_all_service_categories: () => {
+      requireAdmin();
+      return serviceCategories;
+    },
     list_services: (args) => {
       const q = (args.search ?? "").toLowerCase();
       return services.filter((s) => {
@@ -1523,6 +1667,7 @@
       return visit ? toVisit(visit) : null;
     },
     create_visit: (args) => {
+      requireReceive();
       const input = args.input ?? {};
       const patient = patientById(input.patientId);
       if (!patient) throw { type: "Validation", data: "Paciente inválido" };
@@ -1533,7 +1678,7 @@
       money.nextVisitId += 1;
       const visit = {
         id,
-        code: `V-2026-${String(id).padStart(4, "0")}`,
+        code: `V-${currentYear()}-${String(id).padStart(4, "0")}`,
         patientId: patient.id,
         patientName: patient.name,
         ownerId: patient.ownerId,
@@ -1555,6 +1700,7 @@
       return toVisit(visit);
     },
     set_visit_status: (args) => {
+      requireReceive();
       const visit = visitById(args.id);
       if (!visit) throw { type: "NotFound", data: "Visita no encontrada" };
       if (visit.status === "FACTURADA" && args.status !== "FACTURADA") {
@@ -1564,6 +1710,7 @@
       return toVisit(visit);
     },
     add_visit_service: (args) => {
+      requireReceive();
       const visit = visitById(args.visitId);
       if (!visit) throw { type: "NotFound", data: "Visita no encontrada" };
       const service = services.find((s) => s.id === args.input?.serviceId);
@@ -1573,12 +1720,14 @@
       return { ...line };
     },
     remove_visit_service: (args) => {
+      requireReceive();
       const visit = visitById(args.visitId);
       if (!visit) throw { type: "NotFound", data: "Visita no encontrada" };
       visit.services = visit.services.filter((l) => l.id !== args.lineId);
       return null;
     },
     update_visit_service_status: (args) => {
+      requireReceive();
       const visit = visitById(args.visitId);
       const line = visit?.services.find((l) => l.id === args.lineId);
       if (!visit || !line) throw { type: "NotFound", data: "Línea no encontrada" };
@@ -1588,6 +1737,7 @@
       return { ...line };
     },
     checkout_visit: (args) => {
+      requireBill();
       const visit = visitById(args.visitId);
       if (!visit) throw { type: "NotFound", data: "Visita no encontrada" };
       if (visit.status !== "FINALIZADA") {
@@ -1620,24 +1770,55 @@
     list_qc_materials: () => [],
     list_qc_runs: () => [],
     list_qc_targets: () => [],
-    list_qc_analyzer_status: () => [],
     get_qc_chart: () => null,
     list_reports: () => [],
-    list_analyzer_sources: () => [],
-    list_analyzer_import_jobs: () => [],
-    list_failed_analyzer_imports: () => [],
-    poll_analyzer_source: () => null,
+    list_analyzer_sources: () => {
+      requireVetOrAdmin();
+      return [];
+    },
+    list_analyzer_import_jobs: () => {
+      requireVetOrAdmin();
+      return [];
+    },
+    list_failed_analyzer_imports: () => {
+      requireVetOrAdmin();
+      return [];
+    },
+    poll_analyzer_source: () => {
+      requireVetOrAdmin();
+      return null;
+    },
     // Listeners/emits del runtime Tauri (Firebird events, app-ready, …)
     "plugin:event|listen": () => () => {},
     "plugin:event|unlisten": () => null,
     "plugin:event|emit": () => null,
   };
 
+  // Error legible para un comando sin handler: el mensaje nombra el comando,
+  // los argumentos y los dos remedios posibles. Se rechaza con un `Error` real
+  // (no con un AppError serializado) porque `typedError` en src/bindings.ts
+  // relanza los Error y convierte el resto en `{ status: "error" }`, que las
+  // páginas suelen pintar como estado vacío sin romper el test.
+  const missingHandlerError = (cmd, args) => {
+    let detail;
+    try {
+      detail = JSON.stringify(args) ?? "undefined";
+    } catch {
+      detail = "<argumentos no serializables>";
+    }
+    return new Error(
+      `[e2e-ipc-mock] Comando sin handler: "${cmd}" (args: ${detail}). ` +
+        "Añade el handler en e2e/ipc-mock.script.js o declara el comando en " +
+        "e2e/ipc-mock.allowlist.mjs si los E2E no deben ejercitarlo.",
+    );
+  };
+
   const invoke = (cmd, args = {}) => {
     const fn = handlers[cmd];
     if (!fn) {
-      console.warn("[e2e-ipc-mock] Comando sin implementar:", cmd, args);
-      return Promise.resolve(null);
+      const error = missingHandlerError(cmd, args);
+      console.error(error.message);
+      return Promise.reject(error);
     }
     try {
       return Promise.resolve(fn(args));
