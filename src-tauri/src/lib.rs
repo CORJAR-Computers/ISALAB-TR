@@ -83,7 +83,8 @@ use crate::commands::patients::{
     list_patients,
 };
 use crate::commands::payments::{
-    get_invoice_balance, list_invoice_payments, list_payment_methods, register_payment,
+    get_billing_report, get_invoice_balance, list_invoice_payments, list_payment_methods,
+    register_payment, void_payment,
 };
 use crate::commands::products::{
     add_stock_movement, get_product, list_products, list_stock_movements, save_product,
@@ -286,6 +287,8 @@ pub fn specta_builder() -> Builder<tauri::Wry> {
             set_invoice_status,
             list_payment_methods,
             register_payment,
+            void_payment,
+            get_billing_report,
             get_invoice_balance,
             list_invoice_payments,
             get_open_cash_session,
@@ -406,6 +409,8 @@ pub fn specta_builder() -> Builder<tauri::Wry> {
         .typ::<crate::models::payment::CreatePaymentLineInput>()
         .typ::<crate::models::payment::CreatePaymentAllocationInput>()
         .typ::<crate::models::payment::RegisterPaymentInput>()
+        .typ::<crate::models::payment::BillingMethodTotal>()
+        .typ::<crate::models::payment::BillingReport>()
         .typ::<crate::models::cash::CashSession>()
         .typ::<crate::models::cash::CashMovement>()
         .typ::<crate::models::cash::CashMethodTotal>()

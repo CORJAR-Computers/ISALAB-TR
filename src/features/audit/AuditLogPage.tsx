@@ -46,6 +46,8 @@ const ACTION_STYLES: Record<
   LOGO_IMPORTED: { variant: "outline", label: "Logo importado" },
   SAMPLE_STATUS_CHANGE: { variant: "secondary", label: "Estado muestra" },
   INVOICE_STATUS_CHANGE: { variant: "secondary", label: "Estado factura" },
+  PAYMENT_REGISTERED: { variant: "default", label: "Pago registrado" },
+  PAYMENT_VOIDED: { variant: "destructive", label: "Pago anulado" },
   CONSULTATION_STATUS_CHANGE: { variant: "secondary", label: "Estado consulta" },
   SURGERY_STATUS_CHANGE: { variant: "secondary", label: "Estado cirugía" },
 };

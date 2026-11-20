@@ -69,6 +69,39 @@ export function useRegisterPayment() {
       }
       qc.invalidateQueries({ queryKey: ["dashboard"] });
       qc.invalidateQueries({ queryKey: ["cash-session-open"] });
+      qc.invalidateQueries({ queryKey: ["cash-summary"] });
+      qc.invalidateQueries({ queryKey: ["cash-movements"] });
+      qc.invalidateQueries({ queryKey: ["billing-report"] });
+    },
+  });
+}
+
+/**
+ * Anula una recepción con motivo. El backend revierte el efectivo en la caja
+ * abierta y devuelve las facturas a su saldo real, así que se invalidan tanto
+ * las facturas afectadas como la caja y el dashboard.
+ */
+export function useVoidPayment() {
+  const qc = useQueryClient();
+  return useMutation({
+    mutationFn: ({ paymentId, reason }: { paymentId: number; reason: string }) =>
+      api.voidPayment(paymentId, reason),
+    onSuccess: (payment) => {
+      qc.invalidateQueries({ queryKey: ["invoices"] });
+      qc.invalidateQueries({ queryKey: ["invoice-counts"] });
+      qc.invalidateQueries({ queryKey: ["invoice"] });
+      for (const allocation of payment.allocations) {
+        qc.invalidateQueries({
+          queryKey: ["invoice-balance", allocation.invoiceId],
+        });
+        qc.invalidateQueries({
+          queryKey: ["invoice-payments", allocation.invoiceId],
+        });
+      }
+      qc.invalidateQueries({ queryKey: ["dashboard"] });
+      qc.invalidateQueries({ queryKey: ["cash-summary"] });
+      qc.invalidateQueries({ queryKey: ["cash-movements"] });
+      qc.invalidateQueries({ queryKey: ["billing-report"] });
     },
   });
 }

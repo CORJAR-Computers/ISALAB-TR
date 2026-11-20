@@ -293,45 +293,67 @@ pub fn list(
         .collect())
 }
 
-/// Cambia el estado de una factura: EMITIDA → PAGADA/ANULADA, PAGADA → ANULADA.
+/// Anula una factura. No existe transición manual a `PAGADA`: una factura
+/// queda pagada solo cuando sus abonos vigentes cubren el total, y eso lo
+/// decide `payments::register`. Tampoco se anula una factura con pagos
+/// vigentes: primero se anulan los pagos, que liberan el saldo.
+///
+/// El UPDATE es un compare-and-set: valida estado, ausencia de pagos y
+/// concurrencia en una sola sentencia atómica (otra PC puede estar cobrando).
 pub fn set_status(conn: &mut SimpleConnection, id: i32, status: &str) -> Result<Invoice, AppError> {
-    // Estados de origen admitidos por cada transición.
-    let from: &[&str] = match status {
-        "PAGADA" => &["EMITIDA"],
-        "ANULADA" => &["EMITIDA", "PAGADA"],
-        _ => &[],
-    };
-    if from.is_empty() {
-        return Err(AppError::Validation(format!(
-            "Estado de factura inválido: {status}"
-        )));
+    let status = status.trim().to_uppercase();
+    if status != "ANULADA" {
+        return Err(AppError::Validation(
+            "El único cambio manual de estado es la anulación: una factura se marca \
+             como pagada al registrar sus pagos."
+                .into(),
+        ));
     }
 
-    // Compare-and-set: si otra PC ya cobró o anuló la factura, este UPDATE
-    // afecta 0 filas. Evita el doble cobro y la anulación de una ya pagada
-    // (los estados son un conjunto fijo interno: se interpolan sin riesgo).
-    let allowed = from
-        .iter()
-        .map(|s| format!("'{s}'"))
-        .collect::<Vec<_>>()
-        .join(", ");
-    let sql = format!(
-        "UPDATE INVOICES
-            SET STATUS = ?, UPDATED_AT = CURRENT_TIMESTAMP
-          WHERE ID = ? AND STATUS IN ({allowed})"
-    );
-    let updated = conn.execute(&sql, (&status, &id)).map_err(AppError::from)?;
+    let updated = conn
+        .execute(
+            "UPDATE INVOICES
+                SET STATUS = 'ANULADA', UPDATED_AT = CURRENT_TIMESTAMP
+              WHERE ID = ? AND STATUS IN ('EMITIDA', 'PAGADA')
+                AND NOT EXISTS (
+                    SELECT 1 FROM PAYMENT_ALLOCATIONS a
+                    JOIN PAYMENTS p ON p.ID = a.PAYMENT_ID
+                    WHERE a.INVOICE_ID = ? AND p.STATUS = 'APLICADO'
+                )",
+            (&id, &id),
+        )
+        .map_err(AppError::from)?;
 
     if updated == 0 {
-        let current: Option<(String,)> = conn
-            .query_first("SELECT STATUS FROM INVOICES WHERE ID = ?", (&id,))
+        // Diagnóstico del porqué: no existe, ya estaba anulada o tiene pagos.
+        let row: Option<(String, f64)> = conn
+            .query_first(
+                "SELECT i.STATUS, CAST(COALESCE((
+                     SELECT SUM(a.AMOUNT)
+                     FROM PAYMENT_ALLOCATIONS a
+                     JOIN PAYMENTS p ON p.ID = a.PAYMENT_ID
+                     WHERE a.INVOICE_ID = i.ID AND p.STATUS = 'APLICADO'
+                 ), 0) AS DOUBLE PRECISION)
+                 FROM INVOICES i WHERE i.ID = ?",
+                (&id,),
+            )
             .map_err(AppError::from)?;
-        let Some((current,)) = current else {
+        let Some((current, paid)) = row else {
             return Err(AppError::NotFound(format!("Factura {id} no encontrada")));
         };
+        if current == "ANULADA" {
+            return Err(AppError::Validation(format!(
+                "La factura {id} ya está anulada"
+            )));
+        }
+        if paid > 0.01 {
+            return Err(AppError::Validation(format!(
+                "La factura tiene pagos vigentes por {paid:.2}: anula primero los pagos \
+                 antes de anularla"
+            )));
+        }
         return Err(AppError::Validation(format!(
-            "Transición de estado no permitida: {current} → {status} \
-             (EMITIDA→PAGADA, →ANULADA)"
+            "No se puede anular una factura en estado {current}"
         )));
     }
 
@@ -582,7 +604,7 @@ mod integration_tests {
     }
 
     #[test]
-    fn test_set_invoice_status_transition() {
+    fn test_set_invoice_status_cannot_mark_as_paid_manually() {
         let (mut conn, db_path) = setup();
 
         conn.execute(
@@ -591,13 +613,30 @@ mod integration_tests {
             (),
         ).unwrap();
 
-        // EMITIDA -> PAGADA
-        let updated = set_status(&mut conn, 1, "PAGADA").unwrap();
-        assert_eq!(updated.status, "PAGADA");
+        // El atajo a PAGADA quedó cerrado: solo un pago real la marca pagada.
+        let result = set_status(&mut conn, 1, "PAGADA");
+        assert!(matches!(result, Err(AppError::Validation(_))));
+        assert_eq!(get(&mut conn, 1).unwrap().unwrap().status, "EMITIDA");
 
-        // PAGADA -> ANULADA
+        test_helpers::cleanup_test_db(&db_path);
+    }
+
+    #[test]
+    fn test_set_invoice_status_anula_una_sola_vez() {
+        let (mut conn, db_path) = setup();
+
+        conn.execute(
+            "INSERT INTO INVOICES (ID, INVOICE_NUMBER, OWNER_ID, SUBTOTAL, TAX_RATE, TAX_AMOUNT, TOTAL, STATUS)
+             VALUES (1, 'FAC-000001', 1, 100000.0, 19.0, 19000.0, 119000.0, 'EMITIDA')",
+            (),
+        ).unwrap();
+
         let updated = set_status(&mut conn, 1, "ANULADA").unwrap();
         assert_eq!(updated.status, "ANULADA");
+
+        // Anular dos veces no es una transición válida.
+        let again = set_status(&mut conn, 1, "ANULADA");
+        assert!(matches!(again, Err(AppError::Validation(_))));
 
         test_helpers::cleanup_test_db(&db_path);
     }
@@ -615,6 +654,57 @@ mod integration_tests {
         // EMITIDA -> EMITIDA (no permitido)
         let result = set_status(&mut conn, 1, "EMITIDA");
         assert!(result.is_err());
+
+        test_helpers::cleanup_test_db(&db_path);
+    }
+
+    /// Una factura con abonos vigentes no se anula: primero hay que anular los
+    /// pagos (que devuelven el saldo). Con el pago anulado, sí.
+    #[test]
+    fn test_cannot_cancel_invoice_with_active_payments() {
+        use crate::models::payment::{
+            CreatePaymentAllocationInput, CreatePaymentLineInput, RegisterPaymentInput,
+        };
+        use crate::repositories::{cash, payments};
+
+        let (mut conn, db_path) = setup();
+        conn.execute(
+            "INSERT INTO INVOICES (ID, INVOICE_NUMBER, OWNER_ID, SUBTOTAL, TAX_RATE, TAX_AMOUNT, TOTAL, STATUS)
+             VALUES (1, 'FAC-000001', 1, 100000.0, 0, 0, 100000.0, 'EMITIDA')",
+            (),
+        )
+        .unwrap();
+        cash::open_session(&mut conn, 0.0, None, 1).unwrap();
+        let payment = payments::register(
+            &mut conn,
+            &RegisterPaymentInput {
+                owner_id: 1,
+                patient_id: None,
+                notes: None,
+                lines: vec![CreatePaymentLineInput {
+                    method_code: "EFECTIVO".into(),
+                    amount: 40000.0,
+                    reference: None,
+                }],
+                allocations: vec![CreatePaymentAllocationInput {
+                    invoice_id: 1,
+                    amount: 40000.0,
+                }],
+            },
+            Some(1),
+        )
+        .unwrap();
+
+        let blocked = set_status(&mut conn, 1, "ANULADA");
+        assert!(matches!(blocked, Err(AppError::Validation(_))));
+        assert_eq!(get(&mut conn, 1).unwrap().unwrap().status, "EMITIDA");
+
+        // Anulado el pago, el saldo vuelve y la factura se puede anular.
+        payments::void(&mut conn, payment.id, "Cobro equivocado", Some(1)).unwrap();
+        assert_eq!(
+            set_status(&mut conn, 1, "ANULADA").unwrap().status,
+            "ANULADA"
+        );
 
         test_helpers::cleanup_test_db(&db_path);
     }

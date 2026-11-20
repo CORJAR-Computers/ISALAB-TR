@@ -97,6 +97,19 @@ pub struct DashboardStats {
     pub invoices_unpaid: i32,
     /// Ingresos totales (facturas PAGADA).
     pub revenue_total: f64,
+    // ---- Cobros y cartera (fase D de abonos/caja) ----
+    /// Cobrado hoy por fecha de recepción (pagos vigentes).
+    pub collected_today: f64,
+    /// Cobrado en el mes en curso por fecha de recepción (pagos vigentes).
+    pub collected_month: f64,
+    /// Saldo total pendiente de las facturas vigentes.
+    pub receivable_total: f64,
+    /// Facturas vigentes con saldo mayor que cero.
+    pub receivable_count: i32,
+    /// Hay una sesión de caja abierta.
+    pub cash_session_open: bool,
+    /// Diferencia del último cierre (contado − esperado); `None` sin cierres.
+    pub last_cash_difference: Option<f64>,
     // ---- Listas para la vista ----
     /// Próximas consultas PENDIENTE (máx. 5).
     pub upcoming_consultations: Vec<ConsultationListItem>,

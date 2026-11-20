@@ -37,6 +37,13 @@ fn count_where(conn: &mut SimpleConnection, sql: &str, p: &str) -> Result<i32, A
         .ok_or_else(|| AppError::Internal("COUNT sin resultado".into()))
 }
 
+fn money(conn: &mut SimpleConnection, sql: &str) -> Result<f64, AppError> {
+    conn.query_first(sql, ())
+        .map_err(AppError::from)?
+        .map(|(v,): (f64,)| v)
+        .ok_or_else(|| AppError::Internal("SUM sin resultado".into()))
+}
+
 /// Métricas del panel de control y listas de la agenda.
 pub fn get_stats(conn: &mut SimpleConnection) -> Result<DashboardStats, AppError> {
     let patients_total = count(conn, "SELECT COUNT(*) FROM PATIENTS")?;
@@ -169,6 +176,64 @@ pub fn get_stats(conn: &mut SimpleConnection) -> Result<DashboardStats, AppError
         .map(|(v,): (f64,)| v)
         .unwrap_or(0.0);
 
+    // ---- Cobros y cartera ----
+    // Cobrado por fecha de recepción (no por fecha de emisión de la factura):
+    // es el dinero que entró, que es justo lo que no distingue `revenue_total`.
+    let collected_today = money(
+        conn,
+        "SELECT CAST(COALESCE(SUM(TOTAL), 0) AS DOUBLE PRECISION)
+           FROM PAYMENTS
+          WHERE STATUS = 'APLICADO' AND CAST(RECEIVED_AT AS DATE) = CURRENT_DATE",
+    )?;
+    let collected_month = money(
+        conn,
+        "SELECT CAST(COALESCE(SUM(TOTAL), 0) AS DOUBLE PRECISION)
+           FROM PAYMENTS
+          WHERE STATUS = 'APLICADO'
+            AND EXTRACT(YEAR FROM RECEIVED_AT) = EXTRACT(YEAR FROM CURRENT_DATE)
+            AND EXTRACT(MONTH FROM RECEIVED_AT) = EXTRACT(MONTH FROM CURRENT_DATE)",
+    )?;
+    let receivable_total = money(
+        conn,
+        "SELECT CAST(COALESCE(SUM(CASE WHEN b.BALANCE > 0.01 THEN b.BALANCE ELSE 0 END), 0)
+                     AS DOUBLE PRECISION)
+           FROM (
+               SELECT CAST(i.TOTAL AS DOUBLE PRECISION) - COALESCE((
+                   SELECT CAST(SUM(a.AMOUNT) AS DOUBLE PRECISION)
+                   FROM PAYMENT_ALLOCATIONS a
+                   JOIN PAYMENTS p ON p.ID = a.PAYMENT_ID
+                   WHERE a.INVOICE_ID = i.ID AND p.STATUS = 'APLICADO'
+               ), 0) AS BALANCE
+               FROM INVOICES i WHERE i.STATUS <> 'ANULADA'
+           ) b",
+    )?;
+    let receivable_count = count(
+        conn,
+        "SELECT COUNT(*) FROM INVOICES i
+          WHERE i.STATUS <> 'ANULADA'
+            AND CAST(i.TOTAL AS DOUBLE PRECISION) - COALESCE((
+                SELECT CAST(SUM(a.AMOUNT) AS DOUBLE PRECISION)
+                FROM PAYMENT_ALLOCATIONS a
+                JOIN PAYMENTS p ON p.ID = a.PAYMENT_ID
+                WHERE a.INVOICE_ID = i.ID AND p.STATUS = 'APLICADO'
+            ), 0) > 0.01",
+    )?;
+    let cash_session_open = count_where(
+        conn,
+        "SELECT COUNT(*) FROM CASH_SESSIONS WHERE STATUS = ?",
+        "ABIERTA",
+    )? > 0;
+    let last_cash_difference: Option<f64> = conn
+        .query_first(
+            "SELECT CAST(COALESCE(DIFFERENCE, 0) AS DOUBLE PRECISION)
+               FROM CASH_SESSIONS
+              WHERE STATUS = 'CERRADA'
+              ORDER BY CLOSED_AT DESC ROWS 1",
+            (),
+        )
+        .map_err(AppError::from)?
+        .map(|(v,)| v);
+
     // ---- Recepción / clínica ----
     let visits_today = count(
         conn,
@@ -241,6 +306,12 @@ pub fn get_stats(conn: &mut SimpleConnection) -> Result<DashboardStats, AppError
         vaccines_due,
         invoices_unpaid,
         revenue_total,
+        collected_today,
+        collected_month,
+        receivable_total,
+        receivable_count,
+        cash_session_open,
+        last_cash_difference,
         visits_today,
         visits_waiting,
         visits_urgent_waiting,
@@ -380,6 +451,13 @@ mod tests {
         assert_eq!(stats.vaccines_due, 0);
         assert_eq!(stats.invoices_unpaid, 0);
         assert_eq!(stats.revenue_total, 0.0);
+        // Cobros y cartera (fase D)
+        assert_eq!(stats.collected_today, 0.0);
+        assert_eq!(stats.collected_month, 0.0);
+        assert_eq!(stats.receivable_total, 0.0);
+        assert_eq!(stats.receivable_count, 0);
+        assert!(!stats.cash_session_open);
+        assert_eq!(stats.last_cash_difference, None);
         assert!(stats.upcoming_consultations.is_empty());
         assert!(stats.upcoming_surgeries.is_empty());
         assert!(stats.upcoming_vaccines.is_empty());
@@ -776,6 +854,83 @@ mod tests {
         // Request only 2
         let consultations = list_upcoming_consultations(&mut conn, 2).unwrap();
         assert_eq!(consultations.len(), 2);
+
+        cleanup_test_db(&db_path);
+    }
+
+    /// Cobros y cartera (fase D): cobrado por recepción, saldo pendiente y caja.
+    #[test]
+    fn test_get_stats_billing_metrics() {
+        use crate::models::payment::{
+            CreatePaymentAllocationInput, CreatePaymentLineInput, RegisterPaymentInput,
+        };
+        use crate::repositories::{cash, payments};
+
+        let (mut conn, db_path) = setup();
+        insert_test_patient(&mut conn);
+
+        conn.execute(
+            "INSERT INTO INVOICES (ID, OWNER_ID, INVOICE_NUMBER, ISSUE_DATE, TOTAL, STATUS)
+             VALUES (1, 1, 'FAC-9001', CURRENT_TIMESTAMP, 100000, 'EMITIDA')",
+            (),
+        )
+        .unwrap();
+
+        cash::open_session(&mut conn, 100000.0, None, 1).unwrap();
+        payments::register(
+            &mut conn,
+            &RegisterPaymentInput {
+                owner_id: 1,
+                patient_id: None,
+                notes: None,
+                lines: vec![CreatePaymentLineInput {
+                    method_code: "EFECTIVO".into(),
+                    amount: 40000.0,
+                    reference: None,
+                }],
+                allocations: vec![CreatePaymentAllocationInput {
+                    invoice_id: 1,
+                    amount: 40000.0,
+                }],
+            },
+            Some(1),
+        )
+        .unwrap();
+
+        let stats = get_stats(&mut conn).unwrap();
+        assert!((stats.collected_today - 40000.0).abs() < 0.01);
+        assert!((stats.collected_month - 40000.0).abs() < 0.01);
+        assert!((stats.receivable_total - 60000.0).abs() < 0.01);
+        assert_eq!(stats.receivable_count, 1);
+        assert!(stats.cash_session_open);
+        assert_eq!(stats.last_cash_difference, None);
+
+        cleanup_test_db(&db_path);
+    }
+
+    /// Una factura anulada no entra en la cartera pendiente.
+    #[test]
+    fn test_get_stats_receivable_ignores_cancelled_invoices() {
+        let (mut conn, db_path) = setup();
+        insert_test_patient(&mut conn);
+
+        conn.execute(
+            "INSERT INTO INVOICES (ID, OWNER_ID, INVOICE_NUMBER, ISSUE_DATE, TOTAL, STATUS)
+             VALUES (1, 1, 'FAC-9010', CURRENT_TIMESTAMP, 80000, 'EMITIDA')",
+            (),
+        )
+        .unwrap();
+        conn.execute(
+            "INSERT INTO INVOICES (ID, OWNER_ID, INVOICE_NUMBER, ISSUE_DATE, TOTAL, STATUS)
+             VALUES (2, 1, 'FAC-9011', CURRENT_TIMESTAMP, 90000, 'ANULADA')",
+            (),
+        )
+        .unwrap();
+
+        let stats = get_stats(&mut conn).unwrap();
+        assert!((stats.receivable_total - 80000.0).abs() < 0.01);
+        assert_eq!(stats.receivable_count, 1);
+        assert!(!stats.cash_session_open);
 
         cleanup_test_db(&db_path);
     }

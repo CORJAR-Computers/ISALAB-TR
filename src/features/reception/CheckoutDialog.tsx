@@ -16,23 +16,28 @@ import { Textarea } from "@/components/ui/textarea";
 import { useCheckoutVisit, useVisit } from "@/hooks/use-queries";
 import { getErrorMessage } from "@/lib/api";
 import { formatCOP } from "@/lib/utils";
-import { PaymentDialog } from "@/features/invoices/PaymentDialog";
 
 /**
  * Cobra una visita FINALIZADA: genera la factura con los precios congelados
- * de la visita y abre el diálogo de pago para registrar el cobro. Si el cobro
- * se cancela, la factura queda pendiente en Facturación.
+ * de la visita y avisa al detalle para que abra el registro de pago. Si el
+ * cobro se cancela, la factura queda pendiente en Facturación.
+ *
+ * El diálogo de pago NO vive aquí: al emitir la factura la visita pasa a
+ * FACTURADA y este componente (condicionado a FINALIZADA) se desmonta; el
+ * pago lo mantiene montado el detalle de la visita.
  */
 export function CheckoutDialog({
   visitId,
   triggerLabel,
+  onInvoiceCreated,
 }: {
   visitId: number;
   triggerLabel?: string;
+  /** Factura emitida: el padre abre el diálogo de pago con ese id. */
+  onInvoiceCreated: (invoiceId: number) => void;
 }) {
   const [open, setOpen] = useState(false);
   const [notes, setNotes] = useState("");
-  const [paymentInvoiceId, setPaymentInvoiceId] = useState<number | null>(null);
 
   const { data: visit } = useVisit(open ? visitId : null);
   const checkout = useCheckoutVisit();
@@ -54,7 +59,7 @@ export function CheckoutDialog({
       });
       setOpen(false);
       setNotes("");
-      setPaymentInvoiceId(invoice.id);
+      onInvoiceCreated(invoice.id);
     } catch (e) {
       toast.error("No se pudo cobrar la visita", {
         description: getErrorMessage(e),
@@ -63,7 +68,6 @@ export function CheckoutDialog({
   };
 
   return (
-    <>
       <Dialog open={open} onOpenChange={setOpen}>
         <DialogTrigger asChild>
           <Button size="sm">
@@ -136,11 +140,5 @@ export function CheckoutDialog({
           </DialogFooter>
         </DialogContent>
       </Dialog>
-
-      <PaymentDialog
-        invoiceId={paymentInvoiceId}
-        onOpenChange={(next) => !next && setPaymentInvoiceId(null)}
-      />
-    </>
   );
 }

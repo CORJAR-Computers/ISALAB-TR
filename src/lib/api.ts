@@ -113,6 +113,7 @@ import type {
   CreateStockMovementInput,
   SaveDbConnectionInput,
   AddCashMovementInput,
+  BillingReport,
   CashMovement,
   CashSession,
   CashSessionSummary,
@@ -418,6 +419,10 @@ export const api = {
     invoke<InvoiceBalance>("get_invoice_balance", { invoiceId }),
   listInvoicePayments: (invoiceId: number) =>
     invoke<Payment[]>("list_invoice_payments", { invoiceId }),
+  voidPayment: (paymentId: number, reason: string) =>
+    invoke<Payment>("void_payment", { paymentId, reason }),
+  getBillingReport: (from: string, to: string) =>
+    invoke<BillingReport>("get_billing_report", { from, to }),
 
   // ---- Caja ----
   getOpenCashSession: () => invoke<CashSession | null>("get_open_cash_session"),

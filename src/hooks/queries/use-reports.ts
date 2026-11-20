@@ -5,6 +5,20 @@ export function useReports() {
   return useQuery({ queryKey: ["reports"], queryFn: api.listReports });
 }
 
+/**
+ * Facturación de un período: facturado por emisión vs. cobrado por recepción.
+ * Se consulta con fechas completas (AAAA-MM-DD) para no pegarle al backend en
+ * cada tecla mientras el usuario edita el rango.
+ */
+export function useBillingReport(from: string, to: string) {
+  const valid = (d: string) => /^\d{4}-\d{2}-\d{2}$/.test(d);
+  return useQuery({
+    queryKey: ["billing-report", from, to],
+    queryFn: () => api.getBillingReport(from, to),
+    enabled: valid(from) && valid(to),
+  });
+}
+
 export function useGenerateReport() {
   const qc = useQueryClient();
   return useMutation({

@@ -6,6 +6,7 @@ import {
   Loader2,
   MessageCircle,
   Receipt,
+  Undo2,
 } from "lucide-react";
 import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
@@ -17,6 +18,7 @@ import {
   DialogHeader,
   DialogTitle,
 } from "@/components/ui/dialog";
+import { Input } from "@/components/ui/input";
 import { Separator } from "@/components/ui/separator";
 import { Skeleton } from "@/components/ui/skeleton";
 import {
@@ -32,6 +34,7 @@ import {
   useInvoiceBalance,
   useInvoicePayments,
   useSetInvoiceStatus,
+  useVoidPayment,
 } from "@/hooks/use-queries";
 import { usePermissions } from "@/hooks/use-permissions";
 import { getErrorMessage } from "@/lib/api";
@@ -51,8 +54,11 @@ export function InvoiceDetailDialog({
   const { data: balance } = useInvoiceBalance(invoiceId);
   const { data: payments } = useInvoicePayments(invoiceId);
   const setStatus = useSetInvoiceStatus();
+  const voidPayment = useVoidPayment();
   const { canBill } = usePermissions();
   const [paying, setPaying] = useState(false);
+  const [voidingId, setVoidingId] = useState<number | null>(null);
+  const [voidReason, setVoidReason] = useState("");
 
   const activePayments = (payments ?? []).filter(
     (p) => p.status === "APLICADO",
@@ -75,6 +81,25 @@ export function InvoiceDetailDialog({
       toast.success("Factura anulada");
     } catch (e) {
       toast.error("No se pudo anular la factura", {
+        description: getErrorMessage(e),
+      });
+    }
+  };
+
+  const confirmVoid = async (paymentId: number) => {
+    try {
+      await voidPayment.mutateAsync({
+        paymentId,
+        reason: voidReason.trim(),
+      });
+      toast.success("Pago anulado", {
+        description:
+          "El efectivo volvió a la caja y la factura recuperó su saldo. Puedes anularla ahora si hace falta.",
+      });
+      setVoidingId(null);
+      setVoidReason("");
+    } catch (e) {
+      toast.error("No se pudo anular el pago", {
         description: getErrorMessage(e),
       });
     }
@@ -238,9 +263,60 @@ export function InvoiceDetailDialog({
                             {p.createdByName ? ` · ${p.createdByName}` : ""}
                           </p>
                         </div>
-                        <span className="font-semibold tabular-nums">
-                          {formatCOP(p.total)}
-                        </span>
+                        <div className="flex items-center gap-2">
+                          <span className="font-semibold tabular-nums">
+                            {formatCOP(p.total)}
+                          </span>
+                          {canBill && p.status === "APLICADO" && (
+                            <Button
+                              variant="ghost"
+                              size="sm"
+                              className="text-destructive h-7 px-2 text-xs"
+                              onClick={() => {
+                                setVoidingId(p.id);
+                                setVoidReason("");
+                              }}
+                            >
+                              <Undo2 className="size-3" />
+                              Anular
+                            </Button>
+                          )}
+                        </div>
+                        {voidingId === p.id && (
+                          <div className="flex w-full flex-wrap items-center gap-2">
+                            <Input
+                              autoFocus
+                              value={voidReason}
+                              onChange={(e) => setVoidReason(e.target.value)}
+                              placeholder="Motivo de la anulación"
+                              className="h-8 flex-1 text-xs"
+                              maxLength={500}
+                            />
+                            <Button
+                              size="sm"
+                              variant="destructive"
+                              className="h-8"
+                              disabled={
+                                voidPayment.isPending || !voidReason.trim()
+                              }
+                              onClick={() => confirmVoid(p.id)}
+                            >
+                              {voidPayment.isPending ? (
+                                <Loader2 className="size-3.5 animate-spin" />
+                              ) : (
+                                "Confirmar"
+                              )}
+                            </Button>
+                            <Button
+                              size="sm"
+                              variant="ghost"
+                              className="h-8"
+                              onClick={() => setVoidingId(null)}
+                            >
+                              Cancelar
+                            </Button>
+                          </div>
+                        )}
                       </div>
                     ))}
                   </div>

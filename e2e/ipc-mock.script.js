@@ -170,6 +170,544 @@
     return { status: "NORMAL", refMin: null, refMax: null };
   };
 
+  // ---------- Caja, facturación y recepción (flujos de dinero) ----------
+  // Reproduce las reglas del backend que ejercitan los E2E: una sola caja
+  // abierta, abonos que descuentan saldo, movimientos de caja solo por la
+  // parte en efectivo y visitas que se facturan al hacer el checkout.
+  const pad2 = (n) => String(n).padStart(2, "0");
+  const stamp = () => {
+    const d = new Date();
+    return `${d.getFullYear()}-${pad2(d.getMonth() + 1)}-${pad2(d.getDate())} ${pad2(d.getHours())}:${pad2(d.getMinutes())}:${pad2(d.getSeconds())}`;
+  };
+  const round2 = (n) => Math.round(n * 100) / 100;
+
+  const owners = [
+    {
+      id: 10,
+      documentType: "CC",
+      documentNumber: "1020304050",
+      fullName: "Juan Pérez",
+      phone: "3001234567",
+      email: null,
+      address: null,
+      city: "Bogotá",
+    },
+  ];
+
+  const serviceCategories = [
+    { id: 1, code: "CONSULTA", name: "Consultas", sortOrder: 1, isActive: true },
+    { id: 2, code: "ESTETICA", name: "Estética", sortOrder: 2, isActive: true },
+  ];
+
+  const services = [
+    {
+      id: 1,
+      code: "CONS-GEN",
+      name: "Consulta general",
+      categoryId: 1,
+      categoryName: "Consultas",
+      description: null,
+      durationMin: 30,
+      price: 60000,
+      taxRate: null,
+      requiresVet: true,
+      requiresGroomer: false,
+      speciesId: null,
+      sortOrder: 1,
+      isActive: true,
+    },
+    {
+      id: 2,
+      code: "BANO",
+      name: "Baño y corte",
+      categoryId: 2,
+      categoryName: "Estética",
+      description: null,
+      durationMin: 60,
+      price: 40000,
+      taxRate: null,
+      requiresVet: false,
+      requiresGroomer: true,
+      speciesId: null,
+      sortOrder: 2,
+      isActive: true,
+    },
+  ];
+
+  const paymentMethods = [
+    { code: "EFECTIVO", name: "Efectivo", kind: "EFECTIVO", requiresReference: false, active: true, sortOrder: 1 },
+    { code: "TRANSFERENCIA", name: "Transferencia", kind: "ELECTRONICO", requiresReference: true, active: true, sortOrder: 2 },
+    { code: "TARJETA", name: "Tarjeta", kind: "ELECTRONICO", requiresReference: true, active: true, sortOrder: 3 },
+  ];
+  const methodOf = (code) =>
+    paymentMethods.find((m) => m.code === code) ?? {
+      code,
+      name: code,
+      kind: "OTRO",
+      requiresReference: false,
+      active: true,
+      sortOrder: 99,
+    };
+
+  const money = {
+    sessions: [],
+    nextSessionId: 1,
+    nextMovementId: 1,
+    payments: [],
+    nextPaymentId: 1,
+    invoices: [],
+    nextInvoiceId: 1,
+    visits: [],
+    nextVisitId: 1,
+    nextVisitServiceId: 1,
+  };
+
+  // ----- Auditoría (append-only, más reciente primero) -----
+  // El backend registra LOGIN, cambios de estado y pagos vía log_audit; aquí
+  // solo se replican las acciones que ejercitan los flujos E2E.
+  const auditLog = {
+    nextId: 3,
+    entries: [
+      {
+        id: 1,
+        userId: 1,
+        username: "admin",
+        action: "LOGIN",
+        details: null,
+        createdAt: "2026-09-08 08:00:00",
+      },
+      {
+        id: 2,
+        userId: 1,
+        username: "admin",
+        action: "SETTINGS_CHANGED",
+        details: "Datos de la clínica actualizados",
+        createdAt: "2026-09-08 08:15:00",
+      },
+    ],
+    push(action, details = null) {
+      const id = this.nextId;
+      this.nextId += 1;
+      this.entries.unshift({
+        id,
+        userId: 1,
+        username: "admin",
+        action,
+        details,
+        createdAt: stamp(),
+      });
+    },
+  };
+
+  // ----- Facturas y saldos -----
+  const invoiceById = (id) => money.invoices.find((i) => i.id === id);
+  const paidOf = (inv) =>
+    round2(
+      money.payments
+        .filter((p) => p.status === "APLICADO")
+        .flatMap((p) => p.allocations)
+        .filter((a) => a.invoiceId === inv.id)
+        .reduce((acc, a) => acc + a.amount, 0),
+    );
+  const balanceOf = (inv) =>
+    inv.status === "ANULADA"
+      ? 0
+      : round2(Math.max((inv.total ?? 0) - paidOf(inv), 0));
+  const paymentStatusOf = (inv) => {
+    if (inv.status === "ANULADA") return "ANULADA";
+    const paid = paidOf(inv);
+    if (paid >= (inv.total ?? 0) - 0.01) return "PAGADA";
+    return paid > 0.01 ? "ABONADA" : "PENDIENTE";
+  };
+  const syncInvoiceStatus = (inv) => {
+    if (inv.status === "ANULADA") return;
+    inv.status = paymentStatusOf(inv) === "PAGADA" ? "PAGADA" : "EMITIDA";
+  };
+  const toInvoice = (inv) => ({
+    id: inv.id,
+    invoiceNumber: inv.invoiceNumber,
+    patientId: inv.patientId,
+    patientName: inv.patientName,
+    ownerId: inv.ownerId,
+    ownerName: inv.ownerName,
+    ownerPhone: inv.ownerPhone ?? null,
+    consultationId: inv.consultationId ?? null,
+    issueDate: inv.issueDate,
+    subtotal: inv.subtotal,
+    taxRate: inv.taxRate,
+    taxAmount: inv.taxAmount,
+    total: inv.total,
+    status: inv.status,
+    paymentMethod: inv.paymentMethod,
+    notes: inv.notes,
+    items: inv.items.map((it) => ({ ...it })),
+  });
+  const toInvoiceListItem = (inv) => ({
+    id: inv.id,
+    invoiceNumber: inv.invoiceNumber,
+    ownerName: inv.ownerName,
+    patientName: inv.patientName,
+    issueDate: inv.issueDate,
+    total: inv.total,
+    status: inv.status,
+    paymentMethod: inv.paymentMethod,
+    itemCount: inv.items.length,
+    paidAmount: paidOf(inv),
+    balance: balanceOf(inv),
+    paymentStatus: paymentStatusOf(inv),
+  });
+
+  const pushInvoice = ({ patientId, ownerId, items, taxRate, notes, paymentMethod }) => {
+    const id = money.nextInvoiceId;
+    money.nextInvoiceId += 1;
+    const owner = owners.find((o) => o.id === ownerId);
+    const patient = patientById(patientId);
+    const lines = items.map((it, idx) => ({
+      id: id * 100 + idx + 1,
+      description: it.description,
+      quantity: it.quantity,
+      unitPrice: round2(it.unitPrice),
+      lineTotal: round2(it.unitPrice * it.quantity),
+    }));
+    const subtotal = round2(lines.reduce((acc, l) => acc + l.lineTotal, 0));
+    const rate = taxRate ?? 19;
+    const invoice = {
+      id,
+      invoiceNumber: `FAC-${String(id).padStart(6, "0")}`,
+      patientId: patientId ?? null,
+      patientName: patient?.name ?? null,
+      ownerId,
+      ownerName: owner?.fullName ?? "Consumidor final",
+      ownerPhone: owner?.phone ?? null,
+      consultationId: null,
+      issueDate: stamp(),
+      subtotal,
+      taxRate: rate,
+      taxAmount: round2((subtotal * rate) / 100),
+      total: round2(subtotal + (subtotal * rate) / 100),
+      status: "EMITIDA",
+      paymentMethod: paymentMethod ?? null,
+      notes: notes ?? null,
+      items: lines,
+    };
+    money.invoices.push(invoice);
+    return invoice;
+  };
+
+  const toPayment = (p) => ({
+    id: p.id,
+    code: p.code,
+    ownerId: p.ownerId,
+    ownerName: p.ownerName,
+    patientId: p.patientId,
+    patientName: p.patientName,
+    cashSessionId: p.cashSessionId,
+    receivedAt: p.receivedAt,
+    total: p.total,
+    status: p.status,
+    notes: p.notes,
+    createdByName: p.createdByName,
+    lines: p.lines.map((l) => ({ ...l })),
+    allocations: p.allocations.map((a) => ({
+      ...a,
+      invoiceNumber: invoiceById(a.invoiceId)?.invoiceNumber ?? "?",
+    })),
+  });
+
+  // Factura pendiente inicial: 100.000 + 19% IVA = 119.000.
+  money.invoices.push({
+    id: 1,
+    invoiceNumber: "FAC-000001",
+    patientId: 1,
+    patientName: "Rocky",
+    ownerId: 10,
+    ownerName: "Juan Pérez",
+    ownerPhone: "3001234567",
+    consultationId: null,
+    issueDate: stamp(),
+    subtotal: 100000,
+    taxRate: 19,
+    taxAmount: 19000,
+    total: 119000,
+    status: "EMITIDA",
+    paymentMethod: "EFECTIVO",
+    notes: null,
+    items: [
+      { id: 101, description: "Consulta general", quantity: 1, unitPrice: 60000, lineTotal: 60000 },
+      { id: 102, description: "Baño y corte", quantity: 1, unitPrice: 40000, lineTotal: 40000 },
+    ],
+  });
+  money.nextInvoiceId = 2;
+
+  // ----- Caja -----
+  const openSession = () =>
+    money.sessions.find((s) => s.status === "ABIERTA") ?? null;
+  const resolveSession = (id) =>
+    id != null
+      ? money.sessions.find((s) => s.id === id) ?? null
+      : openSession();
+  const sessionMovement = (session, kind, amount, reason, paymentId = null) => {
+    const id = money.nextMovementId;
+    money.nextMovementId += 1;
+    session.movements.push({
+      id,
+      cashSessionId: session.id,
+      kind,
+      amount: round2(amount),
+      paymentId,
+      reason,
+      createdByName: "Administrador",
+      createdAt: stamp(),
+    });
+  };
+  const sessionTotals = (session) => {
+    const cashIn = round2(
+      session.movements.filter((m) => m.amount > 0).reduce((a, m) => a + m.amount, 0),
+    );
+    const cashOut = round2(
+      session.movements
+        .filter((m) => m.amount < 0)
+        .reduce((a, m) => a + Math.abs(m.amount), 0),
+    );
+    const expectedCash = round2(session.openingFloat + cashIn - cashOut);
+    const applied = money.payments.filter(
+      (p) => p.cashSessionId === session.id && p.status === "APLICADO",
+    );
+    const totalCollected = round2(applied.reduce((a, p) => a + p.total, 0));
+    const byMethod = new Map();
+    for (const p of applied) {
+      for (const l of p.lines) {
+        byMethod.set(l.methodCode, round2((byMethod.get(l.methodCode) ?? 0) + l.amount));
+      }
+    }
+    const methods = [...byMethod.entries()].map(([code, amount]) => ({
+      methodCode: code,
+      methodName: methodOf(code).name,
+      amount,
+    }));
+    const totalBilled = round2(
+      money.invoices
+        .filter(
+          (inv) =>
+            inv.status !== "ANULADA" &&
+            money.payments.some(
+              (p) =>
+                p.status === "APLICADO" &&
+                p.cashSessionId === session.id &&
+                p.allocations.some((a) => a.invoiceId === inv.id),
+            ),
+        )
+        .reduce((a, inv) => a + (inv.total ?? 0), 0),
+    );
+    return { cashIn, cashOut, expectedCash, totalCollected, totalBilled, methods, applied };
+  };
+  const toCashSession = (session) => {
+    const t = sessionTotals(session);
+    return {
+      id: session.id,
+      code: session.code,
+      openedAt: session.openedAt,
+      openedBy: session.openedBy,
+      openedByName: session.openedByName,
+      openingFloat: session.openingFloat,
+      status: session.status,
+      closedAt: session.closedAt,
+      closedByName: session.closedByName,
+      expectedCash: t.expectedCash,
+      countedCash: session.countedCash,
+      difference: session.difference,
+      totalBilled: t.totalBilled,
+      totalCollected: t.totalCollected,
+      notes: session.notes,
+    };
+  };
+  const buildSummary = (session) => {
+    const t = sessionTotals(session);
+    return {
+      session: toCashSession(session),
+      openingFloat: session.openingFloat,
+      expectedCash: t.expectedCash,
+      countedCash: session.countedCash,
+      difference: session.difference,
+      totalBilled: t.totalBilled,
+      totalCollected: t.totalCollected,
+      cashIn: t.cashIn,
+      cashOut: t.cashOut,
+      paymentsCount: t.applied.length,
+      methods: t.methods,
+      movements: session.movements.map((m) => ({ ...m })),
+      countLines: (session.countLines ?? []).map((l) => ({ ...l })),
+    };
+  };
+
+  const registerPayment = (input) => {
+    const session = openSession();
+    if (!session) {
+      throw { type: "Validation", data: "Abre una caja antes de cobrar" };
+    }
+    const total = round2((input.lines ?? []).reduce((a, l) => a + l.amount, 0));
+    if (total <= 0) {
+      throw { type: "Validation", data: "El pago no tiene importe" };
+    }
+    const allocations = (input.allocations ?? []).map((a) => {
+      const inv = invoiceById(a.invoiceId);
+      if (!inv) throw { type: "NotFound", data: "Factura no encontrada" };
+      if (inv.status === "ANULADA") {
+        throw { type: "Validation", data: "La factura está anulada" };
+      }
+      if (a.amount > balanceOf(inv) + 0.01) {
+        throw {
+          type: "Validation",
+          data: `El abono supera el saldo de ${inv.invoiceNumber}`,
+        };
+      }
+      return { id: a.invoiceId, invoiceId: a.invoiceId, amount: round2(a.amount) };
+    });
+    const id = money.nextPaymentId;
+    money.nextPaymentId += 1;
+    const payment = {
+      id,
+      code: `REC-${String(id).padStart(6, "0")}`,
+      ownerId: input.ownerId,
+      ownerName: owners.find((o) => o.id === input.ownerId)?.fullName ?? "Consumidor final",
+      patientId: input.patientId ?? null,
+      patientName: patientById(input.patientId)?.name ?? null,
+      cashSessionId: session.id,
+      receivedAt: stamp(),
+      total,
+      status: "APLICADO",
+      notes: input.notes ?? null,
+      createdByName: "Administrador",
+      lines: (input.lines ?? []).map((l, idx) => {
+        const m = methodOf(l.methodCode);
+        return {
+          id: id * 10 + idx + 1,
+          methodCode: m.code,
+          methodName: m.name,
+          methodKind: m.kind,
+          amount: round2(l.amount),
+          reference: l.reference ?? null,
+        };
+      }),
+      allocations,
+    };
+    money.payments.push(payment);
+    for (const line of payment.lines) {
+      if (line.methodKind === "EFECTIVO") {
+        sessionMovement(
+          session,
+          "PAGO_EFECTIVO",
+          line.amount,
+          `Pago ${payment.code}`,
+          payment.id,
+        );
+      }
+    }
+    for (const a of allocations) syncInvoiceStatus(invoiceById(a.invoiceId));
+    auditLog.push(
+      "PAYMENT_REGISTERED",
+      `Pago ${payment.code} por ${payment.total.toFixed(2)} aplicado a ${allocations.length} factura(s)`,
+    );
+    return toPayment(payment);
+  };
+
+  const voidPayment = (paymentId, reason) => {
+    const payment = money.payments.find((p) => p.id === paymentId);
+    if (!payment) throw { type: "NotFound", data: "Pago no encontrado" };
+    if (payment.status === "ANULADO") {
+      throw { type: "Validation", data: "El pago ya está anulado" };
+    }
+    if (!(reason ?? "").trim()) {
+      throw { type: "Validation", data: "El motivo de la anulación es obligatorio" };
+    }
+    const session = resolveSession(payment.cashSessionId);
+    if (!session || session.status !== "ABIERTA") {
+      throw { type: "Validation", data: "La caja del pago ya está cerrada" };
+    }
+    payment.status = "ANULADO";
+    for (const line of payment.lines) {
+      if (line.methodKind === "EFECTIVO") {
+        sessionMovement(
+          session,
+          "DEVOLUCION",
+          -line.amount,
+          `Anulación ${payment.code}: ${reason}`,
+          payment.id,
+        );
+      }
+    }
+    for (const a of payment.allocations) syncInvoiceStatus(invoiceById(a.invoiceId));
+    auditLog.push(
+      "PAYMENT_VOIDED",
+      `Pago ${payment.code} anulado por ${payment.total.toFixed(2)}: ${reason.trim()}`,
+    );
+    return toPayment(payment);
+  };
+
+  // ----- Visitas -----
+  const visitById = (id) => money.visits.find((v) => v.id === id);
+  const visitTotal = (visit) =>
+    round2(
+      visit.services
+        .filter((l) => l.status !== "CANCELADA")
+        .reduce((acc, l) => acc + (l.unitPrice ?? 0) * l.quantity, 0),
+    );
+  const toVisit = (visit) => ({
+    id: visit.id,
+    code: visit.code,
+    patientId: visit.patientId,
+    patientName: visit.patientName,
+    ownerId: visit.ownerId,
+    ownerName: visit.ownerName,
+    appointmentId: null,
+    arrivedAt: visit.arrivedAt,
+    priority: visit.priority,
+    status: visit.status,
+    notes: visit.notes,
+    createdByName: "Administrador",
+    services: visit.services.map((l) => ({ ...l, visitId: visit.id })),
+  });
+  const toVisitListItem = (visit) => ({
+    id: visit.id,
+    code: visit.code,
+    patientId: visit.patientId,
+    patientName: visit.patientName,
+    ownerId: visit.ownerId,
+    ownerName: visit.ownerName,
+    arrivedAt: visit.arrivedAt,
+    priority: visit.priority,
+    status: visit.status,
+    notes: visit.notes,
+    servicesSummary: visit.services
+      .filter((l) => l.status !== "CANCELADA")
+      .map((l) => l.serviceName)
+      .join(" + "),
+    estimatedTotal: visitTotal(visit),
+  });
+  const visitLine = (visit, service, input) => {
+    const id = money.nextVisitServiceId;
+    money.nextVisitServiceId += 1;
+    return {
+      id,
+      visitId: visit.id,
+      serviceId: service.id,
+      serviceName: service.name,
+      serviceCode: service.code,
+      categoryId: service.categoryId,
+      categoryName: service.categoryName,
+      professionalId: input.professionalId ?? null,
+      professionalName: null,
+      quantity: input.quantity ?? 1,
+      unitPrice: service.price,
+      taxRate: service.taxRate,
+      status: "PENDIENTE",
+      startedAt: null,
+      finishedAt: null,
+      notes: input.notes ?? null,
+      seq: visit.services.length + 1,
+    };
+  };
+
   // ---------- Handlers por comando Tauri ----------
   const handlers = {
     get_session: () => null,
@@ -226,10 +764,40 @@
         vaccinesDue: 0,
         invoicesUnpaid: 0,
         revenueTotal: 0,
+        visitsToday: money.visits.length,
+        visitsWaiting: money.visits.filter((v) => v.status === "EN_ESPERA").length,
+        visitsUrgentWaiting: money.visits.filter(
+          (v) => v.status === "EN_ESPERA" && v.priority === "URGENTE",
+        ).length,
+        avgWaitMinutes: 0,
+        appointmentsToday: 0,
+        groomingSessionsToday: 0,
+        revenueByCategory: [],
+        // Fase D de abonos/caja: cobrado, cartera y estado de la caja.
+        collectedToday: round2(
+          money.payments
+            .filter((p) => p.status === "APLICADO")
+            .reduce((a, p) => a + p.total, 0),
+        ),
+        collectedMonth: round2(
+          money.payments
+            .filter((p) => p.status === "APLICADO")
+            .reduce((a, p) => a + p.total, 0),
+        ),
+        receivableTotal: round2(
+          money.invoices.reduce((a, i) => a + balanceOf(i), 0),
+        ),
+        receivableCount: money.invoices.filter((i) => balanceOf(i) > 0.01).length,
+        cashSessionOpen: openSession() != null,
+        lastCashDifference:
+          money.sessions.filter((s) => s.status === "CERRADA").length > 0
+            ? money.sessions.filter((s) => s.status === "CERRADA").at(-1).difference
+            : null,
         upcomingConsultations: [],
         upcomingSurgeries: [],
         upcomingVaccines: [],
         recentSamples: list.slice(-5).reverse(),
+        upcomingAppointments: [],
       };
     },
     list_sample_types: () => sampleTypes,
@@ -646,18 +1214,7 @@
       { id: 1, speciesId: 1, name: "Labrador" },
       { id: 2, speciesId: 1, name: "Criollo" },
     ],
-    list_owners: () => [
-      {
-        id: 10,
-        documentType: "CC",
-        documentNumber: "1020304050",
-        fullName: "Juan Pérez",
-        phone: "3001234567",
-        email: null,
-        address: null,
-        city: "Bogotá",
-      },
-    ],
+    list_owners: () => owners,
     list_users: () => [
       {
         id: 1,
@@ -678,31 +1235,386 @@
         createdAt: "2026-08-02 09:30:00",
       },
     ],
-    list_audit_log: () => [
-      {
-        id: 1,
-        userId: 1,
-        username: "admin",
-        action: "LOGIN",
-        details: null,
-        createdAt: "2026-09-08 08:00:00",
-      },
-      {
-        id: 2,
-        userId: 1,
-        username: "admin",
-        action: "SETTINGS_CHANGED",
-        details: "Datos de la clínica actualizados",
-        createdAt: "2026-09-08 08:15:00",
-      },
-    ],
+    list_audit_log: (args = {}) => {
+      let rows = [...auditLog.entries].sort((a, b) => b.id - a.id);
+      if (args.username) {
+        const q = String(args.username).toLowerCase();
+        rows = rows.filter((r) => r.username.toLowerCase().includes(q));
+      }
+      if (args.action) rows = rows.filter((r) => r.action === args.action);
+      const offset = args.offset ?? 0;
+      const limit = args.limit ?? rows.length;
+      return rows.slice(offset, offset + limit).map((r) => ({ ...r }));
+    },
     list_consultations: () => [],
     count_consultations: () => [],
     list_surgeries: () => [],
     count_surgeries: () => [],
     list_vaccines: () => [],
-    list_invoices: () => [],
-    count_invoices: () => [],
+    // Catálogo de tipos de vacuna (seed de 0002_seed_catalog.sql). El diálogo
+    // de nueva vacuna lo consulta al montar la página de Vacunación.
+    list_vaccine_types: () => [
+      { id: 1, code: "RABIA", name: "Rabia" },
+      { id: 2, code: "POLI_CANINA", name: "Polivalente canina (M2)" },
+      { id: 3, code: "POLI_FELINA", name: "Polivalente felina (TCRP)" },
+      { id: 4, code: "LEPTO", name: "Leptospirosis" },
+      { id: 5, code: "TOS_PERRERAS", name: "Tos de las perreras" },
+    ],
+    // ---- Facturación, pagos y reportes de dinero ----
+    list_invoices: (args) => {
+      let list = money.invoices.map(toInvoiceListItem);
+      if (args.status) list = list.filter((i) => i.paymentStatus === args.status);
+      const q = (args.search ?? "").toLowerCase();
+      if (q) {
+        list = list.filter(
+          (i) =>
+            i.invoiceNumber.toLowerCase().includes(q) ||
+            i.ownerName.toLowerCase().includes(q) ||
+            (i.patientName ?? "").toLowerCase().includes(q),
+        );
+      }
+      return list;
+    },
+    count_invoices: () => {
+      const rows = [];
+      for (const status of ["PENDIENTE", "ABONADA", "PAGADA", "ANULADA"]) {
+        const count = money.invoices.filter(
+          (i) => paymentStatusOf(i) === status,
+        ).length;
+        if (count > 0) rows.push({ status, count });
+      }
+      return rows;
+    },
+    get_invoice: (args) => {
+      const inv = invoiceById(args.id);
+      return inv ? toInvoice(inv) : null;
+    },
+    create_invoice: (args) => {
+      const input = args.input ?? {};
+      return toInvoice(
+        pushInvoice({
+          patientId: input.patientId ?? null,
+          ownerId: input.ownerId,
+          items: input.items ?? [],
+          taxRate: input.taxRate ?? null,
+          notes: input.notes ?? null,
+          paymentMethod: input.paymentMethod ?? null,
+        }),
+      );
+    },
+    set_invoice_status: (args) => {
+      const inv = invoiceById(args.id);
+      if (!inv) throw { type: "NotFound", data: "Factura no encontrada" };
+      if (args.status !== "ANULADA") {
+        throw {
+          type: "Validation",
+          data: "Solo se puede anular; el estado PAGADA lo determina el cobro",
+        };
+      }
+      if (inv.status === "ANULADA") {
+        throw { type: "Validation", data: "La factura ya está anulada" };
+      }
+      const active = money.payments.some(
+        (p) =>
+          p.status === "APLICADO" &&
+          p.allocations.some((a) => a.invoiceId === inv.id),
+      );
+      if (active) {
+        throw {
+          type: "Validation",
+          data: "La factura tiene pagos vigentes: anúlalos primero",
+        };
+      }
+      inv.status = "ANULADA";
+      // Misma acción que `set_invoice_status` en el backend.
+      auditLog.push("INVOICE_STATUS_CHANGE", `Factura ${inv.id} → estado ANULADA`);
+      return toInvoice(inv);
+    },
+    get_invoice_balance: (args) => {
+      const inv = invoiceById(args.invoiceId);
+      if (!inv) throw { type: "NotFound", data: "Factura no encontrada" };
+      return {
+        invoiceId: inv.id,
+        invoiceNumber: inv.invoiceNumber,
+        total: inv.total ?? 0,
+        paidAmount: paidOf(inv),
+        balance: balanceOf(inv),
+        paymentStatus: paymentStatusOf(inv),
+        status: inv.status,
+      };
+    },
+    list_invoice_payments: (args) =>
+      money.payments
+        .filter((p) => p.allocations.some((a) => a.invoiceId === args.invoiceId))
+        .map(toPayment),
+    list_payment_methods: (args) =>
+      paymentMethods.filter((m) => (args.includeInactive ? true : m.active)),
+    register_payment: (args) => registerPayment(args.input ?? {}),
+    void_payment: (args) => voidPayment(args.paymentId, args.reason),
+    get_billing_report: (args) => {
+      const from = args.from ?? "0000-01-01";
+      const to = args.to ?? "9999-12-31";
+      const inRange = (day) => day >= from && day <= to;
+      const billed = money.invoices.filter(
+        (i) => i.status !== "ANULADA" && inRange(i.issueDate.slice(0, 10)),
+      );
+      const received = money.payments.filter(
+        (p) => p.status === "APLICADO" && inRange(p.receivedAt.slice(0, 10)),
+      );
+      const byMethod = new Map();
+      for (const p of received) {
+        for (const l of p.lines) {
+          byMethod.set(l.methodCode, round2((byMethod.get(l.methodCode) ?? 0) + l.amount));
+        }
+      }
+      return {
+        fromDate: from,
+        toDate: to,
+        billedTotal: round2(billed.reduce((a, i) => a + (i.total ?? 0), 0)),
+        billedTax: round2(billed.reduce((a, i) => a + (i.taxAmount ?? 0), 0)),
+        billedCount: billed.length,
+        collectedTotal: round2(received.reduce((a, p) => a + p.total, 0)),
+        collectedCount: received.length,
+        outstandingTotal: round2(billed.reduce((a, i) => a + balanceOf(i), 0)),
+        methods: [...byMethod.entries()].map(([code, amount]) => ({
+          methodCode: code,
+          methodName: methodOf(code).name,
+          amount,
+        })),
+      };
+    },
+    generate_recibo_invoice: (args) => {
+      const inv = invoiceById(args.invoiceId);
+      if (!inv) throw { type: "NotFound", data: "Factura no encontrada" };
+      return {
+        path: `C:/mock/recibo-${inv.invoiceNumber}.pdf`,
+        fileName: `ISALAB_Recibo_${inv.invoiceNumber}.pdf`,
+        sampleCode: inv.invoiceNumber,
+        generatedAt: stamp(),
+      };
+    },
+
+    // ---- Caja ----
+    get_open_cash_session: () => {
+      const session = openSession();
+      return session ? toCashSession(session) : null;
+    },
+    open_cash_session: (args) => {
+      if (openSession()) {
+        throw { type: "Validation", data: "Ya hay una caja abierta" };
+      }
+      const id = money.nextSessionId;
+      money.nextSessionId += 1;
+      const session = {
+        id,
+        code: `CAJ-${String(id).padStart(8, "0")}`,
+        openedAt: stamp(),
+        openedBy: 1,
+        openedByName: "Administrador",
+        openingFloat: round2(args.openingFloat ?? 0),
+        status: "ABIERTA",
+        closedAt: null,
+        closedByName: null,
+        countedCash: null,
+        difference: null,
+        notes: args.notes ?? null,
+        movements: [],
+      };
+      money.sessions.push(session);
+      return toCashSession(session);
+    },
+    add_cash_movement: (args) => {
+      const session = openSession();
+      if (!session) {
+        throw { type: "Validation", data: "No hay una caja abierta" };
+      }
+      const input = args.input ?? {};
+      const amount = round2(Math.abs(input.amount ?? 0));
+      if (amount <= 0 || !(input.reason ?? "").trim()) {
+        throw { type: "Validation", data: "Importe y motivo son obligatorios" };
+      }
+      const signed =
+        input.kind === "AJUSTE" ? round2(input.amount) : -amount;
+      sessionMovement(session, input.kind, signed, input.reason.trim());
+      return session.movements[session.movements.length - 1];
+    },
+    list_cash_movements: (args) => {
+      const session = resolveSession(args.sessionId);
+      return session ? session.movements.map((m) => ({ ...m })) : [];
+    },
+    get_cash_session_summary: (args) => {
+      const session = resolveSession(args.sessionId);
+      return session ? buildSummary(session) : null;
+    },
+    close_cash_session: (args) => {
+      const session = openSession();
+      if (!session) {
+        throw { type: "Validation", data: "No hay una caja abierta" };
+      }
+      const input = args.input ?? {};
+      const countLines = (input.countLines ?? []).map((l) => ({
+        denomination: l.denomination,
+        quantity: l.quantity,
+        subtotal: round2(l.denomination * l.quantity),
+      }));
+      const countedCash = round2(
+        countLines.reduce((a, l) => a + l.subtotal, 0),
+      );
+      if (countLines.length === 0) {
+        throw {
+          type: "Validation",
+          data: "Registra al menos una denominación en el arqueo",
+        };
+      }
+      const { expectedCash } = sessionTotals(session);
+      session.status = "CERRADA";
+      session.closedAt = stamp();
+      session.closedByName = "Administrador";
+      session.countedCash = countedCash;
+      session.difference = round2(countedCash - expectedCash);
+      session.countLines = countLines;
+      session.notes = input.notes ?? session.notes;
+      return buildSummary(session);
+    },
+    list_cash_sessions: (args) =>
+      [...money.sessions]
+        .sort((a, b) => b.id - a.id)
+        .slice(0, args.limit ?? 30)
+        .map(toCashSession),
+    generate_cash_close_pdf: (args) => {
+      const session = resolveSession(args.sessionId);
+      return {
+        path: `C:/mock/cierre-${session?.code ?? "CAJA"}.pdf`,
+        fileName: `ISALAB_Cierre_${session?.code ?? "CAJA"}.pdf`,
+        sampleCode: session?.code ?? "CAJA",
+        generatedAt: stamp(),
+      };
+    },
+
+    // ---- Recepción de pacientes (visitas) ----
+    list_service_categories: () => serviceCategories,
+    list_all_service_categories: () => serviceCategories,
+    list_services: (args) => {
+      const q = (args.search ?? "").toLowerCase();
+      return services.filter((s) => {
+        if (!args.includeInactive && !s.isActive) return false;
+        if (args.categoryId != null && s.categoryId !== args.categoryId) return false;
+        if (q && !s.name.toLowerCase().includes(q)) return false;
+        return true;
+      });
+    },
+    list_visits: (args) => {
+      let list = [...money.visits].sort((a, b) => b.id - a.id);
+      if (args.date) list = list.filter((v) => v.arrivedAt.slice(0, 10) === args.date);
+      if (args.status) list = list.filter((v) => v.status === args.status);
+      const q = (args.search ?? "").toLowerCase();
+      if (q) {
+        list = list.filter(
+          (v) =>
+            v.code.toLowerCase().includes(q) ||
+            v.patientName.toLowerCase().includes(q) ||
+            v.ownerName.toLowerCase().includes(q),
+        );
+      }
+      return list.map(toVisitListItem);
+    },
+    get_visit: (args) => {
+      const visit = visitById(args.id);
+      return visit ? toVisit(visit) : null;
+    },
+    create_visit: (args) => {
+      const input = args.input ?? {};
+      const patient = patientById(input.patientId);
+      if (!patient) throw { type: "Validation", data: "Paciente inválido" };
+      if (!(input.services ?? []).length) {
+        throw { type: "Validation", data: "Agrega al menos un servicio" };
+      }
+      const id = money.nextVisitId;
+      money.nextVisitId += 1;
+      const visit = {
+        id,
+        code: `V-2026-${String(id).padStart(4, "0")}`,
+        patientId: patient.id,
+        patientName: patient.name,
+        ownerId: patient.ownerId,
+        ownerName: patient.ownerName,
+        // Mismo criterio que el backend: ARRIVED_AT se sella con la fecha
+        // local del equipo (CURRENT_TIMESTAMP de Firebird), no con UTC.
+        arrivedAt: stamp(),
+        priority: input.priority ?? "NORMAL",
+        status: "EN_ESPERA",
+        notes: input.notes ?? null,
+        services: [],
+      };
+      for (const line of input.services) {
+        const service = services.find((s) => s.id === line.serviceId);
+        if (!service) throw { type: "Validation", data: "Servicio inválido" };
+        visit.services.push(visitLine(visit, service, line));
+      }
+      money.visits.push(visit);
+      return toVisit(visit);
+    },
+    set_visit_status: (args) => {
+      const visit = visitById(args.id);
+      if (!visit) throw { type: "NotFound", data: "Visita no encontrada" };
+      if (visit.status === "FACTURADA" && args.status !== "FACTURADA") {
+        throw { type: "Validation", data: "Una visita facturada no cambia de estado" };
+      }
+      visit.status = args.status;
+      return toVisit(visit);
+    },
+    add_visit_service: (args) => {
+      const visit = visitById(args.visitId);
+      if (!visit) throw { type: "NotFound", data: "Visita no encontrada" };
+      const service = services.find((s) => s.id === args.input?.serviceId);
+      if (!service) throw { type: "Validation", data: "Servicio inválido" };
+      const line = visitLine(visit, service, args.input ?? {});
+      visit.services.push(line);
+      return { ...line };
+    },
+    remove_visit_service: (args) => {
+      const visit = visitById(args.visitId);
+      if (!visit) throw { type: "NotFound", data: "Visita no encontrada" };
+      visit.services = visit.services.filter((l) => l.id !== args.lineId);
+      return null;
+    },
+    update_visit_service_status: (args) => {
+      const visit = visitById(args.visitId);
+      const line = visit?.services.find((l) => l.id === args.lineId);
+      if (!visit || !line) throw { type: "NotFound", data: "Línea no encontrada" };
+      line.status = args.input?.status ?? line.status;
+      if (line.status === "EN_PROCESO" && !line.startedAt) line.startedAt = stamp();
+      if (line.status === "COMPLETADA" && !line.finishedAt) line.finishedAt = stamp();
+      return { ...line };
+    },
+    checkout_visit: (args) => {
+      const visit = visitById(args.visitId);
+      if (!visit) throw { type: "NotFound", data: "Visita no encontrada" };
+      if (visit.status !== "FINALIZADA") {
+        throw {
+          type: "Validation",
+          data: "Solo se cobra una visita finalizada",
+        };
+      }
+      const lines = visit.services.filter((l) => l.status !== "CANCELADA");
+      if (lines.length === 0) {
+        throw { type: "Validation", data: "La visita no tiene servicios activos" };
+      }
+      const invoice = pushInvoice({
+        patientId: visit.patientId,
+        ownerId: visit.ownerId,
+        items: lines.map((l) => ({
+          description: l.serviceName,
+          quantity: l.quantity,
+          unitPrice: l.unitPrice ?? 0,
+        })),
+        taxRate: 19,
+        notes: args.notes ?? null,
+        paymentMethod: args.paymentMethod ?? null,
+      });
+      visit.status = "FACTURADA";
+      return toInvoice(invoice);
+    },
     list_lab_orders: () => [],
     count_lab_orders: () => [],
     list_qc_materials: () => [],

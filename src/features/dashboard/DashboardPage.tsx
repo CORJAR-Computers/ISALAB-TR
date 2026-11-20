@@ -4,6 +4,7 @@ import {
   Activity,
   AlertTriangle,
   Ban,
+  Banknote,
   CalendarClock,
   CheckCircle2,
   Clock,
@@ -323,6 +324,46 @@ export function DashboardPage() {
           label="Estética de hoy"
           value={stats.groomingSessionsToday}
           tone="bg-pink-500/15 text-pink-600 dark:text-pink-400"
+        />
+      </div>
+
+      {/* Cobros y caja (fase D): cobrado real por recepción, no por factura emitida */}
+      <div className="grid grid-cols-2 gap-3 sm:grid-cols-3 lg:grid-cols-4">
+        <StatCard
+          icon={Banknote}
+          label="Cobrado hoy"
+          value={formatCOP(stats.collectedToday ?? 0)}
+          tone="bg-emerald-500/15 text-emerald-600 dark:text-emerald-400"
+        />
+        <StatCard
+          icon={TrendingUp}
+          label="Cobrado del mes"
+          value={formatCOP(stats.collectedMonth ?? 0)}
+          tone="bg-primary/10 text-primary"
+        />
+        <StatCard
+          icon={Receipt}
+          label={`Pendiente de cobro · ${stats.receivableCount} factura${
+            stats.receivableCount === 1 ? "" : "s"
+          }`}
+          value={formatCOP(stats.receivableTotal ?? 0)}
+          tone="bg-destructive/10 text-destructive"
+        />
+        <StatCard
+          icon={Wallet}
+          label={
+            stats.cashSessionOpen
+              ? "Caja abierta del turno"
+              : stats.lastCashDifference == null
+                ? "Caja cerrada"
+                : `Último cierre · dif. ${formatCOP(stats.lastCashDifference)}`
+          }
+          value={stats.cashSessionOpen ? "Abierta" : "Cerrada"}
+          tone={
+            stats.cashSessionOpen
+              ? "bg-success/15 text-success"
+              : "bg-muted text-muted-foreground"
+          }
         />
       </div>
 
@@ -851,12 +892,13 @@ export function DashboardPage() {
                 {stats.invoicesUnpaid === 1 ? "" : "s"} de cobro
               </p>
               <p className="text-muted-foreground text-xs">
-                Revisa las facturas emitidas para registrarlas como pagadas.
+                Cobra el saldo desde Facturación con un pago (efectivo, mixto o
+                abono).
               </p>
             </div>
-            <Badge variant="outline" className="text-success">
+            <Badge variant="outline" className="text-destructive">
               <Wallet className="size-3" />
-              {formatCOP(stats.revenueTotal ?? 0)} cobrados
+              {formatCOP(stats.receivableTotal ?? 0)} por cobrar
             </Badge>
             <Badge variant={INVOICE_STATUS.EMITIDA.variant}>
               {INVOICE_STATUS.EMITIDA.label}

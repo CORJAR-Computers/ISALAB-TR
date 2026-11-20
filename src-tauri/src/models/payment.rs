@@ -90,6 +90,35 @@ pub struct CreatePaymentAllocationInput {
     pub amount: f64,
 }
 
+/// Total cobrado con un método dentro de un período.
+#[derive(Debug, Clone, Serialize, Deserialize, Type)]
+#[serde(rename_all = "camelCase")]
+pub struct BillingMethodTotal {
+    pub method_code: String,
+    pub method_name: String,
+    pub amount: f64,
+}
+
+/// Reporte de facturación de un período: separa lo **facturado** (facturas
+/// emitidas, sin anuladas) de lo **cobrado** (recepciones aplicadas) y deja el
+/// saldo pendiente de las facturas emitidas en el rango.
+#[derive(Debug, Clone, Serialize, Deserialize, Type)]
+#[serde(rename_all = "camelCase")]
+pub struct BillingReport {
+    /// YYYY-MM-DD (inclusive)
+    pub from_date: String,
+    /// YYYY-MM-DD (inclusive)
+    pub to_date: String,
+    pub billed_total: f64,
+    pub billed_tax: f64,
+    pub billed_count: i32,
+    pub collected_total: f64,
+    pub collected_count: i32,
+    /// Saldo de las facturas emitidas en el período que sigue sin cobrarse.
+    pub outstanding_total: f64,
+    pub methods: Vec<BillingMethodTotal>,
+}
+
 #[derive(Debug, Clone, Serialize, Deserialize, Type)]
 #[serde(rename_all = "camelCase")]
 pub struct RegisterPaymentInput {

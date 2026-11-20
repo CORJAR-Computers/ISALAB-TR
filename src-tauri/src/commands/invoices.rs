@@ -40,7 +40,8 @@ pub fn get_invoice(state: State<'_, AppState>, id: i32) -> Result<Option<Invoice
     invoices_repo::get(pooled.conn(), id)
 }
 
-/// Cambia el estado de una factura (EMITIDA→PAGADA/ANULADA, PAGADA→ANULADA).
+/// Anula una factura sin pagos vigentes. El estado `PAGADA` solo lo produce
+/// el registro de pagos (`register_payment`), no este comando.
 #[tauri::command]
 #[specta::specta]
 pub fn set_invoice_status(

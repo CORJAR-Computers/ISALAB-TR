@@ -44,11 +44,14 @@ export function useSetInvoiceStatus() {
   return useMutation({
     mutationFn: ({ id, status }: { id: number; status: string }) =>
       api.setInvoiceStatus(id, status),
-    onSuccess: () => {
+    onSuccess: (_invoice, vars) => {
       qc.invalidateQueries({ queryKey: ["invoices"] });
       qc.invalidateQueries({ queryKey: ["invoice-counts"] });
       qc.invalidateQueries({ queryKey: ["invoice"] });
+      qc.invalidateQueries({ queryKey: ["invoice-balance", vars.id] });
+      // Anular cambia la cartera pendiente y el reporte del período.
       qc.invalidateQueries({ queryKey: ["dashboard"] });
+      qc.invalidateQueries({ queryKey: ["billing-report"] });
     },
   });
 }

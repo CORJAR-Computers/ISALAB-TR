@@ -110,6 +110,7 @@ export {
   useOpenCashSession,
   useOpenCash,
   useRegisterPayment,
+  useVoidPayment,
 } from "./use-payments";
 export {
   useCashSummary,
@@ -175,6 +176,7 @@ export {
 } from "./use-grooming";
 export {
   useReports,
+  useBillingReport,
   useGenerateReport,
   useGenerateSampleLabels,
   useGenerateFormulaMedica,

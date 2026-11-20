@@ -19,15 +19,31 @@ import {
   TableHeader,
   TableRow,
 } from "@/components/ui/table";
+import { Input } from "@/components/ui/input";
+import { Label } from "@/components/ui/label";
 import { Skeleton } from "@/components/ui/skeleton";
-import { useReports } from "@/hooks/use-queries";
+import { useBillingReport, useReports } from "@/hooks/use-queries";
 import { api, getErrorMessage } from "@/lib/api";
-import { formatDateTime } from "@/lib/utils";
+import { formatCOP, formatDateTime } from "@/lib/utils";
 import { GenerateReportDialog } from "./GenerateReportDialog";
+
+function isoDay(d: Date): string {
+  const pad = (n: number) => String(n).padStart(2, "0");
+  return `${d.getFullYear()}-${pad(d.getMonth() + 1)}-${pad(d.getDate())}`;
+}
 
 export function ReportsPage() {
   const { data: reports, isLoading, isError } = useReports();
   const [genOpen, setGenOpen] = useState(false);
+  const today = new Date();
+  const [from, setFrom] = useState(
+    isoDay(new Date(today.getFullYear(), today.getMonth(), 1)),
+  );
+  const [to, setTo] = useState(isoDay(today));
+  const { data: billing, isLoading: billingLoading } = useBillingReport(
+    from,
+    to,
+  );
 
   const open = async (path: string) => {
     try {
@@ -70,6 +86,119 @@ export function ReportsPage() {
           Generar informe
         </Button>
       </div>
+
+      {/* Facturado vs. cobrado: dos fechas distintas, dos cifras distintas. */}
+      <Card className="gap-0 p-0">
+        <CardHeader className="border-b">
+          <CardTitle className="text-base">Facturación del período</CardTitle>
+          <CardDescription>
+            Facturado por fecha de emisión y cobrado por fecha de recepción. El
+            total de facturas pagadas mezclaba ambas cosas.
+          </CardDescription>
+        </CardHeader>
+        <CardContent className="space-y-4 p-4">
+          <div className="flex flex-wrap items-end gap-3">
+            <div className="space-y-1">
+              <Label htmlFor="billing-from" className="text-xs">
+                Desde
+              </Label>
+              <Input
+                id="billing-from"
+                type="date"
+                value={from}
+                onChange={(e) => setFrom(e.target.value)}
+                className="h-9 w-40"
+              />
+            </div>
+            <div className="space-y-1">
+              <Label htmlFor="billing-to" className="text-xs">
+                Hasta
+              </Label>
+              <Input
+                id="billing-to"
+                type="date"
+                value={to}
+                onChange={(e) => setTo(e.target.value)}
+                className="h-9 w-40"
+              />
+            </div>
+            {billing && (
+              <p className="text-muted-foreground pb-2 text-xs">
+                {billing.billedCount} factura
+                {billing.billedCount === 1 ? "" : "s"} ·{" "}
+                {billing.collectedCount} recibo
+                {billing.collectedCount === 1 ? "" : "s"}
+              </p>
+            )}
+          </div>
+
+          {billingLoading || !billing ? (
+            <Skeleton className="h-20 w-full" />
+          ) : (
+            <>
+              <div className="grid gap-3 sm:grid-cols-3">
+                <div className="rounded-lg border p-3">
+                  <p className="text-muted-foreground text-xs font-medium tracking-wide uppercase">
+                    Facturado
+                  </p>
+                  <p className="mt-1 text-xl font-bold tabular-nums">
+                    {formatCOP(billing.billedTotal ?? 0)}
+                  </p>
+                  <p className="text-muted-foreground text-xs">
+                    IVA {formatCOP(billing.billedTax ?? 0)}
+                  </p>
+                </div>
+                <div className="rounded-lg border p-3">
+                  <p className="text-muted-foreground text-xs font-medium tracking-wide uppercase">
+                    Cobrado
+                  </p>
+                  <p className="text-success mt-1 text-xl font-bold tabular-nums">
+                    {formatCOP(billing.collectedTotal ?? 0)}
+                  </p>
+                  <p className="text-muted-foreground text-xs">
+                    {billing.collectedCount} recepción
+                    {billing.collectedCount === 1 ? "" : "es"}
+                  </p>
+                </div>
+                <div className="rounded-lg border p-3">
+                  <p className="text-muted-foreground text-xs font-medium tracking-wide uppercase">
+                    Por cobrar
+                  </p>
+                  <p className="text-destructive mt-1 text-xl font-bold tabular-nums">
+                    {formatCOP(billing.outstandingTotal ?? 0)}
+                  </p>
+                  <p className="text-muted-foreground text-xs">
+                    saldo de lo facturado en el rango
+                  </p>
+                </div>
+              </div>
+
+              {billing.methods.length > 0 && (
+                <div className="overflow-hidden rounded-lg border">
+                  <Table>
+                    <TableHeader>
+                      <TableRow className="hover:bg-transparent">
+                        <TableHead>Método de pago</TableHead>
+                        <TableHead className="text-right">Cobrado</TableHead>
+                      </TableRow>
+                    </TableHeader>
+                    <TableBody>
+                      {billing.methods.map((m) => (
+                        <TableRow key={m.methodCode}>
+                          <TableCell>{m.methodName}</TableCell>
+                          <TableCell className="text-right tabular-nums">
+                            {formatCOP(m.amount ?? 0)}
+                          </TableCell>
+                        </TableRow>
+                      ))}
+                    </TableBody>
+                  </Table>
+                </div>
+              )}
+            </>
+          )}
+        </CardContent>
+      </Card>
 
       <Card className="gap-0 p-0">
         <CardHeader className="border-b">

@@ -1,4 +1,4 @@
-import { useMemo } from "react";
+import { useMemo, useState } from "react";
 import { toast } from "sonner";
 import {
   Banknote,
@@ -40,6 +40,7 @@ import { getErrorMessage } from "@/lib/api";
 import { VISIT_SERVICE_STATUS, VISIT_STATUS } from "@/lib/status";
 import { cn, formatCOP } from "@/lib/utils";
 import { CheckoutDialog } from "./CheckoutDialog";
+import { PaymentDialog } from "@/features/invoices/PaymentDialog";
 import type { VisitListItem } from "@/bindings";
 
 export function VisitDetailDialog({
@@ -59,6 +60,9 @@ export function VisitDetailDialog({
   const removeService = useRemoveVisitService();
   const setLineStatus = useUpdateVisitServiceStatus();
   const { canReceive, canBill } = usePermissions();
+  // Factura emitida por el checkout: el diálogo de pago vive aquí para
+  // sobrevivir a la transición FINALIZADA → FACTURADA del detalle.
+  const [paymentInvoiceId, setPaymentInvoiceId] = useState<number | null>(null);
 
   const busy =
     setStatus.isPending ||
@@ -92,7 +96,8 @@ export function VisitDetailDialog({
   };
 
   return (
-    <Dialog open={open} onOpenChange={(o) => !o && onClose()}>
+    <>
+      <Dialog open={open} onOpenChange={(o) => !o && onClose()}>
       <DialogContent className="max-h-[90vh] overflow-y-auto sm:max-w-2xl">
         {isLoading || !visit ? (
           <div className="space-y-3">
@@ -155,6 +160,7 @@ export function VisitDetailDialog({
                 <CheckoutDialog
                   visitId={visit.id}
                   triggerLabel={`Cobrar ${formatCOP(estimatedTotal)}`}
+                  onInvoiceCreated={setPaymentInvoiceId}
                 />
               )}
               {canChangeStatus && (
@@ -376,6 +382,12 @@ export function VisitDetailDialog({
           </>
         )}
       </DialogContent>
-    </Dialog>
+      </Dialog>
+
+      <PaymentDialog
+        invoiceId={paymentInvoiceId}
+        onOpenChange={(next) => !next && setPaymentInvoiceId(null)}
+      />
+    </>
   );
 }

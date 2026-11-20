@@ -634,7 +634,7 @@ export const commands = {
 	notes: string | null,
 	items: InvoiceItem[],
 } | null, AppError>(__TAURI_INVOKE("get_invoice", { id })),
-	/**  Cambia el estado de una factura (EMITIDA→PAGADA/ANULADA, PAGADA→ANULADA). */
+	/**  Anula una factura sin pagos vigentes. El estado `PAGADA` solo lo produce el registro de pagos (`register_payment`), no este comando. */
 	setInvoiceStatus: (id: number, status: string) => typedError<Invoice, AppError>(__TAURI_INVOKE("set_invoice_status", { id, status })),
 	/**  Catálogo de métodos de pago (para el diálogo de cobro). */
 	listPaymentMethods: (includeInactive: boolean | null) => typedError<PaymentMethod[], AppError>(__TAURI_INVOKE("list_payment_methods", { includeInactive })),
@@ -644,6 +644,10 @@ export const commands = {
 	getInvoiceBalance: (invoiceId: number) => typedError<InvoiceBalance, AppError>(__TAURI_INVOKE("get_invoice_balance", { invoiceId })),
 	/**  Historial de pagos aplicados a una factura. */
 	listInvoicePayments: (invoiceId: number) => typedError<Payment[], AppError>(__TAURI_INVOKE("list_invoice_payments", { invoiceId })),
+	/**  Anula una recepción con motivo: revierte su efectivo en la caja abierta, libera las facturas y devuelve el saldo a su estado real. */
+	voidPayment: (paymentId: number, reason: string) => typedError<Payment, AppError>(__TAURI_INVOKE("void_payment", { paymentId, reason })),
+	/**  Reporte del período separando facturado (emisión) de cobrado (recepción). */
+	getBillingReport: (from: string, to: string) => typedError<BillingReport, AppError>(__TAURI_INVOKE("get_billing_report", { from, to })),
 	/**  Sesión de caja abierta actual, o `None` si no hay ninguna. */
 	getOpenCashSession: () => typedError<CashSession | null, AppError>(__TAURI_INVOKE("get_open_cash_session")),
 	/**  Abre la caja con su base inicial. Falla si ya hay una abierta. */
@@ -1345,6 +1349,18 @@ export type DashboardStats = {
 	invoicesUnpaid: number,
 	/**  Ingresos totales (facturas PAGADA). */
 	revenueTotal: number | null,
+	/**  Cobrado hoy por fecha de recepción (pagos vigentes). */
+	collectedToday: number | null,
+	/**  Cobrado en el mes en curso por fecha de recepción (pagos vigentes). */
+	collectedMonth: number | null,
+	/**  Saldo total pendiente de las facturas vigentes. */
+	receivableTotal: number | null,
+	/**  Facturas vigentes con saldo mayor que cero. */
+	receivableCount: number,
+	/**  Hay una sesión de caja abierta. */
+	cashSessionOpen: boolean,
+	/**  Diferencia del último cierre (contado − esperado); `null` sin cierres. */
+	lastCashDifference: number | null,
 	/**  Próximas consultas PENDIENTE (máx. 5). */
 	upcomingConsultations: ConsultationListItem[],
 	/**  Próximas cirugías PROGRAMADA/EN_CURSO (máx. 5). */
@@ -2773,6 +2789,33 @@ export type InvoiceBalance = {
 	paymentStatus: string,
 	/**  Estado histórico de la factura (EMITIDA | PAGADA | ANULADA). */
 	status: string,
+};
+
+/**  Total cobrado con un método dentro de un período. */
+export type BillingMethodTotal = {
+	methodCode: string,
+	methodName: string,
+	amount: number,
+};
+
+/**
+ *  Reporte de facturación de un período: separa lo **facturado** (facturas
+ *  emitidas, sin anuladas) de lo **cobrado** (recepciones aplicadas) y deja el
+ *  saldo pendiente de las facturas emitidas en el rango.
+ */
+export type BillingReport = {
+	/**  YYYY-MM-DD (inclusive) */
+	fromDate: string,
+	/**  YYYY-MM-DD (inclusive) */
+	toDate: string,
+	billedTotal: number,
+	billedTax: number,
+	billedCount: number,
+	collectedTotal: number,
+	collectedCount: number,
+	/**  Saldo de las facturas emitidas en el período que sigue sin cobrarse. */
+	outstandingTotal: number,
+	methods: BillingMethodTotal[],
 };
 
 /**  Recepción de pago completa, con líneas y facturas aplicadas. */
