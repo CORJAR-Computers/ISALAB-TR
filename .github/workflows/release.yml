@@ -297,6 +297,11 @@ jobs:
       # ring (vía cc-rs) busca el archiver MSVC lib.exe, que xwin NO provee
       # (solo descarga CRT/SDK). llvm-lib emula lib.exe; sin esto el build
       # falla en ring: 'failed to find tool "lib.exe"'.
+      # OJO: cc-rs NO lee CARGO_TARGET_*_AR (solo AR_<target>, TARGET_AR y AR),
+      # así que las variables deben ir con el nombre del target y guiones bajos;
+      # con CARGO_TARGET_*_AR el fallback fallaba en este mismo punto.
+      AR_x86_64_pc_windows_msvc: llvm-lib
+      CC_x86_64_pc_windows_msvc: clang-cl
       CARGO_TARGET_X86_64_PC_WINDOWS_MSVC_AR: llvm-lib
       # ring compila C con cc-rs: clang-cl es el compilador MSVC-compatible
       # que ya viene en ubuntu-latest (o se instala con el paquete clang).
