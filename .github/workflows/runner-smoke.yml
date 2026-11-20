@@ -17,6 +17,39 @@ jobs:
     runs-on: [self-hosted, Windows, X64, isalab-release]
     steps:
       - uses: actions/checkout@v7
+      # Diagnóstico: este runner tiene Git for Windows instalado con la opción
+      # por defecto ("Git from the command line and also from 3rd-party
+      # software"), que añade al PATH solo <Git>\cmd: git.exe resuelve pero
+      # bash.exe (que vive en <Git>\bin) no. Las acciones compuestas que
+      # declaran `shell: bash` —dtolnay/rust-toolchain entre ellas— fallan
+      # entonces con "bash: command not found" antes siquiera de instalar Rust.
+      # Se expone Git Bash en el PATH del job vía GITHUB_PATH; este smoke test
+      # lo valida e imprime la versión de bash.
+      - name: Expose Git Bash on PATH (self-hosted Windows)
+        if: runner.os == 'Windows' && runner.environment == 'self-hosted'
+        shell: pwsh
+        run: |
+          # Se parte de la ubicación de git.exe y se cae a las rutas estándar
+          # de Git for Windows.
+          $git = (Get-Command git -ErrorAction SilentlyContinue).Source
+          $roots = @()
+          if ($git) { $roots += Split-Path (Split-Path $git -Parent) -Parent }
+          $roots += "$env:ProgramFiles\Git", "${env:ProgramFiles(x86)}\Git", "$env:LOCALAPPDATA\Programs\Git"
+          $bash = $null
+          foreach ($root in $roots) {
+            foreach ($rel in 'bin\bash.exe', 'usr\bin\bash.exe') {
+              $candidate = Join-Path $root $rel
+              if (Test-Path $candidate) { $bash = $candidate; break }
+            }
+            if ($bash) { break }
+          }
+          if (-not $bash) {
+            throw "bash.exe no encontrado: instala Git for Windows con Git Bash en el runner."
+          }
+          Write-Host "Git Bash: $bash"
+          Split-Path $bash -Parent | Out-File -FilePath $env:GITHUB_PATH -Encoding utf8 -Append
+          & $bash --version | Select-Object -First 1
+
       - name: Install Rust (como en release.yml)
         uses: dtolnay/rust-toolchain@stable
       - name: Toolchain versions
