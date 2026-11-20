@@ -1,0 +1,11508 @@
+{
+ "comment": "Generado por scripts/gen-ipc-shapes.mjs desde src/bindings.ts. No editar a mano: `npm run gen:ipc-shapes`.",
+ "commands": {
+  "accession_lab_order": {
+   "result": {
+    "kind": "ref",
+    "name": "Sample"
+   },
+   "args": [
+    "input"
+   ]
+  },
+  "acknowledge_critical": {
+   "result": {
+    "kind": "array",
+    "items": {
+     "kind": "ref",
+     "name": "NotificationLogEntry"
+    }
+   },
+   "args": [
+    "resultIds",
+    "sampleId"
+   ]
+  },
+  "add_cash_movement": {
+   "result": {
+    "kind": "ref",
+    "name": "CashMovement"
+   },
+   "args": [
+    "input"
+   ]
+  },
+  "add_stay_event": {
+   "result": {
+    "kind": "ref",
+    "name": "StayEvent"
+   },
+   "args": [
+    "input",
+    "stayId"
+   ]
+  },
+  "add_stock_movement": {
+   "result": {
+    "kind": "ref",
+    "name": "StockMovement"
+   },
+   "args": [
+    "input"
+   ]
+  },
+  "add_visit_attachment": {
+   "result": {
+    "kind": "ref",
+    "name": "VisitAttachment"
+   },
+   "args": [
+    "input",
+    "sourcePath"
+   ]
+  },
+  "add_visit_service": {
+   "result": {
+    "kind": "ref",
+    "name": "VisitService"
+   },
+   "args": [
+    "input",
+    "visitId"
+   ]
+  },
+  "attach_result_file": {
+   "result": {
+    "kind": "ref",
+    "name": "ResultAttachment"
+   },
+   "args": [
+    "resultId",
+    "sourcePath"
+   ]
+  },
+  "cancel_appointment": {
+   "result": {
+    "kind": "ref",
+    "name": "Appointment"
+   },
+   "args": [
+    "id"
+   ]
+  },
+  "cancel_stay": {
+   "result": {
+    "kind": "ref",
+    "name": "Stay"
+   },
+   "args": [
+    "id"
+   ]
+  },
+  "change_password": {
+   "result": {
+    "kind": "ref",
+    "name": "SessionUser"
+   },
+   "args": [
+    "input"
+   ]
+  },
+  "check_in_appointment": {
+   "result": {
+    "kind": "ref",
+    "name": "Visit"
+   },
+   "args": [
+    "id"
+   ]
+  },
+  "check_out_stay": {
+   "result": {
+    "kind": "ref",
+    "name": "Stay"
+   },
+   "args": [
+    "id",
+    "input"
+   ]
+  },
+  "checkout_visit": {
+   "result": {
+    "kind": "ref",
+    "name": "Invoice"
+   },
+   "args": [
+    "notes",
+    "paymentMethod",
+    "visitId"
+   ]
+  },
+  "close_cash_session": {
+   "result": {
+    "kind": "ref",
+    "name": "CashSessionSummary"
+   },
+   "args": [
+    "input"
+   ]
+  },
+  "count_consultations": {
+   "result": {
+    "kind": "array",
+    "items": {
+     "kind": "ref",
+     "name": "StatusCount"
+    }
+   },
+   "args": []
+  },
+  "count_invoices": {
+   "result": {
+    "kind": "array",
+    "items": {
+     "kind": "ref",
+     "name": "StatusCount"
+    }
+   },
+   "args": []
+  },
+  "count_lab_orders": {
+   "result": {
+    "kind": "array",
+    "items": {
+     "kind": "ref",
+     "name": "StatusCount"
+    }
+   },
+   "args": []
+  },
+  "count_samples": {
+   "result": {
+    "kind": "array",
+    "items": {
+     "kind": "ref",
+     "name": "StatusCount"
+    }
+   },
+   "args": []
+  },
+  "count_surgeries": {
+   "result": {
+    "kind": "array",
+    "items": {
+     "kind": "ref",
+     "name": "StatusCount"
+    }
+   },
+   "args": []
+  },
+  "create_analyte": {
+   "result": {
+    "kind": "ref",
+    "name": "Analyte"
+   },
+   "args": [
+    "input"
+   ]
+  },
+  "create_analyzer": {
+   "result": {
+    "kind": "ref",
+    "name": "Analyzer"
+   },
+   "args": [
+    "input"
+   ]
+  },
+  "create_appointment": {
+   "result": {
+    "kind": "ref",
+    "name": "Appointment"
+   },
+   "args": [
+    "input"
+   ]
+  },
+  "create_consultation": {
+   "result": {
+    "kind": "ref",
+    "name": "Consultation"
+   },
+   "args": [
+    "input"
+   ]
+  },
+  "create_invoice": {
+   "result": {
+    "kind": "ref",
+    "name": "Invoice"
+   },
+   "args": [
+    "input"
+   ]
+  },
+  "create_lab_order": {
+   "result": {
+    "kind": "ref",
+    "name": "LabOrder"
+   },
+   "args": [
+    "input"
+   ]
+  },
+  "create_patient": {
+   "result": {
+    "kind": "ref",
+    "name": "Patient"
+   },
+   "args": [
+    "input"
+   ]
+  },
+  "create_reference_range": {
+   "result": {
+    "kind": "ref",
+    "name": "ReferenceRange"
+   },
+   "args": [
+    "input"
+   ]
+  },
+  "create_sample": {
+   "result": {
+    "kind": "ref",
+    "name": "Sample"
+   },
+   "args": [
+    "input"
+   ]
+  },
+  "create_stay": {
+   "result": {
+    "kind": "ref",
+    "name": "Stay"
+   },
+   "args": [
+    "input"
+   ]
+  },
+  "create_surgery": {
+   "result": {
+    "kind": "ref",
+    "name": "Surgery"
+   },
+   "args": [
+    "input"
+   ]
+  },
+  "create_user": {
+   "result": {
+    "kind": "ref",
+    "name": "UserListItem"
+   },
+   "args": [
+    "input"
+   ]
+  },
+  "create_vaccine": {
+   "result": {
+    "kind": "ref",
+    "name": "Vaccine"
+   },
+   "args": [
+    "input"
+   ]
+  },
+  "create_visit": {
+   "result": {
+    "kind": "ref",
+    "name": "Visit"
+   },
+   "args": [
+    "input"
+   ]
+  },
+  "db_health": {
+   "result": {
+    "kind": "ref",
+    "name": "DbHealth"
+   },
+   "args": []
+  },
+  "delete_analyzer": {
+   "result": {
+    "kind": "null"
+   },
+   "args": [
+    "id"
+   ]
+  },
+  "delete_analyzer_import_job": {
+   "result": {
+    "kind": "null"
+   },
+   "args": [
+    "jobId"
+   ]
+  },
+  "delete_analyzer_source": {
+   "result": {
+    "kind": "null"
+   },
+   "args": [
+    "id"
+   ]
+  },
+  "delete_clinic_logo": {
+   "result": {
+    "kind": "null"
+   },
+   "args": []
+  },
+  "delete_lab_result": {
+   "result": {
+    "kind": "null"
+   },
+   "args": [
+    "analyteId",
+    "sampleId"
+   ]
+  },
+  "delete_panel": {
+   "result": {
+    "kind": "null"
+   },
+   "args": [
+    "id"
+   ]
+  },
+  "delete_pkcs12": {
+   "result": {
+    "kind": "null"
+   },
+   "args": []
+  },
+  "delete_qc_material": {
+   "result": {
+    "kind": "null"
+   },
+   "args": [
+    "id"
+   ]
+  },
+  "delete_qc_run": {
+   "result": {
+    "kind": "null"
+   },
+   "args": [
+    "id"
+   ]
+  },
+  "delete_reference_range": {
+   "result": {
+    "kind": "null"
+   },
+   "args": [
+    "id"
+   ]
+  },
+  "delete_result_attachment": {
+   "result": {
+    "kind": "null"
+   },
+   "args": [
+    "id"
+   ]
+  },
+  "delete_secondary_logo": {
+   "result": {
+    "kind": "null"
+   },
+   "args": [
+    "id"
+   ]
+  },
+  "delete_service_category": {
+   "result": {
+    "kind": "null"
+   },
+   "args": [
+    "id"
+   ]
+  },
+  "delete_visit_attachment": {
+   "result": {
+    "kind": "null"
+   },
+   "args": [
+    "id"
+   ]
+  },
+  "export_diagnostics": {
+   "result": {
+    "kind": "string"
+   },
+   "args": [
+    "destPath"
+   ]
+  },
+  "export_local_config": {
+   "result": {
+    "kind": "string"
+   },
+   "args": [
+    "destPath"
+   ]
+  },
+  "export_results_csv": {
+   "result": {
+    "kind": "string"
+   },
+   "args": [
+    "destPath",
+    "search",
+    "status"
+   ]
+  },
+  "export_samples_csv": {
+   "result": {
+    "kind": "string"
+   },
+   "args": [
+    "destPath",
+    "search",
+    "status"
+   ]
+  },
+  "finish_grooming_session": {
+   "result": {
+    "kind": "ref",
+    "name": "GroomingSession"
+   },
+   "args": [
+    "input",
+    "visitServiceId"
+   ]
+  },
+  "generate_carnet_vacunacion": {
+   "result": {
+    "kind": "ref",
+    "name": "ReportFile"
+   },
+   "args": [
+    "patientId"
+   ]
+  },
+  "generate_cash_close_pdf": {
+   "result": {
+    "kind": "ref",
+    "name": "ReportFile"
+   },
+   "args": [
+    "sessionId"
+   ]
+  },
+  "generate_certificado_cirugia": {
+   "result": {
+    "kind": "ref",
+    "name": "ReportFile"
+   },
+   "args": [
+    "surgeryId"
+   ]
+  },
+  "generate_clinical_report": {
+   "result": {
+    "kind": "ref",
+    "name": "ReportFile"
+   },
+   "args": [
+    "overrideLogoId",
+    "sampleId",
+    "saveLogoPreference"
+   ]
+  },
+  "generate_consentimiento": {
+   "result": {
+    "kind": "ref",
+    "name": "ReportFile"
+   },
+   "args": [
+    "surgeryId"
+   ]
+  },
+  "generate_formula_medica": {
+   "result": {
+    "kind": "ref",
+    "name": "ReportFile"
+   },
+   "args": [
+    "consultationId"
+   ]
+  },
+  "generate_recibo_invoice": {
+   "result": {
+    "kind": "ref",
+    "name": "ReportFile"
+   },
+   "args": [
+    "invoiceId"
+   ]
+  },
+  "generate_sample_labels": {
+   "result": {
+    "kind": "ref",
+    "name": "ReportFile"
+   },
+   "args": [
+    "sampleIds"
+   ]
+  },
+  "get_appointment": {
+   "result": {
+    "kind": "union",
+    "of": [
+     {
+      "kind": "null"
+     },
+     {
+      "kind": "object",
+      "fields": {
+       "id": {
+        "shape": {
+         "kind": "number"
+        }
+       },
+       "code": {
+        "shape": {
+         "kind": "string"
+        }
+       },
+       "patientId": {
+        "shape": {
+         "kind": "number"
+        }
+       },
+       "patientName": {
+        "shape": {
+         "kind": "string"
+        }
+       },
+       "ownerId": {
+        "shape": {
+         "kind": "number"
+        }
+       },
+       "ownerName": {
+        "shape": {
+         "kind": "string"
+        }
+       },
+       "serviceId": {
+        "shape": {
+         "kind": "number"
+        }
+       },
+       "serviceName": {
+        "shape": {
+         "kind": "string"
+        }
+       },
+       "serviceCode": {
+        "shape": {
+         "kind": "string"
+        }
+       },
+       "categoryId": {
+        "shape": {
+         "kind": "number"
+        }
+       },
+       "categoryName": {
+        "shape": {
+         "kind": "string"
+        }
+       },
+       "professionalId": {
+        "shape": {
+         "kind": "union",
+         "of": [
+          {
+           "kind": "null"
+          },
+          {
+           "kind": "number"
+          }
+         ]
+        }
+       },
+       "professionalName": {
+        "shape": {
+         "kind": "union",
+         "of": [
+          {
+           "kind": "null"
+          },
+          {
+           "kind": "string"
+          }
+         ]
+        }
+       },
+       "scheduledAt": {
+        "shape": {
+         "kind": "string"
+        }
+       },
+       "durationMin": {
+        "shape": {
+         "kind": "number"
+        }
+       },
+       "status": {
+        "shape": {
+         "kind": "string"
+        }
+       },
+       "notes": {
+        "shape": {
+         "kind": "union",
+         "of": [
+          {
+           "kind": "null"
+          },
+          {
+           "kind": "string"
+          }
+         ]
+        }
+       },
+       "createdAt": {
+        "shape": {
+         "kind": "string"
+        }
+       },
+       "updatedAt": {
+        "shape": {
+         "kind": "string"
+        }
+       }
+      }
+     }
+    ]
+   },
+   "args": [
+    "id"
+   ]
+  },
+  "get_billing_report": {
+   "result": {
+    "kind": "ref",
+    "name": "BillingReport"
+   },
+   "args": [
+    "from",
+    "to"
+   ]
+  },
+  "get_cash_session_summary": {
+   "result": {
+    "kind": "ref",
+    "name": "CashSessionSummary"
+   },
+   "args": [
+    "sessionId"
+   ]
+  },
+  "get_clinic_branding": {
+   "result": {
+    "kind": "ref",
+    "name": "ClinicBranding"
+   },
+   "args": []
+  },
+  "get_clinic_logo_content": {
+   "result": {
+    "kind": "union",
+    "of": [
+     {
+      "kind": "null"
+     },
+     {
+      "kind": "object",
+      "fields": {
+       "BYTES_PER_ELEMENT": {
+        "shape": {
+         "kind": "number"
+        }
+       },
+       "buffer": {
+        "shape": {
+         "kind": "object",
+         "fields": {
+          "byteLength": {
+           "shape": {
+            "kind": "number"
+           }
+          },
+          "slice": {
+           "shape": {
+            "kind": "object",
+            "fields": {}
+           }
+          },
+          "__@toStringTag@78": {
+           "shape": {
+            "kind": "unknown"
+           }
+          }
+         }
+        }
+       },
+       "byteLength": {
+        "shape": {
+         "kind": "number"
+        }
+       },
+       "byteOffset": {
+        "shape": {
+         "kind": "number"
+        }
+       },
+       "copyWithin": {
+        "shape": {
+         "kind": "object",
+         "fields": {}
+        }
+       },
+       "every": {
+        "shape": {
+         "kind": "object",
+         "fields": {}
+        }
+       },
+       "fill": {
+        "shape": {
+         "kind": "object",
+         "fields": {}
+        }
+       },
+       "filter": {
+        "shape": {
+         "kind": "object",
+         "fields": {}
+        }
+       },
+       "find": {
+        "shape": {
+         "kind": "object",
+         "fields": {}
+        }
+       },
+       "findIndex": {
+        "shape": {
+         "kind": "object",
+         "fields": {}
+        }
+       },
+       "forEach": {
+        "shape": {
+         "kind": "object",
+         "fields": {}
+        }
+       },
+       "indexOf": {
+        "shape": {
+         "kind": "object",
+         "fields": {}
+        }
+       },
+       "join": {
+        "shape": {
+         "kind": "object",
+         "fields": {}
+        }
+       },
+       "lastIndexOf": {
+        "shape": {
+         "kind": "object",
+         "fields": {}
+        }
+       },
+       "length": {
+        "shape": {
+         "kind": "number"
+        }
+       },
+       "map": {
+        "shape": {
+         "kind": "object",
+         "fields": {}
+        }
+       },
+       "reduce": {
+        "shape": {
+         "kind": "object",
+         "fields": {}
+        }
+       },
+       "reduceRight": {
+        "shape": {
+         "kind": "object",
+         "fields": {}
+        }
+       },
+       "reverse": {
+        "shape": {
+         "kind": "object",
+         "fields": {}
+        }
+       },
+       "set": {
+        "shape": {
+         "kind": "object",
+         "fields": {}
+        }
+       },
+       "slice": {
+        "shape": {
+         "kind": "object",
+         "fields": {}
+        }
+       },
+       "some": {
+        "shape": {
+         "kind": "object",
+         "fields": {}
+        }
+       },
+       "sort": {
+        "shape": {
+         "kind": "object",
+         "fields": {}
+        }
+       },
+       "subarray": {
+        "shape": {
+         "kind": "object",
+         "fields": {}
+        }
+       },
+       "toLocaleString": {
+        "shape": {
+         "kind": "object",
+         "fields": {}
+        }
+       },
+       "toString": {
+        "shape": {
+         "kind": "object",
+         "fields": {}
+        }
+       },
+       "valueOf": {
+        "shape": {
+         "kind": "object",
+         "fields": {}
+        }
+       },
+       "entries": {
+        "shape": {
+         "kind": "object",
+         "fields": {}
+        }
+       },
+       "keys": {
+        "shape": {
+         "kind": "object",
+         "fields": {}
+        }
+       },
+       "values": {
+        "shape": {
+         "kind": "object",
+         "fields": {}
+        }
+       },
+       "includes": {
+        "shape": {
+         "kind": "object",
+         "fields": {}
+        }
+       },
+       "at": {
+        "shape": {
+         "kind": "object",
+         "fields": {}
+        }
+       },
+       "__@iterator@24": {
+        "shape": {
+         "kind": "object",
+         "fields": {}
+        }
+       },
+       "__@toStringTag@78": {
+        "shape": {
+         "kind": "unknown"
+        }
+       }
+      }
+     }
+    ]
+   },
+   "args": []
+  },
+  "get_clinic_settings": {
+   "result": {
+    "kind": "ref",
+    "name": "ClinicSettings"
+   },
+   "args": []
+  },
+  "get_clinical_history": {
+   "result": {
+    "kind": "ref",
+    "name": "ClinicalHistory"
+   },
+   "args": [
+    "patientId"
+   ]
+  },
+  "get_dashboard_stats": {
+   "result": {
+    "kind": "ref",
+    "name": "DashboardStats"
+   },
+   "args": []
+  },
+  "get_db_connection": {
+   "result": {
+    "kind": "ref",
+    "name": "DbConnectionInfo"
+   },
+   "args": []
+  },
+  "get_grooming_session": {
+   "result": {
+    "kind": "union",
+    "of": [
+     {
+      "kind": "null"
+     },
+     {
+      "kind": "object",
+      "fields": {
+       "id": {
+        "shape": {
+         "kind": "number"
+        }
+       },
+       "visitServiceId": {
+        "shape": {
+         "kind": "number"
+        }
+       },
+       "visitId": {
+        "shape": {
+         "kind": "number"
+        }
+       },
+       "serviceName": {
+        "shape": {
+         "kind": "string"
+        }
+       },
+       "patientId": {
+        "shape": {
+         "kind": "number"
+        }
+       },
+       "patientName": {
+        "shape": {
+         "kind": "string"
+        }
+       },
+       "ownerName": {
+        "shape": {
+         "kind": "string"
+        }
+       },
+       "groomerId": {
+        "shape": {
+         "kind": "union",
+         "of": [
+          {
+           "kind": "null"
+          },
+          {
+           "kind": "number"
+          }
+         ]
+        }
+       },
+       "groomerName": {
+        "shape": {
+         "kind": "union",
+         "of": [
+          {
+           "kind": "null"
+          },
+          {
+           "kind": "string"
+          }
+         ]
+        }
+       },
+       "style": {
+        "shape": {
+         "kind": "union",
+         "of": [
+          {
+           "kind": "null"
+          },
+          {
+           "kind": "string"
+          }
+         ]
+        }
+       },
+       "bathType": {
+        "shape": {
+         "kind": "union",
+         "of": [
+          {
+           "kind": "null"
+          },
+          {
+           "kind": "string"
+          }
+         ]
+        }
+       },
+       "coatCondition": {
+        "shape": {
+         "kind": "union",
+         "of": [
+          {
+           "kind": "null"
+          },
+          {
+           "kind": "string"
+          }
+         ]
+        }
+       },
+       "mattingLevel": {
+        "shape": {
+         "kind": "number"
+        }
+       },
+       "weightKg": {
+        "shape": {
+         "kind": "union",
+         "of": [
+          {
+           "kind": "null"
+          },
+          {
+           "kind": "number"
+          }
+         ]
+        }
+       },
+       "behavior": {
+        "shape": {
+         "kind": "union",
+         "of": [
+          {
+           "kind": "null"
+          },
+          {
+           "kind": "string"
+          }
+         ]
+        }
+       },
+       "productsUsed": {
+        "shape": {
+         "kind": "union",
+         "of": [
+          {
+           "kind": "null"
+          },
+          {
+           "kind": "string"
+          }
+         ]
+        }
+       },
+       "startedAt": {
+        "shape": {
+         "kind": "union",
+         "of": [
+          {
+           "kind": "null"
+          },
+          {
+           "kind": "string"
+          }
+         ]
+        }
+       },
+       "finishedAt": {
+        "shape": {
+         "kind": "union",
+         "of": [
+          {
+           "kind": "null"
+          },
+          {
+           "kind": "string"
+          }
+         ]
+        }
+       },
+       "nextSuggestedAt": {
+        "shape": {
+         "kind": "union",
+         "of": [
+          {
+           "kind": "null"
+          },
+          {
+           "kind": "string"
+          }
+         ]
+        }
+       },
+       "notes": {
+        "shape": {
+         "kind": "union",
+         "of": [
+          {
+           "kind": "null"
+          },
+          {
+           "kind": "string"
+          }
+         ]
+        }
+       },
+       "createdAt": {
+        "shape": {
+         "kind": "string"
+        }
+       },
+       "updatedAt": {
+        "shape": {
+         "kind": "string"
+        }
+       }
+      }
+     }
+    ]
+   },
+   "args": [
+    "visitServiceId"
+   ]
+  },
+  "get_invoice": {
+   "result": {
+    "kind": "union",
+    "of": [
+     {
+      "kind": "null"
+     },
+     {
+      "kind": "object",
+      "fields": {
+       "id": {
+        "shape": {
+         "kind": "number"
+        }
+       },
+       "invoiceNumber": {
+        "shape": {
+         "kind": "string"
+        }
+       },
+       "patientId": {
+        "shape": {
+         "kind": "union",
+         "of": [
+          {
+           "kind": "null"
+          },
+          {
+           "kind": "number"
+          }
+         ]
+        }
+       },
+       "patientName": {
+        "shape": {
+         "kind": "union",
+         "of": [
+          {
+           "kind": "null"
+          },
+          {
+           "kind": "string"
+          }
+         ]
+        }
+       },
+       "ownerId": {
+        "shape": {
+         "kind": "number"
+        }
+       },
+       "ownerName": {
+        "shape": {
+         "kind": "string"
+        }
+       },
+       "ownerPhone": {
+        "shape": {
+         "kind": "union",
+         "of": [
+          {
+           "kind": "null"
+          },
+          {
+           "kind": "string"
+          }
+         ]
+        }
+       },
+       "consultationId": {
+        "shape": {
+         "kind": "union",
+         "of": [
+          {
+           "kind": "null"
+          },
+          {
+           "kind": "number"
+          }
+         ]
+        }
+       },
+       "issueDate": {
+        "shape": {
+         "kind": "string"
+        }
+       },
+       "subtotal": {
+        "shape": {
+         "kind": "union",
+         "of": [
+          {
+           "kind": "null"
+          },
+          {
+           "kind": "number"
+          }
+         ]
+        }
+       },
+       "taxRate": {
+        "shape": {
+         "kind": "union",
+         "of": [
+          {
+           "kind": "null"
+          },
+          {
+           "kind": "number"
+          }
+         ]
+        }
+       },
+       "taxAmount": {
+        "shape": {
+         "kind": "union",
+         "of": [
+          {
+           "kind": "null"
+          },
+          {
+           "kind": "number"
+          }
+         ]
+        }
+       },
+       "total": {
+        "shape": {
+         "kind": "union",
+         "of": [
+          {
+           "kind": "null"
+          },
+          {
+           "kind": "number"
+          }
+         ]
+        }
+       },
+       "status": {
+        "shape": {
+         "kind": "string"
+        }
+       },
+       "paymentMethod": {
+        "shape": {
+         "kind": "union",
+         "of": [
+          {
+           "kind": "null"
+          },
+          {
+           "kind": "string"
+          }
+         ]
+        }
+       },
+       "notes": {
+        "shape": {
+         "kind": "union",
+         "of": [
+          {
+           "kind": "null"
+          },
+          {
+           "kind": "string"
+          }
+         ]
+        }
+       },
+       "items": {
+        "shape": {
+         "kind": "array",
+         "items": {
+          "kind": "ref",
+          "name": "InvoiceItem"
+         }
+        }
+       }
+      }
+     }
+    ]
+   },
+   "args": [
+    "id"
+   ]
+  },
+  "get_invoice_balance": {
+   "result": {
+    "kind": "ref",
+    "name": "InvoiceBalance"
+   },
+   "args": [
+    "invoiceId"
+   ]
+  },
+  "get_lab_order": {
+   "result": {
+    "kind": "union",
+    "of": [
+     {
+      "kind": "null"
+     },
+     {
+      "kind": "object",
+      "fields": {
+       "id": {
+        "shape": {
+         "kind": "number"
+        }
+       },
+       "code": {
+        "shape": {
+         "kind": "string"
+        }
+       },
+       "patientId": {
+        "shape": {
+         "kind": "number"
+        }
+       },
+       "patientName": {
+        "shape": {
+         "kind": "string"
+        }
+       },
+       "speciesName": {
+        "shape": {
+         "kind": "string"
+        }
+       },
+       "ownerName": {
+        "shape": {
+         "kind": "string"
+        }
+       },
+       "consultationId": {
+        "shape": {
+         "kind": "union",
+         "of": [
+          {
+           "kind": "null"
+          },
+          {
+           "kind": "number"
+          }
+         ]
+        }
+       },
+       "requestedBy": {
+        "shape": {
+         "kind": "union",
+         "of": [
+          {
+           "kind": "null"
+          },
+          {
+           "kind": "string"
+          }
+         ]
+        }
+       },
+       "priority": {
+        "shape": {
+         "kind": "string"
+        }
+       },
+       "status": {
+        "shape": {
+         "kind": "string"
+        }
+       },
+       "notes": {
+        "shape": {
+         "kind": "union",
+         "of": [
+          {
+           "kind": "null"
+          },
+          {
+           "kind": "string"
+          }
+         ]
+        }
+       },
+       "requestedAt": {
+        "shape": {
+         "kind": "string"
+        }
+       },
+       "items": {
+        "shape": {
+         "kind": "array",
+         "items": {
+          "kind": "ref",
+          "name": "LabOrderItem"
+         }
+        }
+       },
+       "samples": {
+        "shape": {
+         "kind": "array",
+         "items": {
+          "kind": "ref",
+          "name": "OrderSampleRef"
+         }
+        }
+       }
+      }
+     }
+    ]
+   },
+   "args": [
+    "id"
+   ]
+  },
+  "get_open_cash_session": {
+   "result": {
+    "kind": "union",
+    "of": [
+     {
+      "kind": "null"
+     },
+     {
+      "kind": "ref",
+      "name": "CashSession"
+     }
+    ]
+   },
+   "args": []
+  },
+  "get_order_for_sample": {
+   "result": {
+    "kind": "union",
+    "of": [
+     {
+      "kind": "null"
+     },
+     {
+      "kind": "object",
+      "fields": {
+       "id": {
+        "shape": {
+         "kind": "number"
+        }
+       },
+       "code": {
+        "shape": {
+         "kind": "string"
+        }
+       },
+       "patientId": {
+        "shape": {
+         "kind": "number"
+        }
+       },
+       "patientName": {
+        "shape": {
+         "kind": "string"
+        }
+       },
+       "speciesName": {
+        "shape": {
+         "kind": "string"
+        }
+       },
+       "ownerName": {
+        "shape": {
+         "kind": "string"
+        }
+       },
+       "consultationId": {
+        "shape": {
+         "kind": "union",
+         "of": [
+          {
+           "kind": "null"
+          },
+          {
+           "kind": "number"
+          }
+         ]
+        }
+       },
+       "requestedBy": {
+        "shape": {
+         "kind": "union",
+         "of": [
+          {
+           "kind": "null"
+          },
+          {
+           "kind": "string"
+          }
+         ]
+        }
+       },
+       "priority": {
+        "shape": {
+         "kind": "string"
+        }
+       },
+       "status": {
+        "shape": {
+         "kind": "string"
+        }
+       },
+       "notes": {
+        "shape": {
+         "kind": "union",
+         "of": [
+          {
+           "kind": "null"
+          },
+          {
+           "kind": "string"
+          }
+         ]
+        }
+       },
+       "requestedAt": {
+        "shape": {
+         "kind": "string"
+        }
+       },
+       "items": {
+        "shape": {
+         "kind": "array",
+         "items": {
+          "kind": "ref",
+          "name": "LabOrderItem"
+         }
+        }
+       },
+       "samples": {
+        "shape": {
+         "kind": "array",
+         "items": {
+          "kind": "ref",
+          "name": "OrderSampleRef"
+         }
+        }
+       }
+      }
+     }
+    ]
+   },
+   "args": [
+    "sampleId"
+   ]
+  },
+  "get_patient": {
+   "result": {
+    "kind": "union",
+    "of": [
+     {
+      "kind": "null"
+     },
+     {
+      "kind": "object",
+      "fields": {
+       "id": {
+        "shape": {
+         "kind": "number"
+        }
+       },
+       "code": {
+        "shape": {
+         "kind": "string"
+        }
+       },
+       "ownerId": {
+        "shape": {
+         "kind": "number"
+        }
+       },
+       "speciesId": {
+        "shape": {
+         "kind": "number"
+        }
+       },
+       "breedId": {
+        "shape": {
+         "kind": "union",
+         "of": [
+          {
+           "kind": "null"
+          },
+          {
+           "kind": "number"
+          }
+         ]
+        }
+       },
+       "name": {
+        "shape": {
+         "kind": "string"
+        }
+       },
+       "sex": {
+        "shape": {
+         "kind": "string"
+        }
+       },
+       "birthDate": {
+        "shape": {
+         "kind": "union",
+         "of": [
+          {
+           "kind": "null"
+          },
+          {
+           "kind": "string"
+          }
+         ]
+        }
+       },
+       "neutered": {
+        "shape": {
+         "kind": "unknown"
+        }
+       },
+       "color": {
+        "shape": {
+         "kind": "union",
+         "of": [
+          {
+           "kind": "null"
+          },
+          {
+           "kind": "string"
+          }
+         ]
+        }
+       },
+       "microchip": {
+        "shape": {
+         "kind": "union",
+         "of": [
+          {
+           "kind": "null"
+          },
+          {
+           "kind": "string"
+          }
+         ]
+        }
+       },
+       "active": {
+        "shape": {
+         "kind": "unknown"
+        }
+       },
+       "notes": {
+        "shape": {
+         "kind": "union",
+         "of": [
+          {
+           "kind": "null"
+          },
+          {
+           "kind": "string"
+          }
+         ]
+        }
+       },
+       "preferredLogoId": {
+        "shape": {
+         "kind": "union",
+         "of": [
+          {
+           "kind": "null"
+          },
+          {
+           "kind": "number"
+          }
+         ]
+        }
+       },
+       "speciesName": {
+        "shape": {
+         "kind": "string"
+        }
+       },
+       "breedName": {
+        "shape": {
+         "kind": "union",
+         "of": [
+          {
+           "kind": "null"
+          },
+          {
+           "kind": "string"
+          }
+         ]
+        }
+       },
+       "ownerName": {
+        "shape": {
+         "kind": "string"
+        }
+       },
+       "ownerPhone": {
+        "shape": {
+         "kind": "union",
+         "of": [
+          {
+           "kind": "null"
+          },
+          {
+           "kind": "string"
+          }
+         ]
+        }
+       },
+       "ageMonths": {
+        "shape": {
+         "kind": "number"
+        }
+       }
+      }
+     }
+    ]
+   },
+   "args": [
+    "id"
+   ]
+  },
+  "get_patient_by_code": {
+   "result": {
+    "kind": "union",
+    "of": [
+     {
+      "kind": "null"
+     },
+     {
+      "kind": "object",
+      "fields": {
+       "id": {
+        "shape": {
+         "kind": "number"
+        }
+       },
+       "code": {
+        "shape": {
+         "kind": "string"
+        }
+       },
+       "ownerId": {
+        "shape": {
+         "kind": "number"
+        }
+       },
+       "speciesId": {
+        "shape": {
+         "kind": "number"
+        }
+       },
+       "breedId": {
+        "shape": {
+         "kind": "union",
+         "of": [
+          {
+           "kind": "null"
+          },
+          {
+           "kind": "number"
+          }
+         ]
+        }
+       },
+       "name": {
+        "shape": {
+         "kind": "string"
+        }
+       },
+       "sex": {
+        "shape": {
+         "kind": "string"
+        }
+       },
+       "birthDate": {
+        "shape": {
+         "kind": "union",
+         "of": [
+          {
+           "kind": "null"
+          },
+          {
+           "kind": "string"
+          }
+         ]
+        }
+       },
+       "neutered": {
+        "shape": {
+         "kind": "unknown"
+        }
+       },
+       "color": {
+        "shape": {
+         "kind": "union",
+         "of": [
+          {
+           "kind": "null"
+          },
+          {
+           "kind": "string"
+          }
+         ]
+        }
+       },
+       "microchip": {
+        "shape": {
+         "kind": "union",
+         "of": [
+          {
+           "kind": "null"
+          },
+          {
+           "kind": "string"
+          }
+         ]
+        }
+       },
+       "active": {
+        "shape": {
+         "kind": "unknown"
+        }
+       },
+       "notes": {
+        "shape": {
+         "kind": "union",
+         "of": [
+          {
+           "kind": "null"
+          },
+          {
+           "kind": "string"
+          }
+         ]
+        }
+       },
+       "preferredLogoId": {
+        "shape": {
+         "kind": "union",
+         "of": [
+          {
+           "kind": "null"
+          },
+          {
+           "kind": "number"
+          }
+         ]
+        }
+       },
+       "speciesName": {
+        "shape": {
+         "kind": "string"
+        }
+       },
+       "breedName": {
+        "shape": {
+         "kind": "union",
+         "of": [
+          {
+           "kind": "null"
+          },
+          {
+           "kind": "string"
+          }
+         ]
+        }
+       },
+       "ownerName": {
+        "shape": {
+         "kind": "string"
+        }
+       },
+       "ownerPhone": {
+        "shape": {
+         "kind": "union",
+         "of": [
+          {
+           "kind": "null"
+          },
+          {
+           "kind": "string"
+          }
+         ]
+        }
+       },
+       "ageMonths": {
+        "shape": {
+         "kind": "number"
+        }
+       }
+      }
+     }
+    ]
+   },
+   "args": [
+    "code"
+   ]
+  },
+  "get_patient_lab_trends": {
+   "result": {
+    "kind": "array",
+    "items": {
+     "kind": "ref",
+     "name": "TrendPoint"
+    }
+   },
+   "args": [
+    "analyteId",
+    "patientId"
+   ]
+  },
+  "get_pkcs12_content": {
+   "result": {
+    "kind": "union",
+    "of": [
+     {
+      "kind": "null"
+     },
+     {
+      "kind": "object",
+      "fields": {
+       "BYTES_PER_ELEMENT": {
+        "shape": {
+         "kind": "number"
+        }
+       },
+       "buffer": {
+        "shape": {
+         "kind": "object",
+         "fields": {
+          "byteLength": {
+           "shape": {
+            "kind": "number"
+           }
+          },
+          "slice": {
+           "shape": {
+            "kind": "object",
+            "fields": {}
+           }
+          },
+          "__@toStringTag@78": {
+           "shape": {
+            "kind": "unknown"
+           }
+          }
+         }
+        }
+       },
+       "byteLength": {
+        "shape": {
+         "kind": "number"
+        }
+       },
+       "byteOffset": {
+        "shape": {
+         "kind": "number"
+        }
+       },
+       "copyWithin": {
+        "shape": {
+         "kind": "object",
+         "fields": {}
+        }
+       },
+       "every": {
+        "shape": {
+         "kind": "object",
+         "fields": {}
+        }
+       },
+       "fill": {
+        "shape": {
+         "kind": "object",
+         "fields": {}
+        }
+       },
+       "filter": {
+        "shape": {
+         "kind": "object",
+         "fields": {}
+        }
+       },
+       "find": {
+        "shape": {
+         "kind": "object",
+         "fields": {}
+        }
+       },
+       "findIndex": {
+        "shape": {
+         "kind": "object",
+         "fields": {}
+        }
+       },
+       "forEach": {
+        "shape": {
+         "kind": "object",
+         "fields": {}
+        }
+       },
+       "indexOf": {
+        "shape": {
+         "kind": "object",
+         "fields": {}
+        }
+       },
+       "join": {
+        "shape": {
+         "kind": "object",
+         "fields": {}
+        }
+       },
+       "lastIndexOf": {
+        "shape": {
+         "kind": "object",
+         "fields": {}
+        }
+       },
+       "length": {
+        "shape": {
+         "kind": "number"
+        }
+       },
+       "map": {
+        "shape": {
+         "kind": "object",
+         "fields": {}
+        }
+       },
+       "reduce": {
+        "shape": {
+         "kind": "object",
+         "fields": {}
+        }
+       },
+       "reduceRight": {
+        "shape": {
+         "kind": "object",
+         "fields": {}
+        }
+       },
+       "reverse": {
+        "shape": {
+         "kind": "object",
+         "fields": {}
+        }
+       },
+       "set": {
+        "shape": {
+         "kind": "object",
+         "fields": {}
+        }
+       },
+       "slice": {
+        "shape": {
+         "kind": "object",
+         "fields": {}
+        }
+       },
+       "some": {
+        "shape": {
+         "kind": "object",
+         "fields": {}
+        }
+       },
+       "sort": {
+        "shape": {
+         "kind": "object",
+         "fields": {}
+        }
+       },
+       "subarray": {
+        "shape": {
+         "kind": "object",
+         "fields": {}
+        }
+       },
+       "toLocaleString": {
+        "shape": {
+         "kind": "object",
+         "fields": {}
+        }
+       },
+       "toString": {
+        "shape": {
+         "kind": "object",
+         "fields": {}
+        }
+       },
+       "valueOf": {
+        "shape": {
+         "kind": "object",
+         "fields": {}
+        }
+       },
+       "entries": {
+        "shape": {
+         "kind": "object",
+         "fields": {}
+        }
+       },
+       "keys": {
+        "shape": {
+         "kind": "object",
+         "fields": {}
+        }
+       },
+       "values": {
+        "shape": {
+         "kind": "object",
+         "fields": {}
+        }
+       },
+       "includes": {
+        "shape": {
+         "kind": "object",
+         "fields": {}
+        }
+       },
+       "at": {
+        "shape": {
+         "kind": "object",
+         "fields": {}
+        }
+       },
+       "__@iterator@24": {
+        "shape": {
+         "kind": "object",
+         "fields": {}
+        }
+       },
+       "__@toStringTag@78": {
+        "shape": {
+         "kind": "unknown"
+        }
+       }
+      }
+     }
+    ]
+   },
+   "args": []
+  },
+  "get_product": {
+   "result": {
+    "kind": "union",
+    "of": [
+     {
+      "kind": "null"
+     },
+     {
+      "kind": "object",
+      "fields": {
+       "id": {
+        "shape": {
+         "kind": "number"
+        }
+       },
+       "code": {
+        "shape": {
+         "kind": "string"
+        }
+       },
+       "name": {
+        "shape": {
+         "kind": "string"
+        }
+       },
+       "category": {
+        "shape": {
+         "kind": "string"
+        }
+       },
+       "unit": {
+        "shape": {
+         "kind": "string"
+        }
+       },
+       "costPrice": {
+        "shape": {
+         "kind": "union",
+         "of": [
+          {
+           "kind": "null"
+          },
+          {
+           "kind": "number"
+          }
+         ]
+        }
+       },
+       "salePrice": {
+        "shape": {
+         "kind": "union",
+         "of": [
+          {
+           "kind": "null"
+          },
+          {
+           "kind": "number"
+          }
+         ]
+        }
+       },
+       "taxRate": {
+        "shape": {
+         "kind": "union",
+         "of": [
+          {
+           "kind": "null"
+          },
+          {
+           "kind": "number"
+          }
+         ]
+        }
+       },
+       "minStock": {
+        "shape": {
+         "kind": "number"
+        }
+       },
+       "active": {
+        "shape": {
+         "kind": "unknown"
+        }
+       },
+       "notes": {
+        "shape": {
+         "kind": "union",
+         "of": [
+          {
+           "kind": "null"
+          },
+          {
+           "kind": "string"
+          }
+         ]
+        }
+       }
+      }
+     }
+    ]
+   },
+   "args": [
+    "id"
+   ]
+  },
+  "get_qc_chart": {
+   "result": {
+    "kind": "union",
+    "of": [
+     {
+      "kind": "null"
+     },
+     {
+      "kind": "object",
+      "fields": {
+       "controlMaterialId": {
+        "shape": {
+         "kind": "number"
+        }
+       },
+       "analyteId": {
+        "shape": {
+         "kind": "number"
+        }
+       },
+       "analyteName": {
+        "shape": {
+         "kind": "string"
+        }
+       },
+       "unit": {
+        "shape": {
+         "kind": "union",
+         "of": [
+          {
+           "kind": "null"
+          },
+          {
+           "kind": "string"
+          }
+         ]
+        }
+       },
+       "mean": {
+        "shape": {
+         "kind": "union",
+         "of": [
+          {
+           "kind": "null"
+          },
+          {
+           "kind": "number"
+          }
+         ]
+        }
+       },
+       "sd": {
+        "shape": {
+         "kind": "union",
+         "of": [
+          {
+           "kind": "null"
+          },
+          {
+           "kind": "number"
+          }
+         ]
+        }
+       },
+       "points": {
+        "shape": {
+         "kind": "array",
+         "items": {
+          "kind": "ref",
+          "name": "QcChartPoint"
+         }
+        }
+       }
+      }
+     }
+    ]
+   },
+   "args": [
+    "analyteId",
+    "controlMaterialId"
+   ]
+  },
+  "get_result_attachment_content": {
+   "result": {
+    "kind": "ref",
+    "name": "AttachmentContent"
+   },
+   "args": [
+    "id"
+   ]
+  },
+  "get_sample": {
+   "result": {
+    "kind": "union",
+    "of": [
+     {
+      "kind": "null"
+     },
+     {
+      "kind": "object",
+      "fields": {
+       "id": {
+        "shape": {
+         "kind": "number"
+        }
+       },
+       "code": {
+        "shape": {
+         "kind": "string"
+        }
+       },
+       "patientId": {
+        "shape": {
+         "kind": "number"
+        }
+       },
+       "sampleTypeId": {
+        "shape": {
+         "kind": "number"
+        }
+       },
+       "sampleTypeName": {
+        "shape": {
+         "kind": "string"
+        }
+       },
+       "receivedAt": {
+        "shape": {
+         "kind": "string"
+        }
+       },
+       "status": {
+        "shape": {
+         "kind": "string"
+        }
+       },
+       "collectedBy": {
+        "shape": {
+         "kind": "union",
+         "of": [
+          {
+           "kind": "null"
+          },
+          {
+           "kind": "string"
+          }
+         ]
+        }
+       },
+       "notes": {
+        "shape": {
+         "kind": "union",
+         "of": [
+          {
+           "kind": "null"
+          },
+          {
+           "kind": "string"
+          }
+         ]
+        }
+       },
+       "analyzerId": {
+        "shape": {
+         "kind": "union",
+         "of": [
+          {
+           "kind": "null"
+          },
+          {
+           "kind": "number"
+          }
+         ]
+        }
+       },
+       "analyzerName": {
+        "shape": {
+         "kind": "union",
+         "of": [
+          {
+           "kind": "null"
+          },
+          {
+           "kind": "string"
+          }
+         ]
+        }
+       },
+       "results": {
+        "shape": {
+         "kind": "array",
+         "items": {
+          "kind": "ref",
+          "name": "LabResult"
+         }
+        }
+       },
+       "qualityIndex": {
+        "shape": {
+         "kind": "union",
+         "of": [
+          {
+           "kind": "null"
+          },
+          {
+           "kind": "string"
+          }
+         ]
+        }
+       },
+       "qualitySeverity": {
+        "shape": {
+         "kind": "union",
+         "of": [
+          {
+           "kind": "null"
+          },
+          {
+           "kind": "string"
+          }
+         ]
+        }
+       },
+       "qualityNote": {
+        "shape": {
+         "kind": "union",
+         "of": [
+          {
+           "kind": "null"
+          },
+          {
+           "kind": "string"
+          }
+         ]
+        }
+       },
+       "rejectedAt": {
+        "shape": {
+         "kind": "union",
+         "of": [
+          {
+           "kind": "null"
+          },
+          {
+           "kind": "string"
+          }
+         ]
+        }
+       },
+       "rejectedBy": {
+        "shape": {
+         "kind": "union",
+         "of": [
+          {
+           "kind": "null"
+          },
+          {
+           "kind": "string"
+          }
+         ]
+        }
+       },
+       "rejectionReason": {
+        "shape": {
+         "kind": "union",
+         "of": [
+          {
+           "kind": "null"
+          },
+          {
+           "kind": "string"
+          }
+         ]
+        }
+       }
+      }
+     }
+    ]
+   },
+   "args": [
+    "id"
+   ]
+  },
+  "get_secondary_logo_content": {
+   "result": {
+    "kind": "union",
+    "of": [
+     {
+      "kind": "null"
+     },
+     {
+      "kind": "object",
+      "fields": {
+       "BYTES_PER_ELEMENT": {
+        "shape": {
+         "kind": "number"
+        }
+       },
+       "buffer": {
+        "shape": {
+         "kind": "object",
+         "fields": {
+          "byteLength": {
+           "shape": {
+            "kind": "number"
+           }
+          },
+          "slice": {
+           "shape": {
+            "kind": "object",
+            "fields": {}
+           }
+          },
+          "__@toStringTag@78": {
+           "shape": {
+            "kind": "unknown"
+           }
+          }
+         }
+        }
+       },
+       "byteLength": {
+        "shape": {
+         "kind": "number"
+        }
+       },
+       "byteOffset": {
+        "shape": {
+         "kind": "number"
+        }
+       },
+       "copyWithin": {
+        "shape": {
+         "kind": "object",
+         "fields": {}
+        }
+       },
+       "every": {
+        "shape": {
+         "kind": "object",
+         "fields": {}
+        }
+       },
+       "fill": {
+        "shape": {
+         "kind": "object",
+         "fields": {}
+        }
+       },
+       "filter": {
+        "shape": {
+         "kind": "object",
+         "fields": {}
+        }
+       },
+       "find": {
+        "shape": {
+         "kind": "object",
+         "fields": {}
+        }
+       },
+       "findIndex": {
+        "shape": {
+         "kind": "object",
+         "fields": {}
+        }
+       },
+       "forEach": {
+        "shape": {
+         "kind": "object",
+         "fields": {}
+        }
+       },
+       "indexOf": {
+        "shape": {
+         "kind": "object",
+         "fields": {}
+        }
+       },
+       "join": {
+        "shape": {
+         "kind": "object",
+         "fields": {}
+        }
+       },
+       "lastIndexOf": {
+        "shape": {
+         "kind": "object",
+         "fields": {}
+        }
+       },
+       "length": {
+        "shape": {
+         "kind": "number"
+        }
+       },
+       "map": {
+        "shape": {
+         "kind": "object",
+         "fields": {}
+        }
+       },
+       "reduce": {
+        "shape": {
+         "kind": "object",
+         "fields": {}
+        }
+       },
+       "reduceRight": {
+        "shape": {
+         "kind": "object",
+         "fields": {}
+        }
+       },
+       "reverse": {
+        "shape": {
+         "kind": "object",
+         "fields": {}
+        }
+       },
+       "set": {
+        "shape": {
+         "kind": "object",
+         "fields": {}
+        }
+       },
+       "slice": {
+        "shape": {
+         "kind": "object",
+         "fields": {}
+        }
+       },
+       "some": {
+        "shape": {
+         "kind": "object",
+         "fields": {}
+        }
+       },
+       "sort": {
+        "shape": {
+         "kind": "object",
+         "fields": {}
+        }
+       },
+       "subarray": {
+        "shape": {
+         "kind": "object",
+         "fields": {}
+        }
+       },
+       "toLocaleString": {
+        "shape": {
+         "kind": "object",
+         "fields": {}
+        }
+       },
+       "toString": {
+        "shape": {
+         "kind": "object",
+         "fields": {}
+        }
+       },
+       "valueOf": {
+        "shape": {
+         "kind": "object",
+         "fields": {}
+        }
+       },
+       "entries": {
+        "shape": {
+         "kind": "object",
+         "fields": {}
+        }
+       },
+       "keys": {
+        "shape": {
+         "kind": "object",
+         "fields": {}
+        }
+       },
+       "values": {
+        "shape": {
+         "kind": "object",
+         "fields": {}
+        }
+       },
+       "includes": {
+        "shape": {
+         "kind": "object",
+         "fields": {}
+        }
+       },
+       "at": {
+        "shape": {
+         "kind": "object",
+         "fields": {}
+        }
+       },
+       "__@iterator@24": {
+        "shape": {
+         "kind": "object",
+         "fields": {}
+        }
+       },
+       "__@toStringTag@78": {
+        "shape": {
+         "kind": "unknown"
+        }
+       }
+      }
+     }
+    ]
+   },
+   "args": [
+    "id"
+   ]
+  },
+  "get_server_backup_status": {
+   "result": {
+    "kind": "ref",
+    "name": "BackupStatus"
+   },
+   "args": []
+  },
+  "get_service": {
+   "result": {
+    "kind": "union",
+    "of": [
+     {
+      "kind": "null"
+     },
+     {
+      "kind": "object",
+      "fields": {
+       "id": {
+        "shape": {
+         "kind": "number"
+        }
+       },
+       "code": {
+        "shape": {
+         "kind": "string"
+        }
+       },
+       "name": {
+        "shape": {
+         "kind": "string"
+        }
+       },
+       "categoryId": {
+        "shape": {
+         "kind": "number"
+        }
+       },
+       "categoryName": {
+        "shape": {
+         "kind": "string"
+        }
+       },
+       "description": {
+        "shape": {
+         "kind": "union",
+         "of": [
+          {
+           "kind": "null"
+          },
+          {
+           "kind": "string"
+          }
+         ]
+        }
+       },
+       "durationMin": {
+        "shape": {
+         "kind": "number"
+        }
+       },
+       "price": {
+        "shape": {
+         "kind": "union",
+         "of": [
+          {
+           "kind": "null"
+          },
+          {
+           "kind": "number"
+          }
+         ]
+        }
+       },
+       "taxRate": {
+        "shape": {
+         "kind": "union",
+         "of": [
+          {
+           "kind": "null"
+          },
+          {
+           "kind": "number"
+          }
+         ]
+        }
+       },
+       "requiresVet": {
+        "shape": {
+         "kind": "unknown"
+        }
+       },
+       "requiresGroomer": {
+        "shape": {
+         "kind": "unknown"
+        }
+       },
+       "speciesId": {
+        "shape": {
+         "kind": "union",
+         "of": [
+          {
+           "kind": "null"
+          },
+          {
+           "kind": "number"
+          }
+         ]
+        }
+       },
+       "sortOrder": {
+        "shape": {
+         "kind": "number"
+        }
+       },
+       "isActive": {
+        "shape": {
+         "kind": "unknown"
+        }
+       }
+      }
+     }
+    ]
+   },
+   "args": [
+    "id"
+   ]
+  },
+  "get_session": {
+   "result": {
+    "kind": "union",
+    "of": [
+     {
+      "kind": "null"
+     },
+     {
+      "kind": "object",
+      "fields": {
+       "id": {
+        "shape": {
+         "kind": "number"
+        }
+       },
+       "username": {
+        "shape": {
+         "kind": "string"
+        }
+       },
+       "fullName": {
+        "shape": {
+         "kind": "string"
+        }
+       },
+       "role": {
+        "shape": {
+         "kind": "string"
+        }
+       },
+       "mustChangePassword": {
+        "shape": {
+         "kind": "unknown"
+        }
+       }
+      }
+     }
+    ]
+   },
+   "args": []
+  },
+  "get_stay": {
+   "result": {
+    "kind": "union",
+    "of": [
+     {
+      "kind": "null"
+     },
+     {
+      "kind": "object",
+      "fields": {
+       "id": {
+        "shape": {
+         "kind": "number"
+        }
+       },
+       "code": {
+        "shape": {
+         "kind": "string"
+        }
+       },
+       "patientId": {
+        "shape": {
+         "kind": "number"
+        }
+       },
+       "patientName": {
+        "shape": {
+         "kind": "string"
+        }
+       },
+       "ownerId": {
+        "shape": {
+         "kind": "number"
+        }
+       },
+       "ownerName": {
+        "shape": {
+         "kind": "string"
+        }
+       },
+       "ownerPhone": {
+        "shape": {
+         "kind": "union",
+         "of": [
+          {
+           "kind": "null"
+          },
+          {
+           "kind": "string"
+          }
+         ]
+        }
+       },
+       "visitId": {
+        "shape": {
+         "kind": "union",
+         "of": [
+          {
+           "kind": "null"
+          },
+          {
+           "kind": "number"
+          }
+         ]
+        }
+       },
+       "resourceId": {
+        "shape": {
+         "kind": "union",
+         "of": [
+          {
+           "kind": "null"
+          },
+          {
+           "kind": "number"
+          }
+         ]
+        }
+       },
+       "resourceName": {
+        "shape": {
+         "kind": "union",
+         "of": [
+          {
+           "kind": "null"
+          },
+          {
+           "kind": "string"
+          }
+         ]
+        }
+       },
+       "kind": {
+        "shape": {
+         "kind": "string"
+        }
+       },
+       "status": {
+        "shape": {
+         "kind": "string"
+        }
+       },
+       "checkInAt": {
+        "shape": {
+         "kind": "string"
+        }
+       },
+       "checkOutAt": {
+        "shape": {
+         "kind": "union",
+         "of": [
+          {
+           "kind": "null"
+          },
+          {
+           "kind": "string"
+          }
+         ]
+        }
+       },
+       "dailyRate": {
+        "shape": {
+         "kind": "union",
+         "of": [
+          {
+           "kind": "null"
+          },
+          {
+           "kind": "number"
+          }
+         ]
+        }
+       },
+       "notes": {
+        "shape": {
+         "kind": "union",
+         "of": [
+          {
+           "kind": "null"
+          },
+          {
+           "kind": "string"
+          }
+         ]
+        }
+       },
+       "days": {
+        "shape": {
+         "kind": "number"
+        }
+       },
+       "estimatedTotal": {
+        "shape": {
+         "kind": "union",
+         "of": [
+          {
+           "kind": "null"
+          },
+          {
+           "kind": "number"
+          }
+         ]
+        }
+       }
+      }
+     }
+    ]
+   },
+   "args": [
+    "id"
+   ]
+  },
+  "get_visit": {
+   "result": {
+    "kind": "union",
+    "of": [
+     {
+      "kind": "null"
+     },
+     {
+      "kind": "object",
+      "fields": {
+       "id": {
+        "shape": {
+         "kind": "number"
+        }
+       },
+       "code": {
+        "shape": {
+         "kind": "string"
+        }
+       },
+       "patientId": {
+        "shape": {
+         "kind": "number"
+        }
+       },
+       "patientName": {
+        "shape": {
+         "kind": "string"
+        }
+       },
+       "ownerId": {
+        "shape": {
+         "kind": "number"
+        }
+       },
+       "ownerName": {
+        "shape": {
+         "kind": "string"
+        }
+       },
+       "appointmentId": {
+        "shape": {
+         "kind": "union",
+         "of": [
+          {
+           "kind": "null"
+          },
+          {
+           "kind": "number"
+          }
+         ]
+        }
+       },
+       "arrivedAt": {
+        "shape": {
+         "kind": "string"
+        }
+       },
+       "priority": {
+        "shape": {
+         "kind": "string"
+        }
+       },
+       "status": {
+        "shape": {
+         "kind": "string"
+        }
+       },
+       "notes": {
+        "shape": {
+         "kind": "union",
+         "of": [
+          {
+           "kind": "null"
+          },
+          {
+           "kind": "string"
+          }
+         ]
+        }
+       },
+       "createdByName": {
+        "shape": {
+         "kind": "union",
+         "of": [
+          {
+           "kind": "null"
+          },
+          {
+           "kind": "string"
+          }
+         ]
+        }
+       },
+       "services": {
+        "shape": {
+         "kind": "array",
+         "items": {
+          "kind": "ref",
+          "name": "VisitService"
+         }
+        }
+       }
+      }
+     }
+    ]
+   },
+   "args": [
+    "id"
+   ]
+  },
+  "get_visit_attachment_content": {
+   "result": {
+    "kind": "ref",
+    "name": "AttachmentContent"
+   },
+   "args": [
+    "id"
+   ]
+  },
+  "get_worklist": {
+   "result": {
+    "kind": "ref",
+    "name": "WorklistData"
+   },
+   "args": []
+  },
+  "global_search": {
+   "result": {
+    "kind": "array",
+    "items": {
+     "kind": "ref",
+     "name": "GlobalSearchResult"
+    }
+   },
+   "args": [
+    "query"
+   ]
+  },
+  "import_analyzer_results": {
+   "result": {
+    "kind": "ref",
+    "name": "ImportSummary"
+   },
+   "args": [
+    "mapping",
+    "path"
+   ]
+  },
+  "import_clinic_logo": {
+   "result": {
+    "kind": "ref",
+    "name": "ClinicAsset"
+   },
+   "args": [
+    "sourcePath"
+   ]
+  },
+  "import_pkcs12": {
+   "result": {
+    "kind": "ref",
+    "name": "ClinicAsset"
+   },
+   "args": [
+    "password",
+    "sourcePath"
+   ]
+  },
+  "import_secondary_logo": {
+   "result": {
+    "kind": "ref",
+    "name": "SecondaryLogo"
+   },
+   "args": [
+    "name",
+    "sourcePath"
+   ]
+  },
+  "interpret_lab_results": {
+   "result": {
+    "kind": "string"
+   },
+   "args": [
+    "sampleId"
+   ]
+  },
+  "list_all_service_categories": {
+   "result": {
+    "kind": "array",
+    "items": {
+     "kind": "ref",
+     "name": "ServiceCategory"
+    }
+   },
+   "args": []
+  },
+  "list_analytes": {
+   "result": {
+    "kind": "array",
+    "items": {
+     "kind": "ref",
+     "name": "Analyte"
+    }
+   },
+   "args": []
+  },
+  "list_analyzer_import_jobs": {
+   "result": {
+    "kind": "array",
+    "items": {
+     "kind": "ref",
+     "name": "AnalyzerImportJob"
+    }
+   },
+   "args": [
+    "limit",
+    "sourceId"
+   ]
+  },
+  "list_analyzer_sources": {
+   "result": {
+    "kind": "array",
+    "items": {
+     "kind": "ref",
+     "name": "AnalyzerSource"
+    }
+   },
+   "args": []
+  },
+  "list_analyzers": {
+   "result": {
+    "kind": "array",
+    "items": {
+     "kind": "ref",
+     "name": "Analyzer"
+    }
+   },
+   "args": []
+  },
+  "list_appointments": {
+   "result": {
+    "kind": "array",
+    "items": {
+     "kind": "ref",
+     "name": "AppointmentListItem"
+    }
+   },
+   "args": [
+    "date",
+    "professionalId",
+    "status"
+   ]
+  },
+  "list_audit_log": {
+   "result": {
+    "kind": "array",
+    "items": {
+     "kind": "ref",
+     "name": "AuditLogEntry"
+    }
+   },
+   "args": [
+    "action",
+    "dateFrom",
+    "dateTo",
+    "limit",
+    "offset",
+    "username"
+   ]
+  },
+  "list_breeds": {
+   "result": {
+    "kind": "array",
+    "items": {
+     "kind": "ref",
+     "name": "Breed"
+    }
+   },
+   "args": [
+    "speciesId"
+   ]
+  },
+  "list_cash_movements": {
+   "result": {
+    "kind": "array",
+    "items": {
+     "kind": "ref",
+     "name": "CashMovement"
+    }
+   },
+   "args": [
+    "sessionId"
+   ]
+  },
+  "list_cash_sessions": {
+   "result": {
+    "kind": "array",
+    "items": {
+     "kind": "ref",
+     "name": "CashSession"
+    }
+   },
+   "args": [
+    "limit"
+   ]
+  },
+  "list_consultations": {
+   "result": {
+    "kind": "array",
+    "items": {
+     "kind": "ref",
+     "name": "ConsultationListItem"
+    }
+   },
+   "args": [
+    "search",
+    "status"
+   ]
+  },
+  "list_failed_analyzer_imports": {
+   "result": {
+    "kind": "array",
+    "items": {
+     "kind": "ref",
+     "name": "AnalyzerImportJob"
+    }
+   },
+   "args": [
+    "limit"
+   ]
+  },
+  "list_grooming_day": {
+   "result": {
+    "kind": "array",
+    "items": {
+     "kind": "ref",
+     "name": "GroomingDayLine"
+    }
+   },
+   "args": [
+    "date"
+   ]
+  },
+  "list_grooming_reminders": {
+   "result": {
+    "kind": "array",
+    "items": {
+     "kind": "ref",
+     "name": "GroomingReminder"
+    }
+   },
+   "args": []
+  },
+  "list_invoice_payments": {
+   "result": {
+    "kind": "array",
+    "items": {
+     "kind": "ref",
+     "name": "Payment"
+    }
+   },
+   "args": [
+    "invoiceId"
+   ]
+  },
+  "list_invoices": {
+   "result": {
+    "kind": "array",
+    "items": {
+     "kind": "ref",
+     "name": "InvoiceListItem"
+    }
+   },
+   "args": [
+    "search",
+    "status"
+   ]
+  },
+  "list_lab_orders": {
+   "result": {
+    "kind": "array",
+    "items": {
+     "kind": "ref",
+     "name": "LabOrderListItem"
+    }
+   },
+   "args": [
+    "search",
+    "status"
+   ]
+  },
+  "list_owners": {
+   "result": {
+    "kind": "array",
+    "items": {
+     "kind": "ref",
+     "name": "Owner"
+    }
+   },
+   "args": [
+    "search"
+   ]
+  },
+  "list_panel_analytes": {
+   "result": {
+    "kind": "array",
+    "items": {
+     "kind": "ref",
+     "name": "PanelAnalyte"
+    }
+   },
+   "args": [
+    "panelId"
+   ]
+  },
+  "list_panels": {
+   "result": {
+    "kind": "array",
+    "items": {
+     "kind": "ref",
+     "name": "Panel"
+    }
+   },
+   "args": []
+  },
+  "list_patient_lab_orders": {
+   "result": {
+    "kind": "array",
+    "items": {
+     "kind": "ref",
+     "name": "LabOrderListItem"
+    }
+   },
+   "args": [
+    "patientId"
+   ]
+  },
+  "list_patients": {
+   "result": {
+    "kind": "array",
+    "items": {
+     "kind": "ref",
+     "name": "Patient"
+    }
+   },
+   "args": [
+    "search"
+   ]
+  },
+  "list_payment_methods": {
+   "result": {
+    "kind": "array",
+    "items": {
+     "kind": "ref",
+     "name": "PaymentMethod"
+    }
+   },
+   "args": [
+    "includeInactive"
+   ]
+  },
+  "list_products": {
+   "result": {
+    "kind": "array",
+    "items": {
+     "kind": "ref",
+     "name": "ProductStockItem"
+    }
+   },
+   "args": [
+    "category",
+    "includeInactive",
+    "search"
+   ]
+  },
+  "list_qc_analyzer_status": {
+   "result": {
+    "kind": "array",
+    "items": {
+     "kind": "ref",
+     "name": "QcAnalyzerStatus"
+    }
+   },
+   "args": []
+  },
+  "list_qc_materials": {
+   "result": {
+    "kind": "array",
+    "items": {
+     "kind": "ref",
+     "name": "QcControlMaterial"
+    }
+   },
+   "args": []
+  },
+  "list_qc_runs": {
+   "result": {
+    "kind": "array",
+    "items": {
+     "kind": "ref",
+     "name": "QcRun"
+    }
+   },
+   "args": [
+    "controlMaterialId"
+   ]
+  },
+  "list_qc_targets": {
+   "result": {
+    "kind": "array",
+    "items": {
+     "kind": "ref",
+     "name": "QcTarget"
+    }
+   },
+   "args": [
+    "controlMaterialId"
+   ]
+  },
+  "list_reference_ranges": {
+   "result": {
+    "kind": "array",
+    "items": {
+     "kind": "ref",
+     "name": "ReferenceRange"
+    }
+   },
+   "args": [
+    "analyzerId"
+   ]
+  },
+  "list_reports": {
+   "result": {
+    "kind": "array",
+    "items": {
+     "kind": "ref",
+     "name": "ReportFile"
+    }
+   },
+   "args": []
+  },
+  "list_resource_board": {
+   "result": {
+    "kind": "array",
+    "items": {
+     "kind": "ref",
+     "name": "ResourceBoardItem"
+    }
+   },
+   "args": []
+  },
+  "list_resources": {
+   "result": {
+    "kind": "array",
+    "items": {
+     "kind": "ref",
+     "name": "Resource"
+    }
+   },
+   "args": [
+    "includeInactive"
+   ]
+  },
+  "list_sample_events": {
+   "result": {
+    "kind": "array",
+    "items": {
+     "kind": "ref",
+     "name": "SampleEvent"
+    }
+   },
+   "args": [
+    "sampleId"
+   ]
+  },
+  "list_sample_notifications": {
+   "result": {
+    "kind": "array",
+    "items": {
+     "kind": "ref",
+     "name": "NotificationLogEntry"
+    }
+   },
+   "args": [
+    "sampleId"
+   ]
+  },
+  "list_sample_types": {
+   "result": {
+    "kind": "array",
+    "items": {
+     "kind": "ref",
+     "name": "SampleType"
+    }
+   },
+   "args": []
+  },
+  "list_samples": {
+   "result": {
+    "kind": "array",
+    "items": {
+     "kind": "ref",
+     "name": "SampleListItem"
+    }
+   },
+   "args": [
+    "search",
+    "status"
+   ]
+  },
+  "list_secondary_logos": {
+   "result": {
+    "kind": "array",
+    "items": {
+     "kind": "ref",
+     "name": "SecondaryLogo"
+    }
+   },
+   "args": []
+  },
+  "list_service_categories": {
+   "result": {
+    "kind": "array",
+    "items": {
+     "kind": "ref",
+     "name": "ServiceCategory"
+    }
+   },
+   "args": []
+  },
+  "list_services": {
+   "result": {
+    "kind": "array",
+    "items": {
+     "kind": "ref",
+     "name": "Service"
+    }
+   },
+   "args": [
+    "categoryId",
+    "includeInactive",
+    "search"
+   ]
+  },
+  "list_species": {
+   "result": {
+    "kind": "array",
+    "items": {
+     "kind": "ref",
+     "name": "Species"
+    }
+   },
+   "args": []
+  },
+  "list_stay_events": {
+   "result": {
+    "kind": "array",
+    "items": {
+     "kind": "ref",
+     "name": "StayEvent"
+    }
+   },
+   "args": [
+    "stayId"
+   ]
+  },
+  "list_stays": {
+   "result": {
+    "kind": "array",
+    "items": {
+     "kind": "ref",
+     "name": "StayListItem"
+    }
+   },
+   "args": [
+    "kind",
+    "patientId",
+    "status"
+   ]
+  },
+  "list_stock_movements": {
+   "result": {
+    "kind": "array",
+    "items": {
+     "kind": "ref",
+     "name": "StockMovement"
+    }
+   },
+   "args": [
+    "limit",
+    "productId"
+   ]
+  },
+  "list_surgeries": {
+   "result": {
+    "kind": "array",
+    "items": {
+     "kind": "ref",
+     "name": "Surgery"
+    }
+   },
+   "args": [
+    "search",
+    "status"
+   ]
+  },
+  "list_users": {
+   "result": {
+    "kind": "array",
+    "items": {
+     "kind": "ref",
+     "name": "UserListItem"
+    }
+   },
+   "args": []
+  },
+  "list_vaccine_types": {
+   "result": {
+    "kind": "array",
+    "items": {
+     "kind": "ref",
+     "name": "VaccineType"
+    }
+   },
+   "args": []
+  },
+  "list_vaccines": {
+   "result": {
+    "kind": "array",
+    "items": {
+     "kind": "ref",
+     "name": "VaccineListItem"
+    }
+   },
+   "args": [
+    "search"
+   ]
+  },
+  "list_visit_attachments": {
+   "result": {
+    "kind": "array",
+    "items": {
+     "kind": "ref",
+     "name": "VisitAttachment"
+    }
+   },
+   "args": [
+    "visitId"
+   ]
+  },
+  "list_visits": {
+   "result": {
+    "kind": "array",
+    "items": {
+     "kind": "ref",
+     "name": "VisitListItem"
+    }
+   },
+   "args": [
+    "date",
+    "search",
+    "status"
+   ]
+  },
+  "log_frontend": {
+   "result": {
+    "kind": "null"
+   },
+   "args": [
+    "context",
+    "level",
+    "message"
+   ]
+  },
+  "login": {
+   "result": {
+    "kind": "ref",
+    "name": "SessionUser"
+   },
+   "args": [
+    "input"
+   ]
+  },
+  "logout": {
+   "result": {
+    "kind": "null"
+   },
+   "args": []
+  },
+  "open_cash_session": {
+   "result": {
+    "kind": "ref",
+    "name": "CashSession"
+   },
+   "args": [
+    "notes",
+    "openingFloat"
+   ]
+  },
+  "open_report_file": {
+   "result": {
+    "kind": "null"
+   },
+   "args": [
+    "path"
+   ]
+  },
+  "open_visit_attachment": {
+   "result": {
+    "kind": "null"
+   },
+   "args": [
+    "id"
+   ]
+  },
+  "poll_analyzer_source": {
+   "result": {
+    "kind": "array",
+    "items": {
+     "kind": "ref",
+     "name": "AnalyzerImportJob"
+    }
+   },
+   "args": [
+    "sourceId"
+   ]
+  },
+  "preview_analyzer_import": {
+   "result": {
+    "kind": "ref",
+    "name": "ImportPreview"
+   },
+   "args": [
+    "path"
+   ]
+  },
+  "record_qc_run": {
+   "result": {
+    "kind": "ref",
+    "name": "QcRun"
+   },
+   "args": [
+    "input"
+   ]
+  },
+  "register_lab_result": {
+   "result": {
+    "kind": "ref",
+    "name": "LabResult"
+   },
+   "args": [
+    "input"
+   ]
+  },
+  "register_lab_results": {
+   "result": {
+    "kind": "array",
+    "items": {
+     "kind": "ref",
+     "name": "LabResult"
+    }
+   },
+   "args": [
+    "input"
+   ]
+  },
+  "register_payment": {
+   "result": {
+    "kind": "ref",
+    "name": "Payment"
+   },
+   "args": [
+    "input"
+   ]
+  },
+  "reject_sample": {
+   "result": {
+    "kind": "ref",
+    "name": "Sample"
+   },
+   "args": [
+    "id",
+    "reason"
+   ]
+  },
+  "remove_visit_service": {
+   "result": {
+    "kind": "null"
+   },
+   "args": [
+    "lineId",
+    "visitId"
+   ]
+  },
+  "reopen_sample": {
+   "result": {
+    "kind": "ref",
+    "name": "Sample"
+   },
+   "args": [
+    "id"
+   ]
+  },
+  "save_analyzer_source": {
+   "result": {
+    "kind": "union",
+    "of": [
+     {
+      "kind": "null"
+     },
+     {
+      "kind": "object",
+      "fields": {
+       "id": {
+        "shape": {
+         "kind": "number"
+        }
+       },
+       "analyzerId": {
+        "shape": {
+         "kind": "number"
+        }
+       },
+       "analyzerName": {
+        "shape": {
+         "kind": "string"
+        }
+       },
+       "sourceType": {
+        "shape": {
+         "kind": "string"
+        }
+       },
+       "folderPath": {
+        "shape": {
+         "kind": "union",
+         "of": [
+          {
+           "kind": "null"
+          },
+          {
+           "kind": "string"
+          }
+         ]
+        }
+       },
+       "enabled": {
+        "shape": {
+         "kind": "unknown"
+        }
+       },
+       "lastPollAt": {
+        "shape": {
+         "kind": "union",
+         "of": [
+          {
+           "kind": "null"
+          },
+          {
+           "kind": "string"
+          }
+         ]
+        }
+       },
+       "mapping": {
+        "shape": {
+         "kind": "union",
+         "of": [
+          {
+           "kind": "null"
+          },
+          {
+           "kind": "ref",
+           "name": "AnalyzerImportMapping"
+          }
+         ]
+        }
+       },
+       "mappedColumns": {
+        "shape": {
+         "kind": "number"
+        }
+       }
+      }
+     }
+    ]
+   },
+   "args": [
+    "input"
+   ]
+  },
+  "save_clinic_settings": {
+   "result": {
+    "kind": "ref",
+    "name": "ClinicSettings"
+   },
+   "args": [
+    "input"
+   ]
+  },
+  "save_db_connection": {
+   "result": {
+    "kind": "string"
+   },
+   "args": [
+    "input"
+   ]
+  },
+  "save_panel": {
+   "result": {
+    "kind": "ref",
+    "name": "Panel"
+   },
+   "args": [
+    "input"
+   ]
+  },
+  "save_product": {
+   "result": {
+    "kind": "ref",
+    "name": "Product"
+   },
+   "args": [
+    "input"
+   ]
+  },
+  "save_qc_material": {
+   "result": {
+    "kind": "ref",
+    "name": "QcControlMaterial"
+   },
+   "args": [
+    "input"
+   ]
+  },
+  "save_resource": {
+   "result": {
+    "kind": "ref",
+    "name": "Resource"
+   },
+   "args": [
+    "input"
+   ]
+  },
+  "save_service": {
+   "result": {
+    "kind": "ref",
+    "name": "Service"
+   },
+   "args": [
+    "input"
+   ]
+  },
+  "save_service_category": {
+   "result": {
+    "kind": "ref",
+    "name": "ServiceCategory"
+   },
+   "args": [
+    "input"
+   ]
+  },
+  "send_critical_email": {
+   "result": {
+    "kind": "array",
+    "items": {
+     "kind": "ref",
+     "name": "NotificationLogEntry"
+    }
+   },
+   "args": [
+    "resultIds",
+    "sampleId"
+   ]
+  },
+  "set_analyzer_active": {
+   "result": {
+    "kind": "ref",
+    "name": "Analyzer"
+   },
+   "args": [
+    "active",
+    "id"
+   ]
+  },
+  "set_appointment_status": {
+   "result": {
+    "kind": "ref",
+    "name": "Appointment"
+   },
+   "args": [
+    "id",
+    "input"
+   ]
+  },
+  "set_consultation_status": {
+   "result": {
+    "kind": "ref",
+    "name": "ConsultationListItem"
+   },
+   "args": [
+    "id",
+    "status"
+   ]
+  },
+  "set_invoice_status": {
+   "result": {
+    "kind": "ref",
+    "name": "Invoice"
+   },
+   "args": [
+    "id",
+    "status"
+   ]
+  },
+  "set_lab_order_status": {
+   "result": {
+    "kind": "ref",
+    "name": "LabOrder"
+   },
+   "args": [
+    "id",
+    "status"
+   ]
+  },
+  "set_product_active": {
+   "result": {
+    "kind": "ref",
+    "name": "Product"
+   },
+   "args": [
+    "active",
+    "id"
+   ]
+  },
+  "set_sample_quality": {
+   "result": {
+    "kind": "ref",
+    "name": "Sample"
+   },
+   "args": [
+    "id",
+    "qualityIndex",
+    "qualityNote",
+    "qualitySeverity"
+   ]
+  },
+  "set_sample_status": {
+   "result": {
+    "kind": "ref",
+    "name": "Sample"
+   },
+   "args": [
+    "id",
+    "status"
+   ]
+  },
+  "set_service_active": {
+   "result": {
+    "kind": "ref",
+    "name": "Service"
+   },
+   "args": [
+    "active",
+    "id"
+   ]
+  },
+  "set_surgery_status": {
+   "result": {
+    "kind": "ref",
+    "name": "Surgery"
+   },
+   "args": [
+    "id",
+    "status"
+   ]
+  },
+  "set_visit_status": {
+   "result": {
+    "kind": "ref",
+    "name": "Visit"
+   },
+   "args": [
+    "id",
+    "status"
+   ]
+  },
+  "test_db_connection": {
+   "result": {
+    "kind": "ref",
+    "name": "DbTestResult"
+   },
+   "args": [
+    "input"
+   ]
+  },
+  "test_groq_connection": {
+   "result": {
+    "kind": "string"
+   },
+   "args": []
+  },
+  "test_smtp_connection": {
+   "result": {
+    "kind": "null"
+   },
+   "args": []
+  },
+  "update_analyzer": {
+   "result": {
+    "kind": "ref",
+    "name": "Analyzer"
+   },
+   "args": [
+    "input"
+   ]
+  },
+  "update_reference_range": {
+   "result": {
+    "kind": "ref",
+    "name": "ReferenceRange"
+   },
+   "args": [
+    "id",
+    "input"
+   ]
+  },
+  "update_visit_service_status": {
+   "result": {
+    "kind": "ref",
+    "name": "VisitService"
+   },
+   "args": [
+    "input",
+    "lineId",
+    "visitId"
+   ]
+  },
+  "upsert_grooming_session": {
+   "result": {
+    "kind": "ref",
+    "name": "GroomingSession"
+   },
+   "args": [
+    "input"
+   ]
+  },
+  "void_payment": {
+   "result": {
+    "kind": "ref",
+    "name": "Payment"
+   },
+   "args": [
+    "paymentId",
+    "reason"
+   ]
+  }
+ },
+ "types": {
+  "Analyte": {
+   "kind": "object",
+   "fields": {
+    "id": {
+     "shape": {
+      "kind": "number"
+     }
+    },
+    "code": {
+     "shape": {
+      "kind": "string"
+     }
+    },
+    "name": {
+     "shape": {
+      "kind": "string"
+     }
+    },
+    "unit": {
+     "shape": {
+      "kind": "union",
+      "of": [
+       {
+        "kind": "null"
+       },
+       {
+        "kind": "string"
+       }
+      ]
+     }
+    },
+    "method": {
+     "shape": {
+      "kind": "union",
+      "of": [
+       {
+        "kind": "null"
+       },
+       {
+        "kind": "string"
+       }
+      ]
+     }
+    }
+   }
+  },
+  "AnalyteCount": {
+   "kind": "object",
+   "fields": {
+    "analyteName": {
+     "shape": {
+      "kind": "string"
+     }
+    },
+    "count": {
+     "shape": {
+      "kind": "number"
+     }
+    }
+   }
+  },
+  "Analyzer": {
+   "kind": "object",
+   "fields": {
+    "id": {
+     "shape": {
+      "kind": "number"
+     }
+    },
+    "code": {
+     "shape": {
+      "kind": "string"
+     }
+    },
+    "name": {
+     "shape": {
+      "kind": "string"
+     }
+    },
+    "manufacturer": {
+     "shape": {
+      "kind": "union",
+      "of": [
+       {
+        "kind": "null"
+       },
+       {
+        "kind": "string"
+       }
+      ]
+     }
+    },
+    "model": {
+     "shape": {
+      "kind": "union",
+      "of": [
+       {
+        "kind": "null"
+       },
+       {
+        "kind": "string"
+       }
+      ]
+     }
+    },
+    "isActive": {
+     "shape": {
+      "kind": "unknown"
+     }
+    },
+    "notes": {
+     "shape": {
+      "kind": "union",
+      "of": [
+       {
+        "kind": "null"
+       },
+       {
+        "kind": "string"
+       }
+      ]
+     }
+    },
+    "rangeCount": {
+     "shape": {
+      "kind": "number"
+     }
+    }
+   }
+  },
+  "AnalyzerImportJob": {
+   "kind": "object",
+   "fields": {
+    "id": {
+     "shape": {
+      "kind": "number"
+     }
+    },
+    "sourceId": {
+     "shape": {
+      "kind": "number"
+     }
+    },
+    "analyzerId": {
+     "shape": {
+      "kind": "number"
+     }
+    },
+    "analyzerName": {
+     "shape": {
+      "kind": "string"
+     }
+    },
+    "fileName": {
+     "shape": {
+      "kind": "string"
+     }
+    },
+    "status": {
+     "shape": {
+      "kind": "string"
+     }
+    },
+    "samplesUpdated": {
+     "shape": {
+      "kind": "number"
+     }
+    },
+    "resultsImported": {
+     "shape": {
+      "kind": "number"
+     }
+    },
+    "skippedRows": {
+     "shape": {
+      "kind": "number"
+     }
+    },
+    "errorMsg": {
+     "shape": {
+      "kind": "union",
+      "of": [
+       {
+        "kind": "null"
+       },
+       {
+        "kind": "string"
+       }
+      ]
+     }
+    },
+    "processedAt": {
+     "shape": {
+      "kind": "string"
+     }
+    }
+   }
+  },
+  "AnalyzerImportMapping": {
+   "kind": "object",
+   "fields": {
+    "sampleCodeColumn": {
+     "shape": {
+      "kind": "number"
+     }
+    },
+    "columns": {
+     "shape": {
+      "kind": "array",
+      "items": {
+       "kind": "ref",
+       "name": "ImportColumnMapping"
+      }
+     }
+    }
+   }
+  },
+  "AnalyzerSource": {
+   "kind": "object",
+   "fields": {
+    "id": {
+     "shape": {
+      "kind": "number"
+     }
+    },
+    "analyzerId": {
+     "shape": {
+      "kind": "number"
+     }
+    },
+    "analyzerName": {
+     "shape": {
+      "kind": "string"
+     }
+    },
+    "sourceType": {
+     "shape": {
+      "kind": "string"
+     }
+    },
+    "folderPath": {
+     "shape": {
+      "kind": "union",
+      "of": [
+       {
+        "kind": "null"
+       },
+       {
+        "kind": "string"
+       }
+      ]
+     }
+    },
+    "enabled": {
+     "shape": {
+      "kind": "unknown"
+     }
+    },
+    "lastPollAt": {
+     "shape": {
+      "kind": "union",
+      "of": [
+       {
+        "kind": "null"
+       },
+       {
+        "kind": "string"
+       }
+      ]
+     }
+    },
+    "mapping": {
+     "shape": {
+      "kind": "union",
+      "of": [
+       {
+        "kind": "null"
+       },
+       {
+        "kind": "ref",
+        "name": "AnalyzerImportMapping"
+       }
+      ]
+     }
+    },
+    "mappedColumns": {
+     "shape": {
+      "kind": "number"
+     }
+    }
+   }
+  },
+  "Appointment": {
+   "kind": "object",
+   "fields": {
+    "id": {
+     "shape": {
+      "kind": "number"
+     }
+    },
+    "code": {
+     "shape": {
+      "kind": "string"
+     }
+    },
+    "patientId": {
+     "shape": {
+      "kind": "number"
+     }
+    },
+    "patientName": {
+     "shape": {
+      "kind": "string"
+     }
+    },
+    "ownerId": {
+     "shape": {
+      "kind": "number"
+     }
+    },
+    "ownerName": {
+     "shape": {
+      "kind": "string"
+     }
+    },
+    "serviceId": {
+     "shape": {
+      "kind": "number"
+     }
+    },
+    "serviceName": {
+     "shape": {
+      "kind": "string"
+     }
+    },
+    "serviceCode": {
+     "shape": {
+      "kind": "string"
+     }
+    },
+    "categoryId": {
+     "shape": {
+      "kind": "number"
+     }
+    },
+    "categoryName": {
+     "shape": {
+      "kind": "string"
+     }
+    },
+    "professionalId": {
+     "shape": {
+      "kind": "union",
+      "of": [
+       {
+        "kind": "null"
+       },
+       {
+        "kind": "number"
+       }
+      ]
+     }
+    },
+    "professionalName": {
+     "shape": {
+      "kind": "union",
+      "of": [
+       {
+        "kind": "null"
+       },
+       {
+        "kind": "string"
+       }
+      ]
+     }
+    },
+    "scheduledAt": {
+     "shape": {
+      "kind": "string"
+     }
+    },
+    "durationMin": {
+     "shape": {
+      "kind": "number"
+     }
+    },
+    "status": {
+     "shape": {
+      "kind": "string"
+     }
+    },
+    "notes": {
+     "shape": {
+      "kind": "union",
+      "of": [
+       {
+        "kind": "null"
+       },
+       {
+        "kind": "string"
+       }
+      ]
+     }
+    },
+    "createdAt": {
+     "shape": {
+      "kind": "string"
+     }
+    },
+    "updatedAt": {
+     "shape": {
+      "kind": "string"
+     }
+    }
+   }
+  },
+  "AppointmentListItem": {
+   "kind": "object",
+   "fields": {
+    "id": {
+     "shape": {
+      "kind": "number"
+     }
+    },
+    "code": {
+     "shape": {
+      "kind": "string"
+     }
+    },
+    "patientId": {
+     "shape": {
+      "kind": "number"
+     }
+    },
+    "patientName": {
+     "shape": {
+      "kind": "string"
+     }
+    },
+    "ownerId": {
+     "shape": {
+      "kind": "number"
+     }
+    },
+    "ownerName": {
+     "shape": {
+      "kind": "string"
+     }
+    },
+    "serviceId": {
+     "shape": {
+      "kind": "number"
+     }
+    },
+    "serviceName": {
+     "shape": {
+      "kind": "string"
+     }
+    },
+    "categoryId": {
+     "shape": {
+      "kind": "number"
+     }
+    },
+    "categoryName": {
+     "shape": {
+      "kind": "string"
+     }
+    },
+    "scheduledAt": {
+     "shape": {
+      "kind": "string"
+     }
+    },
+    "durationMin": {
+     "shape": {
+      "kind": "number"
+     }
+    },
+    "status": {
+     "shape": {
+      "kind": "string"
+     }
+    },
+    "professionalName": {
+     "shape": {
+      "kind": "union",
+      "of": [
+       {
+        "kind": "null"
+       },
+       {
+        "kind": "string"
+       }
+      ]
+     }
+    }
+   }
+  },
+  "AttachmentContent": {
+   "kind": "object",
+   "fields": {
+    "fileName": {
+     "shape": {
+      "kind": "string"
+     }
+    },
+    "mimeType": {
+     "shape": {
+      "kind": "union",
+      "of": [
+       {
+        "kind": "null"
+       },
+       {
+        "kind": "string"
+       }
+      ]
+     }
+    },
+    "sizeBytes": {
+     "shape": {
+      "kind": "number"
+     }
+    },
+    "dataUrl": {
+     "shape": {
+      "kind": "string"
+     }
+    }
+   }
+  },
+  "AuditLogEntry": {
+   "kind": "object",
+   "fields": {
+    "id": {
+     "shape": {
+      "kind": "number"
+     }
+    },
+    "userId": {
+     "shape": {
+      "kind": "union",
+      "of": [
+       {
+        "kind": "null"
+       },
+       {
+        "kind": "number"
+       }
+      ]
+     }
+    },
+    "username": {
+     "shape": {
+      "kind": "string"
+     }
+    },
+    "action": {
+     "shape": {
+      "kind": "string"
+     }
+    },
+    "details": {
+     "shape": {
+      "kind": "union",
+      "of": [
+       {
+        "kind": "null"
+       },
+       {
+        "kind": "string"
+       }
+      ]
+     }
+    },
+    "createdAt": {
+     "shape": {
+      "kind": "string"
+     }
+    }
+   }
+  },
+  "BackupStatus": {
+   "kind": "object",
+   "fields": {
+    "lastBackupAt": {
+     "shape": {
+      "kind": "union",
+      "of": [
+       {
+        "kind": "null"
+       },
+       {
+        "kind": "string"
+       }
+      ]
+     }
+    },
+    "lastBackupFile": {
+     "shape": {
+      "kind": "union",
+      "of": [
+       {
+        "kind": "null"
+       },
+       {
+        "kind": "string"
+       }
+      ]
+     }
+    }
+   }
+  },
+  "BillingMethodTotal": {
+   "kind": "object",
+   "fields": {
+    "methodCode": {
+     "shape": {
+      "kind": "string"
+     }
+    },
+    "methodName": {
+     "shape": {
+      "kind": "string"
+     }
+    },
+    "amount": {
+     "shape": {
+      "kind": "number"
+     }
+    }
+   }
+  },
+  "BillingReport": {
+   "kind": "object",
+   "fields": {
+    "fromDate": {
+     "shape": {
+      "kind": "string"
+     }
+    },
+    "toDate": {
+     "shape": {
+      "kind": "string"
+     }
+    },
+    "billedTotal": {
+     "shape": {
+      "kind": "number"
+     }
+    },
+    "billedTax": {
+     "shape": {
+      "kind": "number"
+     }
+    },
+    "billedCount": {
+     "shape": {
+      "kind": "number"
+     }
+    },
+    "collectedTotal": {
+     "shape": {
+      "kind": "number"
+     }
+    },
+    "collectedCount": {
+     "shape": {
+      "kind": "number"
+     }
+    },
+    "outstandingTotal": {
+     "shape": {
+      "kind": "number"
+     }
+    },
+    "methods": {
+     "shape": {
+      "kind": "array",
+      "items": {
+       "kind": "ref",
+       "name": "BillingMethodTotal"
+      }
+     }
+    }
+   }
+  },
+  "Breed": {
+   "kind": "object",
+   "fields": {
+    "id": {
+     "shape": {
+      "kind": "number"
+     }
+    },
+    "speciesId": {
+     "shape": {
+      "kind": "number"
+     }
+    },
+    "name": {
+     "shape": {
+      "kind": "string"
+     }
+    }
+   }
+  },
+  "CashCountLine": {
+   "kind": "object",
+   "fields": {
+    "denomination": {
+     "shape": {
+      "kind": "number"
+     }
+    },
+    "quantity": {
+     "shape": {
+      "kind": "number"
+     }
+    },
+    "subtotal": {
+     "shape": {
+      "kind": "number"
+     }
+    }
+   }
+  },
+  "CashMethodTotal": {
+   "kind": "object",
+   "fields": {
+    "methodCode": {
+     "shape": {
+      "kind": "string"
+     }
+    },
+    "methodName": {
+     "shape": {
+      "kind": "string"
+     }
+    },
+    "amount": {
+     "shape": {
+      "kind": "number"
+     }
+    }
+   }
+  },
+  "CashMovement": {
+   "kind": "object",
+   "fields": {
+    "id": {
+     "shape": {
+      "kind": "number"
+     }
+    },
+    "cashSessionId": {
+     "shape": {
+      "kind": "number"
+     }
+    },
+    "kind": {
+     "shape": {
+      "kind": "string"
+     }
+    },
+    "amount": {
+     "shape": {
+      "kind": "number"
+     }
+    },
+    "paymentId": {
+     "shape": {
+      "kind": "union",
+      "of": [
+       {
+        "kind": "null"
+       },
+       {
+        "kind": "number"
+       }
+      ]
+     }
+    },
+    "reason": {
+     "shape": {
+      "kind": "union",
+      "of": [
+       {
+        "kind": "null"
+       },
+       {
+        "kind": "string"
+       }
+      ]
+     }
+    },
+    "createdByName": {
+     "shape": {
+      "kind": "union",
+      "of": [
+       {
+        "kind": "null"
+       },
+       {
+        "kind": "string"
+       }
+      ]
+     }
+    },
+    "createdAt": {
+     "shape": {
+      "kind": "string"
+     }
+    }
+   }
+  },
+  "CashSession": {
+   "kind": "object",
+   "fields": {
+    "id": {
+     "shape": {
+      "kind": "number"
+     }
+    },
+    "code": {
+     "shape": {
+      "kind": "string"
+     }
+    },
+    "openedAt": {
+     "shape": {
+      "kind": "string"
+     }
+    },
+    "openedBy": {
+     "shape": {
+      "kind": "number"
+     }
+    },
+    "openedByName": {
+     "shape": {
+      "kind": "union",
+      "of": [
+       {
+        "kind": "null"
+       },
+       {
+        "kind": "string"
+       }
+      ]
+     }
+    },
+    "openingFloat": {
+     "shape": {
+      "kind": "number"
+     }
+    },
+    "status": {
+     "shape": {
+      "kind": "string"
+     }
+    },
+    "closedAt": {
+     "shape": {
+      "kind": "union",
+      "of": [
+       {
+        "kind": "null"
+       },
+       {
+        "kind": "string"
+       }
+      ]
+     }
+    },
+    "closedByName": {
+     "shape": {
+      "kind": "union",
+      "of": [
+       {
+        "kind": "null"
+       },
+       {
+        "kind": "string"
+       }
+      ]
+     }
+    },
+    "expectedCash": {
+     "shape": {
+      "kind": "union",
+      "of": [
+       {
+        "kind": "null"
+       },
+       {
+        "kind": "number"
+       }
+      ]
+     }
+    },
+    "countedCash": {
+     "shape": {
+      "kind": "union",
+      "of": [
+       {
+        "kind": "null"
+       },
+       {
+        "kind": "number"
+       }
+      ]
+     }
+    },
+    "difference": {
+     "shape": {
+      "kind": "union",
+      "of": [
+       {
+        "kind": "null"
+       },
+       {
+        "kind": "number"
+       }
+      ]
+     }
+    },
+    "totalBilled": {
+     "shape": {
+      "kind": "union",
+      "of": [
+       {
+        "kind": "null"
+       },
+       {
+        "kind": "number"
+       }
+      ]
+     }
+    },
+    "totalCollected": {
+     "shape": {
+      "kind": "union",
+      "of": [
+       {
+        "kind": "null"
+       },
+       {
+        "kind": "number"
+       }
+      ]
+     }
+    },
+    "notes": {
+     "shape": {
+      "kind": "union",
+      "of": [
+       {
+        "kind": "null"
+       },
+       {
+        "kind": "string"
+       }
+      ]
+     }
+    }
+   }
+  },
+  "CashSessionSummary": {
+   "kind": "object",
+   "fields": {
+    "session": {
+     "shape": {
+      "kind": "ref",
+      "name": "CashSession"
+     }
+    },
+    "openingFloat": {
+     "shape": {
+      "kind": "number"
+     }
+    },
+    "expectedCash": {
+     "shape": {
+      "kind": "number"
+     }
+    },
+    "countedCash": {
+     "shape": {
+      "kind": "union",
+      "of": [
+       {
+        "kind": "null"
+       },
+       {
+        "kind": "number"
+       }
+      ]
+     }
+    },
+    "difference": {
+     "shape": {
+      "kind": "union",
+      "of": [
+       {
+        "kind": "null"
+       },
+       {
+        "kind": "number"
+       }
+      ]
+     }
+    },
+    "totalBilled": {
+     "shape": {
+      "kind": "number"
+     }
+    },
+    "totalCollected": {
+     "shape": {
+      "kind": "number"
+     }
+    },
+    "cashIn": {
+     "shape": {
+      "kind": "number"
+     }
+    },
+    "cashOut": {
+     "shape": {
+      "kind": "number"
+     }
+    },
+    "paymentsCount": {
+     "shape": {
+      "kind": "number"
+     }
+    },
+    "methods": {
+     "shape": {
+      "kind": "array",
+      "items": {
+       "kind": "ref",
+       "name": "CashMethodTotal"
+      }
+     }
+    },
+    "movements": {
+     "shape": {
+      "kind": "array",
+      "items": {
+       "kind": "ref",
+       "name": "CashMovement"
+      }
+     }
+    },
+    "countLines": {
+     "shape": {
+      "kind": "array",
+      "items": {
+       "kind": "ref",
+       "name": "CashCountLine"
+      }
+     }
+    }
+   }
+  },
+  "ClinicAsset": {
+   "kind": "object",
+   "fields": {
+    "kind": {
+     "shape": {
+      "kind": "string"
+     }
+    },
+    "fileName": {
+     "shape": {
+      "kind": "union",
+      "of": [
+       {
+        "kind": "null"
+       },
+       {
+        "kind": "string"
+       }
+      ]
+     }
+    },
+    "mimeType": {
+     "shape": {
+      "kind": "union",
+      "of": [
+       {
+        "kind": "null"
+       },
+       {
+        "kind": "string"
+       }
+      ]
+     }
+    },
+    "sizeBytes": {
+     "shape": {
+      "kind": "number"
+     }
+    },
+    "updatedAt": {
+     "shape": {
+      "kind": "string"
+     }
+    }
+   }
+  },
+  "ClinicBranding": {
+   "kind": "object",
+   "fields": {
+    "clinicName": {
+     "shape": {
+      "kind": "string"
+     }
+    },
+    "tagline": {
+     "shape": {
+      "kind": "union",
+      "of": [
+       {
+        "kind": "null"
+       },
+       {
+        "kind": "string"
+       }
+      ]
+     }
+    }
+   }
+  },
+  "ClinicSettings": {
+   "kind": "object",
+   "fields": {
+    "clinicName": {
+     "shape": {
+      "kind": "string"
+     }
+    },
+    "clinicNit": {
+     "shape": {
+      "kind": "string"
+     }
+    },
+    "address": {
+     "shape": {
+      "kind": "union",
+      "of": [
+       {
+        "kind": "null"
+       },
+       {
+        "kind": "string"
+       }
+      ]
+     }
+    },
+    "phone": {
+     "shape": {
+      "kind": "union",
+      "of": [
+       {
+        "kind": "null"
+       },
+       {
+        "kind": "string"
+       }
+      ]
+     }
+    },
+    "city": {
+     "shape": {
+      "kind": "union",
+      "of": [
+       {
+        "kind": "null"
+       },
+       {
+        "kind": "string"
+       }
+      ]
+     }
+    },
+    "logo": {
+     "shape": {
+      "kind": "union",
+      "of": [
+       {
+        "kind": "null"
+       },
+       {
+        "kind": "ref",
+        "name": "ClinicAsset"
+       }
+      ]
+     }
+    },
+    "taxRate": {
+     "shape": {
+      "kind": "union",
+      "of": [
+       {
+        "kind": "null"
+       },
+       {
+        "kind": "number"
+       }
+      ]
+     }
+    },
+    "currency": {
+     "shape": {
+      "kind": "string"
+     }
+    },
+    "signatureMode": {
+     "shape": {
+      "kind": "string"
+     }
+    },
+    "vetName": {
+     "shape": {
+      "kind": "string"
+     }
+    },
+    "vetLicense": {
+     "shape": {
+      "kind": "union",
+      "of": [
+       {
+        "kind": "null"
+       },
+       {
+        "kind": "string"
+       }
+      ]
+     }
+    },
+    "groqApiKey": {
+     "shape": {
+      "kind": "union",
+      "of": [
+       {
+        "kind": "null"
+       },
+       {
+        "kind": "string"
+       }
+      ]
+     }
+    },
+    "certificate": {
+     "shape": {
+      "kind": "union",
+      "of": [
+       {
+        "kind": "null"
+       },
+       {
+        "kind": "ref",
+        "name": "ClinicAsset"
+       }
+      ]
+     }
+    },
+    "pkcs12Password": {
+     "shape": {
+      "kind": "union",
+      "of": [
+       {
+        "kind": "null"
+       },
+       {
+        "kind": "string"
+       }
+      ]
+     }
+    },
+    "smtpHost": {
+     "shape": {
+      "kind": "union",
+      "of": [
+       {
+        "kind": "null"
+       },
+       {
+        "kind": "string"
+       }
+      ]
+     }
+    },
+    "smtpPort": {
+     "shape": {
+      "kind": "union",
+      "of": [
+       {
+        "kind": "null"
+       },
+       {
+        "kind": "number"
+       }
+      ]
+     }
+    },
+    "smtpTls": {
+     "shape": {
+      "kind": "union",
+      "of": [
+       {
+        "kind": "null"
+       },
+       {
+        "kind": "string"
+       }
+      ]
+     }
+    },
+    "smtpUsername": {
+     "shape": {
+      "kind": "union",
+      "of": [
+       {
+        "kind": "null"
+       },
+       {
+        "kind": "string"
+       }
+      ]
+     }
+    },
+    "smtpPassword": {
+     "shape": {
+      "kind": "union",
+      "of": [
+       {
+        "kind": "null"
+       },
+       {
+        "kind": "string"
+       }
+      ]
+     }
+    },
+    "smtpFrom": {
+     "shape": {
+      "kind": "union",
+      "of": [
+       {
+        "kind": "null"
+       },
+       {
+        "kind": "string"
+       }
+      ]
+     }
+    },
+    "tagline": {
+     "shape": {
+      "kind": "union",
+      "of": [
+       {
+        "kind": "null"
+       },
+       {
+        "kind": "string"
+       }
+      ]
+     }
+    },
+    "groomingDefaultDuration": {
+     "shape": {
+      "kind": "union",
+      "of": [
+       {
+        "kind": "null"
+       },
+       {
+        "kind": "number"
+       }
+      ]
+     }
+    },
+    "receptionTicketPrefix": {
+     "shape": {
+      "kind": "union",
+      "of": [
+       {
+        "kind": "null"
+       },
+       {
+        "kind": "string"
+       }
+      ]
+     }
+    }
+   }
+  },
+  "ClinicalHistory": {
+   "kind": "object",
+   "fields": {
+    "patient": {
+     "shape": {
+      "kind": "ref",
+      "name": "Patient"
+     }
+    },
+    "owner": {
+     "shape": {
+      "kind": "union",
+      "of": [
+       {
+        "kind": "null"
+       },
+       {
+        "kind": "ref",
+        "name": "Owner"
+       }
+      ]
+     }
+    },
+    "consultations": {
+     "shape": {
+      "kind": "array",
+      "items": {
+       "kind": "ref",
+       "name": "Consultation"
+      }
+     }
+    },
+    "vaccines": {
+     "shape": {
+      "kind": "array",
+      "items": {
+       "kind": "ref",
+       "name": "Vaccine"
+      }
+     }
+    },
+    "samples": {
+     "shape": {
+      "kind": "array",
+      "items": {
+       "kind": "ref",
+       "name": "Sample"
+      }
+     }
+    },
+    "visits": {
+     "shape": {
+      "kind": "array",
+      "items": {
+       "kind": "ref",
+       "name": "VisitListItem"
+      }
+     }
+    },
+    "groomingSessions": {
+     "shape": {
+      "kind": "array",
+      "items": {
+       "kind": "ref",
+       "name": "GroomingSession"
+      }
+     }
+    },
+    "charges": {
+     "shape": {
+      "kind": "array",
+      "items": {
+       "kind": "ref",
+       "name": "PatientChargeSummary"
+      }
+     }
+    }
+   }
+  },
+  "Consultation": {
+   "kind": "object",
+   "fields": {
+    "id": {
+     "shape": {
+      "kind": "number"
+     }
+    },
+    "patientId": {
+     "shape": {
+      "kind": "number"
+     }
+    },
+    "veterinarianId": {
+     "shape": {
+      "kind": "union",
+      "of": [
+       {
+        "kind": "null"
+       },
+       {
+        "kind": "number"
+       }
+      ]
+     }
+    },
+    "consultationDate": {
+     "shape": {
+      "kind": "string"
+     }
+    },
+    "reason": {
+     "shape": {
+      "kind": "string"
+     }
+    },
+    "anamnesis": {
+     "shape": {
+      "kind": "union",
+      "of": [
+       {
+        "kind": "null"
+       },
+       {
+        "kind": "string"
+       }
+      ]
+     }
+    },
+    "physicalExam": {
+     "shape": {
+      "kind": "union",
+      "of": [
+       {
+        "kind": "null"
+       },
+       {
+        "kind": "string"
+       }
+      ]
+     }
+    },
+    "diagnosis": {
+     "shape": {
+      "kind": "union",
+      "of": [
+       {
+        "kind": "null"
+       },
+       {
+        "kind": "string"
+       }
+      ]
+     }
+    },
+    "treatmentPlan": {
+     "shape": {
+      "kind": "union",
+      "of": [
+       {
+        "kind": "null"
+       },
+       {
+        "kind": "string"
+       }
+      ]
+     }
+    },
+    "status": {
+     "shape": {
+      "kind": "string"
+     }
+    },
+    "veterinarianName": {
+     "shape": {
+      "kind": "union",
+      "of": [
+       {
+        "kind": "null"
+       },
+       {
+        "kind": "string"
+       }
+      ]
+     }
+    }
+   }
+  },
+  "ConsultationListItem": {
+   "kind": "object",
+   "fields": {
+    "id": {
+     "shape": {
+      "kind": "number"
+     }
+    },
+    "patientId": {
+     "shape": {
+      "kind": "number"
+     }
+    },
+    "patientName": {
+     "shape": {
+      "kind": "string"
+     }
+    },
+    "speciesName": {
+     "shape": {
+      "kind": "string"
+     }
+    },
+    "ownerName": {
+     "shape": {
+      "kind": "string"
+     }
+    },
+    "consultationDate": {
+     "shape": {
+      "kind": "string"
+     }
+    },
+    "reason": {
+     "shape": {
+      "kind": "string"
+     }
+    },
+    "status": {
+     "shape": {
+      "kind": "string"
+     }
+    },
+    "veterinarianName": {
+     "shape": {
+      "kind": "union",
+      "of": [
+       {
+        "kind": "null"
+       },
+       {
+        "kind": "string"
+       }
+      ]
+     }
+    }
+   }
+  },
+  "DailySampleVolume": {
+   "kind": "object",
+   "fields": {
+    "date": {
+     "shape": {
+      "kind": "string"
+     }
+    },
+    "count": {
+     "shape": {
+      "kind": "number"
+     }
+    }
+   }
+  },
+  "DashboardStats": {
+   "kind": "object",
+   "fields": {
+    "patientsTotal": {
+     "shape": {
+      "kind": "number"
+     }
+    },
+    "patientsActive": {
+     "shape": {
+      "kind": "number"
+     }
+    },
+    "samplesTotal": {
+     "shape": {
+      "kind": "number"
+     }
+    },
+    "samplesInProgress": {
+     "shape": {
+      "kind": "number"
+     }
+    },
+    "samplesFinished": {
+     "shape": {
+      "kind": "number"
+     }
+    },
+    "samplesCancelled": {
+     "shape": {
+      "kind": "number"
+     }
+    },
+    "abnormalResults": {
+     "shape": {
+      "kind": "number"
+     }
+    },
+    "avgProcessingHours": {
+     "shape": {
+      "kind": "union",
+      "of": [
+       {
+        "kind": "null"
+       },
+       {
+        "kind": "number"
+       }
+      ]
+     }
+    },
+    "turnaroundBySampleType": {
+     "shape": {
+      "kind": "array",
+      "items": {
+       "kind": "ref",
+       "name": "SampleTypeTurnaround"
+      }
+     }
+    },
+    "abnormalRate": {
+     "shape": {
+      "kind": "union",
+      "of": [
+       {
+        "kind": "null"
+       },
+       {
+        "kind": "number"
+       }
+      ]
+     }
+    },
+    "weeklyVolume": {
+     "shape": {
+      "kind": "array",
+      "items": {
+       "kind": "ref",
+       "name": "DailySampleVolume"
+      }
+     }
+    },
+    "topAnalytes": {
+     "shape": {
+      "kind": "array",
+      "items": {
+       "kind": "ref",
+       "name": "AnalyteCount"
+      }
+     }
+    },
+    "consultationsPending": {
+     "shape": {
+      "kind": "number"
+     }
+    },
+    "surgeriesProgrammed": {
+     "shape": {
+      "kind": "number"
+     }
+    },
+    "visitsToday": {
+     "shape": {
+      "kind": "number"
+     }
+    },
+    "visitsWaiting": {
+     "shape": {
+      "kind": "number"
+     }
+    },
+    "visitsUrgentWaiting": {
+     "shape": {
+      "kind": "number"
+     }
+    },
+    "avgWaitMinutes": {
+     "shape": {
+      "kind": "union",
+      "of": [
+       {
+        "kind": "null"
+       },
+       {
+        "kind": "number"
+       }
+      ]
+     }
+    },
+    "appointmentsToday": {
+     "shape": {
+      "kind": "number"
+     }
+    },
+    "groomingSessionsToday": {
+     "shape": {
+      "kind": "number"
+     }
+    },
+    "revenueByCategory": {
+     "shape": {
+      "kind": "array",
+      "items": {
+       "kind": "ref",
+       "name": "RevenueByCategory"
+      }
+     }
+    },
+    "vaccinesDue": {
+     "shape": {
+      "kind": "number"
+     }
+    },
+    "invoicesUnpaid": {
+     "shape": {
+      "kind": "number"
+     }
+    },
+    "revenueTotal": {
+     "shape": {
+      "kind": "union",
+      "of": [
+       {
+        "kind": "null"
+       },
+       {
+        "kind": "number"
+       }
+      ]
+     }
+    },
+    "collectedToday": {
+     "shape": {
+      "kind": "union",
+      "of": [
+       {
+        "kind": "null"
+       },
+       {
+        "kind": "number"
+       }
+      ]
+     }
+    },
+    "collectedMonth": {
+     "shape": {
+      "kind": "union",
+      "of": [
+       {
+        "kind": "null"
+       },
+       {
+        "kind": "number"
+       }
+      ]
+     }
+    },
+    "receivableTotal": {
+     "shape": {
+      "kind": "union",
+      "of": [
+       {
+        "kind": "null"
+       },
+       {
+        "kind": "number"
+       }
+      ]
+     }
+    },
+    "receivableCount": {
+     "shape": {
+      "kind": "number"
+     }
+    },
+    "cashSessionOpen": {
+     "shape": {
+      "kind": "unknown"
+     }
+    },
+    "lastCashDifference": {
+     "shape": {
+      "kind": "union",
+      "of": [
+       {
+        "kind": "null"
+       },
+       {
+        "kind": "number"
+       }
+      ]
+     }
+    },
+    "upcomingConsultations": {
+     "shape": {
+      "kind": "array",
+      "items": {
+       "kind": "ref",
+       "name": "ConsultationListItem"
+      }
+     }
+    },
+    "upcomingSurgeries": {
+     "shape": {
+      "kind": "array",
+      "items": {
+       "kind": "ref",
+       "name": "Surgery"
+      }
+     }
+    },
+    "upcomingVaccines": {
+     "shape": {
+      "kind": "array",
+      "items": {
+       "kind": "ref",
+       "name": "VaccineListItem"
+      }
+     }
+    },
+    "recentSamples": {
+     "shape": {
+      "kind": "array",
+      "items": {
+       "kind": "ref",
+       "name": "SampleListItem"
+      }
+     }
+    },
+    "upcomingAppointments": {
+     "shape": {
+      "kind": "array",
+      "items": {
+       "kind": "ref",
+       "name": "AppointmentListItem"
+      }
+     }
+    }
+   }
+  },
+  "DbConnectionInfo": {
+   "kind": "object",
+   "fields": {
+    "mode": {
+     "shape": {
+      "kind": "string"
+     }
+    },
+    "host": {
+     "shape": {
+      "kind": "string"
+     }
+    },
+    "port": {
+     "shape": {
+      "kind": "number"
+     }
+    },
+    "database": {
+     "shape": {
+      "kind": "string"
+     }
+    },
+    "user": {
+     "shape": {
+      "kind": "string"
+     }
+    },
+    "hasPassword": {
+     "shape": {
+      "kind": "unknown"
+     }
+    },
+    "target": {
+     "shape": {
+      "kind": "string"
+     }
+    },
+    "source": {
+     "shape": {
+      "kind": "string"
+     }
+    }
+   }
+  },
+  "DbHealth": {
+   "kind": "object",
+   "fields": {
+    "ok": {
+     "shape": {
+      "kind": "unknown"
+     }
+    },
+    "status": {
+     "shape": {
+      "kind": "ref",
+      "name": "DbStatus"
+     }
+    },
+    "message": {
+     "shape": {
+      "kind": "string"
+     }
+    },
+    "mode": {
+     "shape": {
+      "kind": "string"
+     }
+    },
+    "target": {
+     "shape": {
+      "kind": "string"
+     }
+    },
+    "host": {
+     "shape": {
+      "kind": "string"
+     }
+    },
+    "port": {
+     "shape": {
+      "kind": "number"
+     }
+    },
+    "database": {
+     "shape": {
+      "kind": "string"
+     }
+    },
+    "user": {
+     "shape": {
+      "kind": "string"
+     }
+    },
+    "clientFound": {
+     "shape": {
+      "kind": "unknown"
+     }
+    },
+    "clientPath": {
+     "shape": {
+      "kind": "string"
+     }
+    },
+    "schemaVersion": {
+     "shape": {
+      "kind": "number"
+     }
+    },
+    "expectedSchemaVersion": {
+     "shape": {
+      "kind": "number"
+     }
+    },
+    "latencyMs": {
+     "shape": {
+      "kind": "number"
+     }
+    }
+   }
+  },
+  "DbStatus": {
+   "kind": "unknown"
+  },
+  "DbTestResult": {
+   "kind": "object",
+   "fields": {
+    "status": {
+     "shape": {
+      "kind": "ref",
+      "name": "DbStatus"
+     }
+    },
+    "message": {
+     "shape": {
+      "kind": "string"
+     }
+    },
+    "latencyMs": {
+     "shape": {
+      "kind": "number"
+     }
+    },
+    "schemaVersion": {
+     "shape": {
+      "kind": "number"
+     }
+    }
+   }
+  },
+  "GlobalSearchResult": {
+   "kind": "object",
+   "fields": {
+    "kind": {
+     "shape": {
+      "kind": "string"
+     }
+    },
+    "id": {
+     "shape": {
+      "kind": "number"
+     }
+    },
+    "title": {
+     "shape": {
+      "kind": "string"
+     }
+    },
+    "subtitle": {
+     "shape": {
+      "kind": "string"
+     }
+    },
+    "code": {
+     "shape": {
+      "kind": "union",
+      "of": [
+       {
+        "kind": "null"
+       },
+       {
+        "kind": "string"
+       }
+      ]
+     }
+    }
+   }
+  },
+  "GroomingDayLine": {
+   "kind": "object",
+   "fields": {
+    "visitServiceId": {
+     "shape": {
+      "kind": "number"
+     }
+    },
+    "visitId": {
+     "shape": {
+      "kind": "number"
+     }
+    },
+    "visitCode": {
+     "shape": {
+      "kind": "string"
+     }
+    },
+    "patientId": {
+     "shape": {
+      "kind": "number"
+     }
+    },
+    "patientName": {
+     "shape": {
+      "kind": "string"
+     }
+    },
+    "ownerName": {
+     "shape": {
+      "kind": "string"
+     }
+    },
+    "serviceId": {
+     "shape": {
+      "kind": "number"
+     }
+    },
+    "serviceName": {
+     "shape": {
+      "kind": "string"
+     }
+    },
+    "professionalId": {
+     "shape": {
+      "kind": "union",
+      "of": [
+       {
+        "kind": "null"
+       },
+       {
+        "kind": "number"
+       }
+      ]
+     }
+    },
+    "professionalName": {
+     "shape": {
+      "kind": "union",
+      "of": [
+       {
+        "kind": "null"
+       },
+       {
+        "kind": "string"
+       }
+      ]
+     }
+    },
+    "lineStatus": {
+     "shape": {
+      "kind": "string"
+     }
+    },
+    "sessionState": {
+     "shape": {
+      "kind": "string"
+     }
+    },
+    "arrivedAt": {
+     "shape": {
+      "kind": "string"
+     }
+    },
+    "visitStatus": {
+     "shape": {
+      "kind": "string"
+     }
+    },
+    "nextSuggestedAt": {
+     "shape": {
+      "kind": "union",
+      "of": [
+       {
+        "kind": "null"
+       },
+       {
+        "kind": "string"
+       }
+      ]
+     }
+    },
+    "mattingLevel": {
+     "shape": {
+      "kind": "number"
+     }
+    }
+   }
+  },
+  "GroomingReminder": {
+   "kind": "object",
+   "fields": {
+    "sessionId": {
+     "shape": {
+      "kind": "number"
+     }
+    },
+    "visitServiceId": {
+     "shape": {
+      "kind": "number"
+     }
+    },
+    "patientName": {
+     "shape": {
+      "kind": "string"
+     }
+    },
+    "ownerName": {
+     "shape": {
+      "kind": "string"
+     }
+    },
+    "serviceName": {
+     "shape": {
+      "kind": "string"
+     }
+    },
+    "nextSuggestedAt": {
+     "shape": {
+      "kind": "string"
+     }
+    },
+    "groomerName": {
+     "shape": {
+      "kind": "union",
+      "of": [
+       {
+        "kind": "null"
+       },
+       {
+        "kind": "string"
+       }
+      ]
+     }
+    }
+   }
+  },
+  "GroomingSession": {
+   "kind": "object",
+   "fields": {
+    "id": {
+     "shape": {
+      "kind": "number"
+     }
+    },
+    "visitServiceId": {
+     "shape": {
+      "kind": "number"
+     }
+    },
+    "visitId": {
+     "shape": {
+      "kind": "number"
+     }
+    },
+    "serviceName": {
+     "shape": {
+      "kind": "string"
+     }
+    },
+    "patientId": {
+     "shape": {
+      "kind": "number"
+     }
+    },
+    "patientName": {
+     "shape": {
+      "kind": "string"
+     }
+    },
+    "ownerName": {
+     "shape": {
+      "kind": "string"
+     }
+    },
+    "groomerId": {
+     "shape": {
+      "kind": "union",
+      "of": [
+       {
+        "kind": "null"
+       },
+       {
+        "kind": "number"
+       }
+      ]
+     }
+    },
+    "groomerName": {
+     "shape": {
+      "kind": "union",
+      "of": [
+       {
+        "kind": "null"
+       },
+       {
+        "kind": "string"
+       }
+      ]
+     }
+    },
+    "style": {
+     "shape": {
+      "kind": "union",
+      "of": [
+       {
+        "kind": "null"
+       },
+       {
+        "kind": "string"
+       }
+      ]
+     }
+    },
+    "bathType": {
+     "shape": {
+      "kind": "union",
+      "of": [
+       {
+        "kind": "null"
+       },
+       {
+        "kind": "string"
+       }
+      ]
+     }
+    },
+    "coatCondition": {
+     "shape": {
+      "kind": "union",
+      "of": [
+       {
+        "kind": "null"
+       },
+       {
+        "kind": "string"
+       }
+      ]
+     }
+    },
+    "mattingLevel": {
+     "shape": {
+      "kind": "number"
+     }
+    },
+    "weightKg": {
+     "shape": {
+      "kind": "union",
+      "of": [
+       {
+        "kind": "null"
+       },
+       {
+        "kind": "number"
+       }
+      ]
+     }
+    },
+    "behavior": {
+     "shape": {
+      "kind": "union",
+      "of": [
+       {
+        "kind": "null"
+       },
+       {
+        "kind": "string"
+       }
+      ]
+     }
+    },
+    "productsUsed": {
+     "shape": {
+      "kind": "union",
+      "of": [
+       {
+        "kind": "null"
+       },
+       {
+        "kind": "string"
+       }
+      ]
+     }
+    },
+    "startedAt": {
+     "shape": {
+      "kind": "union",
+      "of": [
+       {
+        "kind": "null"
+       },
+       {
+        "kind": "string"
+       }
+      ]
+     }
+    },
+    "finishedAt": {
+     "shape": {
+      "kind": "union",
+      "of": [
+       {
+        "kind": "null"
+       },
+       {
+        "kind": "string"
+       }
+      ]
+     }
+    },
+    "nextSuggestedAt": {
+     "shape": {
+      "kind": "union",
+      "of": [
+       {
+        "kind": "null"
+       },
+       {
+        "kind": "string"
+       }
+      ]
+     }
+    },
+    "notes": {
+     "shape": {
+      "kind": "union",
+      "of": [
+       {
+        "kind": "null"
+       },
+       {
+        "kind": "string"
+       }
+      ]
+     }
+    },
+    "createdAt": {
+     "shape": {
+      "kind": "string"
+     }
+    },
+    "updatedAt": {
+     "shape": {
+      "kind": "string"
+     }
+    }
+   }
+  },
+  "ImportColumnMapping": {
+   "kind": "object",
+   "fields": {
+    "columnIndex": {
+     "shape": {
+      "kind": "number"
+     }
+    },
+    "analyteId": {
+     "shape": {
+      "kind": "number"
+     }
+    }
+   }
+  },
+  "ImportPreview": {
+   "kind": "object",
+   "fields": {
+    "fileName": {
+     "shape": {
+      "kind": "string"
+     }
+    },
+    "delimiter": {
+     "shape": {
+      "kind": "string"
+     }
+    },
+    "headers": {
+     "shape": {
+      "kind": "array",
+      "items": {
+       "kind": "string"
+      }
+     }
+    },
+    "sampleRows": {
+     "shape": {
+      "kind": "array",
+      "items": {
+       "kind": "array",
+       "items": {
+        "kind": "string"
+       }
+      }
+     }
+    },
+    "suggestedSampleCodeColumn": {
+     "shape": {
+      "kind": "union",
+      "of": [
+       {
+        "kind": "null"
+       },
+       {
+        "kind": "number"
+       }
+      ]
+     }
+    },
+    "suggestedAnalytes": {
+     "shape": {
+      "kind": "array",
+      "items": {
+       "kind": "union",
+       "of": [
+        {
+         "kind": "null"
+        },
+        {
+         "kind": "number"
+        }
+       ]
+      }
+     }
+    },
+    "totalRows": {
+     "shape": {
+      "kind": "number"
+     }
+    }
+   }
+  },
+  "ImportSkip": {
+   "kind": "object",
+   "fields": {
+    "row": {
+     "shape": {
+      "kind": "number"
+     }
+    },
+    "reason": {
+     "shape": {
+      "kind": "string"
+     }
+    }
+   }
+  },
+  "ImportSummary": {
+   "kind": "object",
+   "fields": {
+    "samplesUpdated": {
+     "shape": {
+      "kind": "number"
+     }
+    },
+    "resultsImported": {
+     "shape": {
+      "kind": "number"
+     }
+    },
+    "skipped": {
+     "shape": {
+      "kind": "array",
+      "items": {
+       "kind": "ref",
+       "name": "ImportSkip"
+      }
+     }
+    }
+   }
+  },
+  "Invoice": {
+   "kind": "object",
+   "fields": {
+    "id": {
+     "shape": {
+      "kind": "number"
+     }
+    },
+    "invoiceNumber": {
+     "shape": {
+      "kind": "string"
+     }
+    },
+    "patientId": {
+     "shape": {
+      "kind": "union",
+      "of": [
+       {
+        "kind": "null"
+       },
+       {
+        "kind": "number"
+       }
+      ]
+     }
+    },
+    "patientName": {
+     "shape": {
+      "kind": "union",
+      "of": [
+       {
+        "kind": "null"
+       },
+       {
+        "kind": "string"
+       }
+      ]
+     }
+    },
+    "ownerId": {
+     "shape": {
+      "kind": "number"
+     }
+    },
+    "ownerName": {
+     "shape": {
+      "kind": "string"
+     }
+    },
+    "ownerPhone": {
+     "shape": {
+      "kind": "union",
+      "of": [
+       {
+        "kind": "null"
+       },
+       {
+        "kind": "string"
+       }
+      ]
+     }
+    },
+    "consultationId": {
+     "shape": {
+      "kind": "union",
+      "of": [
+       {
+        "kind": "null"
+       },
+       {
+        "kind": "number"
+       }
+      ]
+     }
+    },
+    "issueDate": {
+     "shape": {
+      "kind": "string"
+     }
+    },
+    "subtotal": {
+     "shape": {
+      "kind": "union",
+      "of": [
+       {
+        "kind": "null"
+       },
+       {
+        "kind": "number"
+       }
+      ]
+     }
+    },
+    "taxRate": {
+     "shape": {
+      "kind": "union",
+      "of": [
+       {
+        "kind": "null"
+       },
+       {
+        "kind": "number"
+       }
+      ]
+     }
+    },
+    "taxAmount": {
+     "shape": {
+      "kind": "union",
+      "of": [
+       {
+        "kind": "null"
+       },
+       {
+        "kind": "number"
+       }
+      ]
+     }
+    },
+    "total": {
+     "shape": {
+      "kind": "union",
+      "of": [
+       {
+        "kind": "null"
+       },
+       {
+        "kind": "number"
+       }
+      ]
+     }
+    },
+    "status": {
+     "shape": {
+      "kind": "string"
+     }
+    },
+    "paymentMethod": {
+     "shape": {
+      "kind": "union",
+      "of": [
+       {
+        "kind": "null"
+       },
+       {
+        "kind": "string"
+       }
+      ]
+     }
+    },
+    "notes": {
+     "shape": {
+      "kind": "union",
+      "of": [
+       {
+        "kind": "null"
+       },
+       {
+        "kind": "string"
+       }
+      ]
+     }
+    },
+    "items": {
+     "shape": {
+      "kind": "array",
+      "items": {
+       "kind": "ref",
+       "name": "InvoiceItem"
+      }
+     }
+    }
+   }
+  },
+  "InvoiceBalance": {
+   "kind": "object",
+   "fields": {
+    "invoiceId": {
+     "shape": {
+      "kind": "number"
+     }
+    },
+    "invoiceNumber": {
+     "shape": {
+      "kind": "string"
+     }
+    },
+    "total": {
+     "shape": {
+      "kind": "number"
+     }
+    },
+    "paidAmount": {
+     "shape": {
+      "kind": "number"
+     }
+    },
+    "balance": {
+     "shape": {
+      "kind": "number"
+     }
+    },
+    "paymentStatus": {
+     "shape": {
+      "kind": "string"
+     }
+    },
+    "status": {
+     "shape": {
+      "kind": "string"
+     }
+    }
+   }
+  },
+  "InvoiceItem": {
+   "kind": "object",
+   "fields": {
+    "id": {
+     "shape": {
+      "kind": "number"
+     }
+    },
+    "description": {
+     "shape": {
+      "kind": "string"
+     }
+    },
+    "quantity": {
+     "shape": {
+      "kind": "number"
+     }
+    },
+    "unitPrice": {
+     "shape": {
+      "kind": "union",
+      "of": [
+       {
+        "kind": "null"
+       },
+       {
+        "kind": "number"
+       }
+      ]
+     }
+    },
+    "lineTotal": {
+     "shape": {
+      "kind": "union",
+      "of": [
+       {
+        "kind": "null"
+       },
+       {
+        "kind": "number"
+       }
+      ]
+     }
+    }
+   }
+  },
+  "InvoiceListItem": {
+   "kind": "object",
+   "fields": {
+    "id": {
+     "shape": {
+      "kind": "number"
+     }
+    },
+    "invoiceNumber": {
+     "shape": {
+      "kind": "string"
+     }
+    },
+    "ownerName": {
+     "shape": {
+      "kind": "string"
+     }
+    },
+    "patientName": {
+     "shape": {
+      "kind": "union",
+      "of": [
+       {
+        "kind": "null"
+       },
+       {
+        "kind": "string"
+       }
+      ]
+     }
+    },
+    "issueDate": {
+     "shape": {
+      "kind": "string"
+     }
+    },
+    "total": {
+     "shape": {
+      "kind": "union",
+      "of": [
+       {
+        "kind": "null"
+       },
+       {
+        "kind": "number"
+       }
+      ]
+     }
+    },
+    "status": {
+     "shape": {
+      "kind": "string"
+     }
+    },
+    "paymentMethod": {
+     "shape": {
+      "kind": "union",
+      "of": [
+       {
+        "kind": "null"
+       },
+       {
+        "kind": "string"
+       }
+      ]
+     }
+    },
+    "itemCount": {
+     "shape": {
+      "kind": "number"
+     }
+    },
+    "paidAmount": {
+     "shape": {
+      "kind": "number"
+     }
+    },
+    "balance": {
+     "shape": {
+      "kind": "number"
+     }
+    },
+    "paymentStatus": {
+     "shape": {
+      "kind": "string"
+     }
+    }
+   }
+  },
+  "LabOrder": {
+   "kind": "object",
+   "fields": {
+    "id": {
+     "shape": {
+      "kind": "number"
+     }
+    },
+    "code": {
+     "shape": {
+      "kind": "string"
+     }
+    },
+    "patientId": {
+     "shape": {
+      "kind": "number"
+     }
+    },
+    "patientName": {
+     "shape": {
+      "kind": "string"
+     }
+    },
+    "speciesName": {
+     "shape": {
+      "kind": "string"
+     }
+    },
+    "ownerName": {
+     "shape": {
+      "kind": "string"
+     }
+    },
+    "consultationId": {
+     "shape": {
+      "kind": "union",
+      "of": [
+       {
+        "kind": "null"
+       },
+       {
+        "kind": "number"
+       }
+      ]
+     }
+    },
+    "requestedBy": {
+     "shape": {
+      "kind": "union",
+      "of": [
+       {
+        "kind": "null"
+       },
+       {
+        "kind": "string"
+       }
+      ]
+     }
+    },
+    "priority": {
+     "shape": {
+      "kind": "string"
+     }
+    },
+    "status": {
+     "shape": {
+      "kind": "string"
+     }
+    },
+    "notes": {
+     "shape": {
+      "kind": "union",
+      "of": [
+       {
+        "kind": "null"
+       },
+       {
+        "kind": "string"
+       }
+      ]
+     }
+    },
+    "requestedAt": {
+     "shape": {
+      "kind": "string"
+     }
+    },
+    "items": {
+     "shape": {
+      "kind": "array",
+      "items": {
+       "kind": "ref",
+       "name": "LabOrderItem"
+      }
+     }
+    },
+    "samples": {
+     "shape": {
+      "kind": "array",
+      "items": {
+       "kind": "ref",
+       "name": "OrderSampleRef"
+      }
+     }
+    }
+   }
+  },
+  "LabOrderItem": {
+   "kind": "object",
+   "fields": {
+    "id": {
+     "shape": {
+      "kind": "number"
+     }
+    },
+    "orderId": {
+     "shape": {
+      "kind": "number"
+     }
+    },
+    "panelId": {
+     "shape": {
+      "kind": "union",
+      "of": [
+       {
+        "kind": "null"
+       },
+       {
+        "kind": "number"
+       }
+      ]
+     }
+    },
+    "panelName": {
+     "shape": {
+      "kind": "union",
+      "of": [
+       {
+        "kind": "null"
+       },
+       {
+        "kind": "string"
+       }
+      ]
+     }
+    },
+    "panelSampleTypeId": {
+     "shape": {
+      "kind": "union",
+      "of": [
+       {
+        "kind": "null"
+       },
+       {
+        "kind": "number"
+       }
+      ]
+     }
+    },
+    "panelSampleTypeName": {
+     "shape": {
+      "kind": "union",
+      "of": [
+       {
+        "kind": "null"
+       },
+       {
+        "kind": "string"
+       }
+      ]
+     }
+    },
+    "analyteId": {
+     "shape": {
+      "kind": "union",
+      "of": [
+       {
+        "kind": "null"
+       },
+       {
+        "kind": "number"
+       }
+      ]
+     }
+    },
+    "analyteName": {
+     "shape": {
+      "kind": "union",
+      "of": [
+       {
+        "kind": "null"
+       },
+       {
+        "kind": "string"
+       }
+      ]
+     }
+    },
+    "unit": {
+     "shape": {
+      "kind": "union",
+      "of": [
+       {
+        "kind": "null"
+       },
+       {
+        "kind": "string"
+       }
+      ]
+     }
+    },
+    "seq": {
+     "shape": {
+      "kind": "number"
+     }
+    }
+   }
+  },
+  "LabOrderListItem": {
+   "kind": "object",
+   "fields": {
+    "id": {
+     "shape": {
+      "kind": "number"
+     }
+    },
+    "code": {
+     "shape": {
+      "kind": "string"
+     }
+    },
+    "patientId": {
+     "shape": {
+      "kind": "number"
+     }
+    },
+    "patientName": {
+     "shape": {
+      "kind": "string"
+     }
+    },
+    "speciesName": {
+     "shape": {
+      "kind": "string"
+     }
+    },
+    "ownerName": {
+     "shape": {
+      "kind": "string"
+     }
+    },
+    "consultationId": {
+     "shape": {
+      "kind": "union",
+      "of": [
+       {
+        "kind": "null"
+       },
+       {
+        "kind": "number"
+       }
+      ]
+     }
+    },
+    "requestedBy": {
+     "shape": {
+      "kind": "union",
+      "of": [
+       {
+        "kind": "null"
+       },
+       {
+        "kind": "string"
+       }
+      ]
+     }
+    },
+    "priority": {
+     "shape": {
+      "kind": "string"
+     }
+    },
+    "status": {
+     "shape": {
+      "kind": "string"
+     }
+    },
+    "itemCount": {
+     "shape": {
+      "kind": "number"
+     }
+    },
+    "requestedAt": {
+     "shape": {
+      "kind": "string"
+     }
+    }
+   }
+  },
+  "LabResult": {
+   "kind": "object",
+   "fields": {
+    "id": {
+     "shape": {
+      "kind": "number"
+     }
+    },
+    "sampleId": {
+     "shape": {
+      "kind": "number"
+     }
+    },
+    "analyteId": {
+     "shape": {
+      "kind": "number"
+     }
+    },
+    "analyteName": {
+     "shape": {
+      "kind": "string"
+     }
+    },
+    "unit": {
+     "shape": {
+      "kind": "union",
+      "of": [
+       {
+        "kind": "null"
+       },
+       {
+        "kind": "string"
+       }
+      ]
+     }
+    },
+    "value": {
+     "shape": {
+      "kind": "union",
+      "of": [
+       {
+        "kind": "null"
+       },
+       {
+        "kind": "number"
+       }
+      ]
+     }
+    },
+    "status": {
+     "shape": {
+      "kind": "string"
+     }
+    },
+    "refMin": {
+     "shape": {
+      "kind": "union",
+      "of": [
+       {
+        "kind": "null"
+       },
+       {
+        "kind": "number"
+       }
+      ]
+     }
+    },
+    "refMax": {
+     "shape": {
+      "kind": "union",
+      "of": [
+       {
+        "kind": "null"
+       },
+       {
+        "kind": "number"
+       }
+      ]
+     }
+    },
+    "customRefMin": {
+     "shape": {
+      "kind": "union",
+      "of": [
+       {
+        "kind": "null"
+       },
+       {
+        "kind": "number"
+       }
+      ]
+     }
+    },
+    "customRefMax": {
+     "shape": {
+      "kind": "union",
+      "of": [
+       {
+        "kind": "null"
+       },
+       {
+        "kind": "number"
+       }
+      ]
+     }
+    },
+    "analyzedAt": {
+     "shape": {
+      "kind": "union",
+      "of": [
+       {
+        "kind": "null"
+       },
+       {
+        "kind": "string"
+       }
+      ]
+     }
+    },
+    "deltaVariation": {
+     "shape": {
+      "kind": "union",
+      "of": [
+       {
+        "kind": "null"
+       },
+       {
+        "kind": "number"
+       }
+      ]
+     }
+    },
+    "isCritical": {
+     "shape": {
+      "kind": "unknown"
+     }
+    },
+    "attachments": {
+     "shape": {
+      "kind": "array",
+      "items": {
+       "kind": "ref",
+       "name": "ResultAttachment"
+      }
+     }
+    }
+   }
+  },
+  "NotificationLogEntry": {
+   "kind": "object",
+   "fields": {
+    "id": {
+     "shape": {
+      "kind": "number"
+     }
+    },
+    "resultId": {
+     "shape": {
+      "kind": "union",
+      "of": [
+       {
+        "kind": "null"
+       },
+       {
+        "kind": "number"
+       }
+      ]
+     }
+    },
+    "sampleId": {
+     "shape": {
+      "kind": "number"
+     }
+    },
+    "channel": {
+     "shape": {
+      "kind": "string"
+     }
+    },
+    "recipientName": {
+     "shape": {
+      "kind": "union",
+      "of": [
+       {
+        "kind": "null"
+       },
+       {
+        "kind": "string"
+       }
+      ]
+     }
+    },
+    "recipientAddress": {
+     "shape": {
+      "kind": "union",
+      "of": [
+       {
+        "kind": "null"
+       },
+       {
+        "kind": "string"
+       }
+      ]
+     }
+    },
+    "status": {
+     "shape": {
+      "kind": "string"
+     }
+    },
+    "sentAt": {
+     "shape": {
+      "kind": "union",
+      "of": [
+       {
+        "kind": "null"
+       },
+       {
+        "kind": "string"
+       }
+      ]
+     }
+    },
+    "ackedAt": {
+     "shape": {
+      "kind": "union",
+      "of": [
+       {
+        "kind": "null"
+       },
+       {
+        "kind": "string"
+       }
+      ]
+     }
+    },
+    "ackedBy": {
+     "shape": {
+      "kind": "union",
+      "of": [
+       {
+        "kind": "null"
+       },
+       {
+        "kind": "string"
+       }
+      ]
+     }
+    },
+    "note": {
+     "shape": {
+      "kind": "union",
+      "of": [
+       {
+        "kind": "null"
+       },
+       {
+        "kind": "string"
+       }
+      ]
+     }
+    },
+    "createdAt": {
+     "shape": {
+      "kind": "string"
+     }
+    }
+   }
+  },
+  "OrderSampleRef": {
+   "kind": "object",
+   "fields": {
+    "id": {
+     "shape": {
+      "kind": "number"
+     }
+    },
+    "code": {
+     "shape": {
+      "kind": "string"
+     }
+    },
+    "sampleTypeName": {
+     "shape": {
+      "kind": "string"
+     }
+    },
+    "status": {
+     "shape": {
+      "kind": "string"
+     }
+    }
+   }
+  },
+  "Owner": {
+   "kind": "object",
+   "fields": {
+    "id": {
+     "shape": {
+      "kind": "number"
+     }
+    },
+    "documentType": {
+     "shape": {
+      "kind": "string"
+     }
+    },
+    "documentNumber": {
+     "shape": {
+      "kind": "string"
+     }
+    },
+    "fullName": {
+     "shape": {
+      "kind": "string"
+     }
+    },
+    "phone": {
+     "shape": {
+      "kind": "union",
+      "of": [
+       {
+        "kind": "null"
+       },
+       {
+        "kind": "string"
+       }
+      ]
+     }
+    },
+    "email": {
+     "shape": {
+      "kind": "union",
+      "of": [
+       {
+        "kind": "null"
+       },
+       {
+        "kind": "string"
+       }
+      ]
+     }
+    },
+    "address": {
+     "shape": {
+      "kind": "union",
+      "of": [
+       {
+        "kind": "null"
+       },
+       {
+        "kind": "string"
+       }
+      ]
+     }
+    },
+    "city": {
+     "shape": {
+      "kind": "union",
+      "of": [
+       {
+        "kind": "null"
+       },
+       {
+        "kind": "string"
+       }
+      ]
+     }
+    }
+   }
+  },
+  "Panel": {
+   "kind": "object",
+   "fields": {
+    "id": {
+     "shape": {
+      "kind": "number"
+     }
+    },
+    "name": {
+     "shape": {
+      "kind": "string"
+     }
+    },
+    "sampleTypeId": {
+     "shape": {
+      "kind": "union",
+      "of": [
+       {
+        "kind": "null"
+       },
+       {
+        "kind": "number"
+       }
+      ]
+     }
+    },
+    "sampleTypeName": {
+     "shape": {
+      "kind": "union",
+      "of": [
+       {
+        "kind": "null"
+       },
+       {
+        "kind": "string"
+       }
+      ]
+     }
+    },
+    "sortOrder": {
+     "shape": {
+      "kind": "number"
+     }
+    },
+    "isActive": {
+     "shape": {
+      "kind": "unknown"
+     }
+    },
+    "notes": {
+     "shape": {
+      "kind": "union",
+      "of": [
+       {
+        "kind": "null"
+       },
+       {
+        "kind": "string"
+       }
+      ]
+     }
+    },
+    "analyteCount": {
+     "shape": {
+      "kind": "number"
+     }
+    }
+   }
+  },
+  "PanelAnalyte": {
+   "kind": "object",
+   "fields": {
+    "analyteId": {
+     "shape": {
+      "kind": "number"
+     }
+    },
+    "analyteName": {
+     "shape": {
+      "kind": "string"
+     }
+    },
+    "unit": {
+     "shape": {
+      "kind": "union",
+      "of": [
+       {
+        "kind": "null"
+       },
+       {
+        "kind": "string"
+       }
+      ]
+     }
+    },
+    "seq": {
+     "shape": {
+      "kind": "number"
+     }
+    }
+   }
+  },
+  "Patient": {
+   "kind": "object",
+   "fields": {
+    "id": {
+     "shape": {
+      "kind": "number"
+     }
+    },
+    "code": {
+     "shape": {
+      "kind": "string"
+     }
+    },
+    "ownerId": {
+     "shape": {
+      "kind": "number"
+     }
+    },
+    "speciesId": {
+     "shape": {
+      "kind": "number"
+     }
+    },
+    "breedId": {
+     "shape": {
+      "kind": "union",
+      "of": [
+       {
+        "kind": "null"
+       },
+       {
+        "kind": "number"
+       }
+      ]
+     }
+    },
+    "name": {
+     "shape": {
+      "kind": "string"
+     }
+    },
+    "sex": {
+     "shape": {
+      "kind": "string"
+     }
+    },
+    "birthDate": {
+     "shape": {
+      "kind": "union",
+      "of": [
+       {
+        "kind": "null"
+       },
+       {
+        "kind": "string"
+       }
+      ]
+     }
+    },
+    "neutered": {
+     "shape": {
+      "kind": "unknown"
+     }
+    },
+    "color": {
+     "shape": {
+      "kind": "union",
+      "of": [
+       {
+        "kind": "null"
+       },
+       {
+        "kind": "string"
+       }
+      ]
+     }
+    },
+    "microchip": {
+     "shape": {
+      "kind": "union",
+      "of": [
+       {
+        "kind": "null"
+       },
+       {
+        "kind": "string"
+       }
+      ]
+     }
+    },
+    "active": {
+     "shape": {
+      "kind": "unknown"
+     }
+    },
+    "notes": {
+     "shape": {
+      "kind": "union",
+      "of": [
+       {
+        "kind": "null"
+       },
+       {
+        "kind": "string"
+       }
+      ]
+     }
+    },
+    "preferredLogoId": {
+     "shape": {
+      "kind": "union",
+      "of": [
+       {
+        "kind": "null"
+       },
+       {
+        "kind": "number"
+       }
+      ]
+     }
+    },
+    "speciesName": {
+     "shape": {
+      "kind": "string"
+     }
+    },
+    "breedName": {
+     "shape": {
+      "kind": "union",
+      "of": [
+       {
+        "kind": "null"
+       },
+       {
+        "kind": "string"
+       }
+      ]
+     }
+    },
+    "ownerName": {
+     "shape": {
+      "kind": "string"
+     }
+    },
+    "ownerPhone": {
+     "shape": {
+      "kind": "union",
+      "of": [
+       {
+        "kind": "null"
+       },
+       {
+        "kind": "string"
+       }
+      ]
+     }
+    },
+    "ageMonths": {
+     "shape": {
+      "kind": "number"
+     }
+    }
+   }
+  },
+  "PatientChargeSummary": {
+   "kind": "object",
+   "fields": {
+    "invoiceId": {
+     "shape": {
+      "kind": "number"
+     }
+    },
+    "invoiceNumber": {
+     "shape": {
+      "kind": "string"
+     }
+    },
+    "issueDate": {
+     "shape": {
+      "kind": "string"
+     }
+    },
+    "total": {
+     "shape": {
+      "kind": "union",
+      "of": [
+       {
+        "kind": "null"
+       },
+       {
+        "kind": "number"
+       }
+      ]
+     }
+    },
+    "status": {
+     "shape": {
+      "kind": "string"
+     }
+    }
+   }
+  },
+  "Payment": {
+   "kind": "object",
+   "fields": {
+    "id": {
+     "shape": {
+      "kind": "number"
+     }
+    },
+    "code": {
+     "shape": {
+      "kind": "string"
+     }
+    },
+    "ownerId": {
+     "shape": {
+      "kind": "number"
+     }
+    },
+    "ownerName": {
+     "shape": {
+      "kind": "string"
+     }
+    },
+    "patientId": {
+     "shape": {
+      "kind": "union",
+      "of": [
+       {
+        "kind": "null"
+       },
+       {
+        "kind": "number"
+       }
+      ]
+     }
+    },
+    "patientName": {
+     "shape": {
+      "kind": "union",
+      "of": [
+       {
+        "kind": "null"
+       },
+       {
+        "kind": "string"
+       }
+      ]
+     }
+    },
+    "cashSessionId": {
+     "shape": {
+      "kind": "union",
+      "of": [
+       {
+        "kind": "null"
+       },
+       {
+        "kind": "number"
+       }
+      ]
+     }
+    },
+    "receivedAt": {
+     "shape": {
+      "kind": "string"
+     }
+    },
+    "total": {
+     "shape": {
+      "kind": "number"
+     }
+    },
+    "status": {
+     "shape": {
+      "kind": "string"
+     }
+    },
+    "notes": {
+     "shape": {
+      "kind": "union",
+      "of": [
+       {
+        "kind": "null"
+       },
+       {
+        "kind": "string"
+       }
+      ]
+     }
+    },
+    "createdByName": {
+     "shape": {
+      "kind": "union",
+      "of": [
+       {
+        "kind": "null"
+       },
+       {
+        "kind": "string"
+       }
+      ]
+     }
+    },
+    "lines": {
+     "shape": {
+      "kind": "array",
+      "items": {
+       "kind": "ref",
+       "name": "PaymentLine"
+      }
+     }
+    },
+    "allocations": {
+     "shape": {
+      "kind": "array",
+      "items": {
+       "kind": "ref",
+       "name": "PaymentAllocation"
+      }
+     }
+    }
+   }
+  },
+  "PaymentAllocation": {
+   "kind": "object",
+   "fields": {
+    "id": {
+     "shape": {
+      "kind": "number"
+     }
+    },
+    "invoiceId": {
+     "shape": {
+      "kind": "number"
+     }
+    },
+    "invoiceNumber": {
+     "shape": {
+      "kind": "string"
+     }
+    },
+    "amount": {
+     "shape": {
+      "kind": "number"
+     }
+    }
+   }
+  },
+  "PaymentLine": {
+   "kind": "object",
+   "fields": {
+    "id": {
+     "shape": {
+      "kind": "number"
+     }
+    },
+    "methodCode": {
+     "shape": {
+      "kind": "string"
+     }
+    },
+    "methodName": {
+     "shape": {
+      "kind": "string"
+     }
+    },
+    "methodKind": {
+     "shape": {
+      "kind": "string"
+     }
+    },
+    "amount": {
+     "shape": {
+      "kind": "number"
+     }
+    },
+    "reference": {
+     "shape": {
+      "kind": "union",
+      "of": [
+       {
+        "kind": "null"
+       },
+       {
+        "kind": "string"
+       }
+      ]
+     }
+    }
+   }
+  },
+  "PaymentMethod": {
+   "kind": "object",
+   "fields": {
+    "code": {
+     "shape": {
+      "kind": "string"
+     }
+    },
+    "name": {
+     "shape": {
+      "kind": "string"
+     }
+    },
+    "kind": {
+     "shape": {
+      "kind": "string"
+     }
+    },
+    "requiresReference": {
+     "shape": {
+      "kind": "unknown"
+     }
+    },
+    "active": {
+     "shape": {
+      "kind": "unknown"
+     }
+    },
+    "sortOrder": {
+     "shape": {
+      "kind": "number"
+     }
+    }
+   }
+  },
+  "Product": {
+   "kind": "object",
+   "fields": {
+    "id": {
+     "shape": {
+      "kind": "number"
+     }
+    },
+    "code": {
+     "shape": {
+      "kind": "string"
+     }
+    },
+    "name": {
+     "shape": {
+      "kind": "string"
+     }
+    },
+    "category": {
+     "shape": {
+      "kind": "string"
+     }
+    },
+    "unit": {
+     "shape": {
+      "kind": "string"
+     }
+    },
+    "costPrice": {
+     "shape": {
+      "kind": "union",
+      "of": [
+       {
+        "kind": "null"
+       },
+       {
+        "kind": "number"
+       }
+      ]
+     }
+    },
+    "salePrice": {
+     "shape": {
+      "kind": "union",
+      "of": [
+       {
+        "kind": "null"
+       },
+       {
+        "kind": "number"
+       }
+      ]
+     }
+    },
+    "taxRate": {
+     "shape": {
+      "kind": "union",
+      "of": [
+       {
+        "kind": "null"
+       },
+       {
+        "kind": "number"
+       }
+      ]
+     }
+    },
+    "minStock": {
+     "shape": {
+      "kind": "number"
+     }
+    },
+    "active": {
+     "shape": {
+      "kind": "unknown"
+     }
+    },
+    "notes": {
+     "shape": {
+      "kind": "union",
+      "of": [
+       {
+        "kind": "null"
+       },
+       {
+        "kind": "string"
+       }
+      ]
+     }
+    }
+   }
+  },
+  "ProductStockItem": {
+   "kind": "object",
+   "fields": {
+    "product": {
+     "shape": {
+      "kind": "ref",
+      "name": "Product"
+     }
+    },
+    "stock": {
+     "shape": {
+      "kind": "number"
+     }
+    },
+    "lowStock": {
+     "shape": {
+      "kind": "unknown"
+     }
+    },
+    "stockValue": {
+     "shape": {
+      "kind": "union",
+      "of": [
+       {
+        "kind": "null"
+       },
+       {
+        "kind": "number"
+       }
+      ]
+     }
+    }
+   }
+  },
+  "QcAnalyzerStatus": {
+   "kind": "object",
+   "fields": {
+    "analyzerId": {
+     "shape": {
+      "kind": "number"
+     }
+    },
+    "latestStatus": {
+     "shape": {
+      "kind": "union",
+      "of": [
+       {
+        "kind": "null"
+       },
+       {
+        "kind": "string"
+       }
+      ]
+     }
+    }
+   }
+  },
+  "QcChartPoint": {
+   "kind": "object",
+   "fields": {
+    "runId": {
+     "shape": {
+      "kind": "number"
+     }
+    },
+    "runDate": {
+     "shape": {
+      "kind": "string"
+     }
+    },
+    "value": {
+     "shape": {
+      "kind": "union",
+      "of": [
+       {
+        "kind": "null"
+       },
+       {
+        "kind": "number"
+       }
+      ]
+     }
+    },
+    "zScore": {
+     "shape": {
+      "kind": "union",
+      "of": [
+       {
+        "kind": "null"
+       },
+       {
+        "kind": "number"
+       }
+      ]
+     }
+    },
+    "violation": {
+     "shape": {
+      "kind": "union",
+      "of": [
+       {
+        "kind": "null"
+       },
+       {
+        "kind": "string"
+       }
+      ]
+     }
+    }
+   }
+  },
+  "QcControlMaterial": {
+   "kind": "object",
+   "fields": {
+    "id": {
+     "shape": {
+      "kind": "number"
+     }
+    },
+    "name": {
+     "shape": {
+      "kind": "string"
+     }
+    },
+    "analyzerId": {
+     "shape": {
+      "kind": "number"
+     }
+    },
+    "analyzerName": {
+     "shape": {
+      "kind": "string"
+     }
+    },
+    "lot": {
+     "shape": {
+      "kind": "union",
+      "of": [
+       {
+        "kind": "null"
+       },
+       {
+        "kind": "string"
+       }
+      ]
+     }
+    },
+    "expiresAt": {
+     "shape": {
+      "kind": "union",
+      "of": [
+       {
+        "kind": "null"
+       },
+       {
+        "kind": "string"
+       }
+      ]
+     }
+    },
+    "isActive": {
+     "shape": {
+      "kind": "unknown"
+     }
+    },
+    "notes": {
+     "shape": {
+      "kind": "union",
+      "of": [
+       {
+        "kind": "null"
+       },
+       {
+        "kind": "string"
+       }
+      ]
+     }
+    },
+    "targetCount": {
+     "shape": {
+      "kind": "number"
+     }
+    }
+   }
+  },
+  "QcRun": {
+   "kind": "object",
+   "fields": {
+    "id": {
+     "shape": {
+      "kind": "number"
+     }
+    },
+    "controlMaterialId": {
+     "shape": {
+      "kind": "number"
+     }
+    },
+    "controlName": {
+     "shape": {
+      "kind": "string"
+     }
+    },
+    "analyzerId": {
+     "shape": {
+      "kind": "number"
+     }
+    },
+    "analyzerName": {
+     "shape": {
+      "kind": "string"
+     }
+    },
+    "runDate": {
+     "shape": {
+      "kind": "string"
+     }
+    },
+    "status": {
+     "shape": {
+      "kind": "string"
+     }
+    },
+    "notes": {
+     "shape": {
+      "kind": "union",
+      "of": [
+       {
+        "kind": "null"
+       },
+       {
+        "kind": "string"
+       }
+      ]
+     }
+    },
+    "createdBy": {
+     "shape": {
+      "kind": "union",
+      "of": [
+       {
+        "kind": "null"
+       },
+       {
+        "kind": "string"
+       }
+      ]
+     }
+    },
+    "measurements": {
+     "shape": {
+      "kind": "array",
+      "items": {
+       "kind": "ref",
+       "name": "QcRunMeasurement"
+      }
+     }
+    }
+   }
+  },
+  "QcRunMeasurement": {
+   "kind": "object",
+   "fields": {
+    "id": {
+     "shape": {
+      "kind": "number"
+     }
+    },
+    "qcRunId": {
+     "shape": {
+      "kind": "number"
+     }
+    },
+    "analyteId": {
+     "shape": {
+      "kind": "number"
+     }
+    },
+    "analyteName": {
+     "shape": {
+      "kind": "string"
+     }
+    },
+    "unit": {
+     "shape": {
+      "kind": "union",
+      "of": [
+       {
+        "kind": "null"
+       },
+       {
+        "kind": "string"
+       }
+      ]
+     }
+    },
+    "value": {
+     "shape": {
+      "kind": "union",
+      "of": [
+       {
+        "kind": "null"
+       },
+       {
+        "kind": "number"
+       }
+      ]
+     }
+    },
+    "zScore": {
+     "shape": {
+      "kind": "union",
+      "of": [
+       {
+        "kind": "null"
+       },
+       {
+        "kind": "number"
+       }
+      ]
+     }
+    },
+    "violation": {
+     "shape": {
+      "kind": "union",
+      "of": [
+       {
+        "kind": "null"
+       },
+       {
+        "kind": "string"
+       }
+      ]
+     }
+    }
+   }
+  },
+  "QcTarget": {
+   "kind": "object",
+   "fields": {
+    "id": {
+     "shape": {
+      "kind": "number"
+     }
+    },
+    "controlMaterialId": {
+     "shape": {
+      "kind": "number"
+     }
+    },
+    "analyteId": {
+     "shape": {
+      "kind": "number"
+     }
+    },
+    "analyteName": {
+     "shape": {
+      "kind": "string"
+     }
+    },
+    "unit": {
+     "shape": {
+      "kind": "union",
+      "of": [
+       {
+        "kind": "null"
+       },
+       {
+        "kind": "string"
+       }
+      ]
+     }
+    },
+    "mean": {
+     "shape": {
+      "kind": "union",
+      "of": [
+       {
+        "kind": "null"
+       },
+       {
+        "kind": "number"
+       }
+      ]
+     }
+    },
+    "sd": {
+     "shape": {
+      "kind": "union",
+      "of": [
+       {
+        "kind": "null"
+       },
+       {
+        "kind": "number"
+       }
+      ]
+     }
+    }
+   }
+  },
+  "ReferenceRange": {
+   "kind": "object",
+   "fields": {
+    "id": {
+     "shape": {
+      "kind": "number"
+     }
+    },
+    "analyzerId": {
+     "shape": {
+      "kind": "number"
+     }
+    },
+    "analyzerName": {
+     "shape": {
+      "kind": "string"
+     }
+    },
+    "analyteId": {
+     "shape": {
+      "kind": "number"
+     }
+    },
+    "analyteName": {
+     "shape": {
+      "kind": "string"
+     }
+    },
+    "unit": {
+     "shape": {
+      "kind": "union",
+      "of": [
+       {
+        "kind": "null"
+       },
+       {
+        "kind": "string"
+       }
+      ]
+     }
+    },
+    "speciesId": {
+     "shape": {
+      "kind": "number"
+     }
+    },
+    "speciesName": {
+     "shape": {
+      "kind": "string"
+     }
+    },
+    "sex": {
+     "shape": {
+      "kind": "union",
+      "of": [
+       {
+        "kind": "null"
+       },
+       {
+        "kind": "string"
+       }
+      ]
+     }
+    },
+    "ageMinMonths": {
+     "shape": {
+      "kind": "number"
+     }
+    },
+    "ageMaxMonths": {
+     "shape": {
+      "kind": "number"
+     }
+    },
+    "minValue": {
+     "shape": {
+      "kind": "union",
+      "of": [
+       {
+        "kind": "null"
+       },
+       {
+        "kind": "number"
+       }
+      ]
+     }
+    },
+    "maxValue": {
+     "shape": {
+      "kind": "union",
+      "of": [
+       {
+        "kind": "null"
+       },
+       {
+        "kind": "number"
+       }
+      ]
+     }
+    },
+    "criticalMin": {
+     "shape": {
+      "kind": "union",
+      "of": [
+       {
+        "kind": "null"
+       },
+       {
+        "kind": "number"
+       }
+      ]
+     }
+    },
+    "criticalMax": {
+     "shape": {
+      "kind": "union",
+      "of": [
+       {
+        "kind": "null"
+       },
+       {
+        "kind": "number"
+       }
+      ]
+     }
+    },
+    "notes": {
+     "shape": {
+      "kind": "union",
+      "of": [
+       {
+        "kind": "null"
+       },
+       {
+        "kind": "string"
+       }
+      ]
+     }
+    }
+   }
+  },
+  "ReportFile": {
+   "kind": "object",
+   "fields": {
+    "path": {
+     "shape": {
+      "kind": "string"
+     }
+    },
+    "fileName": {
+     "shape": {
+      "kind": "string"
+     }
+    },
+    "sampleCode": {
+     "shape": {
+      "kind": "string"
+     }
+    },
+    "generatedAt": {
+     "shape": {
+      "kind": "string"
+     }
+    }
+   }
+  },
+  "Resource": {
+   "kind": "object",
+   "fields": {
+    "id": {
+     "shape": {
+      "kind": "number"
+     }
+    },
+    "name": {
+     "shape": {
+      "kind": "string"
+     }
+    },
+    "kind": {
+     "shape": {
+      "kind": "string"
+     }
+    },
+    "capacity": {
+     "shape": {
+      "kind": "number"
+     }
+    },
+    "active": {
+     "shape": {
+      "kind": "unknown"
+     }
+    },
+    "notes": {
+     "shape": {
+      "kind": "union",
+      "of": [
+       {
+        "kind": "null"
+       },
+       {
+        "kind": "string"
+       }
+      ]
+     }
+    }
+   }
+  },
+  "ResourceBoardItem": {
+   "kind": "object",
+   "fields": {
+    "resource": {
+     "shape": {
+      "kind": "ref",
+      "name": "Resource"
+     }
+    },
+    "occupied": {
+     "shape": {
+      "kind": "number"
+     }
+    },
+    "needsVet": {
+     "shape": {
+      "kind": "number"
+     }
+    }
+   }
+  },
+  "ResultAttachment": {
+   "kind": "object",
+   "fields": {
+    "id": {
+     "shape": {
+      "kind": "number"
+     }
+    },
+    "resultId": {
+     "shape": {
+      "kind": "number"
+     }
+    },
+    "fileName": {
+     "shape": {
+      "kind": "string"
+     }
+    },
+    "mimeType": {
+     "shape": {
+      "kind": "union",
+      "of": [
+       {
+        "kind": "null"
+       },
+       {
+        "kind": "string"
+       }
+      ]
+     }
+    },
+    "sizeBytes": {
+     "shape": {
+      "kind": "number"
+     }
+    },
+    "createdAt": {
+     "shape": {
+      "kind": "string"
+     }
+    }
+   }
+  },
+  "RevenueByCategory": {
+   "kind": "object",
+   "fields": {
+    "categoryId": {
+     "shape": {
+      "kind": "number"
+     }
+    },
+    "categoryName": {
+     "shape": {
+      "kind": "string"
+     }
+    },
+    "revenue": {
+     "shape": {
+      "kind": "union",
+      "of": [
+       {
+        "kind": "null"
+       },
+       {
+        "kind": "number"
+       }
+      ]
+     }
+    }
+   }
+  },
+  "Sample": {
+   "kind": "object",
+   "fields": {
+    "id": {
+     "shape": {
+      "kind": "number"
+     }
+    },
+    "code": {
+     "shape": {
+      "kind": "string"
+     }
+    },
+    "patientId": {
+     "shape": {
+      "kind": "number"
+     }
+    },
+    "sampleTypeId": {
+     "shape": {
+      "kind": "number"
+     }
+    },
+    "sampleTypeName": {
+     "shape": {
+      "kind": "string"
+     }
+    },
+    "receivedAt": {
+     "shape": {
+      "kind": "string"
+     }
+    },
+    "status": {
+     "shape": {
+      "kind": "string"
+     }
+    },
+    "collectedBy": {
+     "shape": {
+      "kind": "union",
+      "of": [
+       {
+        "kind": "null"
+       },
+       {
+        "kind": "string"
+       }
+      ]
+     }
+    },
+    "notes": {
+     "shape": {
+      "kind": "union",
+      "of": [
+       {
+        "kind": "null"
+       },
+       {
+        "kind": "string"
+       }
+      ]
+     }
+    },
+    "analyzerId": {
+     "shape": {
+      "kind": "union",
+      "of": [
+       {
+        "kind": "null"
+       },
+       {
+        "kind": "number"
+       }
+      ]
+     }
+    },
+    "analyzerName": {
+     "shape": {
+      "kind": "union",
+      "of": [
+       {
+        "kind": "null"
+       },
+       {
+        "kind": "string"
+       }
+      ]
+     }
+    },
+    "results": {
+     "shape": {
+      "kind": "array",
+      "items": {
+       "kind": "ref",
+       "name": "LabResult"
+      }
+     }
+    },
+    "qualityIndex": {
+     "shape": {
+      "kind": "union",
+      "of": [
+       {
+        "kind": "null"
+       },
+       {
+        "kind": "string"
+       }
+      ]
+     }
+    },
+    "qualitySeverity": {
+     "shape": {
+      "kind": "union",
+      "of": [
+       {
+        "kind": "null"
+       },
+       {
+        "kind": "string"
+       }
+      ]
+     }
+    },
+    "qualityNote": {
+     "shape": {
+      "kind": "union",
+      "of": [
+       {
+        "kind": "null"
+       },
+       {
+        "kind": "string"
+       }
+      ]
+     }
+    },
+    "rejectedAt": {
+     "shape": {
+      "kind": "union",
+      "of": [
+       {
+        "kind": "null"
+       },
+       {
+        "kind": "string"
+       }
+      ]
+     }
+    },
+    "rejectedBy": {
+     "shape": {
+      "kind": "union",
+      "of": [
+       {
+        "kind": "null"
+       },
+       {
+        "kind": "string"
+       }
+      ]
+     }
+    },
+    "rejectionReason": {
+     "shape": {
+      "kind": "union",
+      "of": [
+       {
+        "kind": "null"
+       },
+       {
+        "kind": "string"
+       }
+      ]
+     }
+    }
+   }
+  },
+  "SampleEvent": {
+   "kind": "object",
+   "fields": {
+    "id": {
+     "shape": {
+      "kind": "number"
+     }
+    },
+    "sampleId": {
+     "shape": {
+      "kind": "number"
+     }
+    },
+    "eventType": {
+     "shape": {
+      "kind": "string"
+     }
+    },
+    "username": {
+     "shape": {
+      "kind": "string"
+     }
+    },
+    "reason": {
+     "shape": {
+      "kind": "union",
+      "of": [
+       {
+        "kind": "null"
+       },
+       {
+        "kind": "string"
+       }
+      ]
+     }
+    },
+    "createdAt": {
+     "shape": {
+      "kind": "string"
+     }
+    }
+   }
+  },
+  "SampleListItem": {
+   "kind": "object",
+   "fields": {
+    "id": {
+     "shape": {
+      "kind": "number"
+     }
+    },
+    "code": {
+     "shape": {
+      "kind": "string"
+     }
+    },
+    "patientId": {
+     "shape": {
+      "kind": "number"
+     }
+    },
+    "patientCode": {
+     "shape": {
+      "kind": "string"
+     }
+    },
+    "patientName": {
+     "shape": {
+      "kind": "string"
+     }
+    },
+    "ownerName": {
+     "shape": {
+      "kind": "string"
+     }
+    },
+    "speciesName": {
+     "shape": {
+      "kind": "string"
+     }
+    },
+    "sampleTypeId": {
+     "shape": {
+      "kind": "number"
+     }
+    },
+    "sampleTypeName": {
+     "shape": {
+      "kind": "string"
+     }
+    },
+    "receivedAt": {
+     "shape": {
+      "kind": "string"
+     }
+    },
+    "status": {
+     "shape": {
+      "kind": "string"
+     }
+    },
+    "collectedBy": {
+     "shape": {
+      "kind": "union",
+      "of": [
+       {
+        "kind": "null"
+       },
+       {
+        "kind": "string"
+       }
+      ]
+     }
+    },
+    "notes": {
+     "shape": {
+      "kind": "union",
+      "of": [
+       {
+        "kind": "null"
+       },
+       {
+        "kind": "string"
+       }
+      ]
+     }
+    },
+    "resultCount": {
+     "shape": {
+      "kind": "number"
+     }
+    },
+    "abnormalCount": {
+     "shape": {
+      "kind": "number"
+     }
+    },
+    "criticalCount": {
+     "shape": {
+      "kind": "number"
+     }
+    },
+    "qualityIndex": {
+     "shape": {
+      "kind": "union",
+      "of": [
+       {
+        "kind": "null"
+       },
+       {
+        "kind": "string"
+       }
+      ]
+     }
+    },
+    "qualitySeverity": {
+     "shape": {
+      "kind": "union",
+      "of": [
+       {
+        "kind": "null"
+       },
+       {
+        "kind": "string"
+       }
+      ]
+     }
+    },
+    "rejectionReason": {
+     "shape": {
+      "kind": "union",
+      "of": [
+       {
+        "kind": "null"
+       },
+       {
+        "kind": "string"
+       }
+      ]
+     }
+    }
+   }
+  },
+  "SampleType": {
+   "kind": "object",
+   "fields": {
+    "id": {
+     "shape": {
+      "kind": "number"
+     }
+    },
+    "code": {
+     "shape": {
+      "kind": "string"
+     }
+    },
+    "name": {
+     "shape": {
+      "kind": "string"
+     }
+    },
+    "tubeType": {
+     "shape": {
+      "kind": "union",
+      "of": [
+       {
+        "kind": "null"
+       },
+       {
+        "kind": "string"
+       }
+      ]
+     }
+    },
+    "anticoagulant": {
+     "shape": {
+      "kind": "union",
+      "of": [
+       {
+        "kind": "null"
+       },
+       {
+        "kind": "string"
+       }
+      ]
+     }
+    },
+    "minVolumeMl": {
+     "shape": {
+      "kind": "union",
+      "of": [
+       {
+        "kind": "null"
+       },
+       {
+        "kind": "number"
+       }
+      ]
+     }
+    }
+   }
+  },
+  "SampleTypeTurnaround": {
+   "kind": "object",
+   "fields": {
+    "sampleTypeId": {
+     "shape": {
+      "kind": "number"
+     }
+    },
+    "sampleTypeName": {
+     "shape": {
+      "kind": "string"
+     }
+    },
+    "avgMinutes": {
+     "shape": {
+      "kind": "union",
+      "of": [
+       {
+        "kind": "null"
+       },
+       {
+        "kind": "number"
+       }
+      ]
+     }
+    },
+    "count": {
+     "shape": {
+      "kind": "number"
+     }
+    }
+   }
+  },
+  "SecondaryLogo": {
+   "kind": "object",
+   "fields": {
+    "id": {
+     "shape": {
+      "kind": "number"
+     }
+    },
+    "name": {
+     "shape": {
+      "kind": "string"
+     }
+    },
+    "mimeType": {
+     "shape": {
+      "kind": "union",
+      "of": [
+       {
+        "kind": "null"
+       },
+       {
+        "kind": "string"
+       }
+      ]
+     }
+    },
+    "sizeBytes": {
+     "shape": {
+      "kind": "number"
+     }
+    },
+    "createdAt": {
+     "shape": {
+      "kind": "string"
+     }
+    }
+   }
+  },
+  "Service": {
+   "kind": "object",
+   "fields": {
+    "id": {
+     "shape": {
+      "kind": "number"
+     }
+    },
+    "code": {
+     "shape": {
+      "kind": "string"
+     }
+    },
+    "name": {
+     "shape": {
+      "kind": "string"
+     }
+    },
+    "categoryId": {
+     "shape": {
+      "kind": "number"
+     }
+    },
+    "categoryName": {
+     "shape": {
+      "kind": "string"
+     }
+    },
+    "description": {
+     "shape": {
+      "kind": "union",
+      "of": [
+       {
+        "kind": "null"
+       },
+       {
+        "kind": "string"
+       }
+      ]
+     }
+    },
+    "durationMin": {
+     "shape": {
+      "kind": "number"
+     }
+    },
+    "price": {
+     "shape": {
+      "kind": "union",
+      "of": [
+       {
+        "kind": "null"
+       },
+       {
+        "kind": "number"
+       }
+      ]
+     }
+    },
+    "taxRate": {
+     "shape": {
+      "kind": "union",
+      "of": [
+       {
+        "kind": "null"
+       },
+       {
+        "kind": "number"
+       }
+      ]
+     }
+    },
+    "requiresVet": {
+     "shape": {
+      "kind": "unknown"
+     }
+    },
+    "requiresGroomer": {
+     "shape": {
+      "kind": "unknown"
+     }
+    },
+    "speciesId": {
+     "shape": {
+      "kind": "union",
+      "of": [
+       {
+        "kind": "null"
+       },
+       {
+        "kind": "number"
+       }
+      ]
+     }
+    },
+    "sortOrder": {
+     "shape": {
+      "kind": "number"
+     }
+    },
+    "isActive": {
+     "shape": {
+      "kind": "unknown"
+     }
+    }
+   }
+  },
+  "ServiceCategory": {
+   "kind": "object",
+   "fields": {
+    "id": {
+     "shape": {
+      "kind": "number"
+     }
+    },
+    "code": {
+     "shape": {
+      "kind": "string"
+     }
+    },
+    "name": {
+     "shape": {
+      "kind": "string"
+     }
+    },
+    "sortOrder": {
+     "shape": {
+      "kind": "number"
+     }
+    },
+    "isActive": {
+     "shape": {
+      "kind": "unknown"
+     }
+    }
+   }
+  },
+  "SessionUser": {
+   "kind": "object",
+   "fields": {
+    "id": {
+     "shape": {
+      "kind": "number"
+     }
+    },
+    "username": {
+     "shape": {
+      "kind": "string"
+     }
+    },
+    "fullName": {
+     "shape": {
+      "kind": "string"
+     }
+    },
+    "role": {
+     "shape": {
+      "kind": "string"
+     }
+    },
+    "mustChangePassword": {
+     "shape": {
+      "kind": "unknown"
+     }
+    }
+   }
+  },
+  "Species": {
+   "kind": "object",
+   "fields": {
+    "id": {
+     "shape": {
+      "kind": "number"
+     }
+    },
+    "code": {
+     "shape": {
+      "kind": "string"
+     }
+    },
+    "name": {
+     "shape": {
+      "kind": "string"
+     }
+    }
+   }
+  },
+  "StatusCount": {
+   "kind": "object",
+   "fields": {
+    "status": {
+     "shape": {
+      "kind": "string"
+     }
+    },
+    "count": {
+     "shape": {
+      "kind": "number"
+     }
+    }
+   }
+  },
+  "Stay": {
+   "kind": "object",
+   "fields": {
+    "id": {
+     "shape": {
+      "kind": "number"
+     }
+    },
+    "code": {
+     "shape": {
+      "kind": "string"
+     }
+    },
+    "patientId": {
+     "shape": {
+      "kind": "number"
+     }
+    },
+    "patientName": {
+     "shape": {
+      "kind": "string"
+     }
+    },
+    "ownerId": {
+     "shape": {
+      "kind": "number"
+     }
+    },
+    "ownerName": {
+     "shape": {
+      "kind": "string"
+     }
+    },
+    "ownerPhone": {
+     "shape": {
+      "kind": "union",
+      "of": [
+       {
+        "kind": "null"
+       },
+       {
+        "kind": "string"
+       }
+      ]
+     }
+    },
+    "visitId": {
+     "shape": {
+      "kind": "union",
+      "of": [
+       {
+        "kind": "null"
+       },
+       {
+        "kind": "number"
+       }
+      ]
+     }
+    },
+    "resourceId": {
+     "shape": {
+      "kind": "union",
+      "of": [
+       {
+        "kind": "null"
+       },
+       {
+        "kind": "number"
+       }
+      ]
+     }
+    },
+    "resourceName": {
+     "shape": {
+      "kind": "union",
+      "of": [
+       {
+        "kind": "null"
+       },
+       {
+        "kind": "string"
+       }
+      ]
+     }
+    },
+    "kind": {
+     "shape": {
+      "kind": "string"
+     }
+    },
+    "status": {
+     "shape": {
+      "kind": "string"
+     }
+    },
+    "checkInAt": {
+     "shape": {
+      "kind": "string"
+     }
+    },
+    "checkOutAt": {
+     "shape": {
+      "kind": "union",
+      "of": [
+       {
+        "kind": "null"
+       },
+       {
+        "kind": "string"
+       }
+      ]
+     }
+    },
+    "dailyRate": {
+     "shape": {
+      "kind": "union",
+      "of": [
+       {
+        "kind": "null"
+       },
+       {
+        "kind": "number"
+       }
+      ]
+     }
+    },
+    "notes": {
+     "shape": {
+      "kind": "union",
+      "of": [
+       {
+        "kind": "null"
+       },
+       {
+        "kind": "string"
+       }
+      ]
+     }
+    },
+    "days": {
+     "shape": {
+      "kind": "number"
+     }
+    },
+    "estimatedTotal": {
+     "shape": {
+      "kind": "union",
+      "of": [
+       {
+        "kind": "null"
+       },
+       {
+        "kind": "number"
+       }
+      ]
+     }
+    }
+   }
+  },
+  "StayEvent": {
+   "kind": "object",
+   "fields": {
+    "id": {
+     "shape": {
+      "kind": "number"
+     }
+    },
+    "stayId": {
+     "shape": {
+      "kind": "number"
+     }
+    },
+    "kind": {
+     "shape": {
+      "kind": "string"
+     }
+    },
+    "occurredAt": {
+     "shape": {
+      "kind": "string"
+     }
+    },
+    "notes": {
+     "shape": {
+      "kind": "union",
+      "of": [
+       {
+        "kind": "null"
+       },
+       {
+        "kind": "string"
+       }
+      ]
+     }
+    },
+    "authorName": {
+     "shape": {
+      "kind": "union",
+      "of": [
+       {
+        "kind": "null"
+       },
+       {
+        "kind": "string"
+       }
+      ]
+     }
+    }
+   }
+  },
+  "StayListItem": {
+   "kind": "object",
+   "fields": {
+    "id": {
+     "shape": {
+      "kind": "number"
+     }
+    },
+    "code": {
+     "shape": {
+      "kind": "string"
+     }
+    },
+    "patientId": {
+     "shape": {
+      "kind": "number"
+     }
+    },
+    "patientName": {
+     "shape": {
+      "kind": "string"
+     }
+    },
+    "ownerName": {
+     "shape": {
+      "kind": "string"
+     }
+    },
+    "resourceName": {
+     "shape": {
+      "kind": "union",
+      "of": [
+       {
+        "kind": "null"
+       },
+       {
+        "kind": "string"
+       }
+      ]
+     }
+    },
+    "kind": {
+     "shape": {
+      "kind": "string"
+     }
+    },
+    "status": {
+     "shape": {
+      "kind": "string"
+     }
+    },
+    "checkInAt": {
+     "shape": {
+      "kind": "string"
+     }
+    },
+    "checkOutAt": {
+     "shape": {
+      "kind": "union",
+      "of": [
+       {
+        "kind": "null"
+       },
+       {
+        "kind": "string"
+       }
+      ]
+     }
+    },
+    "days": {
+     "shape": {
+      "kind": "number"
+     }
+    },
+    "estimatedTotal": {
+     "shape": {
+      "kind": "union",
+      "of": [
+       {
+        "kind": "null"
+       },
+       {
+        "kind": "number"
+       }
+      ]
+     }
+    }
+   }
+  },
+  "StockMovement": {
+   "kind": "object",
+   "fields": {
+    "id": {
+     "shape": {
+      "kind": "number"
+     }
+    },
+    "productId": {
+     "shape": {
+      "kind": "number"
+     }
+    },
+    "productName": {
+     "shape": {
+      "kind": "string"
+     }
+    },
+    "productCode": {
+     "shape": {
+      "kind": "string"
+     }
+    },
+    "quantity": {
+     "shape": {
+      "kind": "number"
+     }
+    },
+    "kind": {
+     "shape": {
+      "kind": "string"
+     }
+    },
+    "unitCost": {
+     "shape": {
+      "kind": "union",
+      "of": [
+       {
+        "kind": "null"
+       },
+       {
+        "kind": "number"
+       }
+      ]
+     }
+    },
+    "reason": {
+     "shape": {
+      "kind": "union",
+      "of": [
+       {
+        "kind": "null"
+       },
+       {
+        "kind": "string"
+       }
+      ]
+     }
+    },
+    "stayId": {
+     "shape": {
+      "kind": "union",
+      "of": [
+       {
+        "kind": "null"
+       },
+       {
+        "kind": "number"
+       }
+      ]
+     }
+    },
+    "visitId": {
+     "shape": {
+      "kind": "union",
+      "of": [
+       {
+        "kind": "null"
+       },
+       {
+        "kind": "number"
+       }
+      ]
+     }
+    },
+    "authorName": {
+     "shape": {
+      "kind": "union",
+      "of": [
+       {
+        "kind": "null"
+       },
+       {
+        "kind": "string"
+       }
+      ]
+     }
+    },
+    "createdAt": {
+     "shape": {
+      "kind": "string"
+     }
+    }
+   }
+  },
+  "Surgery": {
+   "kind": "object",
+   "fields": {
+    "id": {
+     "shape": {
+      "kind": "number"
+     }
+    },
+    "patientId": {
+     "shape": {
+      "kind": "number"
+     }
+    },
+    "patientName": {
+     "shape": {
+      "kind": "string"
+     }
+    },
+    "speciesName": {
+     "shape": {
+      "kind": "string"
+     }
+    },
+    "ownerName": {
+     "shape": {
+      "kind": "string"
+     }
+    },
+    "ownerPhone": {
+     "shape": {
+      "kind": "union",
+      "of": [
+       {
+        "kind": "null"
+       },
+       {
+        "kind": "string"
+       }
+      ]
+     }
+    },
+    "veterinarianId": {
+     "shape": {
+      "kind": "union",
+      "of": [
+       {
+        "kind": "null"
+       },
+       {
+        "kind": "number"
+       }
+      ]
+     }
+    },
+    "veterinarianName": {
+     "shape": {
+      "kind": "union",
+      "of": [
+       {
+        "kind": "null"
+       },
+       {
+        "kind": "string"
+       }
+      ]
+     }
+    },
+    "surgeryType": {
+     "shape": {
+      "kind": "string"
+     }
+    },
+    "scheduledAt": {
+     "shape": {
+      "kind": "string"
+     }
+    },
+    "anesthesiaType": {
+     "shape": {
+      "kind": "union",
+      "of": [
+       {
+        "kind": "null"
+       },
+       {
+        "kind": "string"
+       }
+      ]
+     }
+    },
+    "preoperativeNotes": {
+     "shape": {
+      "kind": "union",
+      "of": [
+       {
+        "kind": "null"
+       },
+       {
+        "kind": "string"
+       }
+      ]
+     }
+    },
+    "postoperativeNotes": {
+     "shape": {
+      "kind": "union",
+      "of": [
+       {
+        "kind": "null"
+       },
+       {
+        "kind": "string"
+       }
+      ]
+     }
+    },
+    "status": {
+     "shape": {
+      "kind": "string"
+     }
+    }
+   }
+  },
+  "TrendPoint": {
+   "kind": "object",
+   "fields": {
+    "date": {
+     "shape": {
+      "kind": "string"
+     }
+    },
+    "value": {
+     "shape": {
+      "kind": "union",
+      "of": [
+       {
+        "kind": "null"
+       },
+       {
+        "kind": "number"
+       }
+      ]
+     }
+    },
+    "refMin": {
+     "shape": {
+      "kind": "union",
+      "of": [
+       {
+        "kind": "null"
+       },
+       {
+        "kind": "number"
+       }
+      ]
+     }
+    },
+    "refMax": {
+     "shape": {
+      "kind": "union",
+      "of": [
+       {
+        "kind": "null"
+       },
+       {
+        "kind": "number"
+       }
+      ]
+     }
+    },
+    "status": {
+     "shape": {
+      "kind": "string"
+     }
+    }
+   }
+  },
+  "UserListItem": {
+   "kind": "object",
+   "fields": {
+    "id": {
+     "shape": {
+      "kind": "number"
+     }
+    },
+    "username": {
+     "shape": {
+      "kind": "string"
+     }
+    },
+    "fullName": {
+     "shape": {
+      "kind": "string"
+     }
+    },
+    "role": {
+     "shape": {
+      "kind": "string"
+     }
+    },
+    "active": {
+     "shape": {
+      "kind": "unknown"
+     }
+    },
+    "mustChangePassword": {
+     "shape": {
+      "kind": "unknown"
+     }
+    },
+    "createdAt": {
+     "shape": {
+      "kind": "string"
+     }
+    }
+   }
+  },
+  "Vaccine": {
+   "kind": "object",
+   "fields": {
+    "id": {
+     "shape": {
+      "kind": "number"
+     }
+    },
+    "patientId": {
+     "shape": {
+      "kind": "number"
+     }
+    },
+    "vaccineTypeId": {
+     "shape": {
+      "kind": "union",
+      "of": [
+       {
+        "kind": "null"
+       },
+       {
+        "kind": "number"
+       }
+      ]
+     }
+    },
+    "vaccineName": {
+     "shape": {
+      "kind": "string"
+     }
+    },
+    "dose": {
+     "shape": {
+      "kind": "union",
+      "of": [
+       {
+        "kind": "null"
+       },
+       {
+        "kind": "string"
+       }
+      ]
+     }
+    },
+    "administeredAt": {
+     "shape": {
+      "kind": "string"
+     }
+    },
+    "nextDoseAt": {
+     "shape": {
+      "kind": "union",
+      "of": [
+       {
+        "kind": "null"
+       },
+       {
+        "kind": "string"
+       }
+      ]
+     }
+    },
+    "lot": {
+     "shape": {
+      "kind": "union",
+      "of": [
+       {
+        "kind": "null"
+       },
+       {
+        "kind": "string"
+       }
+      ]
+     }
+    },
+    "manufacturer": {
+     "shape": {
+      "kind": "union",
+      "of": [
+       {
+        "kind": "null"
+       },
+       {
+        "kind": "string"
+       }
+      ]
+     }
+    },
+    "veterinarianName": {
+     "shape": {
+      "kind": "union",
+      "of": [
+       {
+        "kind": "null"
+       },
+       {
+        "kind": "string"
+       }
+      ]
+     }
+    },
+    "notes": {
+     "shape": {
+      "kind": "union",
+      "of": [
+       {
+        "kind": "null"
+       },
+       {
+        "kind": "string"
+       }
+      ]
+     }
+    }
+   }
+  },
+  "VaccineListItem": {
+   "kind": "object",
+   "fields": {
+    "id": {
+     "shape": {
+      "kind": "number"
+     }
+    },
+    "patientId": {
+     "shape": {
+      "kind": "number"
+     }
+    },
+    "patientName": {
+     "shape": {
+      "kind": "string"
+     }
+    },
+    "speciesName": {
+     "shape": {
+      "kind": "string"
+     }
+    },
+    "ownerName": {
+     "shape": {
+      "kind": "string"
+     }
+    },
+    "vaccineName": {
+     "shape": {
+      "kind": "string"
+     }
+    },
+    "administeredAt": {
+     "shape": {
+      "kind": "string"
+     }
+    },
+    "nextDoseAt": {
+     "shape": {
+      "kind": "union",
+      "of": [
+       {
+        "kind": "null"
+       },
+       {
+        "kind": "string"
+       }
+      ]
+     }
+    },
+    "lot": {
+     "shape": {
+      "kind": "union",
+      "of": [
+       {
+        "kind": "null"
+       },
+       {
+        "kind": "string"
+       }
+      ]
+     }
+    },
+    "manufacturer": {
+     "shape": {
+      "kind": "union",
+      "of": [
+       {
+        "kind": "null"
+       },
+       {
+        "kind": "string"
+       }
+      ]
+     }
+    },
+    "veterinarianName": {
+     "shape": {
+      "kind": "union",
+      "of": [
+       {
+        "kind": "null"
+       },
+       {
+        "kind": "string"
+       }
+      ]
+     }
+    }
+   }
+  },
+  "VaccineType": {
+   "kind": "object",
+   "fields": {
+    "id": {
+     "shape": {
+      "kind": "number"
+     }
+    },
+    "code": {
+     "shape": {
+      "kind": "string"
+     }
+    },
+    "name": {
+     "shape": {
+      "kind": "string"
+     }
+    }
+   }
+  },
+  "Visit": {
+   "kind": "object",
+   "fields": {
+    "id": {
+     "shape": {
+      "kind": "number"
+     }
+    },
+    "code": {
+     "shape": {
+      "kind": "string"
+     }
+    },
+    "patientId": {
+     "shape": {
+      "kind": "number"
+     }
+    },
+    "patientName": {
+     "shape": {
+      "kind": "string"
+     }
+    },
+    "ownerId": {
+     "shape": {
+      "kind": "number"
+     }
+    },
+    "ownerName": {
+     "shape": {
+      "kind": "string"
+     }
+    },
+    "appointmentId": {
+     "shape": {
+      "kind": "union",
+      "of": [
+       {
+        "kind": "null"
+       },
+       {
+        "kind": "number"
+       }
+      ]
+     }
+    },
+    "arrivedAt": {
+     "shape": {
+      "kind": "string"
+     }
+    },
+    "priority": {
+     "shape": {
+      "kind": "string"
+     }
+    },
+    "status": {
+     "shape": {
+      "kind": "string"
+     }
+    },
+    "notes": {
+     "shape": {
+      "kind": "union",
+      "of": [
+       {
+        "kind": "null"
+       },
+       {
+        "kind": "string"
+       }
+      ]
+     }
+    },
+    "createdByName": {
+     "shape": {
+      "kind": "union",
+      "of": [
+       {
+        "kind": "null"
+       },
+       {
+        "kind": "string"
+       }
+      ]
+     }
+    },
+    "services": {
+     "shape": {
+      "kind": "array",
+      "items": {
+       "kind": "ref",
+       "name": "VisitService"
+      }
+     }
+    }
+   }
+  },
+  "VisitAttachment": {
+   "kind": "object",
+   "fields": {
+    "id": {
+     "shape": {
+      "kind": "number"
+     }
+    },
+    "visitId": {
+     "shape": {
+      "kind": "number"
+     }
+    },
+    "fileName": {
+     "shape": {
+      "kind": "string"
+     }
+    },
+    "mimeType": {
+     "shape": {
+      "kind": "union",
+      "of": [
+       {
+        "kind": "null"
+       },
+       {
+        "kind": "string"
+       }
+      ]
+     }
+    },
+    "kind": {
+     "shape": {
+      "kind": "union",
+      "of": [
+       {
+        "kind": "null"
+       },
+       {
+        "kind": "string"
+       }
+      ]
+     }
+    },
+    "sizeBytes": {
+     "shape": {
+      "kind": "number"
+     }
+    },
+    "createdAt": {
+     "shape": {
+      "kind": "string"
+     }
+    }
+   }
+  },
+  "VisitListItem": {
+   "kind": "object",
+   "fields": {
+    "id": {
+     "shape": {
+      "kind": "number"
+     }
+    },
+    "code": {
+     "shape": {
+      "kind": "string"
+     }
+    },
+    "patientId": {
+     "shape": {
+      "kind": "number"
+     }
+    },
+    "patientName": {
+     "shape": {
+      "kind": "string"
+     }
+    },
+    "ownerId": {
+     "shape": {
+      "kind": "number"
+     }
+    },
+    "ownerName": {
+     "shape": {
+      "kind": "string"
+     }
+    },
+    "arrivedAt": {
+     "shape": {
+      "kind": "string"
+     }
+    },
+    "priority": {
+     "shape": {
+      "kind": "string"
+     }
+    },
+    "status": {
+     "shape": {
+      "kind": "string"
+     }
+    },
+    "notes": {
+     "shape": {
+      "kind": "union",
+      "of": [
+       {
+        "kind": "null"
+       },
+       {
+        "kind": "string"
+       }
+      ]
+     }
+    },
+    "servicesSummary": {
+     "shape": {
+      "kind": "string"
+     }
+    },
+    "estimatedTotal": {
+     "shape": {
+      "kind": "union",
+      "of": [
+       {
+        "kind": "null"
+       },
+       {
+        "kind": "number"
+       }
+      ]
+     }
+    }
+   }
+  },
+  "VisitService": {
+   "kind": "object",
+   "fields": {
+    "id": {
+     "shape": {
+      "kind": "number"
+     }
+    },
+    "visitId": {
+     "shape": {
+      "kind": "number"
+     }
+    },
+    "serviceId": {
+     "shape": {
+      "kind": "number"
+     }
+    },
+    "serviceName": {
+     "shape": {
+      "kind": "string"
+     }
+    },
+    "serviceCode": {
+     "shape": {
+      "kind": "string"
+     }
+    },
+    "categoryId": {
+     "shape": {
+      "kind": "number"
+     }
+    },
+    "categoryName": {
+     "shape": {
+      "kind": "string"
+     }
+    },
+    "professionalId": {
+     "shape": {
+      "kind": "union",
+      "of": [
+       {
+        "kind": "null"
+       },
+       {
+        "kind": "number"
+       }
+      ]
+     }
+    },
+    "professionalName": {
+     "shape": {
+      "kind": "union",
+      "of": [
+       {
+        "kind": "null"
+       },
+       {
+        "kind": "string"
+       }
+      ]
+     }
+    },
+    "quantity": {
+     "shape": {
+      "kind": "number"
+     }
+    },
+    "unitPrice": {
+     "shape": {
+      "kind": "union",
+      "of": [
+       {
+        "kind": "null"
+       },
+       {
+        "kind": "number"
+       }
+      ]
+     }
+    },
+    "taxRate": {
+     "shape": {
+      "kind": "union",
+      "of": [
+       {
+        "kind": "null"
+       },
+       {
+        "kind": "number"
+       }
+      ]
+     }
+    },
+    "status": {
+     "shape": {
+      "kind": "string"
+     }
+    },
+    "startedAt": {
+     "shape": {
+      "kind": "union",
+      "of": [
+       {
+        "kind": "null"
+       },
+       {
+        "kind": "string"
+       }
+      ]
+     }
+    },
+    "finishedAt": {
+     "shape": {
+      "kind": "union",
+      "of": [
+       {
+        "kind": "null"
+       },
+       {
+        "kind": "string"
+       }
+      ]
+     }
+    },
+    "notes": {
+     "shape": {
+      "kind": "union",
+      "of": [
+       {
+        "kind": "null"
+       },
+       {
+        "kind": "string"
+       }
+      ]
+     }
+    },
+    "seq": {
+     "shape": {
+      "kind": "number"
+     }
+    }
+   }
+  },
+  "WorklistData": {
+   "kind": "object",
+   "fields": {
+    "date": {
+     "shape": {
+      "kind": "string"
+     }
+    },
+    "totalPending": {
+     "shape": {
+      "kind": "number"
+     }
+    },
+    "today": {
+     "shape": {
+      "kind": "array",
+      "items": {
+       "kind": "ref",
+       "name": "WorklistGroup"
+      }
+     }
+    },
+    "overdue": {
+     "shape": {
+      "kind": "array",
+      "items": {
+       "kind": "ref",
+       "name": "WorklistGroup"
+      }
+     }
+    }
+   }
+  },
+  "WorklistGroup": {
+   "kind": "object",
+   "fields": {
+    "sampleTypeId": {
+     "shape": {
+      "kind": "number"
+     }
+    },
+    "sampleTypeName": {
+     "shape": {
+      "kind": "string"
+     }
+    },
+    "count": {
+     "shape": {
+      "kind": "number"
+     }
+    },
+    "maxElapsedMinutes": {
+     "shape": {
+      "kind": "number"
+     }
+    },
+    "samples": {
+     "shape": {
+      "kind": "array",
+      "items": {
+       "kind": "ref",
+       "name": "WorklistSample"
+      }
+     }
+    }
+   }
+  },
+  "WorklistSample": {
+   "kind": "object",
+   "fields": {
+    "id": {
+     "shape": {
+      "kind": "number"
+     }
+    },
+    "code": {
+     "shape": {
+      "kind": "string"
+     }
+    },
+    "patientId": {
+     "shape": {
+      "kind": "number"
+     }
+    },
+    "patientName": {
+     "shape": {
+      "kind": "string"
+     }
+    },
+    "ownerName": {
+     "shape": {
+      "kind": "string"
+     }
+    },
+    "speciesName": {
+     "shape": {
+      "kind": "string"
+     }
+    },
+    "sampleTypeId": {
+     "shape": {
+      "kind": "number"
+     }
+    },
+    "sampleTypeName": {
+     "shape": {
+      "kind": "string"
+     }
+    },
+    "status": {
+     "shape": {
+      "kind": "string"
+     }
+    },
+    "receivedAt": {
+     "shape": {
+      "kind": "string"
+     }
+    },
+    "elapsedMinutes": {
+     "shape": {
+      "kind": "number"
+     }
+    },
+    "resultCount": {
+     "shape": {
+      "kind": "number"
+     }
+    },
+    "abnormalCount": {
+     "shape": {
+      "kind": "number"
+     }
+    }
+   }
+  }
+ }
+}

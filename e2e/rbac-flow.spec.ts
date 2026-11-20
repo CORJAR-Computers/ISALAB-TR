@@ -1,5 +1,6 @@
-import { test, expect, type Page } from "@playwright/test";
-import { fileURLToPath } from "node:url";
+import type { Page } from "@playwright/test";
+import { expect, test } from "./fixtures";
+import { installIpcMock } from "./mock";
 import { gotoView } from "./navigation";
 
 /**
@@ -16,9 +17,7 @@ import { gotoView } from "./navigation";
  *      capacidades la cubre src/hooks/use-permissions.test.ts).
  */
 test.beforeEach(async ({ page }) => {
-  await page.addInitScript({
-    path: fileURLToPath(new URL("./ipc-mock.script.js", import.meta.url)),
-  });
+  await installIpcMock(page);
 });
 
 type Role = "ADMIN" | "VETERINARIO" | "AUXILIAR" | "RECEPCION" | "PELUQUERO";
@@ -210,7 +209,10 @@ for (const role of Object.keys(USERS) as Role[]) {
       expect(listUsers).toMatchObject({ ok: false, error: { type: "Forbidden" } });
     }
 
-    const saveSettings = await invoke(page, "save_clinic_settings");
+    // Payload mínimo: aquí solo importa el rechazo por rol (Forbidden).
+    const saveSettings = await invoke(page, "save_clinic_settings", {
+      input: {},
+    });
     if (role === "ADMIN") {
       expect(saveSettings.ok).toBe(true);
     } else {

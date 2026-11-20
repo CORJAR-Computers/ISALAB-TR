@@ -1,5 +1,6 @@
-import { test, expect, type Page } from "@playwright/test";
-import { fileURLToPath } from "node:url";
+import type { Page } from "@playwright/test";
+import { expect, test } from "./fixtures";
+import { installIpcMock } from "./mock";
 import { gotoView } from "./navigation";
 import { entityCode, entityCodePattern } from "./dates";
 
@@ -11,9 +12,7 @@ import { entityCode, entityCodePattern } from "./dates";
  * memoria), inyectado antes de que cargue la app.
  */
 test.beforeEach(async ({ page }) => {
-  await page.addInitScript({
-    path: fileURLToPath(new URL("./ipc-mock.script.js", import.meta.url)),
-  });
+  await installIpcMock(page);
 });
 
 async function login(page: Page) {

@@ -9,6 +9,22 @@
 // ejercitarlo, se declara en e2e/ipc-mock.allowlist.mjs (lo verifica
 // `npm run check:e2e-mock`).
 //
+// Inyección de fallos (E2E): `window.__E2E_IPC_FAULTS__.set({...})` hace que
+// los comandos seleccionados rechacen como lo haría el backend con la base
+// caída (AppError { type, data }), para probar los estados de error y el
+// reintento de la UI de verdad. Configuración:
+//   { all: true }                  → todos los comandos
+//   { groups: ["reception"] }       → un grupo de FAULT_GROUPS
+//   { commands: ["get_session"] }   → un comando concreto
+//   { prefixes: ["list_"] }         → por prefijo de comando
+//   { remaining: 1 }               → solo las próximas N llamadas
+//   { errorType?, message? }       → forma del error (por defecto Database)
+// La configuración vive en localStorage (clave "e2e:ipc-faults") para poder
+// fijarla con addInitScript ANTES de que arranque la app y sobrevivir a un
+// reload. `__E2E_IPC_FAULTS__.stats()` cuenta llamadas por comando, útil para
+// esperar el reintento automático de react-query antes de simular la vuelta
+// de la base.
+//
 // Script en JS plano de navegador (sin imports): se ejecuta en la página.
 (() => {
   if (window.__TAURI_INTERNALS__) return;
@@ -59,10 +75,33 @@
     },
   ];
 
+  // tubeType/anticoagulant/minVolumeMl replican las columnas de la tabla
+  // (todas nullable); antes faltaban y la tabla quedaba sin datos.
   const sampleTypes = [
-    { id: 1, code: "BLOOD", name: "Sangre" },
-    { id: 2, code: "SERUM", name: "Suero" },
-    { id: 3, code: "URINE", name: "Orina" },
+    {
+      id: 1,
+      code: "BLOOD",
+      name: "Sangre",
+      tubeType: "EDTA",
+      anticoagulant: "EDTA K2",
+      minVolumeMl: 1,
+    },
+    {
+      id: 2,
+      code: "SERUM",
+      name: "Suero",
+      tubeType: "Tapa roja",
+      anticoagulant: null,
+      minVolumeMl: 2,
+    },
+    {
+      id: 3,
+      code: "URINE",
+      name: "Orina",
+      tubeType: "Estéril",
+      anticoagulant: null,
+      minVolumeMl: 5,
+    },
   ];
 
   // Catálogo de analitos: los 3 históricos + los que siembra la migración
@@ -167,6 +206,7 @@
       id: s.id,
       code: s.code,
       patientId: s.patientId,
+      patientCode: p?.code ?? "?",
       patientName: p?.name ?? "?",
       ownerName: p?.ownerName ?? "?",
       speciesName: p?.speciesName ?? "?",
@@ -180,6 +220,12 @@
       abnormalCount: s.results.filter(
         (r) => r.status === "ALTO" || r.status === "BAJO",
       ).length,
+      criticalCount: s.results.filter(
+        (r) => r.status === "CRITICO" || r.status === "CRITICAL",
+      ).length,
+      qualityIndex: s.qualityIndex ?? null,
+      qualitySeverity: s.qualitySeverity ?? null,
+      rejectionReason: s.rejectionReason ?? null,
     };
   };
 
@@ -791,6 +837,275 @@
   };
 
   // ---------- Handlers por comando Tauri ----------
+  // ---------- Inyección de fallos (E2E) ----------
+  // Grupos con nombre para que los specs no mantengan listas de comandos.
+  // Un grupo se queda corto con el tiempo: el fallo simplemente no aplica.
+  const FAULT_GROUPS = {
+    session: ["get_session", "login", "logout"],
+    dashboard: ["get_dashboard_stats"],
+    reception: [
+      "list_visits",
+      "get_visit",
+      "create_visit",
+      "set_visit_status",
+      "add_visit_service",
+      "remove_visit_service",
+      "update_visit_service_status",
+      "checkout_visit",
+    ],
+    patients: ["list_patients", "get_patient", "global_search"],
+    samples: [
+      "list_samples",
+      "get_sample",
+      "count_samples",
+      "list_sample_events",
+      "get_worklist",
+    ],
+    invoices: [
+      "list_invoices",
+      "count_invoices",
+      "get_invoice",
+      "get_invoice_balance",
+      "list_invoice_payments",
+    ],
+    cash: [
+      "get_open_cash_session",
+      "open_cash_session",
+      "add_cash_movement",
+      "list_cash_movements",
+      "get_cash_session_summary",
+      "close_cash_session",
+    ],
+  };
+
+  const FAULTS_KEY = "e2e:ipc-faults";
+  const DB_DOWN_MESSAGE =
+    "No se pudo conectar con la base de datos (Firebird no responde).";
+
+  const readFaults = () => {
+    try {
+      const raw = window.localStorage.getItem(FAULTS_KEY);
+      return raw ? JSON.parse(raw) : {};
+    } catch {
+      return {};
+    }
+  };
+
+  const writeFaults = (config) => {
+    try {
+      window.localStorage.setItem(FAULTS_KEY, JSON.stringify(config ?? {}));
+    } catch {
+      // localStorage no disponible: el test corre sin fallos, no se rompe aquí.
+    }
+  };
+
+  const faultMatches = (config, cmd) => {
+    if (!config) return false;
+    if (config.all) return true;
+    if (Array.isArray(config.commands) && config.commands.includes(cmd)) {
+      return true;
+    }
+    if (
+      Array.isArray(config.groups) &&
+      config.groups.some((group) => (FAULT_GROUPS[group] ?? []).includes(cmd))
+    ) {
+      return true;
+    }
+    if (
+      Array.isArray(config.prefixes) &&
+      config.prefixes.some((prefix) => cmd.startsWith(prefix))
+    ) {
+      return true;
+    }
+    return false;
+  };
+
+  // Devuelve la configuración si esta llamada debe fallar; descuenta
+  // `remaining` para poder programar fallos de una sola vez.
+  const consumeFault = (cmd) => {
+    const config = readFaults();
+    if (!faultMatches(config, cmd)) return null;
+    if (typeof config.remaining === "number") {
+      if (config.remaining <= 0) return null;
+      writeFaults({ ...config, remaining: config.remaining - 1 });
+    }
+    return config;
+  };
+
+  // Conteo de invocaciones por comando: permite a un spec esperar el reintento
+  // automático de react-query sin depender de una pausa fija.
+  const callsByCommand = new Map();
+  let callsTotal = 0;
+
+  // ---------- Validación de forma (e2e/ipc-shapes.json) ----------
+  // Las formas se generan de src/bindings.ts (scripts/gen-ipc-shapes.mjs) y se
+  // inyectan con e2e/mock.ts. Si el mock devuelve un campo con otro nombre (o
+  // le falta uno requerido), el test falla aquí con la ruta exacta en vez de
+  // pintar una pantalla vacía en la clínica.
+  // Se lee en cada uso a propósito: el script con las formas se inyecta
+  // después que el mock, así que al cargar este archivo aún no existe.
+  const shapes = () => window.__E2E_IPC_SHAPES__ ?? null;
+  // Violaciones acumuladas: el fixture de e2e/fixtures.ts las comprueba al
+  // cerrar el test, de modo que un mock incoherente falla aunque la UI se
+  // limite a pintar un estado de error.
+  const shapeErrors = (window.__E2E_IPC_SHAPE_ERRORS__ = []);
+
+  const recordShapeError = (message) => {
+    if (shapeErrors.length < 50) shapeErrors.push(message);
+  };
+
+  const typeOfValue = (value) => {
+    if (value === null) return "null";
+    if (Array.isArray(value)) return "array";
+    return typeof value;
+  };
+
+  const shapeLabel = (shape) => {
+    switch (shape.kind) {
+      case "ref":
+        return shape.name;
+      case "array":
+        return `array<${shapeLabel(shape.items)}>`;
+      case "union":
+        return shape.of.map(shapeLabel).join(" | ");
+      case "object":
+      case "record":
+        return "objeto";
+      case "unknown":
+        return "cualquiera";
+      default:
+        return shape.kind;
+    }
+  };
+
+  const checkShape = (value, shape, path, issues, depth = 0) => {
+    if (!shape || depth > 12 || shape.kind === "unknown") return;
+    if (shape.kind === "ref") {
+      const target = shapes()?.types?.[shape.name];
+      if (target) checkShape(value, target, path, issues, depth + 1);
+      return;
+    }
+    if (shape.kind === "union") {
+      const fits = shape.of.some((option) => {
+        const probe = [];
+        checkShape(value, option, path, probe, depth + 1);
+        return probe.length === 0;
+      });
+      if (!fits) {
+        issues.push(
+          `${path}: no coincide con ${shapeLabel(shape)} (llegó ${typeOfValue(value)})`,
+        );
+      }
+      return;
+    }
+    if (shape.kind === "array") {
+      if (!Array.isArray(value)) {
+        issues.push(`${path}: se esperaba array, llegó ${typeOfValue(value)}`);
+        return;
+      }
+      value.forEach((item, index) =>
+        checkShape(item, shape.items, `${path}[${index}]`, issues, depth + 1),
+      );
+      return;
+    }
+    if (shape.kind === "record") {
+      if (value === null || typeof value !== "object" || Array.isArray(value)) {
+        issues.push(`${path}: se esperaba objeto, llegó ${typeOfValue(value)}`);
+      }
+      return;
+    }
+    if (shape.kind === "object") {
+      if (value === null || typeof value !== "object" || Array.isArray(value)) {
+        issues.push(`${path}: se esperaba objeto, llegó ${typeOfValue(value)}`);
+        return;
+      }
+      for (const [name, field] of Object.entries(shape.fields)) {
+        if (!(name in value)) {
+          if (!field.optional) {
+            issues.push(
+              `${path}.${name}: falta el campo (así se llama en bindings.ts)`,
+            );
+          }
+          continue;
+        }
+        checkShape(value[name], field.shape, `${path}.${name}`, issues, depth + 1);
+      }
+      return;
+    }
+    if (shape.kind === "null") {
+      if (value !== null) {
+        issues.push(`${path}: se esperaba null, llegó ${typeOfValue(value)}`);
+      }
+      return;
+    }
+    if (typeOfValue(value) !== shape.kind) {
+      issues.push(
+        `${path}: se esperaba ${shape.kind}, llegó ${typeOfValue(value)}`,
+      );
+    }
+  };
+
+  /** Valida la respuesta de un comando; lanza un error legible si no cuadra. */
+  const assertResponseShape = (cmd, value) => {
+    const spec = shapes()?.commands?.[cmd];
+    if (!spec) return;
+    const issues = [];
+    checkShape(value, spec.result, `respuesta de ${cmd}`, issues);
+    if (issues.length === 0) return;
+    const message =
+      `[e2e-ipc-shapes] La respuesta de "${cmd}" no coincide con src/bindings.ts:\n  ` +
+      issues.join("\n  ") +
+      "\nAjusta el handler en e2e/ipc-mock.script.js (o regenera las formas si cambió el tipo).";
+    recordShapeError(message);
+    throw new Error(message);
+  };
+
+  /** Valida que el payload tenga exactamente las claves de bindings.ts. */
+  const assertArgsShape = (cmd, args) => {
+    const spec = shapes()?.commands?.[cmd];
+    if (!spec || spec.args.length === 0) return;
+    const received = Object.keys(args ?? {}).sort();
+    const expected = [...spec.args].sort();
+    const missing = expected.filter((key) => !received.includes(key));
+    const extra = received.filter((key) => !expected.includes(key));
+    if (missing.length === 0 && extra.length === 0) return;
+    const message =
+      `[e2e-ipc-shapes] El payload de "${cmd}" no coincide con src/bindings.ts:` +
+      (missing.length ? `\n  faltan: ${missing.join(", ")}` : "") +
+      (extra.length ? `\n  sobran: ${extra.join(", ")}` : "") +
+      `\n  esperado: [${expected.join(", ")}] · recibido: [${received.join(", ")}]`;
+    recordShapeError(message);
+    throw new Error(message);
+  };
+
+  // Ajustes de la clínica: la forma completa que espera bindings.ts
+  // (ClinicSettings), con los campos de SMTP y marca en null por defecto.
+  const clinicSettings = () => ({
+    clinicName: "Clínica Veterinaria Central",
+    clinicNit: "900000000-0",
+    address: "Calle 12 # 34-56",
+    phone: "3001234567",
+    city: "Bogotá D.C.",
+    logo: null,
+    taxRate: 19,
+    currency: "COP",
+    signatureMode: "GRAPHIC",
+    vetName: "Dra. Ana Pérez",
+    vetLicense: "MVZ 12345",
+    groqApiKey: null,
+    certificate: null,
+    pkcs12Password: null,
+    smtpHost: null,
+    smtpPort: null,
+    smtpTls: null,
+    smtpUsername: null,
+    smtpPassword: null,
+    smtpFrom: null,
+    tagline: null,
+    groomingDefaultDuration: 60,
+    receptionTicketPrefix: null,
+  });
+
   const handlers = {
     get_session: () => (sessionUser ? { ...sessionUser } : null),
     login: (args) => {
@@ -818,11 +1133,19 @@
     },
     db_health: () => ({
       ok: true,
+      status: "connected",
       message: "ok",
-      dbPath: "C:/mock/isalab.fdb",
-      fbclientFound: true,
-      fbclientPath: "fbclient.dll",
+      mode: "EMBEDDED",
+      target: "C:/mock/isalab.fdb",
+      host: "localhost",
+      port: 3050,
+      database: "C:/mock/isalab.fdb",
+      user: "SYSDBA",
+      clientFound: true,
+      clientPath: "fbclient.dll",
       schemaVersion: 11,
+      expectedSchemaVersion: 11,
+      latencyMs: 2,
     }),
     get_dashboard_stats: () => {
       const list = samples.map(toListItem);
@@ -1049,6 +1372,12 @@
         analyzerName: input.analyzerId != null ? analyzerById(input.analyzerId)?.name ?? null : null,
         collectedBy: input.collectedBy ?? null,
         notes: input.notes ?? null,
+        qualityIndex: null,
+        qualityNote: null,
+        qualitySeverity: null,
+        rejectedAt: null,
+        rejectedBy: null,
+        rejectionReason: null,
         results: [],
       };
       nextSampleId += 1;
@@ -1271,25 +1600,11 @@
         return ap - bp;
       });
     },
-    get_clinic_settings: () => ({
-      clinicName: "Clínica Veterinaria Central",
-      clinicNit: "900000000-0",
-      address: "Calle 12 # 34-56",
-      phone: "3001234567",
-      city: "Bogotá D.C.",
-      logoPath: null,
-      taxRate: 19,
-      currency: "COP",
-      signatureMode: "GRAPHIC",
-      vetName: "Dra. Ana Pérez",
-      vetLicense: "MVZ 12345",
-      groqApiKey: null,
-      pkcs12Path: null,
-      pkcs12Password: null,
-    }),
+    get_clinic_settings: () => clinicSettings(),
     save_clinic_settings: (args) => {
       requireAdmin();
-      return args.input;
+      // Como el backend: devuelve los ajustes guardados completos.
+      return { ...clinicSettings(), ...args.input };
     },
     import_clinic_logo: (args) => {
       requireAdmin();
@@ -1299,13 +1614,15 @@
       {
         id: 1,
         name: "Logo Falso",
-        logoPath: "C:/logos/falso.png",
+        mimeType: "image/png",
+        sizeBytes: 18432,
         createdAt: daysAgo(20, 10, 0),
       },
       {
         id: 2,
         name: "Proyecto X",
-        logoPath: "C:/logos/proyecto-x.png",
+        mimeType: "image/png",
+        sizeBytes: 9216,
         createdAt: daysAgo(19, 11, 0),
       },
     ],
@@ -1314,7 +1631,8 @@
       return {
         id: 3,
         name: args.input.name,
-        logoPath: args.input.sourcePath,
+        mimeType: "image/png",
+        sizeBytes: 12288,
         createdAt: daysAgo(18, 12, 0),
       };
     },
@@ -1583,8 +1901,16 @@
       return session ? session.movements.map((m) => ({ ...m })) : [];
     },
     get_cash_session_summary: (args) => {
-      const session = resolveSession(args.sessionId);
-      return session ? buildSummary(session) : null;
+      // El backend devuelve Result<CashSessionSummary>: sin caja abierta falla
+      // con Validation, no con null (bindings.ts no lo declara nullable).
+      const session = args.sessionId == null ? openSession() : resolveSession(args.sessionId);
+      if (!session) {
+        throw {
+          type: "Validation",
+          data: "No hay una caja abierta. Abre la caja primero.",
+        };
+      }
+      return buildSummary(session);
     },
     close_cash_session: (args) => {
       requireBill();
@@ -1772,6 +2098,9 @@
     list_qc_targets: () => [],
     get_qc_chart: () => null,
     list_reports: () => [],
+    // Diagnóstico: la UI reenvía errores al log de Rust y puede exportarlo.
+    log_frontend: () => null,
+    export_diagnostics: () => "C:/mock/isalab-diagnostico.zip",
     list_analyzer_sources: () => {
       requireVetOrAdmin();
       return [];
@@ -1814,6 +2143,19 @@
   };
 
   const invoke = (cmd, args = {}) => {
+    callsTotal += 1;
+    callsByCommand.set(cmd, (callsByCommand.get(cmd) ?? 0) + 1);
+
+    const fault = consumeFault(cmd);
+    if (fault) {
+      const error = {
+        type: fault.errorType ?? "Database",
+        data: fault.message ?? DB_DOWN_MESSAGE,
+      };
+      console.error(`[e2e-ipc-mock] fallo inyectado en "${cmd}": ${error.data}`);
+      return Promise.reject(error);
+    }
+
     const fn = handlers[cmd];
     if (!fn) {
       const error = missingHandlerError(cmd, args);
@@ -1821,8 +2163,14 @@
       return Promise.reject(error);
     }
     try {
-      return Promise.resolve(fn(args));
+      const value = fn(args);
+      // El payload se valida solo si el comando lo aceptó: un rechazo por rol
+      // (Forbidden) ocurre antes de mirar los argumentos, como en Rust.
+      assertArgsShape(cmd, args);
+      assertResponseShape(cmd, value);
+      return Promise.resolve(value);
     } catch (err) {
+      console.error(err.message ?? String(err));
       return Promise.reject(err);
     }
   };
@@ -1841,6 +2189,25 @@
       }
     },
   };
+  // API de control de fallos para los specs (ver cabecera del archivo).
+  window.__E2E_IPC_FAULTS__ = {
+    key: FAULTS_KEY,
+    groups: () => Object.keys(FAULT_GROUPS),
+    get: readFaults,
+    set: (config) => {
+      writeFaults(config);
+      return readFaults();
+    },
+    clear: () => {
+      writeFaults({});
+      return readFaults();
+    },
+    stats: () => ({
+      total: callsTotal,
+      byCommand: Object.fromEntries(callsByCommand),
+    }),
+  };
+
   window.__TAURI_INTERNALS__ = {
     invoke,
     // La UI usa convertFileSrc (p. ej. para previsualizar logos). En el

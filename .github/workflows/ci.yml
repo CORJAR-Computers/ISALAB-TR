@@ -50,6 +50,11 @@ jobs:
       # comandos nuevos).
       - name: Check bindings.ts is up to date
         run: npm run check:bindings
+      # Esquema por comando (campos de respuesta y claves del payload) generado
+      # desde bindings.ts y cruzado con los tipos de Rust: un campo renombrado
+      # en Rust o en el mock falla aquí, no en la clínica.
+      - name: Check IPC command shapes
+        run: npm run check:ipc-shapes
       # `lint` cubre src/ y e2e/ (incluye las reglas de eslint-plugin-playwright).
       - name: Run ESLint
         run: npm run lint
@@ -205,6 +210,8 @@ jobs:
       # (e2e/ipc-mock.allowlist.mjs). `npm test` lo corre también vía pretest.
       - name: Check E2E IPC mock covers all UI commands
         run: npm run check:e2e-mock
+      - name: Check IPC command shapes
+        run: npm run check:ipc-shapes
       - name: Run E2E smoke tests
         # La UI corre en el dev server de Vite con el IPC de Tauri mockeado
         # (e2e/ipc-mock.script.js): valida login, dashboard y el flujo

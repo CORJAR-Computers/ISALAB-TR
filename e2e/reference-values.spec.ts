@@ -1,5 +1,6 @@
-import { test, expect, type Page, type Locator } from "@playwright/test";
-import { fileURLToPath } from "node:url";
+import type { Page, Locator } from "@playwright/test";
+import { expect, test } from "./fixtures";
+import { installIpcMock } from "./mock";
 import { gotoView } from "./navigation";
 
 /**
@@ -18,9 +19,7 @@ const VIEW_W = 1440;
 const VIEW_H = 900;
 
 test.beforeEach(async ({ page }) => {
-  await page.addInitScript({
-    path: fileURLToPath(new URL("./ipc-mock.script.js", import.meta.url)),
-  });
+  await installIpcMock(page);
   await page.setViewportSize({ width: VIEW_W, height: VIEW_H });
 });
 

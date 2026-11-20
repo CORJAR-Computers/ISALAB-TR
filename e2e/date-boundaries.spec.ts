@@ -1,5 +1,6 @@
-import { test, expect, type Page } from "@playwright/test";
-import { fileURLToPath } from "node:url";
+import type { Page } from "@playwright/test";
+import { expect, test } from "./fixtures";
+import { installIpcMock } from "./mock";
 import { entityCode, entityCodePattern } from "./dates";
 import { gotoView } from "./navigation";
 
@@ -20,9 +21,7 @@ import { gotoView } from "./navigation";
  */
 
 test.beforeEach(async ({ page }) => {
-  await page.addInitScript({
-    path: fileURLToPath(new URL("./ipc-mock.script.js", import.meta.url)),
-  });
+  await installIpcMock(page);
   await page.setViewportSize({ width: 1440, height: 900 });
 });
 

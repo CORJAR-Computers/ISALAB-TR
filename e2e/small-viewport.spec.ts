@@ -1,5 +1,6 @@
-import { test, expect, type Page } from "@playwright/test";
-import { fileURLToPath } from "node:url";
+import type { Page } from "@playwright/test";
+import { expect, test } from "./fixtures";
+import { installIpcMock } from "./mock";
 import { entityCode } from "./dates";
 import { gotoView as gotoViewItem } from "./navigation";
 
@@ -24,9 +25,7 @@ const W_MD = 911; // 1366 / 1.5
 const H_MD = 576; // 768 / 1.5 - barra de tareas
 
 test.beforeEach(async ({ page }) => {
-  await page.addInitScript({
-    path: fileURLToPath(new URL("./ipc-mock.script.js", import.meta.url)),
-  });
+  await installIpcMock(page);
 });
 
 async function login(page: Page, width: number, height: number) {
