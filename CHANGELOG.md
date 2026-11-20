@@ -6,6 +6,24 @@ The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.1.0/).
 
 ## [Unreleased]
 
+## [1.2.0] - 2026-11-20
+
+### 🎯 Release Summary
+
+La 1.2 cierra la clínica completa dentro de ISALAB: agenda, recepción con cola
+de espera, historia clínica, peluquería, estancias, inventario con lotes y
+vencimientos, catálogo de servicios y cobro con caja —abonos, pagos mixtos,
+cierre con arqueo y anulación con reverso auditado—. La base puede vivir en un
+servidor Firebird 5 además de embebida, los adjuntos viajan dentro de la base y
+la app ya puede diagnosticarse sola: log rotativo en disco y «Exportar
+diagnóstico» en ZIP con versión, esquema y estado de Firebird para soporte.
+
+| Métrica | v1.1.0 | v1.2.0 |
+|--------|-------|-------|
+| Tests Rust (Firebird real) | 304 | 431 |
+| Tests frontend | 125 | 153 |
+| E2E Playwright | 17 | 32 |
+
 ### Added
 
 - **`npm run verify-updater`**: verificación de extremo a extremo del
@@ -20,6 +38,59 @@ The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.1.0/).
 - **`docs/release-process.md`**: checklist completo del proceso de release:
   bump en los 6 sitios, CHANGELOG y popup, tag, draft y auditoría del feed,
   publicación y verificación en caliente con `verify-updater`.
+- **Clínica integral**: agenda generalizada (profesional, duración de la cita
+  y control de solapamientos), recepción con cola de espera priorizada,
+  detalle de visita y cobro en el mismo flujo, peluquería con tablero diario,
+  estancias hospitalarias, catálogo de servicios con facturación derivada y
+  capacidades por rol aplicadas en la UI y en el backend.
+- **Cobros y caja**: abonos y pagos mixtos repartidos entre varias facturas,
+  caja con apertura, cierre y arqueo por denominaciones, gastos, retiros y
+  ajustes, anulación de pagos con devolución del efectivo y auditoría, y
+  reporte de facturación que separa lo emitido de lo cobrado.
+- **Inventario de productos**: lotes, fechas de vencimiento y trazabilidad
+  del consumo en vacunas y tratamientos.
+- **Marca de la clínica**: frase configurable en el login, la barra lateral y
+  «Acerca de».
+- **Firebird 5 en servidor**: conexión TCP con la configuración guardada en el
+  equipo (contraseña cifrada con DPAPI), eventos de servidor y migraciones
+  ejecutables desde un runner de administración además del arranque normal.
+- **Adjuntos como BLOB** dentro de la base, en lugar de archivos sueltos que se
+  perdían al mover el equipo.
+- **Diagnóstico**: log rotativo en `<app_data>/logs` (2 MB × 5 copias) escrito
+  por el backend y alimentado también por la UI (`onerror`,
+  `unhandledrejection` y errores de `QueryCache`/`MutationCache`), y
+  «Exportar diagnóstico» en Acerca de, que genera un ZIP con `diagnostico.txt`
+  (versión, esquema actual y esperado, estado real de Firebird y conexión) y
+  los logs, listo para adjuntar a soporte.
+
+### Changed
+
+- Las fechas y los códigos consecutivos se derivan del día local del equipo,
+  no de UTC: la agenda, la cola de recepción y la caducidad de vacunas ya no
+  apuntan al día siguiente después de las 19:00.
+- Las consultas fallidas muestran un estado de error compartido con motivo y
+  botón de reintentar en las doce páginas que antes se quedaban en el
+  esqueleto de carga o decían «sin datos».
+
+### Fixed
+
+- Anular un pago de un céntimo en efectivo no registraba la devolución y la
+  caja quedaba descuadrada (detectado por los property tests de caja).
+- Un fallo al restaurar la sesión, en los eventos Firebird o en una consulta
+  ya no se silencia: se muestra el motivo y queda en el log.
+- Las ediciones de la configuración se conservan al recargar, y la versión del
+  menú coincide con la de «Acerca de».
+- El mock de los E2E devolvía campos mal nombrados en cinco comandos; ahora
+  cada respuesta se valida contra `bindings.ts` y los tipos de Rust.
+
+### Internal
+
+- Property tests de caja, abonos y anulación con proptest (48 casos por
+  corrida) sobre una base Firebird real.
+- Inyección de fallos en el mock IPC para probar la UI con la base caída, y
+  esquema por comando (mock ↔ `bindings.ts` ↔ Rust) verificado en CI.
+- CI fija `TZ=America/Bogota` y lintá los specs E2E junto con su cobertura del
+  mock.
 
 ## [1.1.0] - 2026-09-10
 
