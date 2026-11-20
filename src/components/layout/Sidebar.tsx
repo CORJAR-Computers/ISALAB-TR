@@ -60,8 +60,8 @@ const SECTIONS: NavSection[] = [
     label: "Operación",
     items: [
       { view: "dashboard", label: "Panel de control", icon: LayoutDashboard },
-      { view: "reception", label: "Recepción de pacientes", icon: DoorOpen },
-      { view: "appointments", label: "Agenda de citas", icon: Calendar },
+      { view: "reception", label: "Recepción de pacientes", icon: DoorOpen, capability: "canReceive" },
+      { view: "appointments", label: "Agenda de citas", icon: Calendar, capability: "canReceive" },
       { view: "agenda", label: "Agenda de consultas", icon: CalendarClock },
       { view: "patients", label: "Pacientes", icon: Users },
       { view: "clinical-history", label: "Historial Clínico", icon: HeartPulse },
@@ -90,7 +90,7 @@ const SECTIONS: NavSection[] = [
     id: "estetica",
     label: "Estética",
     items: [
-      { view: "grooming", label: "Peluquería", icon: Sparkles },
+      { view: "grooming", label: "Peluquería", icon: Sparkles, capability: "canGroom" },
     ],
   },
   {

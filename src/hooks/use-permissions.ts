@@ -24,7 +24,11 @@ export type Capabilities = {
   isVetOrAdmin: boolean;
 };
 
-const byRole = (role: string): Capabilities => {
+/**
+ * Capacidades del rol. Exportada para que el test de paridad la compare con
+ * `capabilities_for_role` de Rust (src/hooks/use-permissions.test.ts).
+ */
+export const capabilitiesForRole = (role: string): Capabilities => {
   switch (role) {
     case "ADMIN":
       return {
@@ -110,5 +114,5 @@ const byRole = (role: string): Capabilities => {
 
 export function usePermissions(): Capabilities {
   const session = useSessionStore((s) => s.session);
-  return byRole(session?.role || "GUEST");
+  return capabilitiesForRole(session?.role || "GUEST");
 }
