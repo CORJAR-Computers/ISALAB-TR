@@ -8,6 +8,7 @@ pub mod csv;
 pub mod csv_parse;
 pub mod db;
 pub mod error;
+pub mod logging;
 pub mod models;
 pub mod pdf_templates;
 pub mod repositories;
@@ -26,6 +27,7 @@ use tauri_specta::{collect_commands, Builder};
 mod mail;
 
 use crate::commands::ai::{interpret_lab_results, test_groq_connection};
+use crate::commands::diagnostics::{export_diagnostics, log_frontend};
 use crate::commands::analyzer_sources::{
     delete_analyzer_import_job, delete_analyzer_source, list_analyzer_import_jobs,
     list_analyzer_sources, list_failed_analyzer_imports, poll_analyzer_source,
@@ -148,6 +150,8 @@ pub fn specta_builder() -> Builder<tauri::Wry> {
     Builder::<tauri::Wry>::new()
         .commands(collect_commands![
             db_health,
+            log_frontend,
+            export_diagnostics,
             get_db_connection,
             save_db_connection,
             test_db_connection,
@@ -447,6 +451,18 @@ pub fn run() {
         .plugin(tauri_plugin_updater::Builder::new().build())
         .plugin(tauri_plugin_process::init())
         .setup(|app| {
+            // Log rotativo en <app_data>/logs antes de tocar la base: si el
+            // arranque falla, el motivo queda en disco y no solo en la UI.
+            let app_data = app
+                .path()
+                .app_data_dir()
+                .unwrap_or_else(|_| std::path::PathBuf::from("."));
+            crate::logging::init(&app_data);
+            crate::logging::info(
+                "app",
+                &format!("iniciando ISALAB {}", app.package_info().version),
+            );
+
             let state = AppState::init(app.handle());
             // Supervisor de fuentes de analizadores (carpetas vigiladas) en
             // segundo plano; sondea las fuentes habilitadas cada 3 s.

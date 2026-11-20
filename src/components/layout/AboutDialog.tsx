@@ -12,9 +12,13 @@ import { useClinicBranding } from "@/hooks/use-queries";
 import { useUiStore } from "@/stores/ui-store";
 import logoSidebar from "@/assets/logo_sidebar.png";
 
+import { useState } from "react";
+import { toast } from "sonner";
+import { save as saveDialog } from "@tauri-apps/plugin-dialog";
 import {
   Cpu,
   Database,
+  Download,
   FileCheck2,
   Globe,
   HeartPulse,
@@ -23,6 +27,8 @@ import {
   Sparkles,
 } from "lucide-react";
 import { useAppVersion } from "@/hooks/use-app-version";
+import { api, getErrorMessage } from "@/lib/api";
+import { localDateISO } from "@/lib/utils";
 
 interface AboutDialogProps {
   /** true mientras la comprobación manual de actualizaciones está en curso. */
@@ -38,6 +44,32 @@ export function AboutDialog({ checking = false, onCheckUpdate }: AboutDialogProp
   const tagline = branding?.tagline || "Clínica Veterinaria";
   // Misma fuente que el pie del sidebar: menú y Acerca de nunca divergen.
   const appVersion = useAppVersion();
+  const [exporting, setExporting] = useState(false);
+
+  /**
+   * Diagnóstico para soporte: versión, esquema, estado de Firebird y logs,
+   * en un ZIP (`diagnostico.txt` + `logs/`). Se escribe en el destino que elija
+   * el usuario para poder adjuntarlo.
+   */
+  const exportDiagnostics = async () => {
+    try {
+      setExporting(true);
+      const destPath = await saveDialog({
+        title: "Exportar diagnóstico",
+        defaultPath: `isalab-diagnostico-${localDateISO()}.zip`,
+        filters: [{ name: "Diagnóstico (ZIP)", extensions: ["zip"] }],
+      });
+      if (!destPath) return;
+      const written = await api.exportDiagnostics(destPath);
+      toast.success("Diagnóstico exportado", { description: written });
+    } catch (e) {
+      toast.error("No se pudo exportar el diagnóstico", {
+        description: getErrorMessage(e),
+      });
+    } finally {
+      setExporting(false);
+    }
+  };
 
   return (
     <Dialog open={aboutOpen} onOpenChange={setAboutOpen}>
@@ -160,6 +192,16 @@ export function AboutDialog({ checking = false, onCheckUpdate }: AboutDialogProp
             © 2026 <strong className="text-foreground font-semibold">CORJAR Computers Solutions</strong>. Todos los derechos reservados.
           </p>
           <div className="flex items-center gap-2">
+            <Button
+              size="sm"
+              variant="outline"
+              className="gap-1.5"
+              onClick={() => void exportDiagnostics()}
+              disabled={exporting}
+            >
+              <Download className="size-3.5" />
+              {exporting ? "Exportando…" : "Exportar diagnóstico"}
+            </Button>
             {appVersion && (
               <span className="text-muted-foreground mr-1 hidden text-[11px] font-mono sm:inline">
                 v{appVersion}

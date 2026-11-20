@@ -9,6 +9,7 @@ pub mod catalog;
 pub mod clinical_history;
 pub mod dashboard;
 pub mod db;
+pub mod diagnostics;
 pub mod exports;
 pub mod grooming;
 pub mod import;

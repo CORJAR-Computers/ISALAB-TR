@@ -11,6 +11,10 @@ export const commands = {
 	 *  comando lo refleja y limpia el pool para que la app se recupere sola.
 	 */
 	dbHealth: () => __TAURI_INVOKE<DbHealth>("db_health"),
+	/**  Reenvía al log en disco un error/aviso capturado en la UI. */
+	logFrontend: (level: string, message: string, context: string | null) => __TAURI_INVOKE<void>("log_frontend", { level, message, context }),
+	/**  Escribe el diagnóstico (versión, esquema, Firebird y logs) en `dest_path`. */
+	exportDiagnostics: (destPath: string) => typedError<string, AppError>(__TAURI_INVOKE("export_diagnostics", { destPath })),
 	getDbConnection: () => __TAURI_INVOKE<DbConnectionInfo>("get_db_connection"),
 	/**
 	 *  Guarda la conexión al servidor en `db-connection.json`.

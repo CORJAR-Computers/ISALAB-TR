@@ -109,6 +109,20 @@ impl AppState {
         // (los tres PCs comparten usuario/clave de Firebird). No se guarda.
         crate::crypto::set_shared_password(&db.password);
 
+        crate::logging::info(
+            "db",
+            &format!(
+                "conectando en modo {} a {} (fbclient {})",
+                db.mode.as_str(),
+                db.target(),
+                if db.fbclient.exists() {
+                    "encontrado"
+                } else {
+                    "NO encontrado"
+                }
+            ),
+        );
+
         match bootstrap(&db) {
             Ok((pool, schema_version)) => {
                 let listeners = crate::db::events::start_firebird_listeners(app.clone(), &db);
@@ -124,17 +138,26 @@ impl AppState {
                     listeners,
                 }
             }
-            Err(e) => Self {
-                pool: DbPool::empty(),
-                db,
-                schema_version: 0,
-                init_error: Some(config_error.unwrap_or_else(|| e.to_string())),
-                session: Mutex::new(None),
-                login_attempts: Mutex::new(HashMap::new()),
-                ai_cache: AiCache::new(),
-                pkcs12_password: Mutex::new(None),
-                listeners: Vec::new(),
-            },
+            Err(e) => {
+                // El motivo queda en el log además del banner: si la clínica
+                // reporta "no abre", aquí está el error real con contexto.
+                let message = config_error.unwrap_or_else(|| e.to_string());
+                crate::logging::error(
+                    "db",
+                    &format!("fallo al inicializar la base: {message}"),
+                );
+                Self {
+                    pool: DbPool::empty(),
+                    db,
+                    schema_version: 0,
+                    init_error: Some(message),
+                    session: Mutex::new(None),
+                    login_attempts: Mutex::new(HashMap::new()),
+                    ai_cache: AiCache::new(),
+                    pkcs12_password: Mutex::new(None),
+                    listeners: Vec::new(),
+                }
+            }
         }
     }
 }

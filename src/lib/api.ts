@@ -149,6 +149,12 @@ export const api = {
   exportLocalConfig: (destPath: string) =>
     invoke<string>("export_local_config", { destPath }),
   getServerBackupStatus: () => invoke<BackupStatus>("get_server_backup_status"),
+  /** Reenvía al log en disco de Rust un error o aviso de la UI. */
+  logFrontend: (level: string, message: string, context?: string | null) =>
+    invoke<void>("log_frontend", { level, message, context: context ?? null }),
+  /** Escribe el diagnóstico exportable (versión, esquema, Firebird, logs). */
+  exportDiagnostics: (destPath: string) =>
+    invoke<string>("export_diagnostics", { destPath }),
 
   // ---- Catálogos ----
   listSpecies: () => invoke<Species[]>("list_species"),
