@@ -13,7 +13,7 @@ import { Skeleton } from "@/components/ui/skeleton";
 import { Badge } from "@/components/ui/badge";
 import { useClinicalHistory, usePatientLabOrders, usePatients } from "@/hooks/use-queries";
 import { LAB_ORDER_STATUS } from "@/lib/status";
-import { formatDateTime } from "@/lib/utils";
+import { formatDateTime, localDateISO } from "@/lib/utils";
 import { useUiStore } from "@/stores/ui-store";
 import { NewVaccineDialog } from "@/features/vaccines/NewVaccineDialog";
 import { NewVisitDialog } from "@/features/reception/NewVisitDialog";
@@ -122,7 +122,7 @@ export function ClinicalHistoryPage() {
 
   // Resumen de recepción/estética para la ficha (fase 5).
   const lastVisit = history.visits[0] ?? null;
-  const today = new Date().toISOString().slice(0, 10);
+  const today = localDateISO();
   const nextGroomingAt =
     history.groomingSessions
       .map((g) => g.nextSuggestedAt)

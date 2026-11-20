@@ -20,14 +20,13 @@ import {
   GROOMING_SESSION_STATE,
   VISIT_SERVICE_STATUS,
 } from "@/lib/status";
-import { cn } from "@/lib/utils";
+import { cn, localDateISO } from "@/lib/utils";
 import type { GroomingDayLine } from "@/bindings";
 import { GroomingSessionDialog } from "./GroomingSessionDialog";
 
 function fmtDay(date: Date): string {
-  const d = new Date(date);
-  d.setMinutes(d.getMinutes() - d.getTimezoneOffset());
-  return d.toISOString().slice(0, 10);
+  // Fecha local: el desplazamiento manual + toISOString era frágil (UTC).
+  return localDateISO(date);
 }
 
 function addDays(date: Date, days: number) {

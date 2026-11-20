@@ -1,6 +1,7 @@
 import { test, expect, type Page } from "@playwright/test";
 import { fileURLToPath } from "node:url";
 import { gotoView } from "./navigation";
+import { entityCode, entityCodePattern } from "./dates";
 
 /**
  * Smoke test E2E: login → dashboard → flujo completo de una muestra
@@ -98,7 +99,9 @@ test("login → dashboard → flujo completo de muestra", async ({ page }) => {
   // Pantalla de éxito: genera la etiqueta con código de barras para el tubo
   const success = page.getByRole("dialog");
   await expect(
-    success.getByRole("heading", { name: /Muestra M-2026-0001 registrada/ }),
+    success.getByRole("heading", {
+      name: new RegExp(`Muestra ${entityCode("M", 1)} registrada`),
+    }),
   ).toBeVisible();
   await expect(
     success.getByRole("button", { name: /Generar e imprimir etiqueta/ }),
@@ -113,7 +116,7 @@ test("login → dashboard → flujo completo de muestra", async ({ page }) => {
   // Se abre el detalle con la muestra RECIBIDA
   const detail = page.getByRole("dialog");
   await expect(
-    detail.getByRole("heading", { name: /Muestra M-2026-0001/ }),
+    detail.getByRole("heading", { name: entityCodePattern("M", 1) }),
   ).toBeVisible();
   await expect(detail.getByText("Recibida", { exact: true })).toBeVisible();
 
@@ -200,10 +203,10 @@ test("login → dashboard → flujo completo de muestra", async ({ page }) => {
     .first()
     .click();
   await expect(
-    detail.getByRole("heading", { name: /Muestra M-2026-0001/ }),
+    detail.getByRole("heading", { name: entityCodePattern("M", 1) }),
   ).toBeHidden();
-  // exact: true → evita los toasts de sonner ("Muestra M-2026-0001 finalizada"…).
-  await expect(page.getByText("M-2026-0001", { exact: true })).toBeVisible();
+  // exact: true → evita los toasts de sonner ("Muestra M-… finalizada"…).
+  await expect(page.getByText(entityCode("M", 1), { exact: true })).toBeVisible();
   await expect(page.getByText("Finalizada", { exact: true }).first()).toBeVisible();
 
   // Tras apilar y cerrar tres diálogos, la app sigue respondiendo (el body no

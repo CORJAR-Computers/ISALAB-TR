@@ -38,6 +38,7 @@ import {
   useVaccineTypes,
 } from "@/hooks/use-queries";
 import { getErrorMessage } from "@/lib/api";
+import { localDateISO } from "@/lib/utils";
 
 const nowLocal = () => {
   const d = new Date();
@@ -45,7 +46,7 @@ const nowLocal = () => {
   return d.toISOString().slice(0, 16);
 };
 
-const today = () => new Date().toISOString().slice(0, 10);
+const today = () => localDateISO();
 
 const schema = z.object({
   patientId: z.coerce.number().min(1, "Selecciona el paciente"),

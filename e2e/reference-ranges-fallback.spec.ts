@@ -1,5 +1,6 @@
 import { test, expect, type Page } from "@playwright/test";
 import { fileURLToPath } from "node:url";
+import { entityCode, entityCodePattern } from "./dates";
 import { gotoView } from "./navigation";
 
 /**
@@ -64,13 +65,15 @@ test("muestra en MINDRAY muestra los rangos del catálogo GENERAL", async ({
   // Pantalla de éxito del registro; al cerrarla el padre abre el detalle.
   const success = page.getByRole("dialog");
   await expect(
-    success.getByRole("heading", { name: /Muestra M-2026-0001 registrada/ }),
+    success.getByRole("heading", {
+      name: new RegExp(`Muestra ${entityCode("M", 1)} registrada`),
+    }),
   ).toBeVisible();
   await success.getByRole("button", { name: "Cerrar" }).first().click();
 
   const detail = page.getByRole("dialog");
   await expect(
-    detail.getByRole("heading", { name: /Muestra M-2026-0001/ }),
+    detail.getByRole("heading", { name: entityCodePattern("M", 1) }),
   ).toBeVisible();
 
   // El equipo de la muestra aparece en la cabecera del detalle.

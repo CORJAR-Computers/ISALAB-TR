@@ -12,7 +12,7 @@ import {
   NewAppointmentDialog,
 } from "./NewAppointmentDialog";
 import { getErrorMessage } from "@/lib/api";
-import { cn } from "@/lib/utils";
+import { cn, localDateISO } from "@/lib/utils";
 import { toast } from "sonner";
 import { useUiStore } from "@/stores/ui-store";
 import { usePermissions } from "@/hooks/use-permissions";
@@ -45,7 +45,8 @@ function formatHour(h: number): string {
 }
 
 function fmtDay(date: Date): string {
-  return date.toISOString().slice(0, 10);
+  // Fecha local (toISOString da la fecha UTC: de noche apunta al día siguiente).
+  return localDateISO(date);
 }
 
 export function AppointmentCalendar() {

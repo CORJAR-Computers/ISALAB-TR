@@ -1,5 +1,6 @@
 import { test, expect, type Page } from "@playwright/test";
 import { fileURLToPath } from "node:url";
+import { entityCode, entityCodePattern } from "./dates";
 
 /**
  * Flujo de recepción: check-in de una visita con servicios del catálogo,
@@ -85,12 +86,12 @@ test("check-in de visita y cobro desde el checkout", async ({ page }) => {
 
   await newVisit.getByRole("button", { name: "Registrar visita" }).click();
   await expect(page.getByText("Visita registrada")).toBeVisible();
-  await expect(page.getByText(/V-2026-0001/).first()).toBeVisible();
+  await expect(page.getByText(entityCodePattern("V", 1)).first()).toBeVisible();
 
   // ---------- 2. La visita aparece en la cola de espera ----------
   const card = page
     .getByRole("button")
-    .filter({ hasText: "V-2026-0001" })
+    .filter({ hasText: entityCode("V", 1) })
     .first();
   await expect(card).toContainText("Rocky");
   await expect(card).toContainText("En espera");
@@ -99,7 +100,9 @@ test("check-in de visita y cobro desde el checkout", async ({ page }) => {
 
   // ---------- 3. Atención y finalización ----------
   const detail = page.getByRole("dialog");
-  await expect(detail.getByRole("heading", { name: /V-2026-0001/ })).toBeVisible();
+  await expect(
+    detail.getByRole("heading", { name: entityCodePattern("V", 1) }),
+  ).toBeVisible();
   await detail.getByRole("button", { name: "Iniciar atención" }).click();
   await expect(page.getByText("Visita en atención")).toBeVisible();
   await expect(detail.getByText("En atención", { exact: true })).toBeVisible();

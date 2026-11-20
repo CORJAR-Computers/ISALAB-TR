@@ -29,6 +29,7 @@ import {
   TableHeader,
   TableRow,
 } from "@/components/ui/table";
+import { localDateISO } from "@/lib/utils";
 import { useAuditLog } from "@/hooks/use-queries";
 import { useSessionStore } from "@/stores/session-store";
 
@@ -127,7 +128,7 @@ export function AuditLogPage() {
     const url = URL.createObjectURL(blob);
     const link = document.createElement("a");
     link.href = url;
-    link.download = `auditoria-${new Date().toISOString().slice(0, 10)}.csv`;
+    link.download = `auditoria-${localDateISO()}.csv`;
     link.click();
     URL.revokeObjectURL(url);
   };

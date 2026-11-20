@@ -1,5 +1,6 @@
 import { test, expect, type Page } from "@playwright/test";
 import { fileURLToPath } from "node:url";
+import { entityCode } from "./dates";
 import { gotoView as gotoViewItem } from "./navigation";
 
 /**
@@ -155,7 +156,7 @@ test.describe(`viewport 1093x614 (14" a 125 %)`, () => {
 
     await expect(
       page.getByRole("dialog").getByRole("heading", {
-        name: /Muestra M-2026-0001 registrada/,
+        name: new RegExp(`Muestra ${entityCode("M", 1)} registrada`),
       }),
     ).toBeVisible();
   });

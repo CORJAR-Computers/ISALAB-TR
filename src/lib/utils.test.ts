@@ -80,7 +80,8 @@ describe('localDateISO', () => {
     // 2026-01-16 01:00 UTC = 2026-01-15 20:00 en Colombia (UTC-5): el bug que
     // hacía que la cola de recepción apuntara al día siguiente.
     const afterSevenPm = new Date('2026-01-16T01:00:00Z')
-    expect(afterSevenPm.toISOString().slice(0, 10)).toBe('2026-01-16')
+    // El instante en UTC ya es el 16 (de ahí venía el bug al derivar la fecha).
+    expect(afterSevenPm.toISOString().startsWith('2026-01-16T')).toBe(true)
     expect(localDateISO(afterSevenPm, 'America/Bogota')).toBe('2026-01-15')
   })
 
