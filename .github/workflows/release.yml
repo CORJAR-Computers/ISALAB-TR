@@ -291,21 +291,10 @@ jobs:
       # src-tauri, y una ruta relativa resolvería en src-tauri/src-tauri/target,
       # rompiendo el cache y el glob de assets del release).
       CARGO_TARGET_DIR: ${{ github.workspace }}/src-tauri/target
-      # Wrapper linker que instala cargo-xwin: enlaza contra el CRT/SDK de
-      # Microsoft descargado por xwin (target MSVC).
-      CARGO_TARGET_X86_64_PC_WINDOWS_MSVC_LINKER: xwin-cargo
-      # ring (vía cc-rs) busca el archiver MSVC lib.exe, que xwin NO provee
-      # (solo descarga CRT/SDK). llvm-lib emula lib.exe; sin esto el build
-      # falla en ring: 'failed to find tool "lib.exe"'.
-      # OJO: cc-rs NO lee CARGO_TARGET_*_AR (solo AR_<target>, TARGET_AR y AR),
-      # así que las variables deben ir con el nombre del target y guiones bajos;
-      # con CARGO_TARGET_*_AR el fallback fallaba en este mismo punto.
-      AR_x86_64_pc_windows_msvc: llvm-lib
-      CC_x86_64_pc_windows_msvc: clang-cl
-      CARGO_TARGET_X86_64_PC_WINDOWS_MSVC_AR: llvm-lib
-      # ring compila C con cc-rs: clang-cl es el compilador MSVC-compatible
-      # que ya viene en ubuntu-latest (o se instala con el paquete clang).
-      CARGO_TARGET_X86_64_PC_WINDOWS_MSVC_CC: clang-cl
+      # El compilador C, el archiver y el linker del CRT/SDK los exporta el
+      # propio cargo-xwin (`cargo xwin env`) en el paso de build: clang-cl
+      # suelto no ve las cabeceras del CRT y falla con 'assert.h not found'.
+
     steps:
       - uses: actions/checkout@v7
         with:
@@ -380,7 +369,16 @@ jobs:
         run: node scripts/prune-firebird.mjs
 
       - name: Build Tauri app (cross-compile Windows x64)
-        run: npx tauri build --target x86_64-pc-windows-msvc --bundles nsis
+        shell: bash
+        env:
+          # Acepta la licencia del SDK de Microsoft (descarga automática).
+          XWIN_ACCEPT_LICENSE: '1'
+        run: |
+          # cargo-xwin exporta CC/CXX/AR/CFLAGS/RUSTFLAGS y el linker con la
+          # ruta real del CRT/SDK que descargó; sin eso clang-cl no encuentra
+          # ni 'assert.h' ni lib.exe.
+          eval "$(cargo xwin env --target x86_64-pc-windows-msvc)"
+          npx tauri build --target x86_64-pc-windows-msvc --bundles nsis
 
       # `tauri build` genera el instalador y su .sig (updater), pero NO el
       # manifiesto latest.json; se genera aquí en bash (el fallback no tiene
