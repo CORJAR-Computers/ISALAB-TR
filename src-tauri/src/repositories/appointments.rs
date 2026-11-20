@@ -182,21 +182,19 @@ fn has_conflict(
 ) -> Result<bool, AppError> {
     // Recupera candidatos del mismo paciente o profesional en el rango y
     // valida solapamiento en Rust.
-    let sql = format!(
-        "SELECT a.ID, a.PROFESSIONAL_ID, LEFT(CAST(a.SCHEDULED_AT AS VARCHAR(60)), 19), a.DURATION_MIN, a.STATUS
+    let sql = "SELECT a.ID, a.PROFESSIONAL_ID, LEFT(CAST(a.SCHEDULED_AT AS VARCHAR(60)), 19), a.DURATION_MIN, a.STATUS
          FROM APPOINTMENTS a
          WHERE (a.PATIENT_ID = ? OR a.PROFESSIONAL_ID = ?)
            AND a.STATUS <> 'CANCELADA'
            AND a.ID <> COALESCE(?, -1)
            AND a.SCHEDULED_AT < ?
            AND DATEADD(MINUTE, a.DURATION_MIN, a.SCHEDULED_AT) > ?
-         ROWS 1",
-    );
+         ROWS 1";
 
     let prof_param = professional_id.unwrap_or(0);
     let rows: Vec<(i32, Option<i32>, String, i32, String)> = conn
         .query(
-            &sql,
+            sql,
             (
                 &patient_id,
                 &prof_param,
@@ -241,9 +239,9 @@ pub fn create_appointment(
         )));
     };
     if !is_active {
-        return Err(AppError::Validation(format!(
-            "El servicio está inactivo en el catálogo"
-        )));
+        return Err(AppError::Validation(
+            "El servicio está inactivo en el catálogo".into(),
+        ));
     }
 
     // Paciente debe existir.
@@ -335,7 +333,7 @@ pub fn list_appointments(
     );
 
     let date_opt = date.map(|s| s.to_string());
-    let prof_opt = professional_id.map(|p| p as i32);
+    let prof_opt = professional_id;
 
     let rows: Vec<AppointmentListRow> = conn
         .query(

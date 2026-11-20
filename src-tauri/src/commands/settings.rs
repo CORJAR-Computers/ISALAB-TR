@@ -237,7 +237,7 @@ pub fn delete_clinic_logo(state: State<'_, AppState>) -> Result<(), AppError> {
             Some(admin.id),
             &admin.username,
             "LOGO_DELETED",
-            Some("Logo principal eliminado".into()),
+            Some("Logo principal eliminado"),
         )
         .ok();
     }
@@ -397,9 +397,8 @@ pub fn import_pkcs12(
     let tmp_path = std::env::temp_dir().join(format!("isalab_pkcs12_{}.tmp", admin.id));
     std::fs::write(&tmp_path, &content)
         .map_err(|e| AppError::Internal(format!("No se pudo escribir el temporal: {e}")))?;
-    let validation = validate_pkcs12(&tmp_path, &password).map_err(|e| {
+    let validation = validate_pkcs12(&tmp_path, &password).inspect_err(|_| {
         let _ = std::fs::remove_file(&tmp_path);
-        e
     })?;
     let _ = std::fs::remove_file(&tmp_path);
 
@@ -463,7 +462,7 @@ pub fn delete_pkcs12(state: State<'_, AppState>) -> Result<(), AppError> {
             Some(admin.id),
             &admin.username,
             "PKCS12_DELETED",
-            Some("Certificado PKCS#12 eliminado".into()),
+            Some("Certificado PKCS#12 eliminado"),
         )
         .ok();
     }

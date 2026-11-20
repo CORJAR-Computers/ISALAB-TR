@@ -108,7 +108,7 @@ fn apply_digital_signature(
     })?;
 
     let result = crate::pdf_templates::sign_pdf_with_pkcs12(
-        out_path, out_path, &tmp_path, &password, &doc_name, doc_name,
+        out_path, out_path, &tmp_path, &password, doc_name, doc_name,
     );
 
     let _ = std::fs::remove_file(&tmp_path);

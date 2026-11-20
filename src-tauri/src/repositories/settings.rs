@@ -148,7 +148,7 @@ pub fn get(conn: &mut SimpleConnection) -> Result<ClinicSettings, AppError> {
         if let Some(stored) = value(conn, key)? {
             match crypto::decrypt_shared(&stored, &salt) {
                 Ok(Some(plain)) => {
-                    let _ = match field {
+                    match field {
                         "groq_api_key" => s.groq_api_key = Some(plain),
                         "smtp_password" => s.smtp_password = Some(plain),
                         _ => {}
@@ -159,7 +159,7 @@ pub fn get(conn: &mut SimpleConnection) -> Result<ClinicSettings, AppError> {
                     // a v2, pero se tolera): no se re-cifra automáticamente aquí
                     // porque el salt podría no existir aún. El siguiente save lo
                     // dejará cifrado.
-                    let _ = match field {
+                    match field {
                         "groq_api_key" => s.groq_api_key = Some(stored.clone()),
                         "smtp_password" => s.smtp_password = Some(stored.clone()),
                         _ => {}
@@ -167,7 +167,7 @@ pub fn get(conn: &mut SimpleConnection) -> Result<ClinicSettings, AppError> {
                 }
                 Err(_) => {
                     // No se puede descifrar (contraseña de DB rotada): no exponer.
-                    let _ = match field {
+                    match field {
                         "groq_api_key" => s.groq_api_key = None,
                         "smtp_password" => s.smtp_password = None,
                         _ => {}

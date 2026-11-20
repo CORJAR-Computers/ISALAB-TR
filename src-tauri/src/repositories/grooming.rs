@@ -10,6 +10,39 @@ use crate::repositories::next_id;
 
 // ============================== HELPERS =====================================
 
+/// Fila cruda del tablero diario de peluquería.
+type GroomingDayRow = (
+    i32,            // vs.id
+    i32,            // visit_id
+    String,         // visit_code
+    i32,            // patient_id
+    String,         // patient_name
+    String,         // owner_name
+    i32,            // service_id
+    String,         // service_name
+    Option<i32>,    // professional_id
+    Option<String>, // professional_name
+    String,         // line_status
+    String,         // arrived_at
+    String,         // visit_status
+    Option<i32>,    // session_id
+    Option<String>, // session_started_at
+    Option<String>, // session_finished_at
+    Option<i32>,    // matting_level
+    Option<String>, // next_suggested_at
+);
+
+/// Fila cruda de los recordatorios de peluquería.
+type GroomingRemindersRow = (
+    i32,            // session_id
+    i32,            // visit_service_id
+    String,         // patient_name
+    String,         // owner_name
+    String,         // service_name
+    String,         // next_suggested_at
+    Option<String>, // groomer_name
+);
+
 type GroomingRow = (
     i32,            // g.id
     i32,            // vs.visit_id
@@ -350,26 +383,7 @@ pub fn list_grooming_day(
     conn: &mut SimpleConnection,
     date: &str,
 ) -> Result<Vec<GroomingDayLine>, AppError> {
-    let rows: Vec<(
-        i32,            // vs.id
-        i32,            // visit_id
-        String,         // visit_code
-        i32,            // patient_id
-        String,         // patient_name
-        String,         // owner_name
-        i32,            // service_id
-        String,         // service_name
-        Option<i32>,    // professional_id
-        Option<String>, // professional_name
-        String,         // line_status
-        String,         // arrived_at
-        String,         // visit_status
-        Option<i32>,    // session_id
-        Option<String>, // session_started_at
-        Option<String>, // session_finished_at
-        Option<i32>,    // matting_level
-        Option<String>, // next_suggested_at
-    )> = conn
+    let rows: Vec<GroomingDayRow> = conn
         .query(
             "
             SELECT vs.ID, v.ID, v.CODE, p.ID, p.NAME, o.FULL_NAME,
@@ -432,15 +446,7 @@ pub fn list_grooming_day(
 pub fn list_grooming_reminders(
     conn: &mut SimpleConnection,
 ) -> Result<Vec<GroomingReminder>, AppError> {
-    let rows: Vec<(
-        i32,            // session_id
-        i32,            // visit_service_id
-        String,         // patient_name
-        String,         // owner_name
-        String,         // service_name
-        String,         // next_suggested_at
-        Option<String>, // groomer_name
-    )> = conn
+    let rows: Vec<GroomingRemindersRow> = conn
         .query(
             "
             SELECT g.ID, g.VISIT_SERVICE_ID, p.NAME, o.FULL_NAME,

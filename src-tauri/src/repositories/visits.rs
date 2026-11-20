@@ -9,6 +9,25 @@ use crate::models::visit::{
 use crate::repositories::invoices as invoices_repo;
 use crate::repositories::next_id;
 
+/// Fila cruda de la cola y del historial de visitas (columnas leídas de Firebird).
+type VisitListRow = (
+    i32,
+    String,
+    i32,
+    String,
+    i32,
+    String,
+    String,
+    String,
+    String,
+    Option<String>,
+    String,
+    f64,
+);
+
+/// Snapshot del catálogo de servicios para una línea de visita.
+type ServiceSnapshot = (String, String, i32, String, f64, Option<f64>, bool);
+
 /// Estados válidos de una visita (migración 0027).
 pub const VISIT_STATUSES: [&str; 5] = [
     "EN_ESPERA",
@@ -266,20 +285,7 @@ pub fn list_visits(
                OR UPPER(o.FULL_NAME) LIKE UPPER(?))
         ORDER BY CASE v.PRIORITY WHEN 'URGENTE' THEN 0 ELSE 1 END, v.ARRIVED_AT, v.ID";
 
-    let rows: Vec<(
-        i32,
-        String,
-        i32,
-        String,
-        i32,
-        String,
-        String,
-        String,
-        String,
-        Option<String>,
-        String,
-        f64,
-    )> = conn
+    let rows: Vec<VisitListRow> = conn
         .query(
             sql,
             (&date, &date, &status, &status, &like, &like, &like, &like),
@@ -331,20 +337,7 @@ pub fn list_visits_by_patient(
         WHERE v.PATIENT_ID = ?
         ORDER BY v.ARRIVED_AT DESC, v.ID DESC";
 
-    let rows: Vec<(
-        i32,
-        String,
-        i32,
-        String,
-        i32,
-        String,
-        String,
-        String,
-        String,
-        Option<String>,
-        String,
-        f64,
-    )> = conn.query(sql, (&patient_id,)).map_err(AppError::from)?;
+    let rows: Vec<VisitListRow> = conn.query(sql, (&patient_id,)).map_err(AppError::from)?;
 
     Ok(rows
         .into_iter()
@@ -471,7 +464,7 @@ fn insert_visit_service(
     }
 
     // Snapshot del catálogo: precio, IVA y datos para mostrar.
-    let snap: Option<(String, String, i32, String, f64, Option<f64>, bool)> = conn
+    let snap: Option<ServiceSnapshot> = conn
         .query_first(
             "SELECT s.CODE, s.NAME, s.CATEGORY_ID, c.NAME,
                     CAST(s.PRICE AS DOUBLE PRECISION),

@@ -349,12 +349,10 @@ pub fn summary(
 
     let counted_from_lines: f64 = count_lines.iter().map(|l| l.subtotal).sum();
     let expected_cash = session.expected_cash.unwrap_or(figures.expected_cash);
-    let counted_cash = session.counted_cash.or_else(|| {
-        if count_lines.is_empty() {
-            None
-        } else {
-            Some(counted_from_lines)
-        }
+    let counted_cash = session.counted_cash.or(if count_lines.is_empty() {
+        None
+    } else {
+        Some(counted_from_lines)
     });
     let difference = session
         .difference

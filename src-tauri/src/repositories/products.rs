@@ -105,8 +105,7 @@ pub fn list_products(
         .filter(|s| !s.trim_matches('%').is_empty());
     let category_opt = category.map(|c| c.to_string());
 
-    let sql = format!(
-        "SELECT FIRST 200 p.ID, p.CODE, p.NAME, p.CATEGORY, p.UNIT,
+    let sql = "SELECT FIRST 200 p.ID, p.CODE, p.NAME, p.CATEGORY, p.UNIT,
                 CAST(p.COST_PRICE AS DOUBLE PRECISION),
                 CAST(p.SALE_PRICE AS DOUBLE PRECISION),
                 CAST(p.TAX_RATE AS DOUBLE PRECISION),
@@ -118,13 +117,12 @@ pub fn list_products(
          WHERE (? IS NULL OR UPPER(p.NAME) LIKE UPPER(?) OR UPPER(p.CODE) LIKE UPPER(?))
            AND (? IS NULL OR p.CATEGORY = ?)
            AND (? = TRUE OR p.ACTIVE = TRUE)
-         ORDER BY p.ACTIVE DESC, p.CATEGORY, p.NAME"
-    );
+         ORDER BY p.ACTIVE DESC, p.CATEGORY, p.NAME";
     let like_ref = like.clone();
 
     let rows: Vec<ProductStockRow> = conn
         .query(
-            &sql,
+            sql,
             (
                 &like_ref,
                 &like_ref,
