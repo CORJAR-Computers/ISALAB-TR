@@ -16,7 +16,7 @@ import { useSessionTimeout } from "@/hooks/use-session-timeout";
 import { useAppUpdater } from "@/hooks/use-app-updater";
 import { UpdateDialog } from "@/components/layout/UpdateDialog";
 import { useSessionStore } from "@/stores/session-store";
-import { api } from "@/lib/api";
+import { api, getErrorMessage } from "@/lib/api";
 import { LoginPage } from "@/features/auth/LoginPage";
 import { GlobalSearchPalette } from "@/features/search/GlobalSearchPalette";
 import { DbConnectionDialog } from "@/features/db/DbConnectionDialog";
@@ -110,6 +110,9 @@ export default function App() {
   const mustChangePassword = session?.mustChangePassword === true;
   const { data: health, refetch: refetchHealth } = useDbHealth();
   const [dbDialogOpen, setDbDialogOpen] = useState(false);
+  // Fallo al restaurar la sesión (base caída, IPC roto…). No es lo mismo que
+  // "no hay sesión": el usuario necesita ver por qué se le pide login otra vez.
+  const [bootError, setBootError] = useState<string | null>(null);
 
   useFirebirdEvents();
   useSessionTimeout();
@@ -122,11 +125,27 @@ export default function App() {
 
   // Restaura la sesión local al abrir la ventana.
   useEffect(() => {
+    let cancelled = false;
     api
       .getSession()
-      .then((user) => useSessionStore.getState().setSession(user))
-      .catch(() => useSessionStore.getState().setSession(null))
-      .finally(() => useSessionStore.getState().setHydrated(true));
+      .then((user) => {
+        if (!cancelled) useSessionStore.getState().setSession(user);
+      })
+      .catch((error: unknown) => {
+        // Un error aquí no equivale a "sin sesión": si la base está caída el
+        // login también fallará. Antes se descartaba y el usuario veía el
+        // formulario de login sin ninguna pista.
+        console.error("[bootstrap] no se pudo restaurar la sesión", error);
+        if (cancelled) return;
+        useSessionStore.getState().setSession(null);
+        setBootError(getErrorMessage(error));
+      })
+      .finally(() => {
+        if (!cancelled) useSessionStore.getState().setHydrated(true);
+      });
+    return () => {
+      cancelled = true;
+    };
   }, []);
 
   // Cuando la app está lista, avisa a Rust para cerrar la ventana splash
@@ -134,7 +153,11 @@ export default function App() {
   useEffect(() => {
     if (!hydrated) return;
     try {
-      void emit("app-ready").catch(() => {});
+      void emit("app-ready").catch((error: unknown) => {
+        // Si el evento no llega, la ventana splash no se cierra: dejarlo en el
+        // log es la única pista para diagnosticarlo.
+        console.error("[bootstrap] no se pudo emitir app-ready", error);
+      });
     } catch {
       /* navegador sin runtime Tauri: ignorar */
     }
@@ -154,7 +177,19 @@ export default function App() {
 
   // Puerta de autenticación.
   if (!session) {
-    return <LoginPage />;
+    return (
+      <>
+        {bootError && (
+          <div
+            role="alert"
+            className="border-destructive/30 bg-destructive/10 text-destructive fixed inset-x-0 top-0 z-50 border-b px-4 py-2 text-center text-xs"
+          >
+            No se pudo restaurar la sesión anterior: {bootError}
+          </div>
+        )}
+        <LoginPage />
+      </>
+    );
   }
 
   const dbDown = health ? !health.ok : false;

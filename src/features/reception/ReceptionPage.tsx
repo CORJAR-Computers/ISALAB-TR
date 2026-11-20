@@ -1,5 +1,10 @@
 import { useEffect, useMemo, useState } from "react";
-import { ClipboardPlus, DoorOpen, Search } from "lucide-react";
+import {
+  AlertTriangle,
+  ClipboardPlus,
+  DoorOpen,
+  Search,
+} from "lucide-react";
 import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
@@ -54,7 +59,7 @@ export function ReceptionPage() {
     return () => clearTimeout(t);
   }, [search]);
 
-  const { data: visits, isLoading } = useVisits(
+  const { data: visits, isLoading, isError, error, refetch } = useVisits(
     dateFilter || null,
     statusFilter,
     debouncedSearch,
@@ -203,7 +208,34 @@ export function ReceptionPage() {
             </div>
           )}
 
-          {!isLoading && (visits ?? []).length === 0 && (
+          {/* Un fallo de la consulta no puede confundirse con una cola vacía:
+              en una clínica, "no hay visitas" y "la base no responde" son
+              cosas muy distintas. */}
+          {isError && (
+            <Card className="border-destructive/30">
+              <CardContent className="space-y-3 py-8 text-center">
+                <AlertTriangle className="text-destructive mx-auto size-8" />
+                <p className="text-sm font-semibold">
+                  No se pudo cargar la cola de visitas
+                </p>
+                <p
+                  role="alert"
+                  className="text-muted-foreground mx-auto max-w-md text-xs break-words"
+                >
+                  {getErrorMessage(error)}
+                </p>
+                <Button
+                  variant="outline"
+                  size="sm"
+                  onClick={() => void refetch()}
+                >
+                  Reintentar
+                </Button>
+              </CardContent>
+            </Card>
+          )}
+
+          {!isLoading && !isError && (visits ?? []).length === 0 && (
             <Card>
               <CardContent className="text-muted-foreground py-10 text-center text-sm">
                 No hay visitas con estos filtros. Registra una con "Registrar

@@ -161,26 +161,37 @@ export function useFirebirdEvents() {
     let cancelled = false;
     const unlisteners: Array<() => void> = [];
 
-    listen<SampleChangedEvent>("sample-changed", (event) => {
-      batcher.pushSample(event.payload.patientId);
-    }).then((un) => {
-      if (cancelled) un();
-      else unlisteners.push(un);
+    /**
+     * Suscribe un evento y garantiza que un fallo del runtime no quede como
+     * promesa rechazada sin manejar. Si `listen` falla, la UI deja de recibir
+     * cambios en vivo: se registra con el nombre del evento (antes la promesa
+     * se descartaba y el fallo era invisible).
+     */
+    const subscribe = <T,>(event: string, handle: (payload: T) => void) => {
+      listen<T>(event, (nativeEvent) => handle(nativeEvent.payload))
+        .then((un) => {
+          if (cancelled) un();
+          else unlisteners.push(un);
+        })
+        .catch((error: unknown) => {
+          console.error(
+            `[firebird-events] No se pudo suscribir a "${event}": la UI no se actualizará en vivo.`,
+            error,
+          );
+        });
+    };
+
+    subscribe<SampleChangedEvent>("sample-changed", (payload) => {
+      batcher.pushSample(payload.patientId);
     });
 
-    listen<LabResultChangedEvent>("lab-result-changed", (event) => {
-      batcher.pushLabResult(event.payload.patientId, event.payload.sampleId);
-    }).then((un) => {
-      if (cancelled) un();
-      else unlisteners.push(un);
+    subscribe<LabResultChangedEvent>("lab-result-changed", (payload) => {
+      batcher.pushLabResult(payload.patientId, payload.sampleId);
     });
 
     // Invalidación genérica: el backend no pudo dar un payload fiable.
-    listen("db-changed", () => {
+    subscribe<unknown>("db-changed", () => {
       batcher.pushGeneric();
-    }).then((un) => {
-      if (cancelled) un();
-      else unlisteners.push(un);
     });
 
     return () => {

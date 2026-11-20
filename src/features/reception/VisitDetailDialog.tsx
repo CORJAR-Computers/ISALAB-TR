@@ -1,6 +1,7 @@
 import { useMemo, useState } from "react";
 import { toast } from "sonner";
 import {
+  AlertTriangle,
   Banknote,
   Check,
   CirclePlay,
@@ -53,7 +54,9 @@ export function VisitDetailDialog({
 }) {
   const open = visitSummary != null;
   const visitId = visitSummary?.id ?? null;
-  const { data: visit, isLoading } = useVisit(open ? visitId : null);
+  const { data: visit, isLoading, isError, error, refetch } = useVisit(
+    open ? visitId : null,
+  );
   const { data: catalogServices = [] } = useServices(null, "");
   const setStatus = useSetVisitStatus();
   const addService = useAddVisitService();
@@ -99,7 +102,23 @@ export function VisitDetailDialog({
     <>
       <Dialog open={open} onOpenChange={(o) => !o && onClose()}>
       <DialogContent className="max-h-[90vh] overflow-y-auto sm:max-w-2xl">
-        {isLoading || !visit ? (
+        {isError ? (
+          // Sin este estado, un fallo de la consulta dejaba el diálogo con los
+          // skeletons de carga para siempre (sin mensaje ni reintento).
+          <div className="space-y-3 py-8 text-center">
+            <AlertTriangle className="text-destructive mx-auto size-8" />
+            <p className="text-sm font-semibold">No se pudo cargar la visita</p>
+            <p
+              role="alert"
+              className="text-muted-foreground mx-auto max-w-md text-xs break-words"
+            >
+              {getErrorMessage(error)}
+            </p>
+            <Button variant="outline" size="sm" onClick={() => void refetch()}>
+              Reintentar
+            </Button>
+          </div>
+        ) : isLoading || !visit ? (
           <div className="space-y-3">
             <Skeleton className="h-8 w-1/2" />
             <Skeleton className="h-24 w-full" />

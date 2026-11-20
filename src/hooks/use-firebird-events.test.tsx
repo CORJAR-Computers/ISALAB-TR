@@ -2,6 +2,7 @@ import { describe, it, expect, vi, beforeEach, afterEach } from "vitest";
 import { renderHook, act } from "@testing-library/react";
 import { QueryClient, QueryClientProvider } from "@tanstack/react-query";
 import type { ReactNode } from "react";
+import { listen } from "@tauri-apps/api/event";
 import { useFirebirdEvents } from "./use-firebird-events";
 
 /**
@@ -173,6 +174,30 @@ describe("useFirebirdEvents (agrupación de invalidaciones)", () => {
     // Una sola llamada, sin filtro de clave: todo queda obsoleto.
     expect(invalidateSpy).toHaveBeenCalledTimes(1);
     expect(invalidateSpy).toHaveBeenCalledWith();
+  });
+
+  it("una suscripción rechazada queda en el log y no como promesa sin manejar", async () => {
+    const consoleError = vi.spyOn(console, "error").mockImplementation(() => {});
+    vi.mocked(listen).mockRejectedValueOnce(
+      new Error("runtime de eventos no disponible"),
+    );
+
+    const { wrapper } = makeWrapper();
+    renderHook(() => useFirebirdEvents(), { wrapper });
+    await act(async () => {
+      await Promise.resolve();
+    });
+
+    // El fallo se registra con el evento afectado (antes se descartaba).
+    expect(consoleError).toHaveBeenCalledWith(
+      expect.stringContaining("sample-changed"),
+      expect.any(Error),
+    );
+    // Una suscripción caída no impide registrar las demás.
+    expect(registeredHandlers.has("lab-result-changed")).toBe(true);
+    expect(registeredHandlers.has("db-changed")).toBe(true);
+
+    consoleError.mockRestore();
   });
 
   it("el unmount cancela el flush pendiente sin invalidar", async () => {

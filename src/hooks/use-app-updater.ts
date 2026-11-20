@@ -49,7 +49,10 @@ export function useAppUpdater() {
         toast.success("Estás usando la versión más reciente de ISALAB.");
       }
       return update;
-    } catch {
+    } catch (error) {
+      // Silencioso en la UI cuando la comprobación es automática, pero nunca
+      // invisible: sin este log un fallo de red o del plugin no deja rastro.
+      console.warn("[updater] no se pudo comprobar actualizaciones", error);
       if (notify) {
         toast.error(
           "No se pudo comprobar actualizaciones. Revisa tu conexión a internet e inténtalo de nuevo.",

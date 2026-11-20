@@ -137,7 +137,7 @@ function AgendaList({
 }
 
 export function DashboardPage() {
-  const { data: stats, isLoading } = useDashboardStats();
+  const { data: stats, isLoading, isError, error, refetch } = useDashboardStats();
   const navigate = useUiStore((s) => s.navigate);
   const requestNewPatient = useUiStore((s) => s.requestNewPatient);
   const setConsultationStatus = useSetConsultationStatus();
@@ -170,6 +170,37 @@ export function DashboardPage() {
       });
     }
   };
+
+  // Un fallo de la consulta NO puede quedarse en el esqueleto de carga para
+  // siempre: con la base caída el panel era una pantalla de skeletons sin
+  // mensaje ni forma de reintentar.
+  if (isError) {
+    return (
+      <Card className="mx-auto max-w-xl">
+        <CardHeader>
+          <CardTitle className="flex items-center gap-2 text-base">
+            <AlertTriangle className="text-destructive size-4.5" />
+            No se pudo cargar el panel de control
+          </CardTitle>
+          <CardDescription>
+            Revisa la conexión con la base de datos e inténtalo de nuevo.
+          </CardDescription>
+        </CardHeader>
+        <CardContent className="space-y-4">
+          <p
+            role="alert"
+            className="bg-muted/50 text-muted-foreground rounded-lg border p-3 font-mono text-xs break-words"
+          >
+            {getErrorMessage(error)}
+          </p>
+          <Button onClick={() => void refetch()} className="gap-2">
+            <Loader2 className="size-4" />
+            Reintentar
+          </Button>
+        </CardContent>
+      </Card>
+    );
+  }
 
   if (isLoading || !stats) {
     return (
