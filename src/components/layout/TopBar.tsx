@@ -135,7 +135,9 @@ export function TopBar() {
           onClick={openSearch}
           className="gap-2 px-2.5 text-muted-foreground"
           title="Buscar en todo el sistema (Ctrl+K)"
-          aria-label="Buscar (Ctrl+K)"
+          // El nombre accesible incluye el texto visible tal cual: con
+          // "Buscar (Ctrl+K)" axe marca label-content-name-mismatch.
+          aria-label="Buscar… Ctrl K"
         >
           <Search className="size-4" />
           <span className="hidden text-sm lg:inline">Buscar…</span>

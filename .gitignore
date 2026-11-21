@@ -41,6 +41,7 @@ Firebird-5.0.3.1683-0-windows-x64/
 
 # Playwright E2E artifacts
 playwright-report/
+coverage/
 test-results/
 
 # Carpetas de mejoras / temporales

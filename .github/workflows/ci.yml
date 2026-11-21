@@ -58,8 +58,18 @@ jobs:
       # `lint` cubre src/ y e2e/ (incluye las reglas de eslint-plugin-playwright).
       - name: Run ESLint
         run: npm run lint
-      - name: Run Vitest
-        run: npm run test
+      # Cobertura con umbrales (vitest.config.ts): mide los módulos con red
+      # hoy (reglas de dinero y helpers compartidos). Baja el umbral solo con
+      # un cambio explícito, no por dejar de probar algo.
+      - name: Run Vitest with coverage thresholds
+        run: npm run test:coverage
+      - name: Upload coverage report
+        if: always()
+        uses: actions/upload-artifact@v7
+        with:
+          name: coverage-summary
+          path: coverage/
+          retention-days: 7
       - name: Build Frontend
         run: npm run build
 

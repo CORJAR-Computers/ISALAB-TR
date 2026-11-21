@@ -1,0 +1,154 @@
+name: Smoke real (instalador + Firebird)
+
+# Prueba lo que el mock de IPC no puede: el binario empaquetado, Firebird
+# embedded real, las migraciones y el instalador NSIS. Corre solo en el runner
+# self-hosted Windows (con sesión de escritorio, que es lo que necesita una app
+# de escritorio) y no bloquea los PR: manual o semanal.
+#
+# Qué comprueba:
+#   1. El binario `isalab-smoke` crea una base, migra a head, verifica catálogo,
+#      usuario ADMIN y una escritura real (triggers y commits, no mocks).
+#   2. El paquete NSIS se instala en silencio, la app arranca y sigue viva
+#      después de 15 s (un crash de arranque por Firebird o por recursos
+#      faltantes se ve aquí y no en la clínica).
+
+on:
+  workflow_dispatch:
+  schedule:
+    # Lunes 08:00 UTC (03:00 en Colombia): el runner está libre.
+    - cron: "0 8 * * 1"
+
+permissions:
+  contents: read
+
+env:
+  CARGO_TERM_COLOR: always
+  FIREBIRD_VERSION: "5.0.3.1683-0"
+  FIREBIRD_DIR: ${{ github.workspace }}\firebird5
+
+jobs:
+  smoke:
+    name: Instalar y arrancar el binario real
+    runs-on: [self-hosted, Windows, X64, isalab-release]
+    timeout-minutes: 60
+    steps:
+      - uses: actions/checkout@v7
+
+      # El runner tiene Git for Windows con el PATH por defecto, que deja
+      # bash.exe fuera. Las acciones compuestas con `shell: bash` (entre ellas
+      # dtolnay/rust-toolchain) fallan sin esto. Mismo arreglo que en
+      # runner-smoke.yml.
+      - name: Expose Git Bash on PATH
+        shell: pwsh
+        run: |
+          $git = (Get-Command git -ErrorAction SilentlyContinue).Source
+          $roots = @()
+          if ($git) { $roots += Split-Path (Split-Path $git -Parent) -Parent }
+          $roots += "$env:ProgramFiles\Git", "${env:ProgramFiles(x86)}\Git", "$env:LOCALAPPDATA\Programs\Git"
+          $bash = $null
+          foreach ($root in $roots) {
+            foreach ($rel in 'bin\bash.exe', 'usr\bin\bash.exe') {
+              $candidate = Join-Path $root $rel
+              if (Test-Path $candidate) { $bash = $candidate; break }
+            }
+            if ($bash) { break }
+          }
+          if (-not $bash) { throw "bash.exe no encontrado en el runner." }
+          Split-Path $bash -Parent | Out-File -FilePath $env:GITHUB_PATH -Encoding utf8 -Append
+
+      - name: Download Firebird 5 Embedded
+        shell: pwsh
+        run: |
+          $url = "https://github.com/FirebirdSQL/firebird/releases/download/v5.0.3/Firebird-5.0.3.1683-0-windows-x64.zip"
+          $zip = "$env:TEMP\firebird5.zip"
+          Invoke-WebRequest -Uri $url -OutFile $zip -UseBasicParsing
+          Expand-Archive -Path $zip -DestinationPath "$env:GITHUB_WORKSPACE\firebird5_tmp" -Force
+          $dll = Get-ChildItem "$env:GITHUB_WORKSPACE\firebird5_tmp" -Recurse -Filter fbclient.dll | Select-Object -First 1
+          if (-not $dll) { throw "fbclient.dll no se encontró en el ZIP de Firebird" }
+          $src = Split-Path $dll.FullName -Parent
+          New-Item -ItemType Directory -Force -Path "$env:GITHUB_WORKSPACE\firebird5" | Out-Null
+          Copy-Item "$src\*" -Destination "$env:GITHUB_WORKSPACE\firebird5" -Recurse -Force
+          Remove-Item "$env:GITHUB_WORKSPACE\firebird5_tmp" -Recurse -Force -ErrorAction SilentlyContinue
+          Remove-Item $zip -Force
+          "$env:GITHUB_WORKSPACE\firebird5" | Out-File -FilePath $env:GITHUB_PATH -Encoding utf8 -Append
+          "FIREBIRD_DIR=$env:GITHUB_WORKSPACE\firebird5" | Out-File -FilePath $env:GITHUB_ENV -Encoding utf8 -Append
+
+      - name: Install Rust
+        uses: dtolnay/rust-toolchain@stable
+        with:
+          toolchain: 1.100.0
+
+      - uses: actions/setup-node@v7
+        with:
+          node-version: 24
+          cache: "npm"
+
+      - name: Install frontend dependencies
+        run: npm ci
+
+      # 1) Canario de esquema con el binario real (sin mock).
+      - name: Build smoke binary (release)
+        run: cargo build --release --bin isalab-smoke --manifest-path src-tauri/Cargo.toml
+
+      - name: Run schema smoke against real Firebird
+        shell: pwsh
+        run: |
+          $exe = "src-tauri\target\release\isalab-smoke.exe"
+          if (-not (Test-Path $exe)) { throw "No se construyó $exe" }
+          & $exe --db "$env:TEMP\isalab-smoke-ci.fdb" --fbclient "$env:FIREBIRD_DIR\fbclient.dll"
+          if ($LASTEXITCODE -ne 0) { throw "El smoke de esquema falló (exit $LASTEXITCODE)" }
+
+      # 2) Instalador: empaquetar, instalar en silencio y arrancar la app.
+      - name: Build NSIS installer
+        shell: pwsh
+        run: |
+          # smoke.conf.json desactiva la firma del updater: este job no publica
+          # releases y no debe pedir la clave privada.
+          npx tauri build --bundles nsis --config src-tauri/smoke.conf.json
+          $installer = Get-ChildItem "src-tauri\target\release\bundle\nsis\*.exe" | Select-Object -First 1
+          if (-not $installer) { throw "No se generó el instalador NSIS" }
+          "INSTALLER=$($installer.FullName)" | Out-File -FilePath $env:GITHUB_ENV -Encoding utf8 -Append
+          Write-Host "Instalador: $($installer.FullName)"
+
+      - name: Install silently and launch the app
+        shell: pwsh
+        run: |
+          $app = Join-Path $env:LOCALAPPDATA "ISALAB\ISALAB.exe"
+          # Si una corrida anterior dejó la app instalada, se desinstala primero.
+          $uninstaller = Join-Path $env:LOCALAPPDATA "ISALAB\uninstall.exe"
+          if (Test-Path $uninstaller) { Start-Process -FilePath $uninstaller -ArgumentList "/S" -Wait }
+
+          Write-Host "Instalando $env:INSTALLER ..."
+          $proc = Start-Process -FilePath $env:INSTALLER -ArgumentList "/S" -Wait -PassThru
+          if ($proc.ExitCode -ne 0) { throw "El instalador falló (exit $($proc.ExitCode))" }
+          if (-not (Test-Path $app)) { throw "La app no quedó instalada en $app" }
+
+          Write-Host "Arrancando $app ..."
+          $running = Start-Process -FilePath $app -PassThru
+          Start-Sleep -Seconds 15
+          $running.Refresh()
+          if ($running.HasExited) {
+            throw "La app terminó sola a los 15 s (exit $($running.ExitCode)): revisar logs en %APPDATA%\com.isalab.clinic"
+          }
+          Write-Host "La app sigue viva (PID $($running.Id)) tras 15 s."
+          Stop-Process -Id $running.Id -Force -ErrorAction SilentlyContinue
+
+      - name: Uninstall
+        if: always()
+        shell: pwsh
+        run: |
+          $uninstaller = Join-Path $env:LOCALAPPDATA "ISALAB\uninstall.exe"
+          if (Test-Path $uninstaller) {
+            Start-Process -FilePath $uninstaller -ArgumentList "/S" -Wait
+            Write-Host "Desinstalado."
+          }
+          Remove-Item "$env:TEMP\isalab-smoke-ci.fdb" -ErrorAction SilentlyContinue
+
+      - name: Upload logs on failure
+        if: failure()
+        uses: actions/upload-artifact@v7
+        with:
+          name: smoke-real-logs
+          path: |
+            ${{ env.APPDATA }}/com.isalab.clinic/logs/**
+          retention-days: 7

@@ -1,4 +1,4 @@
-import { useEffect, useMemo, useState } from "react";
+import { useEffect, useMemo, useRef, useState } from "react";
 import { Banknote, Plus, Receipt, Search } from "lucide-react";
 import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
@@ -42,6 +42,20 @@ export function InvoicesPage() {
   const [status, setStatus] = useState<string | null>(null);
   const [search, setSearch] = useState("");
   const [newOpen, setNewOpen] = useState(false);
+  // El diálogo se abre por estado (no con DialogTrigger) y Radix devolvía el
+  // foco al menú lateral. Aquí se guarda el botón real para recuperarlo al
+  // cerrar: teclado y lector de pantalla siguen donde estaban.
+  const newInvoiceButton = useRef<HTMLButtonElement>(null);
+  const wasNewOpen = useRef(false);
+  useEffect(() => {
+    if (wasNewOpen.current && !newOpen) {
+      const button = newInvoiceButton.current;
+      const timer = window.setTimeout(() => button?.focus(), 300);
+      wasNewOpen.current = newOpen;
+      return () => window.clearTimeout(timer);
+    }
+    wasNewOpen.current = newOpen;
+  }, [newOpen]);
   const [detailId, setDetailId] = useState<number | null>(null);
   const [payingId, setPayingId] = useState<number | null>(null);
   const { data: invoices, isLoading, isError } = useInvoices(status, search);
@@ -98,7 +112,7 @@ export function InvoicesPage() {
           </p>
         </div>
         {canBill && (
-          <Button onClick={() => setNewOpen(true)}>
+          <Button ref={newInvoiceButton} onClick={() => setNewOpen(true)}>
             <Plus className="size-4" />
             Nueva factura
           </Button>

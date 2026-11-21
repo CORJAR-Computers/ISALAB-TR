@@ -6,6 +6,58 @@ The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.1.0/).
 
 ## [Unreleased]
 
+## [1.3.0] - 2026-11-21
+
+### 🎯 Release Summary
+
+La 1.3 no añade pantallas: cierra los huecos del arnés de pruebas para que las
+siguientes fases de dinero y seguridad no lleguen a la clínica sin red. La
+migración de una base con datos se prueba de verdad (v35 → actual), los PDFs
+legales se verifican por su contenido y no por su nombre, la suite comprueba
+también accesibilidad, datos a escala y el binario empaquetado con Firebird
+embedded. La cobertura pasa a tener umbral por módulo en dinero, sesión y las
+pantallas que ya tienen tests.
+
+| Métrica | v1.2.0 | v1.3.0 |
+|--------|-------|-------|
+| Tests Vitest | 153 | 180 |
+| E2E Playwright | 32 | 41 |
+| Tests Rust (Firebird real) | 431 | 435 |
+
+### Added
+
+- **Migración con datos sembrados** (`db/migrations.rs`): un test reproduce una
+  base en el esquema anterior (v35) con facturas en los tres estados, la migra
+  a head y verifica conteos, sumas, estados y tablas nuevas vacías; repetir el
+  runner no duplica ni mueve la versión.
+- **PDFs verificados por contenido** (`pdf_templates/financial_content_tests.rs`):
+  el recibo y el cierre de caja se generan con printpdf y se leen con `lopdf`;
+  el test exige número de factura, titular, importes formateados y la
+  diferencia de arqueo con su signo. Cubre nombres largos e importes de siete
+  cifras.
+- **Accesibilidad** (`e2e/a11y.spec.ts`): `@axe-core/playwright` sobre login,
+  panel, recepción, facturación, caja y el modal de factura, con allowlist
+  documentada; además comprueba foco atrapado, Escape y recorrido con teclado
+  del formulario de apertura de caja.
+- **Datos a escala** (`e2e/scale.spec.ts`): Facturación con 2.000 facturas
+  dentro de un presupuesto de pintado y con un tope de comandos IPC, para
+  detectar un N+1 antes de que lo sufra el mostrador.
+- **Smoke del binario real** (`src/bin/isalab-smoke.rs` y
+  `.github/workflows/smoke-real.yml`): crea una base, migra a head, verifica
+  catálogo, usuario ADMIN y una escritura real; el workflow instala el NSIS en
+  silencio y comprueba que la app sigue viva tras 15 s. Manual o semanal en el
+  runner self-hosted.
+- **Tests de componente de Facturación, Caja y Login**: totales que excluyen
+  anuladas, apertura/cierre de caja, historial con faltante, validación del
+  login y envío del usuario sin espacios.
+
+### Changed
+
+- **Gate de cobertura por módulo** (`vitest.config.ts`): `money.ts` y los
+  helpers de `src/lib` mantienen 95/85/95/70; las tres pantallas nuevas entran
+  con el suelo medido hoy (75/75/60/60 en Caja, 65/65/45/65 en Facturación y
+  80/80/60/55 en Login). Bajar un umbral exige un cambio explícito.
+
 ### Security
 
 - **Dependencias Rust al día con RustSec**: se cierran los 19 advisories que

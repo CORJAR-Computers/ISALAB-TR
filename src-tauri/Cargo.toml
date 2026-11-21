@@ -1,6 +1,6 @@
 [package]
 name = "isalab"
-version = "1.2.0"
+version = "1.3.0"
 description = "Sistema de gestión para laboratorios veterinarios (Firebird 5 Embedded)"
 authors = ["ISALAB"]
 edition = "2021"
@@ -75,6 +75,10 @@ strip = true
 
 [dev-dependencies]
 proptest = "1.8.0"
+# Lector de PDF para los tests de contenido (extraer el texto de un PDF real
+# generado por printpdf). Ya viene en el árbol por printpdf/pdf_signer; se
+# declara explícito para no depender de una dependencia transitiva.
+lopdf = "0.44"
 # Desde pdf_signer 0.3 el testkit (PKCS#12 autofirmado y PDF de muestra) está
 # tras una feature. Solo lo usan los tests de firma, así que se activa aquí y
 # no en las dependencias del binario.

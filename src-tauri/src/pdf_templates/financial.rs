@@ -440,3 +440,7 @@ pub fn generate_cash_close(data: &CashCloseData, out_path: &Path) -> Result<(), 
     draw_footer(&mut pdf, &format!("Cierre de caja {}", s.code));
     save_pdf(pdf, out_path, "ISALAB · Cierre de caja")
 }
+
+#[cfg(test)]
+#[path = "financial_content_tests.rs"]
+mod content_tests;

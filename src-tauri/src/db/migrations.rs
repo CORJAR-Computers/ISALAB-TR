@@ -572,6 +572,165 @@ mod tests {
         cleanup_test_db(&db_path);
     }
 
+    /// Aplica las primeras `cut` migraciones sin pasar por el runner.
+    ///
+    /// Reproduce el estado de una clínica instalada con una versión anterior
+    /// del esquema, que es lo que el runner se encuentra al actualizar.
+    fn apply_prefix(conn: &mut SimpleConnection, cut: usize) {
+        ensure_schema_table(conn).expect("tabla de versiones");
+        for (idx, (name, sql)) in MIGRATIONS.iter().enumerate().take(cut) {
+            apply_migration(conn, (idx + 1) as i32, name, sql, no_demo())
+                .unwrap_or_else(|e| panic!("migración {name} falló: {e}"));
+        }
+    }
+
+    #[test]
+    fn upgrading_a_seeded_database_preserves_its_data() {
+        let (mut conn, db_path) = setup_empty_test_db();
+
+        // Base de una clínica en el esquema anterior a pagos y caja (v35).
+        // No se ejecuta 0005: los datos son los del test, no los de demo.
+        apply_prefix(&mut conn, 35);
+        assert_eq!(applied_version(&mut conn).expect("versión"), 35);
+
+        let (species_id,): (i32,) = conn
+            .query_first("SELECT FIRST 1 ID FROM SPECIES", ())
+            .expect("especie sembrada")
+            .expect("el catálogo trae al menos una especie");
+
+        conn.execute(
+            "INSERT INTO OWNERS (ID, DOCUMENT_TYPE, DOCUMENT_NUMBER, FULL_NAME)
+             VALUES (1, 'CC', '1001', 'Ana Pérez')",
+            (),
+        )
+        .expect("propietario");
+        conn.execute(
+            &format!(
+                "INSERT INTO PATIENTS (ID, OWNER_ID, SPECIES_ID, NAME, SEX)
+                 VALUES (1, 1, {species_id}, 'Luna', 'F')"
+            ),
+            (),
+        )
+        .expect("paciente");
+        // Una factura vigente, una abonada y una anulada: los tres estados
+        // que la migración de dinero debe dejar intactos.
+        conn.execute(
+            "INSERT INTO INVOICES
+                (ID, INVOICE_NUMBER, PATIENT_ID, OWNER_ID, SUBTOTAL, TAX_RATE, TAX_AMOUNT, TOTAL, STATUS)
+             VALUES (1, 'FAC-000001', 1, 1, 100000, 19, 19000, 119000, 'EMITIDA')",
+            (),
+        )
+        .expect("factura 1");
+        conn.execute(
+            "INSERT INTO INVOICES
+                (ID, INVOICE_NUMBER, PATIENT_ID, OWNER_ID, SUBTOTAL, TAX_RATE, TAX_AMOUNT, TOTAL, STATUS)
+             VALUES (2, 'FAC-000002', 1, 1, 50000, 0, 0, 50000, 'PAGADA')",
+            (),
+        )
+        .expect("factura 2");
+        conn.execute(
+            "INSERT INTO INVOICES
+                (ID, INVOICE_NUMBER, PATIENT_ID, OWNER_ID, SUBTOTAL, TAX_RATE, TAX_AMOUNT, TOTAL, STATUS)
+             VALUES (3, 'FAC-000003', 1, 1, 30000, 0, 0, 30000, 'ANULADA')",
+            (),
+        )
+        .expect("factura 3");
+        conn.execute(
+            "INSERT INTO INVOICE_ITEMS (ID, INVOICE_ID, DESCRIPTION, QUANTITY, UNIT_PRICE, LINE_TOTAL)
+             VALUES (1, 1, 'Consulta', 1, 100000, 100000)",
+            (),
+        )
+        .expect("línea 1");
+        conn.execute(
+            "INSERT INTO INVOICE_ITEMS (ID, INVOICE_ID, DESCRIPTION, QUANTITY, UNIT_PRICE, LINE_TOTAL)
+             VALUES (2, 2, 'Baño', 1, 50000, 50000)",
+            (),
+        )
+        .expect("línea 2");
+
+        // El runner real actualiza hasta head sin pedir datos de demo.
+        let version = run_migrations_with(&mut conn, no_demo()).expect("migrar a head");
+        assert_eq!(version, expected_version());
+        assert!(pending_migrations(&mut conn)
+            .expect("pendientes")
+            .is_empty());
+
+        // Nada se pierde ni se reinterpreta: mismos conteos y mismas sumas.
+        let (invoices, total): (i32, f64) = conn
+            .query_first(
+                "SELECT COUNT(*), CAST(SUM(TOTAL) AS DOUBLE PRECISION) FROM INVOICES",
+                (),
+            )
+            .expect("facturas")
+            .expect("una fila de agregados");
+        assert_eq!(invoices, 3);
+        assert!((total - 199_000.0).abs() < 0.01, "suma: {total}");
+
+        let (items, items_total): (i32, f64) = conn
+            .query_first(
+                "SELECT COUNT(*), CAST(SUM(LINE_TOTAL) AS DOUBLE PRECISION) FROM INVOICE_ITEMS",
+                (),
+            )
+            .expect("líneas")
+            .expect("una fila de agregados");
+        assert_eq!(items, 2);
+        assert!(
+            (items_total - 150_000.0).abs() < 0.01,
+            "suma: {items_total}"
+        );
+
+        let (status,): (String,) = conn
+            .query_first("SELECT STATUS FROM INVOICES WHERE ID = 3", ())
+            .expect("estado")
+            .expect("factura anulada");
+        assert_eq!(status.trim(), "ANULADA");
+
+        // 0036 no inventa cajas y sí hace el backfill de la factura pagada:
+        // un recibo LEG- por su total, con su línea y su asignación.
+        let (sessions,): (i32,) = conn
+            .query_first("SELECT COUNT(*) FROM CASH_SESSIONS", ())
+            .expect("cajas")
+            .expect("una fila");
+        assert_eq!(sessions, 0);
+
+        let (payments, payments_total): (i32, f64) = conn
+            .query_first(
+                "SELECT COUNT(*), CAST(SUM(TOTAL) AS DOUBLE PRECISION) FROM PAYMENTS",
+                (),
+            )
+            .expect("pagos")
+            .expect("una fila");
+        assert_eq!(payments, 1, "solo la factura PAGADA genera recibo");
+        assert!(
+            (payments_total - 50_000.0).abs() < 0.01,
+            "total migrado: {payments_total}"
+        );
+        let (leg_code,): (String,) = conn
+            .query_first("SELECT TRIM(CODE) FROM PAYMENTS", ())
+            .expect("código")
+            .expect("una fila");
+        assert_eq!(leg_code, "LEG-FAC-000002");
+        let (allocations,): (i32,) = conn
+            .query_first("SELECT COUNT(*) FROM PAYMENT_ALLOCATIONS", ())
+            .expect("asignaciones")
+            .expect("una fila");
+        assert_eq!(allocations, 1);
+
+        // Idempotencia: repetir el runner no vuelve a aplicar ni duplica nada.
+        assert_eq!(
+            run_migrations_with(&mut conn, no_demo()).expect("segunda corrida"),
+            expected_version()
+        );
+        let (invoices_after,): (i32,) = conn
+            .query_first("SELECT COUNT(*) FROM INVOICES", ())
+            .expect("contar de nuevo")
+            .expect("una fila");
+        assert_eq!(invoices_after, 3);
+
+        drop(conn);
+        cleanup_test_db(&db_path);
+    }
+
     #[test]
     fn a_version_cannot_be_registered_twice() {
         let (mut conn, db_path) = setup_empty_test_db();

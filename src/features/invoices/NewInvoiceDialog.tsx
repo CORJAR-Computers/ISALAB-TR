@@ -245,7 +245,13 @@ export function NewInvoiceDialog({
                         onValueChange={(v) => field.onChange(Number(v))}
                       >
                         <FormControl>
-                          <SelectTrigger className="w-full">
+                          {/* Radix no pinta el placeholder cuando el valor es
+                              una cadena vacía: el nombre accesible va en el
+                              propio trigger. */}
+                          <SelectTrigger
+                            className="w-full"
+                            aria-label="Propietario a facturar"
+                          >
                             <SelectValue placeholder="Selecciona…" />
                           </SelectTrigger>
                         </FormControl>
@@ -306,7 +312,7 @@ export function NewInvoiceDialog({
                         onValueChange={(v) => field.onChange(Number(v))}
                       >
                         <FormControl>
-                          <SelectTrigger className="w-full">
+                          <SelectTrigger className="w-full" aria-label="Paciente (opcional)">
                             <SelectValue placeholder="Sin paciente" />
                           </SelectTrigger>
                         </FormControl>
@@ -337,7 +343,12 @@ export function NewInvoiceDialog({
                   if (service) addFromCatalog(service);
                 }}
               >
-                <SelectTrigger className="w-full">
+                {/* El texto del placeholder no basta para el nombre accesible
+                    del combobox (axe button-name): se repite en aria-label. */}
+                <SelectTrigger
+                  className="w-full"
+                  aria-label="Busca un servicio… (baño, vacuna, consulta)"
+                >
                   <SelectValue placeholder="Busca un servicio… (baño, vacuna, consulta)" />
                 </SelectTrigger>
                 <SelectContent>
@@ -449,8 +460,10 @@ export function NewInvoiceDialog({
                     <FormLabel>Método de pago</FormLabel>
                     <Select value={field.value ?? ""} onValueChange={field.onChange}>
                       <FormControl>
-                        <SelectTrigger className="w-full">
-                          <SelectValue />
+                        {/* Radix no pinta el placeholder con valor "": el
+                            nombre accesible va en el trigger. */}
+                        <SelectTrigger className="w-full" aria-label="Método de pago">
+                          <SelectValue placeholder="Selecciona…" />
                         </SelectTrigger>
                       </FormControl>
                       <SelectContent>
