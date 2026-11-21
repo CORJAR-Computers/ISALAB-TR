@@ -659,16 +659,24 @@ mod tests {
             (&patient_id,),
         )
         .unwrap();
-        // Visita de hoy con línea iniciada hace 30 min: espera promedio 30.
+        // Visita de hoy con línea iniciada 30 min después de la llegada:
+        // espera promedio 30. Las horas son fijas dentro del día actual
+        // (08:00 → 08:30) y no relativas a CURRENT_TIMESTAMP: con
+        // `DATEADD(-30 MINUTE TO CURRENT_TIMESTAMP)` la llegada caía en el día
+        // anterior cuando el suite corría poco después de medianoche (runner en
+        // UTC) y `visits_today` bajaba a 1 según la hora a la que tocara.
         conn.execute(
             "INSERT INTO VISITS (ID, PATIENT_ID, OWNER_ID, ARRIVED_AT, STATUS)
-             VALUES (2, ?, 1, DATEADD(-30 MINUTE TO CURRENT_TIMESTAMP), 'EN_ATENCION')",
+             VALUES (2, ?, 1,
+                     DATEADD(8 HOUR TO CAST(CURRENT_DATE AS TIMESTAMP)), 'EN_ATENCION')",
             (&patient_id,),
         )
         .unwrap();
         conn.execute(
             "INSERT INTO VISIT_SERVICES (ID, VISIT_ID, SERVICE_ID, UNIT_PRICE, STATUS, STARTED_AT)
-             VALUES (1, 2, 1, 50000, 'EN_PROCESO', CURRENT_TIMESTAMP)",
+             VALUES (1, 2, 1, 50000, 'EN_PROCESO',
+                     DATEADD(30 MINUTE TO
+                       DATEADD(8 HOUR TO CAST(CURRENT_DATE AS TIMESTAMP))))",
             (),
         )
         .unwrap();
@@ -726,7 +734,11 @@ mod tests {
         // Cola de espera: la urgente de hoy y la de ayer siguen EN_ESPERA.
         assert_eq!(stats.visits_waiting, 2);
         assert_eq!(stats.visits_urgent_waiting, 1);
-        assert!((stats.avg_wait_minutes - 30.0).abs() < 0.01);
+        assert!(
+            (stats.avg_wait_minutes - 30.0).abs() < 0.01,
+            "espera promedio inesperada: {}",
+            stats.avg_wait_minutes
+        );
         assert_eq!(stats.appointments_today, 1);
         assert_eq!(stats.grooming_sessions_today, 1);
         assert_eq!(stats.revenue_by_category.len(), 1);
