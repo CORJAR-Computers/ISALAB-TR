@@ -2,6 +2,7 @@
 //! para tests de integración. Se ejecuta solo con `#[cfg(test)]`.
 
 use std::path::{Path, PathBuf};
+use std::sync::OnceLock;
 
 use rsfbclient::prelude::*;
 use rsfbclient::SimpleConnection;
@@ -124,31 +125,17 @@ pub fn setup_empty_test_db() -> (SimpleConnection, PathBuf) {
     (conn, db_path)
 }
 
-/// Crea una base de datos temporal para tests con nombre único.
-/// Devuelve la conexión y la ruta de la DB.
-pub fn setup_test_db() -> (SimpleConnection, PathBuf) {
-    let db_path = temp_db_path("test");
+/// Molde de base de datos: se crea y migra **una vez por proceso**.
+///
+/// Antes cada test creaba una base desde cero y ejecutaba las 36 migraciones
+/// (~2 s por test, ~660 s la suite completa). Ahora todas las pruebas parten
+/// de una copia de este archivo ya migrado y limpio: la copia en disco cuesta
+/// milisegundos y cada test sigue teniendo su base aislada.
+static TEMPLATE_DB: OnceLock<Result<PathBuf, String>> = OnceLock::new();
 
-    // Asegurar que no existe una DB previa
-    let _ = std::fs::remove_file(&db_path);
-
-    let fbclient = fbclient_path();
-    if !fbclient.exists() {
-        panic!(
-            "fbclient.dll no encontrado en {}. Los tests de integración requieren Firebird 5 Embedded.",
-            fbclient.display()
-        );
-    }
-
-    // Crear la DB
-    let mut conn =
-        create_database(&db_path, &fbclient).expect("No se pudo crear la base de datos de prueba");
-
-    // Ejecutar migraciones
-    let _version =
-        migrations::run_migrations(&mut conn).expect("Las migraciones fallaron en la DB de prueba");
-
-    // Limpiar datos de prueba de la migración 0005 (son para demo, no para tests)
+/// Deja la base sin datos de demostración y con los generadores a cero, que es
+/// el estado del que parten los tests de repositorio.
+fn limpiar_para_tests(conn: &mut SimpleConnection) {
     let cleanup_statements = [
         "DELETE FROM CASH_SESSION_TOTALS",
         "DELETE FROM CASH_COUNT_LINES",
@@ -167,7 +154,7 @@ pub fn setup_test_db() -> (SimpleConnection, PathBuf) {
         "DELETE FROM PATIENTS",
         "DELETE FROM OWNERS",
     ];
-    for stmt in &cleanup_statements {
+    for stmt in cleanup_statements {
         conn.execute(stmt, ()).ok();
     }
 
@@ -200,7 +187,56 @@ pub fn setup_test_db() -> (SimpleConnection, PathBuf) {
         (),
     )
     .ok();
+}
 
+/// Construye el molde: base nueva, migrada y limpia, con la conexión cerrada
+/// para que el archivo se pueda copiar.
+fn crear_molde() -> Result<PathBuf, String> {
+    let db_path = temp_db_path("template");
+    let _ = std::fs::remove_file(&db_path);
+
+    let fbclient = fbclient_path();
+    if !fbclient.exists() {
+        return Err(format!(
+            "fbclient.dll no encontrado en {}",
+            fbclient.display()
+        ));
+    }
+
+    let mut conn = create_database(&db_path, &fbclient)
+        .map_err(|e| format!("no se pudo crear la base molde: {e}"))?;
+    migrations::run_migrations(&mut conn)
+        .map_err(|e| format!("las migraciones del molde fallaron: {e}"))?;
+    limpiar_para_tests(&mut conn);
+    // Firebird vuelca y suelta el archivo al soltar la conexión.
+    drop(conn);
+
+    Ok(db_path)
+}
+
+/// Crea una base de datos temporal para tests con nombre único.
+///
+/// Es una copia del molde migrado: mismo esquema y mismos generadores que la
+/// creación desde cero, sin repetir las migraciones en cada prueba.
+pub fn setup_test_db() -> (SimpleConnection, PathBuf) {
+    let template = TEMPLATE_DB
+        .get_or_init(crear_molde)
+        .as_ref()
+        .unwrap_or_else(|e| panic!("No se pudo preparar la base molde de los tests: {e}"))
+        .clone();
+
+    let db_path = temp_db_path("test");
+    let _ = std::fs::remove_file(&db_path);
+    std::fs::copy(&template, &db_path).unwrap_or_else(|e| {
+        panic!(
+            "No se pudo copiar la base molde {} a {}: {e}",
+            template.display(),
+            db_path.display()
+        )
+    });
+
+    let conn =
+        test_connection(&db_path).expect("No se pudo abrir la copia de la base de datos de prueba");
     (conn, db_path)
 }
 

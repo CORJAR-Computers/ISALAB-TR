@@ -6,6 +6,13 @@ The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.1.0/).
 
 ## [Unreleased]
 
+### Changed
+
+- Los tests de Rust ya no crean y migran una base de datos en cada prueba: un
+  molde migrado y limpio se construye una vez por proceso y cada test trabaja
+  sobre su propia copia. La suite completa pasa de ~11 min a ~1,6 min sin
+  perder aislamiento entre pruebas.
+
 ## [1.3.0] - 2026-11-21
 
 ### 🎯 Release Summary
