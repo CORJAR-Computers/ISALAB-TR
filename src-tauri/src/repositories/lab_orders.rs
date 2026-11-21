@@ -496,7 +496,7 @@ mod tests {
     use crate::models::lab_order::CreateLabOrderItemInput;
     use crate::test_helpers;
 
-    fn setup() -> (SimpleConnection, std::path::PathBuf) {
+    fn setup() -> (crate::test_helpers::TestDb, std::path::PathBuf) {
         test_helpers::setup_test_db()
     }
 

@@ -1,13 +1,16 @@
 //! Helper de testing: crea una base de datos temporal con Firebird Embedded
 //! para tests de integración. Se ejecuta solo con `#[cfg(test)]`.
 
+use std::ops::{Deref, DerefMut};
 use std::path::{Path, PathBuf};
 use std::sync::OnceLock;
+use std::time::{Duration, Instant};
 
 use rsfbclient::prelude::*;
 use rsfbclient::SimpleConnection;
 
-use crate::db::{create_database, migrations, new_connection};
+use crate::db::config::DbConfig;
+use crate::db::{connect, create_database, migrations};
 use crate::error::AppError;
 
 // ── Resolución de fbclient.dll ─────────────────────────────────────────────
@@ -104,11 +107,89 @@ fn temp_db_path(kind: &str) -> PathBuf {
     std::env::temp_dir().join(format!("isalab_{kind}_{thread_id:?}_{timestamp}.fdb"))
 }
 
+/// Conexión de prueba: cierra el attachment y borra el `.fdb` al soltarse.
+///
+/// Antes cada test llamaba a [`cleanup_test_db`] mientras su propia conexión
+/// seguía abierta. En Windows el archivo está bloqueado por el motor, así que
+/// `remove_file` fallaba en silencio y cada pasada dejaba ~436 `.fdb` en
+/// `%TEMP%`. Envolver la conexión permite cerrarla **antes** de borrar, en el
+/// mismo punto y sin depender de que cada test se acuerde del orden.
+///
+/// Se comporta como una `SimpleConnection` (`Deref`/`DerefMut`), así que
+/// `conn.execute(..)`, `repo::fn(&mut conn, ..)` y `drop(conn)` siguen igual.
+pub struct TestDb {
+    // `Option` para poder cerrar la conexión en `drop` antes de tocar el disco.
+    conn: Option<SimpleConnection>,
+    path: PathBuf,
+}
+
+impl TestDb {
+    fn new(conn: SimpleConnection, path: PathBuf) -> Self {
+        Self {
+            conn: Some(conn),
+            path,
+        }
+    }
+
+    /// Ruta del `.fdb` temporal (útil para reabrirlo o inspeccionarlo).
+    pub fn path(&self) -> &Path {
+        &self.path
+    }
+}
+
+impl Deref for TestDb {
+    type Target = SimpleConnection;
+
+    fn deref(&self) -> &Self::Target {
+        self.conn.as_ref().expect("conexión de prueba ya cerrada")
+    }
+}
+
+impl DerefMut for TestDb {
+    fn deref_mut(&mut self) -> &mut Self::Target {
+        self.conn.as_mut().expect("conexión de prueba ya cerrada")
+    }
+}
+
+impl Drop for TestDb {
+    fn drop(&mut self) {
+        // El orden importa: primero el attachment (libera el handle del .fdb),
+        // después el borrado. Al revés nunca funciona en Windows.
+        drop(self.conn.take());
+        remove_db_files(&self.path);
+    }
+}
+
+/// Borra el `.fdb` y sus auxiliares, reintentando brevemente.
+///
+/// Cerrar un attachment embedded no es instantáneo: el motor suelta el archivo
+/// unos milisegundos después. Un único `remove_file` se ejecuta demasiado
+/// pronto y deja el fichero huérfano, así que se insiste durante ~1 s. Si otro
+/// test aún tiene una conexión abierta al mismo archivo, se rinde sin ruido:
+/// el siguiente intento del guard (o el SO al cerrar el proceso) lo libera.
+fn remove_db_files(db_path: &Path) {
+    let aux = [
+        db_path.to_path_buf(),
+        db_path.with_extension("fdb.tmp"),
+        db_path.with_extension("fdb.lock"),
+    ];
+
+    for path in aux {
+        for _ in 0..40 {
+            match std::fs::remove_file(&path) {
+                Ok(()) => break,
+                Err(e) if e.kind() == std::io::ErrorKind::NotFound => break,
+                Err(_) => std::thread::sleep(Duration::from_millis(25)),
+            }
+        }
+    }
+}
+
 /// Crea una base de datos temporal vacía (sin migraciones) con nombre único.
 ///
 /// La usan los tests del runner: necesitan partir de cero para comprobar el
 /// registro de versiones y el rollback de una migración fallida.
-pub fn setup_empty_test_db() -> (SimpleConnection, PathBuf) {
+pub fn setup_empty_test_db() -> (TestDb, PathBuf) {
     let db_path = temp_db_path("empty");
     let _ = std::fs::remove_file(&db_path);
 
@@ -122,7 +203,7 @@ pub fn setup_empty_test_db() -> (SimpleConnection, PathBuf) {
 
     let conn =
         create_database(&db_path, &fbclient).expect("No se pudo crear la base de datos de prueba");
-    (conn, db_path)
+    (TestDb::new(conn, db_path.clone()), db_path)
 }
 
 /// Molde de base de datos: se crea y migra **una vez por proceso**.
@@ -217,8 +298,9 @@ fn crear_molde() -> Result<PathBuf, String> {
 /// Crea una base de datos temporal para tests con nombre único.
 ///
 /// Es una copia del molde migrado: mismo esquema y mismos generadores que la
-/// creación desde cero, sin repetir las migraciones en cada prueba.
-pub fn setup_test_db() -> (SimpleConnection, PathBuf) {
+/// creación desde cero, sin repetir las migraciones en cada prueba. La conexión
+/// va envuelta en [`TestDb`]: al soltarla se cierra y se borra el archivo.
+pub fn setup_test_db() -> (TestDb, PathBuf) {
     let template = TEMPLATE_DB
         .get_or_init(crear_molde)
         .as_ref()
@@ -237,16 +319,59 @@ pub fn setup_test_db() -> (SimpleConnection, PathBuf) {
 
     let conn =
         test_connection(&db_path).expect("No se pudo abrir la copia de la base de datos de prueba");
-    (conn, db_path)
+    (TestDb::new(conn, db_path.clone()), db_path)
 }
+
+/// Plazo para abrir una base de test.
+///
+/// El de producción (5 s, [`crate::db::config::DEFAULT_CONNECT_TIMEOUT_MS`]) se
+/// queda corto con la suite completa: 435 tests abren bases en paralelo y el
+/// motor embedded, bajo esa carga, tarda más en arrancar. Un fallo aquí no
+/// describe un problema de la app sino del entorno del test, así que el plazo es
+/// propio, holgado y acotado: si de verdad no hay motor, el test falla en 20 s,
+/// no se queda esperando.
+const TEST_CONNECT_TIMEOUT: Duration = Duration::from_secs(20);
+
+/// Intentos de conexión de un test ante un error inmediato (no un timeout).
+const TEST_CONNECT_ATTEMPTS: u32 = 3;
 
 /// Crea una nueva conexión a la DB de prueba existente.
+///
+/// Usa un timeout más generoso que la app y reintenta hasta
+/// [`TEST_CONNECT_ATTEMPTS`] veces los errores inmediatos (por ejemplo, una
+/// copia del molde que otro test acaba de liberar). Un timeout no se reintenta:
+/// cada intento deja un hilo todavía vivo que podría abrir el archivo *después*
+/// de que el guard lo haya borrado.
 pub fn test_connection(db_path: &Path) -> Result<SimpleConnection, AppError> {
     let fbclient = fbclient_path();
-    new_connection(db_path, &fbclient)
+    let mut cfg = DbConfig::embedded(db_path, &fbclient);
+    cfg.connect_timeout = TEST_CONNECT_TIMEOUT;
+
+    let mut last_error = None;
+    for attempt in 1..=TEST_CONNECT_ATTEMPTS {
+        let started = Instant::now();
+        match connect(&cfg) {
+            Ok(conn) => return Ok(conn),
+            Err(err) => {
+                let timed_out = started.elapsed() >= TEST_CONNECT_TIMEOUT;
+                last_error = Some(err);
+                if timed_out || attempt == TEST_CONNECT_ATTEMPTS {
+                    break;
+                }
+                std::thread::sleep(Duration::from_millis(100 * u64::from(attempt)));
+            }
+        }
+    }
+
+    Err(last_error.expect("TEST_CONNECT_ATTEMPTS debe ser al menos 1"))
 }
 
-/// Limpia la base de datos de prueba.
+/// Borra la base de datos de prueba de un camino sin guard.
+///
+/// Es best-effort y **no** reintenta: si la conexión sigue abierta el archivo
+/// está bloqueado y no se puede borrar ahora. La limpieza real la hace el
+/// `Drop` de [`TestDb`] al cerrar la conexión; esta función queda para rutas
+/// sueltas que no pasan por el guard.
 pub fn cleanup_test_db(db_path: &Path) {
     let _ = std::fs::remove_file(db_path);
     // También eliminar archivos auxiliares de Firebird
@@ -317,4 +442,36 @@ pub fn insert_test_reference_range(conn: &mut SimpleConnection) {
         (),
     )
     .ok();
+}
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+
+    /// El `.fdb` de un test no debe sobrevivir a la conexión: si el guard deja
+    /// el archivo, cada pasada acumula cientos de ficheros en `%TEMP%`.
+    #[test]
+    fn el_guard_borra_el_fichero_al_cerrar_la_conexion() {
+        let (mut conn, db_path) = setup_test_db();
+        assert!(db_path.exists(), "la copia del molde debe existir");
+        conn.execute("SELECT 1 FROM RDB$DATABASE", ()).ok();
+
+        drop(conn);
+
+        assert!(
+            !db_path.exists(),
+            "el .fdb debe borrarse al soltar el guard: {}",
+            db_path.display()
+        );
+    }
+
+    #[test]
+    fn la_conexion_de_test_usa_un_timeout_propio_mas_holgado() {
+        let (conn, db_path) = setup_test_db();
+        let fbclient = fbclient_path();
+        let mut cfg = DbConfig::embedded(&db_path, &fbclient);
+        cfg.connect_timeout = TEST_CONNECT_TIMEOUT;
+        assert_eq!(cfg.connect_timeout, Duration::from_secs(20));
+        drop(conn);
+    }
 }

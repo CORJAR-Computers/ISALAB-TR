@@ -173,7 +173,7 @@ mod integration_tests {
     use crate::repositories::clinical_history as history_repo;
     use crate::test_helpers;
 
-    fn setup() -> (SimpleConnection, std::path::PathBuf, i32) {
+    fn setup() -> (crate::test_helpers::TestDb, std::path::PathBuf, i32) {
         let (mut conn, db_path) = test_helpers::setup_test_db();
         let patient_id = test_helpers::insert_test_patient(&mut conn);
         test_helpers::insert_test_sample_type(&mut conn);

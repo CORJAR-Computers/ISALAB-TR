@@ -623,7 +623,7 @@ mod tests {
     use super::*;
     use crate::test_helpers;
 
-    fn setup() -> (SimpleConnection, std::path::PathBuf) {
+    fn setup() -> (crate::test_helpers::TestDb, std::path::PathBuf) {
         let (mut conn, db_path) = test_helpers::setup_test_db();
         test_helpers::insert_test_patient(&mut conn);
         conn.execute(

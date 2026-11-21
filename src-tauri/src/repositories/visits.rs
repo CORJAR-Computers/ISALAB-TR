@@ -796,7 +796,7 @@ mod tests {
     use crate::models::visit::CreateVisitInput;
     use crate::test_helpers;
 
-    fn setup() -> (SimpleConnection, std::path::PathBuf) {
+    fn setup() -> (crate::test_helpers::TestDb, std::path::PathBuf) {
         let (mut conn, db_path) = test_helpers::setup_test_db();
         // El helper limpia el seed de demo: creamos pacientes de prueba.
         // Paciente 1 "Luna" (propietario 1); paciente 2 "Rocky" (propietario 2).

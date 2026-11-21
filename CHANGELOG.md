@@ -17,6 +17,16 @@ The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.1.0/).
   721 s (−24 %) y de 9,7 GB a 4,5 GB de artefactos. Los backtraces conservan
   nombres y líneas; solo se pierden los locales por variable.
 
+### Fixed
+
+- Los tests de Rust ya no dejan bases temporales en `%TEMP%`: la conexión de
+  cada prueba se cierra antes de borrar el `.fdb`. En Windows el archivo está
+  bloqueado mientras el motor lo tiene abierto, así que el borrado fallaba en
+  silencio y cada pasada dejaba ~436 ficheros. Además, la conexión de los
+  tests usa un plazo propio de 20 s con reintentos acotados ante errores
+  inmediatos: el timeout de 5 s de la app se agotaba bajo la carga de la
+  suite y hacía fallar uno o dos tests al azar.
+
 ## [1.3.0] - 2026-11-21
 
 ### 🎯 Release Summary

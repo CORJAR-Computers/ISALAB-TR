@@ -763,7 +763,7 @@ mod tests {
     use crate::test_helpers::{cleanup_test_db, setup_empty_test_db, setup_test_db};
     use std::path::PathBuf;
 
-    fn setup() -> (SimpleConnection, PathBuf) {
+    fn setup() -> (crate::test_helpers::TestDb, PathBuf) {
         let (mut conn, db_path) = setup_test_db();
         conn.execute(
             "INSERT INTO OWNERS (ID, DOCUMENT_TYPE, DOCUMENT_NUMBER, FULL_NAME)

@@ -602,7 +602,7 @@ mod tests {
     use crate::test_helpers::*;
     use std::path::PathBuf;
 
-    fn setup() -> (SimpleConnection, PathBuf) {
+    fn setup() -> (crate::test_helpers::TestDb, PathBuf) {
         setup_test_db()
     }
 

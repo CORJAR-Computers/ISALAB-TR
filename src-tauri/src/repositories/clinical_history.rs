@@ -647,7 +647,7 @@ mod tests {
     use crate::test_helpers::*;
     use std::path::PathBuf;
 
-    fn setup() -> (SimpleConnection, PathBuf) {
+    fn setup() -> (crate::test_helpers::TestDb, PathBuf) {
         let (conn, db_path) = setup_test_db();
         (conn, db_path)
     }

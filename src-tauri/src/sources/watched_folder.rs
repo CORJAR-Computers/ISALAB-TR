@@ -211,7 +211,7 @@ mod tests {
     use std::fs;
     use std::path::PathBuf;
 
-    fn setup() -> (SimpleConnection, PathBuf) {
+    fn setup() -> (crate::test_helpers::TestDb, PathBuf) {
         test_helpers::setup_test_db()
     }
 
@@ -237,7 +237,7 @@ mod tests {
 
     /// Configura DB con paciente + tipo de muestra + analito, crea una muestra
     /// RECIBIDA y devuelve (conn, db_path, sample_code).
-    fn seed_sample_with_code() -> (SimpleConnection, PathBuf, String) {
+    fn seed_sample_with_code() -> (crate::test_helpers::TestDb, PathBuf, String) {
         let (mut conn, db_path) = setup();
         let patient_id = test_helpers::insert_test_patient(&mut conn);
         test_helpers::insert_test_sample_type(&mut conn);

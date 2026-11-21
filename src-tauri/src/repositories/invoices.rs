@@ -478,7 +478,7 @@ mod integration_tests {
     use super::*;
     use crate::test_helpers;
 
-    fn setup() -> (SimpleConnection, std::path::PathBuf) {
+    fn setup() -> (crate::test_helpers::TestDb, std::path::PathBuf) {
         let (mut conn, db_path) = test_helpers::setup_test_db();
         // Insertar propietario para facturación
         conn.execute(

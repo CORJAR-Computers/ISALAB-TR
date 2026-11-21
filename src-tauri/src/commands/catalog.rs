@@ -157,10 +157,9 @@ pub fn list_vaccine_types(state: State<'_, AppState>) -> Result<Vec<VaccineType>
 mod tests {
     use super::*;
     use crate::test_helpers::*;
-    use rsfbclient::SimpleConnection;
     use std::path::PathBuf;
 
-    fn setup() -> (SimpleConnection, PathBuf) {
+    fn setup() -> (crate::test_helpers::TestDb, PathBuf) {
         setup_test_db()
     }
 
