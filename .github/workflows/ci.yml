@@ -167,7 +167,14 @@ jobs:
           # (rsa 0.9, Marvin Attack) no tienen fix disponible y están
           # documentadas en CHANGELOG. Se ignoran explícitamente para que este
           # paso falle solo cuando aparezca una vulnerabilidad NUEVA.
-          cargo audit --ignore RUSTSEC-2026-0187 --ignore RUSTSEC-2023-0071
+          #
+          # RUSTSEC-2026-0387: crypto-bigint 0.5.5 llega por
+          # pdf_signer -> p256/p384 -> elliptic-curve 0.13, que exige
+          # crypto-bigint 0.5 (el fix es 0.7.6). No hay forma de subirlo sin
+          # que pdf_signer migre a elliptic-curve 0.14, así que se ignora
+          # hasta entonces. Revisar al actualizar pdf_signer.
+          cargo audit --ignore RUSTSEC-2026-0187 --ignore RUSTSEC-2023-0071 \
+            --ignore RUSTSEC-2026-0387
 
   e2e:
     name: E2E Smoke (Playwright)

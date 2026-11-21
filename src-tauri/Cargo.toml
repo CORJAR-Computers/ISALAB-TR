@@ -46,9 +46,9 @@ rsfbclient = { version = "0.27", default-features = false, features = ["dynamic_
 tauri-plugin-dialog = "2"
 tauri-plugin-updater = "2"
 tauri-plugin-process = "2"
-zip = "4.2.0"
+zip = "9.8.1"
 walkdir = "2.5.0"
-pdf_signer = "0.2"
+pdf_signer = "0.3.3"
 p12-keystore = "0.2.1"
 x509-cert = "0.2.5"
 
@@ -75,3 +75,7 @@ strip = true
 
 [dev-dependencies]
 proptest = "1.8.0"
+# Desde pdf_signer 0.3 el testkit (PKCS#12 autofirmado y PDF de muestra) está
+# tras una feature. Solo lo usan los tests de firma, así que se activa aquí y
+# no en las dependencias del binario.
+pdf_signer = { version = "0.3.3", features = ["testkit"] }

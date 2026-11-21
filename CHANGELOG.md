@@ -6,6 +6,27 @@ The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.1.0/).
 
 ## [Unreleased]
 
+### Security
+
+- **Dependencias Rust al día con RustSec**: se cierran los 19 advisories que
+  tenían parche disponible. `lettre` 0.11.24 (6 avisos de SMTP),
+  `zip` 9.8.1 (6 de extracción de archivos), `rustls` 0.23.46,
+  `rustls-webpki` 0.103.17, `webpki-root-certs` 1.0.12 y `pdf_signer` 0.3.3.
+  Unificar `zip` en 9 obliga a `tauri-plugin-updater` 2.14.1, que a su vez
+  sube el stack de Tauri (`wry` 0.57, `webview2-com` 0.39).
+  `crypto-bigint` 0.5.5 queda como única excepción documentada
+  (`--ignore RUSTSEC-2026-0387`): llega por `pdf_signer → elliptic-curve`
+  0.13, que exige la serie 0.5 y no admite el fix (0.7.6).
+
+### Fixed
+
+- **Test del panel dependiente de la hora**: `test_get_stats_clinic_metrics`
+  anclaba la visita en atención a `CURRENT_TIMESTAMP - 30 MINUTE`; si el suite
+  llegaba a ese test en los primeros 30 minutos del día (el runner corre en
+  UTC) la visita caía en la fecha anterior y `visits_today` bajaba a 1,
+  tumbando el job `Backend (Rust)`. Ahora usa horas fijas del día actual
+  (08:00 → 08:30) y el resultado ya no depende de la hora de ejecución.
+
 ## [1.2.0] - 2026-11-20
 
 ### 🎯 Release Summary
