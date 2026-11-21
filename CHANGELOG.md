@@ -12,6 +12,10 @@ The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.1.0/).
   molde migrado y limpio se construye una vez por proceso y cada test trabaja
   sobre su propia copia. La suite completa pasa de ~11 min a ~1,6 min sin
   perder aislamiento entre pruebas.
+- Los perfiles `dev`/`test` de Rust usan `debug = 1` en lugar de la
+  información de depuración completa: la compilación limpia baja de 948 s a
+  721 s (−24 %) y de 9,7 GB a 4,5 GB de artefactos. Los backtraces conservan
+  nombres y líneas; solo se pierden los locales por variable.
 
 ## [1.3.0] - 2026-11-21
 

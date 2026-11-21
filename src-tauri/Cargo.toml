@@ -66,6 +66,13 @@ barcoders = "2.0.0"
 [target.'cfg(windows)'.dependencies]
 windows-sys = { version = "0.59", features = ["Win32_Foundation", "Win32_Security_Cryptography"] }
 
+# `debug = 1` (sin `line-tables-only`) recorta la compilación limpia de los
+# tests un ~24 % (948 s → 721 s, 9,7 → 4,5 GB de `target`) y conserva nombres y
+# números de línea en los backtraces; solo se pierden los locales por variable.
+# El perfil `test` hereda de `dev`, así que `cargo test` lo usa tal cual.
+[profile.dev]
+debug = 1
+
 [profile.release]
 codegen-units = 1
 lto = true
