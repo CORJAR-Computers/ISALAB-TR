@@ -99,7 +99,13 @@ jobs:
     # Windows) y para los reintentos de `cargo fetch` (15 min cada uno).
     # El run colgado llegó a 1 h sin terminar: aquí muere a los 50 min.
     timeout-minutes: 50
+    # La clínica opera en hora de Colombia (UTC-5). Varios tests de reportes y
+    # fechas calculan "hoy" desde la hora del sistema, así que sin esta variable
+    # los asserts del runner UTC (9999-12-31T23:59:59Z / 00:00Z) no reproducen
+    # lo que la app ve en la clínica y, al rotar runner o horario de mantenimiento,
+    # algunos tests volverían a fallar solo por la zona.
     env:
+      TZ: America/Bogota
       FIREBIRD_VERSION: "5.0.3.1683-0"
       FIREBIRD_DIR: ${{ github.workspace }}\firebird5
     steps:
