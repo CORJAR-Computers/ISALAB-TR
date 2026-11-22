@@ -1,0 +1,14 @@
+# Toolchain del backend, fijado en el repo y no por máquina.
+#
+# El CI instala esta misma versión (`dtolnay/rust-toolchain` con
+# `toolchain: 1.100.0`) y rustup la aplica en local al ejecutar `cargo` desde
+# `src-tauri/`, así que `cargo fmt --check` y `cargo clippy` corren con la
+# misma versión en los dos sitios. Antes, un equipo con otra versión veía
+# diferencias de formato o lints que el CI no reproducía.
+#
+# 1.100.0 es la versión con la que está formateado el backend (rustfmt 1.11.0).
+# Subirla es un cambio deliberado: se acompaña de `cargo fmt` en el mismo
+# commit, nunca de un rojo inesperado.
+[toolchain]
+channel = "1.100.0"
+components = ["rustfmt", "clippy"]

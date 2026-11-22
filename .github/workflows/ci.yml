@@ -6,6 +6,16 @@ on:
   pull_request:
     branches: [ "master" ]
 
+# Un push nuevo a la misma rama/PR cancela el run anterior en curso.
+# Motivo: el runner no tenía techo propio y un run colgado (CI #114 del
+# backend, >1 h dentro de "Run tests" sobre un test que se quedó esperando
+# la conexión de Firebird) mantuvo la ventana ocupada hasta el límite de 6 h.
+# Con grupos por ref, además, solo el último commit de una rama consume
+# runners: los pushes intermedios ya no compiten entre sí.
+concurrency:
+  group: ${{ github.workflow }}-${{ github.ref }}
+  cancel-in-progress: true
+
 # Los jobs de CI solo suben artefactos (upload-artifact), no escriben en el
 # repo. Mínimo privilegio: lectura. (release.yml declara su propio permiso de
 # escritura cuando necesita publicar el release.)
@@ -20,10 +30,18 @@ env:
 # fallos transitorios de mirrors/CDN (p. ej. "Hash Sum mismatch" de apt en
 # CI #113) no deben tumbar el build. Cada intento tiene timeout propio.
 
+# Presupuesto de tiempo por job (`timeout-minutes`). Son techos de seguridad,
+# no estimaciones de duración: cada uno está muy por encima del tiempo normal
+# medido, pero acotado por debajo de la ventana de 6 h del runner. Un job que
+# los supere se cancela con fallo explícito en vez de quedarse colgado.
+
 jobs:
   frontend:
     name: Frontend (React)
     runs-on: ubuntu-latest
+    # Normal: ~1-2 min (CI #115: 52 s). Techo holgado para cache fría de npm
+    # y los 3 intentos de `npm ci` (10 min cada uno).
+    timeout-minutes: 20
     env:
       # La clínica opera en hora de Colombia (UTC-5) y los runners corren en UTC.
       # Con TZ=UTC un uso accidental de toISOString() para fechas "de hoy" en
@@ -76,6 +94,11 @@ jobs:
   backend:
     name: Backend (Rust)
     runs-on: windows-latest
+    # Normal: 17-18 min (CI #115: 17 min 51 s, de los cuales 2 min 16 s son
+    # tests). El techo deja margen para cache fría de cargo (compilar deps en
+    # Windows) y para los reintentos de `cargo fetch` (15 min cada uno).
+    # El run colgado llegó a 1 h sin terminar: aquí muere a los 50 min.
+    timeout-minutes: 50
     env:
       FIREBIRD_VERSION: "5.0.3.1683-0"
       FIREBIRD_DIR: ${{ github.workspace }}\firebird5
@@ -161,9 +184,17 @@ jobs:
         run: cargo fmt --all -- --check
         working-directory: ./src-tauri
       - name: Run clippy
-        run: cargo clippy -- -D warnings
+        # `--all-targets` incluye los tests: sin esta bandera los errores de
+        # las propias pruebas (lints de test, imports muertos en `mod tests`)
+        # solo salen al compilarlas durante `cargo test`, no en el lint.
+        run: cargo clippy --all-targets -- -D warnings
         working-directory: ./src-tauri
       - name: Run tests
+        # Normal: ~2 min 16 s (CI #115; 135,83 s). Techo propio a nivel de paso
+        # porque el cuelgue real ocurrió aquí: un test que se queda esperando la
+        # conexión de Firebird no consume CPU, así que ningún mecanismo de GitHub
+        # lo detecta; con 25 min deja de quemar runner mucho antes que el job.
+        timeout-minutes: 25
         run: cargo test
         working-directory: ./src-tauri
       - name: Install cargo-audit
@@ -190,6 +221,10 @@ jobs:
   e2e:
     name: E2E Smoke (Playwright)
     runs-on: ubuntu-latest
+    # Normal: ~4-6 min (CI #115: 3 min 50 s). Margen para la instalación de
+    # navegadores y deps de apt (3 intentos de 15 min) y el arranque del dev
+    # server de Vite.
+    timeout-minutes: 40
     env:
       # Igual que en el job de frontend: los specs de fecha y los códigos
       # consecutivos (V-AAAA-NNNN) se derivan del día LOCAL del equipo. En UTC
@@ -256,6 +291,10 @@ jobs:
     name: Tauri Build
     needs: [frontend, backend]
     runs-on: windows-latest
+    # Normal: ~20-30 min (compilación release con LTO de todo el backend). Es
+    # el job más caro: el techo está por encima del peor caso razonable para
+    # no cortar un build sano, pero por debajo de la ventana de 6 h del runner.
+    timeout-minutes: 60
     env:
       # createUpdaterArtifacts está activo: sin la clave de firma el build falla.
       TAURI_SIGNING_PRIVATE_KEY: ${{ secrets.TAURI_SIGNING_PRIVATE_KEY }}
