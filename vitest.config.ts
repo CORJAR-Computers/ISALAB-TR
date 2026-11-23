@@ -32,6 +32,9 @@ export default defineConfig({
       // daría 0 % en pantallas sin tests y el gate sería ruido.
       include: [
         'src/features/cash/money.ts',
+        // Lógica pura de la agenda semanal (parseo de hora, rango, agrupación
+        // por día y carriles de solape): la cubre agenda-week.test.ts.
+        'src/features/agenda/agenda-week.ts',
         // Pantallas del dominio de dinero y sesión: ahora tienen tests de
         // componente, así que entran en el gate con su propio suelo.
         'src/features/cash/CashPage.tsx',
@@ -57,6 +60,15 @@ export default defineConfig({
           statements: 85,
           functions: 95,
           branches: 70,
+        },
+        // Medido hoy: 100 % en las cuatro métricas. Se deja branches en 90 para
+        // que una rama defensiva nueva no rompa el gate sin test, pero
+        // cualquier línea o función sin cubrir en este módulo lo rompe.
+        'src/features/agenda/agenda-week.ts': {
+          lines: 100,
+          statements: 100,
+          functions: 100,
+          branches: 90,
         },
         // Suelos medidos con la suite actual, no aspiracionales: cubren el
         // resumen de caja, el historial con diferencia y el formulario de
