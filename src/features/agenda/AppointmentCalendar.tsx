@@ -7,16 +7,19 @@ import { QueryErrorState } from "@/components/query-error-state";
 import { useAppointments, useCheckInAppointment } from "@/hooks/use-queries";
 import { NewAppointmentDialog } from "./NewAppointmentDialog";
 import { getErrorMessage } from "@/lib/api";
-import { cn, localDateISO } from "@/lib/utils";
+import { cn } from "@/lib/utils";
+import {
+  addDays,
+  buildWeek,
+  formatHour,
+  formatTime,
+  parseScheduledAt,
+} from "./agenda-week";
 import { toast } from "sonner";
 import { useUiStore } from "@/stores/ui-store";
 import { usePermissions } from "@/hooks/use-permissions";
 import type { AppointmentListItem } from "@/bindings";
 
-/** Franja base de la agenda: primera hora con etiqueta. */
-const BASE_START_HOUR = 7;
-/** Última hora con etiqueta en la rejilla base (la rejilla llega hasta las 23:00). */
-const BASE_END_HOUR = 22;
 /** Alto de una hora en la rejilla. */
 const HOUR_HEIGHT = 48;
 /** Alto mínimo de una tarjeta: una línea de texto, para citas de 15 min. */
@@ -44,42 +47,6 @@ const STATUS_LABEL: Record<string, string> = {
 /** Estados en los que el clic hace check-in (crea la visita); el resto abre el historial. */
 const CHECK_IN_STATUSES = new Set(["PROGRAMADA", "CONFIRMADA"]);
 
-function addDays(date: Date, days: number) {
-  const d = new Date(date);
-  d.setDate(d.getDate() + days);
-  return d;
-}
-
-function startOfDay(date: Date) {
-  const d = new Date(date);
-  d.setHours(0, 0, 0, 0);
-  return d;
-}
-
-/**
- * `scheduledAt` llega como `YYYY-MM-DD HH:MM:SS` (hora local, sin zona).
- * Se parsea a mano: `new Date("2026-11-23 08:30:00")` es dependiente del motor
- * (Safari lo rechaza) y el cálculo de la hora debe ser local, no UTC. Se acepta
- * también el separador `T` por si el backend cambia a ISO 8601.
- */
-function parseScheduledAt(value: string): { day: string; minutes: number } {
-  const [day, time = "00:00:00"] = value.split(/[T ]/);
-  const [hh = 0, mm = 0] = time.split(":").map(Number);
-  return { day, minutes: hh * 60 + mm };
-}
-
-/** Minutos desde medianoche → `HH:00`. */
-function formatHour(hour: number): string {
-  return `${String(hour).padStart(2, "0")}:00`;
-}
-
-/** Minutos desde medianoche → `HH:MM`. */
-function formatTime(minutes: number): string {
-  return `${String(Math.floor(minutes / 60)).padStart(2, "0")}:${String(
-    minutes % 60,
-  ).padStart(2, "0")}`;
-}
-
 export function AppointmentCalendar() {
   const navigate = useUiStore((s) => s.navigate);
   const setActivePatient = useUiStore((s) => s.setActivePatient);
@@ -103,51 +70,12 @@ export function AppointmentCalendar() {
     refetch,
   } = useAppointments(null, null, null, true);
 
-  /**
-   * Días de la semana visible (domingo → sábado), citas agrupadas por día y
-   * rango horario a pintar.
-   *
-   * El rango se amplía para incluir cualquier cita de la semana fuera de
-   * 07:00–22:00: una cita de 06:30 o de 22:30 se dibuja en su hora real en vez
-   * de recortarse a la primera/última franja. Con la agenda dentro de horario
-   * el rango es el base y una semana sin citas pinta 07:00–22:00.
-   *
-   * La clave de cada día se calcula aquí una sola vez y la usan tanto la
-   * agrupación como el render, para que no puedan discrepar.
-   */
-  const { days, byDay, startHour, endHour } = useMemo(() => {
-    const weekStart = startOfDay(addDays(viewDate, -viewDate.getDay()));
-    const days = Array.from({ length: 7 }, (_, i) => {
-      const date = addDays(weekStart, i);
-      return { date, key: localDateISO(date) };
-    });
-
-    const byDay = new Map<string, AppointmentListItem[]>(
-      days.map((d) => [d.key, []]),
-    );
-
-    let firstHour = BASE_START_HOUR;
-    let lastHour = BASE_END_HOUR + 1;
-
-    for (const appt of appointments) {
-      const { day, minutes } = parseScheduledAt(appt.scheduledAt);
-      const bucket = byDay.get(day);
-      if (!bucket) continue; // cita de otra semana
-      bucket.push(appt);
-      firstHour = Math.min(firstHour, Math.floor(minutes / 60));
-      lastHour = Math.max(
-        lastHour,
-        Math.ceil((minutes + Math.max(appt.durationMin, 0)) / 60),
-      );
-    }
-
-    return {
-      days,
-      byDay,
-      startHour: Math.max(0, firstHour),
-      endHour: Math.min(24, lastHour),
-    };
-  }, [appointments, viewDate]);
+  // La semana (días, rango horario, agrupación y carriles) se calcula en
+  // agenda-week.ts, que tiene sus propios tests.
+  const { days, byDay, startHour, endHour } = useMemo(
+    () => buildWeek(viewDate, appointments),
+    [appointments, viewDate],
+  );
 
   const hours = useMemo(
     () => Array.from({ length: endHour - startHour }, (_, i) => startHour + i),
@@ -278,6 +206,7 @@ export function AppointmentCalendar() {
               {days.map(({ key }) => (
                 <div
                   key={key}
+                  data-testid="agenda-day-column"
                   className="relative border-r border-border last:border-r-0"
                   style={{ height: gridHeight }}
                 >
@@ -293,11 +222,18 @@ export function AppointmentCalendar() {
                   {isLoading ? (
                     <Skeleton className="absolute top-24 left-1 right-1 h-12" />
                   ) : (
-                    (byDay.get(key) ?? []).map((appt) => {
+                    (byDay.get(key) ?? []).map(({ appt, lane, lanes }) => {
                       const { minutes } = parseScheduledAt(appt.scheduledAt);
                       const detail = `${formatTime(minutes)} · ${appt.code} · ${appt.patientName} · ${appt.serviceName} · ${STATUS_LABEL[appt.status] ?? appt.status}`;
                       const top =
                         ((minutes - startHour * 60) / 60) * HOUR_HEIGHT;
+                      // Ancho del carril: las citas del mismo grupo se reparten
+                      // el ancho de la columna en partes iguales.
+                      const laneWidth = 100 / lanes;
+                      // Con carriles estrechos la hora se trunca y deja de
+                      // leerse el nombre: ahí manda el nombre (la hora ya la da
+                      // la posición vertical) y el resto va en el tooltip.
+                      const compact = lanes > 1;
                       // Una cita que termina después de la última hora de la
                       // rejilla (p. ej. 23:45 + 60 min) se recorta al borde
                       // inferior en vez de salirse del calendario.
@@ -319,22 +255,41 @@ export function AppointmentCalendar() {
                           title={detail}
                           aria-label={detail}
                           className={cn(
-                            "absolute left-1 right-1 overflow-hidden rounded border px-1.5 py-px text-left shadow-sm transition-colors hover:brightness-95 focus-visible:ring-2 focus-visible:ring-ring focus-visible:outline-none",
+                            "absolute overflow-hidden rounded border py-px text-left shadow-sm transition-colors hover:brightness-95 focus-visible:ring-2 focus-visible:ring-ring focus-visible:outline-none",
+                            compact ? "px-1" : "px-1.5",
                             STATUS_CLASS[appt.status] ??
                               "bg-secondary text-secondary-foreground border-secondary/40",
                           )}
-                          style={{ top, height }}
+                          style={{
+                            top,
+                            height,
+                            left: `calc(${lane * laneWidth}% + 2px)`,
+                            width: `calc(${laneWidth}% - 4px)`,
+                          }}
                         >
-                          {/* Una línea: en columnas de ~100px dos líneas se
+                          {/* Una sola línea: en columnas de ~100px dos líneas se
                               recortan a media altura en las citas cortas. El
                               resto del detalle va en el tooltip. */}
-                          <div className="truncate text-[10px] leading-tight">
-                            <span className="font-normal tabular-nums opacity-80">
-                              {formatTime(minutes)}
-                            </span>{" "}
-                            <span className="font-semibold">
-                              {appt.patientName}
-                            </span>
+                          <div
+                            className={cn(
+                              "truncate leading-tight",
+                              compact ? "text-[9px]" : "text-[10px]",
+                            )}
+                          >
+                            {compact ? (
+                              <span className="font-semibold">
+                                {appt.patientName}
+                              </span>
+                            ) : (
+                              <>
+                                <span className="font-normal tabular-nums opacity-80">
+                                  {formatTime(minutes)}
+                                </span>{" "}
+                                <span className="font-semibold">
+                                  {appt.patientName}
+                                </span>
+                              </>
+                            )}
                           </div>
                         </button>
                       );
