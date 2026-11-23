@@ -84,23 +84,113 @@ export function formatHour(hour: number): string {
   return formatTime(hour * 60);
 }
 
+type Interval = { appt: AppointmentListItem; start: number; end: number };
+
+/** Rectángulo final de una cita: carril izquierdo y carriles que ocupa. */
+type Rect = { appt: AppointmentListItem; left: number; span: number };
+
+type Layout = { rects: Rect[]; lanes: number };
+
+/** Franja ya dibujada por otra cita, para no meter una tarjeta encima. */
+type Taken = { left: number; right: number; start: number; end: number };
+
+/**
+ * Reparto clásico: cada cita al primer carril libre y ensanche hacia la derecha
+ * mientras el carril siguiente quede libre durante TODA su franja.
+ *
+ * Es el reparto mínimo por hora de inicio, pero no puede aprovechar un hueco a
+ * la izquierda: la cita llegó a ese carril justo porque el de la izquierda
+ * estaba ocupado cuando empezó.
+ */
+function layoutFromLeft(cluster: Interval[]): Layout {
+  const laneEnds: number[] = [];
+  const placed: (Interval & { lane: number })[] = [];
+  for (const item of cluster) {
+    let lane = laneEnds.findIndex((end) => end <= item.start);
+    if (lane === -1) {
+      lane = laneEnds.length;
+      laneEnds.push(item.end);
+    } else {
+      laneEnds[lane] = item.end;
+    }
+    placed.push({ ...item, lane });
+  }
+
+  const lanes = laneEnds.length;
+  const rects = placed.map((item) => {
+    // Solo se prueban carriles a la derecha del propio, así que la cita no se
+    // encuentra a sí misma.
+    const free = (lane: number) =>
+      !placed.some(
+        (other) =>
+          other.lane === lane &&
+          other.start < item.end &&
+          other.end > item.start,
+      );
+    let span = 1;
+    while (item.lane + span < lanes && free(item.lane + span)) span += 1;
+    return { appt: item.appt, left: item.lane, span };
+  });
+  return { rects, lanes };
+}
+
+/**
+ * Reparto espejo: cada cita va al carril libre más a la derecha y se ensancha
+ * hacia la izquierda.
+ *
+ * Al empaquetar a la derecha quedan huecos a la izquierda, que las citas que
+ * llegan después sí pueden ocupar cuando la cita que los ocupaba ya terminó. No
+ * hace falta mirar a la derecha: el carril elegido es el libre más a la derecha,
+ * así que los de su derecha están ocupados al empezar. La expansión comprueba
+ * tanto las citas basadas en el carril como los rectángulos ya dibujados, porque
+ * una vecina ensanchada ocupa sitio aunque su carril base sea otro.
+ */
+function layoutFromRight(cluster: Interval[]): Layout {
+  const laneEnds: number[] = [];
+  const taken: Taken[] = [];
+  const rects: Rect[] = [];
+
+  for (const item of cluster) {
+    const free = (lane: number) =>
+      laneEnds[lane] <= item.start &&
+      !taken.some(
+        (rect) =>
+          lane >= rect.left &&
+          lane <= rect.right &&
+          rect.start < item.end &&
+          rect.end > item.start,
+      );
+
+    let base = laneEnds.length - 1;
+    while (base >= 0 && !free(base)) base -= 1;
+    if (base === -1) base = laneEnds.length;
+
+    let left = base;
+    while (left > 0 && free(left - 1)) left -= 1;
+
+    laneEnds[base] = item.end;
+    taken.push({ left, right: base, start: item.start, end: item.end });
+    rects.push({ appt: item.appt, left, span: base - left + 1 });
+  }
+
+  return { rects, lanes: laneEnds.length };
+}
+
 /**
  * Reparte en carriles las citas de un día para que las que se solapan se lean
  * todas en vez de taparse.
  *
  * Se agrupa por clústeres de solapamiento (una cita sin solape conserva todo el
- * ancho) y dentro de cada clúster se asigna a cada cita el primer carril que ya
- * haya quedado libre (`fin <= inicio`), que es el reparto mínimo con orden por
- * hora de inicio. Una cita sin duración ocupa `MIN_SLOT_MINUTES` para no quedar
- * exactamente encima de otra a la misma hora.
+ * ancho) y, dentro de cada uno, se calculan dos repartos: el clásico (de
+ * izquierda a derecha) y el espejo, que deja huecos a la izquierda y los rellena
+ * después. Se queda el espejo solo si no deja ninguna tarjeta más estrecha que
+ * el clásico: la posición es secundaria al ancho, así que en el peor caso se
+ * mantiene el reparto de siempre.
  *
- * Después, cada cita se expande hacia la derecha mientras los carriles
- * siguientes estén libres durante TODA su franja: así una cita de 30 min a las
- * 09:30 no se queda con un tercio del ancho cuando el carril de su derecha se
- * liberó a las 09:30. Esos carriles contiguos que una cita puede usar son su
- * sub-clúster; el ancho se calcula como `span / lanes` y nunca invade otra
- * tarjeta, porque un carril que aparece ocupado en cualquier instante de la
- * franja corta la expansión.
+ * El ancho se calcula como `span / lanes`, y la expansión se corta en cuanto un
+ * carril aparece ocupado en cualquier instante de la franja, así que dos
+ * tarjetas nunca se tapan. Una cita sin duración ocupa `MIN_SLOT_MINUTES` para
+ * no quedar exactamente encima de otra a la misma hora.
  */
 export function assignLanes(appts: AppointmentListItem[]): LanedAppointment[] {
   const items = appts
@@ -115,43 +205,26 @@ export function assignLanes(appts: AppointmentListItem[]): LanedAppointment[] {
     .sort((a, b) => a.start - b.start || a.appt.id - b.appt.id);
 
   const out: LanedAppointment[] = [];
-  let cluster: typeof items = [];
+  let cluster: Interval[] = [];
   let clusterEnd = -1;
 
   const flush = () => {
     if (cluster.length === 0) return;
-    const laneEnds: number[] = [];
-    const placed: {
-      appt: AppointmentListItem;
-      start: number;
-      end: number;
-      lane: number;
-    }[] = [];
-    for (const item of cluster) {
-      let lane = laneEnds.findIndex((end) => end <= item.start);
-      if (lane === -1) {
-        lane = laneEnds.length;
-        laneEnds.push(item.end);
-      } else {
-        laneEnds[lane] = item.end;
-      }
-      placed.push({ ...item, lane });
-    }
-    const lanes = laneEnds.length;
-    for (const item of placed) {
-      let span = 1;
-      for (let lane = item.lane + 1; lane < lanes; lane += 1) {
-        const busy = placed.some(
-          (other) =>
-            other !== item &&
-            other.lane === lane &&
-            other.start < item.end &&
-            other.end > item.start,
-        );
-        if (busy) break;
-        span += 1;
-      }
-      out.push({ appt: item.appt, lane: item.lane, lanes, span });
+    const fromLeft = layoutFromLeft(cluster);
+    const fromRight = layoutFromRight(cluster);
+    const mirrorIsAtLeastAsWide = fromRight.rects.every(
+      (rect, index) =>
+        rect.span / fromRight.lanes >=
+        fromLeft.rects[index].span / fromLeft.lanes,
+    );
+    const layout = mirrorIsAtLeastAsWide ? fromRight : fromLeft;
+    for (const rect of layout.rects) {
+      out.push({
+        appt: rect.appt,
+        lane: rect.left,
+        lanes: layout.lanes,
+        span: rect.span,
+      });
     }
     cluster = [];
     clusterEnd = -1;

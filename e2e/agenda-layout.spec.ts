@@ -18,7 +18,9 @@ import { gotoView } from "./navigation";
  *      solapa conserva el ancho de la columna.
  *   3. Carril liberado a media tarde: la cita posterior se ensancha a dos
  *      carriles sin invadir a la larga que sigue ocupando el suyo.
- *   4. Semana sin citas: la franja base 07:00–22:00 se pinta completa y sin
+ *   4. Varias citas que acaban a la vez: la siguiente rellena el hueco que
+ *      queda a su izquierda y crece hacia allí.
+ *   5. Semana sin citas: la franja base 07:00–22:00 se pinta completa y sin
  *      tarjetas.
  *
  * Las expectativas en píxeles dependen de HOUR_HEIGHT de
@@ -122,8 +124,10 @@ function readGrid(page: Page) {
     ).map((el) => {
       const card = el.getBoundingClientRect();
       const col = (el.parentElement as HTMLElement).getBoundingClientRect();
+      const title = (el.getAttribute("title") ?? "").split(" · ");
       return {
-        time: (el.getAttribute("title") ?? "").split(" · ")[0],
+        time: title[0],
+        code: title[1] ?? "",
         top: Math.round(card.top - col.top),
         height: Math.round(card.height),
         left: Math.round(card.left - col.left),
@@ -348,6 +352,79 @@ test("carril liberado a media tarde: la cita posterior se ensancha", async ({
     narrow.left + narrow.width + 1,
   );
   // Sin salirse de su columna (lo mide `readGrid` contra el contenedor).
+  expect(widened.inside).toBe(true);
+});
+
+test("varias citas acaban a la vez: la siguiente rellena el hueco a su izquierda", async ({
+  page,
+}) => {
+  await seedAgenda(
+    page,
+    toRows([
+      // Ocupa el carril 0 hasta las 10:30.
+      {
+        id: 1,
+        hh: 9,
+        mm: 0,
+        durationMin: 90,
+        status: "PROGRAMADA",
+        patient: "Toby",
+      },
+      // Tres citas que acaban a las 10:30 y dejan libres los carriles 1-3.
+      {
+        id: 2,
+        hh: 10,
+        mm: 15,
+        durationMin: 20,
+        status: "CONFIRMADA",
+        patient: "Nala",
+      },
+      {
+        id: 3,
+        hh: 10,
+        mm: 15,
+        durationMin: 15,
+        status: "PROGRAMADA",
+        patient: "Michi",
+      },
+      {
+        id: 4,
+        hh: 10,
+        mm: 15,
+        durationMin: 15,
+        status: "ATENDIDA",
+        patient: "Luna",
+      },
+      // La de 10:30 caería en el cuarto carril; se ensancha al tercero.
+      {
+        id: 5,
+        hh: 10,
+        mm: 30,
+        durationMin: 60,
+        status: "PROGRAMADA",
+        patient: "Kira",
+      },
+    ]),
+  );
+  await openAgenda(page);
+  await expect(page.getByTitle(/C-2026-0005/)).toBeVisible();
+
+  const grid = await readGrid(page);
+  const card = (code: string) => {
+    const found = grid.cards.find((c) => c.code === code);
+    expect(found, `no se encontró la cita ${code}`).toBeTruthy();
+    return found!;
+  };
+
+  const single = card("C-2026-0002");
+  const third = card("C-2026-0003");
+  const widened = card("C-2026-0005");
+
+  // Ocupa dos carriles (el suyo y el de la izquierda, ya libre): el doble de
+  // ancho que una cita de un solo carril.
+  expect(widened.width).toBeGreaterThan(single.width * 1.6);
+  // Empieza donde el tercer carril (el cuarto es el de su hora, ya ocupado).
+  expect(Math.abs(widened.left - third.left)).toBeLessThanOrEqual(2);
   expect(widened.inside).toBe(true);
 });
 

@@ -113,6 +113,40 @@ describe("assignLanes", () => {
     ]);
   });
 
+  it("rellena el hueco a la izquierda cuando varias citas acaban a la vez", () => {
+    // 09:00–10:30 y tres citas que terminan a las 10:30. La de 10:30 cae en el
+    // cuarto carril, pero el tercero ya está libre: ocupa dos cuartos, no uno.
+    const a = appt("2026-11-23 09:00:00", 90);
+    const b = appt("2026-11-23 10:15:00", 20);
+    const c = appt("2026-11-23 10:15:00", 15);
+    const d = appt("2026-11-23 10:15:00", 15);
+    const e = appt("2026-11-23 10:30:00", 60);
+    const lanes = assignLanes([a, b, c, d, e]);
+    expect(lanes.map((l) => [l.appt.id, l.lane, l.span, l.lanes])).toEqual([
+      [a.id, 0, 1, 4],
+      [b.id, 1, 1, 4],
+      [c.id, 2, 1, 4],
+      [d.id, 3, 1, 4],
+      [e.id, 2, 2, 4],
+    ]);
+  });
+
+  it("si el reparto espejo deja una tarjeta más estrecha, se queda el de siempre", () => {
+    // Empaquetando a la derecha, la cita de 09:00 perdería el segundo carril
+    // que el reparto clásico sí le deja libre a su derecha: gana el ancho.
+    const a = appt("2026-11-23 09:00:00", 60);
+    const b = appt("2026-11-23 09:00:00", 20);
+    const c = appt("2026-11-23 09:45:00", 15);
+    const d = appt("2026-11-23 09:45:00", 20);
+    const lanes = assignLanes([a, b, c, d]);
+    expect(lanes.map((l) => [l.appt.id, l.lane, l.span, l.lanes])).toEqual([
+      [a.id, 0, 1, 3],
+      [b.id, 1, 2, 3],
+      [c.id, 1, 1, 3],
+      [d.id, 2, 1, 3],
+    ]);
+  });
+
   it("ensancha la cita posterior cuando el carril de su derecha se libera", () => {
     // Clúster de 3 carriles: 09:00–11:00, 09:00–09:30, 09:05–09:30 y
     // 09:30–10:00. A las 09:30 el carril 2 ya está libre, así que la cita de las
