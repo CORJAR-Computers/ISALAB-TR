@@ -2,6 +2,7 @@ import type { Page } from "@playwright/test";
 import { expect, test } from "./fixtures";
 import { installIpcMock } from "./mock";
 import { gotoView } from "./navigation";
+import { todayISO } from "./agenda";
 
 /**
  * Regresión de LAYOUT de la agenda semanal.
@@ -31,12 +32,6 @@ import { gotoView } from "./navigation";
 const HOUR_HEIGHT = 48;
 
 const pad = (n: number) => String(n).padStart(2, "0");
-
-/** Fecha local de hoy: la agenda abre en la semana que la contiene. */
-function todayISO(): string {
-  const d = new Date();
-  return `${d.getFullYear()}-${pad(d.getMonth() + 1)}-${pad(d.getDate())}`;
-}
 
 type Seed = {
   id: number;

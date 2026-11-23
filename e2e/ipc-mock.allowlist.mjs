@@ -30,10 +30,7 @@ export const allowlistedCommands = [
   "set_consultation_status",
 
   // --- Citas -----------------------------------------------------------------
-  "create_appointment",
   "get_appointment",
-  "set_appointment_status",
-  "cancel_appointment",
 
   // --- Muestras: calidad, rechazo, correo crítico ----------------------------
   "set_sample_quality",

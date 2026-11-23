@@ -195,6 +195,7 @@
   const pad4 = (n) => String(n).padStart(4, "0");
   const sampleCode = () => `M-${currentYear()}-${pad4(nextSampleId)}`;
   const patientById = (id) => patients.find((p) => p.id === id);
+  const serviceById = (id) => services.find((s) => s.id === id);
   const sampleTypeById = (id) => sampleTypes.find((t) => t.id === id);
   const sampleById = (id) => samples.find((s) => s.id === id);
   const analyzerById = (id) => analyzers.find((a) => a.id === id);
@@ -391,36 +392,94 @@
   };
 
   // ----- Agenda de citas -----
-  // Dos citas de hoy: la de Rocky sigue PROGRAMADA (el clic hace check-in y
-  // crea la visita vinculada) y la de Luna ya está ATENDIDA (el clic abre su
+  // Dos citas de hoy: la de Rocky está PROGRAMADA (el clic hace check-in y crea
+  // la visita vinculada) y la de Luna ya está ATENDIDA (el clic abre su
   // historial clínico). Las horas se calculan al arrancar el mock para que
-  // caigan siempre en la semana que pinta la agenda. Los datos del paciente y
-  // del servicio salen de `patients`/`services` en vez de repetirlos aquí.
+  // caigan siempre en la semana que pinta la agenda.
   const consulta = services.find((s) => s.code === "CONS-GEN");
-  const appointment = (id, patientId, hours, minutes, status) => {
-    const patient = patientById(patientId);
-    return {
-      id,
-      code: `C-${currentYear()}-${String(id).padStart(4, "0")}`,
-      patientId,
-      patientName: patient.name,
-      ownerId: patient.ownerId,
-      ownerName: patient.ownerName,
-      serviceId: consulta.id,
-      serviceName: consulta.name,
-      categoryId: consulta.categoryId,
-      categoryName: consulta.categoryName,
-      scheduledAt: daysAgo(0, hours, minutes),
-      durationMin: consulta.durationMin,
-      status,
-      professionalName: null,
-    };
+  /** Estados de origen que admite cada transición (la misma máquina que el backend). */
+  const APPOINTMENT_FROM = {
+    CONFIRMADA: ["PROGRAMADA"],
+    EN_ATENCION: ["PROGRAMADA", "CONFIRMADA"],
+    ATENDIDA: ["EN_ATENCION"],
+    NO_ASISTIO: ["PROGRAMADA", "CONFIRMADA", "EN_ATENCION"],
+    CANCELADA: ["PROGRAMADA", "CONFIRMADA", "EN_ATENCION"],
   };
+  /** `YYYY-MM-DDTHH:MM` (lo que da un datetime-local) → `YYYY-MM-DD HH:MM:SS`. */
+  const asStamp = (value) => {
+    const spaced = value.replace("T", " ");
+    return spaced.length === 16 ? `${spaced}:00` : spaced;
+  };
+  /** Cita completa (`Appointment`); la usan las sembradas y las creadas. */
+  const buildAppointment = ({
+    id,
+    patient,
+    service,
+    scheduledAt,
+    status,
+    professionalId = null,
+    durationMin,
+    notes = null,
+    createdAt = scheduledAt,
+  }) => ({
+    id,
+    code: `C-${currentYear()}-${String(id).padStart(4, "0")}`,
+    patientId: patient.id,
+    patientName: patient.name,
+    ownerId: patient.ownerId,
+    ownerName: patient.ownerName,
+    serviceId: service.id,
+    serviceName: service.name,
+    serviceCode: service.code,
+    categoryId: service.categoryId,
+    categoryName: service.categoryName,
+    professionalId,
+    professionalName: null,
+    scheduledAt,
+    durationMin: durationMin ?? service.durationMin,
+    status,
+    notes,
+    createdAt,
+    updatedAt: createdAt,
+  });
+  const seedAppointment = (id, patientId, hours, status) =>
+    buildAppointment({
+      id,
+      patient: patientById(patientId),
+      service: consulta,
+      scheduledAt: daysAgo(0, hours, 0),
+      status,
+    });
   const agenda = {
     appointments: [
-      appointment(1, 1, 9, 0, "PROGRAMADA"),
-      appointment(2, 2, 11, 0, "ATENDIDA"),
+      seedAppointment(1, 1, 9, "PROGRAMADA"),
+      seedAppointment(2, 2, 11, "ATENDIDA"),
     ],
+    nextId: 3,
+  };
+  /** Fila del listado: `AppointmentListItem` deja fuera estos campos. */
+  const toAppointmentListItem = ({
+    serviceCode: _serviceCode,
+    professionalId: _professionalId,
+    notes: _notes,
+    createdAt: _createdAt,
+    updatedAt: _updatedAt,
+    ...row
+  }) => row;
+  const appointmentById = (id) => agenda.appointments.find((a) => a.id === id);
+  /** Cambia el estado, validando la transición como el backend. */
+  const moveAppointment = (appt, status, notes) => {
+    if (!(APPOINTMENT_FROM[status] ?? []).includes(appt.status)) {
+      throw {
+        type: "Validation",
+        data: `Transición de estado inválida: ${appt.status} → ${status}`,
+      };
+    }
+    appt.status = status;
+    // El backend hace COALESCE(?, NOTES): las notas solo se tocan si llegan.
+    if (notes != null) appt.notes = notes;
+    appt.updatedAt = stamp();
+    return { ...appt };
   };
 
   // Actividad clínica sembrada para que el historial tenga datos sin depender
@@ -1776,15 +1835,16 @@
     // en vez de un error. Si algún spec empieza a ejercitarlas, se modela el
     // estado aquí (no en la allowlist).
     list_appointments: (args) => {
-      let list = [...agenda.appointments];
+      let rows = agenda.appointments;
       if (args.date) {
-        list = list.filter((a) => a.scheduledAt.slice(0, 10) === args.date);
+        rows = rows.filter((a) => a.scheduledAt.slice(0, 10) === args.date);
       }
-      if (args.status) list = list.filter((a) => a.status === args.status);
-      // Ninguna cita del mock tiene profesional asignado, así que filtrar por
-      // `professionalId` devuelve vacío, como haría el backend.
-      if (args.professionalId != null) list = [];
-      return list;
+      if (args.status) rows = rows.filter((a) => a.status === args.status);
+      // Las citas del mock se crean sin profesional; el filtro sigue siendo real.
+      if (args.professionalId != null) {
+        rows = rows.filter((a) => a.professionalId === args.professionalId);
+      }
+      return rows.map(toAppointmentListItem);
     },
     list_grooming_day: () => [],
     list_grooming_reminders: () => [],
@@ -2085,10 +2145,11 @@
       const visit = visitById(args.id);
       return visit ? toVisit(visit) : null;
     },
-    /** Check-in de una cita: crea su visita y deja la cita EN_ATENCION. */
+    /** Check-in de una cita: crea su visita (con el servicio de la cita) y la
+     * deja ATENDIDA, como el backend. */
     check_in_appointment: (args) => {
       requireReceive();
-      const appt = agenda.appointments.find((a) => a.id === args.id);
+      const appt = appointmentById(args.id);
       if (!appt) throw { type: "NotFound", data: "Cita no encontrada" };
       if (appt.status !== "PROGRAMADA" && appt.status !== "CONFIRMADA") {
         throw { type: "Validation", data: "La cita ya no admite check-in" };
@@ -2113,9 +2174,55 @@
         notes: null,
         services: [],
       };
+      const service = services.find((s) => s.id === appt.serviceId);
+      if (service) {
+        visit.services.push(
+          visitLine(visit, service, { professionalId: appt.professionalId }),
+        );
+      }
       money.visits.push(visit);
-      appt.status = "EN_ATENCION";
+      appt.status = "ATENDIDA";
+      appt.updatedAt = stamp();
       return toVisit(visit);
+    },
+    /** Programa una cita desde el diálogo de la agenda. */
+    create_appointment: (args) => {
+      requireReceive();
+      const { input } = args;
+      const patient = patientById(input.patientId);
+      const service = serviceById(input.serviceId);
+      if (!patient || !service) {
+        throw { type: "Validation", data: "Paciente o servicio inválido" };
+      }
+      const id = agenda.nextId;
+      agenda.nextId += 1;
+      const appt = buildAppointment({
+        id,
+        patient,
+        service,
+        scheduledAt: asStamp(input.scheduledAt),
+        durationMin: input.durationMin,
+        professionalId: input.professionalId,
+        notes: input.notes,
+        status: "PROGRAMADA",
+        createdAt: stamp(),
+      });
+      agenda.appointments.push(appt);
+      return { ...appt };
+    },
+    /** Cambia el estado de una cita (máquina de estados del backend). */
+    set_appointment_status: (args) => {
+      requireReceive();
+      const appt = appointmentById(args.id);
+      if (!appt) throw { type: "NotFound", data: "Cita no encontrada" };
+      return moveAppointment(appt, args.input?.status, args.input?.notes);
+    },
+    /** Anula una cita: es la transición a CANCELADA. */
+    cancel_appointment: (args) => {
+      requireReceive();
+      const appt = appointmentById(args.id);
+      if (!appt) throw { type: "NotFound", data: "Cita no encontrada" };
+      return moveAppointment(appt, "CANCELADA", null);
     },
     /** Historial clínico: ficha, propietario, actividad y cobros del paciente. */
     get_clinical_history: (args) => {
