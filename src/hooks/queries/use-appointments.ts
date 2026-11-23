@@ -5,17 +5,21 @@ import type {
   UpdateAppointmentStatusInput,
 } from "@/bindings";
 
-/** Lista la agenda con filtros opcionales: fecha (YYYY-MM-DD), estado y profesional. */
+/**
+ * Citas de una ventana de fechas (YYYY-MM-DD, ambas inclusive) con filtros
+ * opcionales de estado y profesional. El rango es obligatorio: el backend no
+ * devuelve «todas las citas», y la semana visible es la que se pide.
+ */
 export function useAppointments(
-  date: string | null,
+  from: string,
+  to: string,
   status: string | null,
   professionalId: number | null,
   enabled = true,
 ) {
   return useQuery({
-    queryKey: ["appointments", date, status, professionalId],
-    queryFn: () =>
-      api.listAppointments(date, status, professionalId),
+    queryKey: ["appointments", from, to, status, professionalId],
+    queryFn: () => api.listAppointments(from, to, status, professionalId),
     placeholderData: (prev) => prev,
     enabled,
   });

@@ -8,6 +8,7 @@ import {
   formatHour,
   formatTime,
   parseScheduledAt,
+  weekRange,
 } from "./agenda-week";
 
 /**
@@ -266,6 +267,23 @@ describe("buildWeek", () => {
     expect(byDay.get("2026-11-23")?.map((l) => [l.lane, l.lanes])).toEqual([
       [0, 2],
       [1, 2],
+    ]);
+  });
+});
+
+describe("weekRange", () => {
+  // Miércoles 25 de noviembre de 2026.
+  const date = new Date(2026, 10, 25, 15, 30);
+
+  it("devuelve de domingo a sábado como claves locales", () => {
+    expect(weekRange(date)).toEqual({ from: "2026-11-22", to: "2026-11-28" });
+  });
+
+  it("cubre exactamente los días que pinta buildWeek", () => {
+    const { days } = buildWeek(date, []);
+    expect([days[0].key, days[6].key]).toEqual([
+      weekRange(date).from,
+      weekRange(date).to,
     ]);
   });
 });

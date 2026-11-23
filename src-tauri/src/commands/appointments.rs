@@ -28,13 +28,14 @@ fn log_appt_audit(
     }
 }
 
-/// Lista la agenda con filtros opcionales: fecha (YYYY-MM-DD), estado y
-/// profesional.
+/// Lista la agenda de una ventana de fechas (`from`/`to` inclusive,
+/// YYYY-MM-DD) con filtros opcionales de estado y profesional.
 #[tauri::command]
 #[specta::specta]
 pub fn list_appointments(
     state: State<'_, AppState>,
-    date: Option<String>,
+    from: String,
+    to: String,
     status: Option<String>,
     professional_id: Option<i32>,
 ) -> Result<Vec<AppointmentListItem>, AppError> {
@@ -42,7 +43,8 @@ pub fn list_appointments(
     let mut pooled = state.pool.acquire()?;
     appt_repo::list_appointments(
         pooled.conn(),
-        date.as_deref(),
+        &from,
+        &to,
         status.as_deref(),
         professional_id,
     )

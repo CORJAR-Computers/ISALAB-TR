@@ -58,6 +58,19 @@ function startOfDay(date: Date): Date {
 }
 
 /**
+ * Ventana de la semana visible (domingo a sábado) como claves `YYYY-MM-DD`
+ * locales: es el rango que se pide al backend, así que la consulta cubre
+ * exactamente los días que pinta `buildWeek`.
+ */
+export function weekRange(date: Date): { from: string; to: string } {
+  const weekStart = startOfDay(addDays(date, -date.getDay()));
+  return {
+    from: localDateISO(weekStart),
+    to: localDateISO(addDays(weekStart, 6)),
+  };
+}
+
+/**
  * `scheduledAt` llega como `YYYY-MM-DD HH:MM:SS` (hora local, sin zona).
  * Se parsea a mano: `new Date("2026-11-23 08:30:00")` es dependiente del motor
  * (Safari lo rechaza) y el cálculo de la hora debe ser local, no UTC. Se acepta

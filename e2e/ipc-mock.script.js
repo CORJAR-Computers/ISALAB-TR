@@ -2064,10 +2064,11 @@
     // en vez de un error. Si algún spec empieza a ejercitarlas, se modela el
     // estado aquí (no en la allowlist).
     list_appointments: (args) => {
-      let rows = agenda.appointments;
-      if (args.date) {
-        rows = rows.filter((a) => a.scheduledAt.slice(0, 10) === args.date);
-      }
+      // Ventana obligatoria, inclusiva en los dos extremos (YYYY-MM-DD).
+      let rows = agenda.appointments.filter((a) => {
+        const day = a.scheduledAt.slice(0, 10);
+        return day >= args.from && day <= args.to;
+      });
       if (args.status) rows = rows.filter((a) => a.status === args.status);
       // Las citas del mock se crean sin profesional; el filtro sigue siendo real.
       if (args.professionalId != null) {

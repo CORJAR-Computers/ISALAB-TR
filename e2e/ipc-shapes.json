@@ -2883,9 +2883,10 @@
     }
    },
    "args": [
-    "date",
+    "from",
     "professionalId",
-    "status"
+    "status",
+    "to"
    ]
   },
   "list_audit_log": {

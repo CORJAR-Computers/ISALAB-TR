@@ -316,30 +316,35 @@ pub fn create_appointment(
 
 // ============================== LISTADO =====================================
 
-/// Lista citas con filtros opcionales: fecha (YYYY-MM-DD), estado y
-/// profesional. Ordenadas por fecha/hora.
+/// Lista las citas de una ventana de fechas (`from`/`to` inclusive,
+/// YYYY-MM-DD) con filtros opcionales de estado y profesional. Ordenadas por
+/// fecha/hora.
+///
+/// La ventana se compara contra `SCHEDULED_AT` sin envolver la columna, así
+/// entra el índice `IX_APPOINTMENTS_SCHEDULED_PROF (SCHEDULED_AT,
+/// PROFESSIONAL_ID)`; el filtro anterior (`LEFT(CAST(...)) = ?`) lo anulaba y
+/// traía toda la tabla. `to` incluye el día completo: el límite superior es
+/// medianoche del día siguiente.
 pub fn list_appointments(
     conn: &mut SimpleConnection,
-    date: Option<&str>,
+    from: &str,
+    to: &str,
     status: Option<&str>,
     professional_id: Option<i32>,
 ) -> Result<Vec<AppointmentListItem>, AppError> {
     let sql = format!(
         "{APPOINTMENT_LIST_SELECT}
-         WHERE (? IS NULL OR LEFT(CAST(a.SCHEDULED_AT AS VARCHAR(60)), 10) = ?)
+         WHERE a.SCHEDULED_AT >= CAST(? AS TIMESTAMP)
+           AND a.SCHEDULED_AT < DATEADD(DAY, 1, CAST(? AS TIMESTAMP))
            AND (? IS NULL OR a.STATUS = ?)
            AND (? IS NULL OR a.PROFESSIONAL_ID = ?)
          ORDER BY a.SCHEDULED_AT, a.ID"
     );
 
-    let date_opt = date.map(|s| s.to_string());
     let prof_opt = professional_id;
 
     let rows: Vec<AppointmentListRow> = conn
-        .query(
-            &sql,
-            (&date_opt, &date_opt, &status, &status, &prof_opt, &prof_opt),
-        )
+        .query(&sql, (from, to, &status, &status, &prof_opt, &prof_opt))
         .map_err(AppError::from)?;
 
     Ok(rows.into_iter().map(map_appointment_list).collect())
@@ -777,14 +782,29 @@ mod tests {
         let (mut conn, db_path) = setup();
         create_appointment(&mut conn, &appt_input(1, 1, "2026-12-01 10:00:00")).unwrap();
         create_appointment(&mut conn, &appt_input(2, 1, "2026-12-01 11:00:00")).unwrap();
+        // Vecinas del día pedido, fuera de la ventana de un solo día. La de
+        // medianoche prueba el borde superior: un solo día no la incluye.
+        create_appointment(&mut conn, &appt_input(1, 1, "2026-11-30 23:00:00")).unwrap();
+        create_appointment(&mut conn, &appt_input(2, 1, "2026-12-02 00:00:00")).unwrap();
 
-        let all = list_appointments(&mut conn, None, None, None).unwrap();
-        assert_eq!(all.len(), 2);
+        let day = list_appointments(&mut conn, "2026-12-01", "2026-12-01", None, None).unwrap();
+        assert_eq!(day.len(), 2);
 
-        let by_date = list_appointments(&mut conn, Some("2026-12-01"), None, None).unwrap();
-        assert_eq!(by_date.len(), 2);
+        // Los bordes son inclusivos en los dos extremos.
+        let wide =
+            list_appointments(&mut conn, "2026-11-30", "2026-12-02", None, None).unwrap();
+        assert_eq!(wide.len(), 4);
+        assert!(wide[0].scheduled_at.starts_with("2026-11-30"));
+        assert!(wide[3].scheduled_at.starts_with("2026-12-02"));
 
-        let by_status = list_appointments(&mut conn, None, Some("PROGRAMADA"), None).unwrap();
+        let by_status = list_appointments(
+            &mut conn,
+            "2026-12-01",
+            "2026-12-01",
+            Some("PROGRAMADA"),
+            None,
+        )
+        .unwrap();
         assert_eq!(by_status.len(), 2);
 
         test_helpers::cleanup_test_db(&db_path);

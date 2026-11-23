@@ -151,10 +151,10 @@ export const commands = {
 	 */
 	checkoutVisit: (visitId: number, paymentMethod: string | null, notes: string | null) => typedError<Invoice, AppError>(__TAURI_INVOKE("checkout_visit", { visitId, paymentMethod, notes })).then((v) => ((v.status === "ok" ? { ...v, data: ({...v.data,items:v.data.items.map(i=>i)}) } : v) as typeof v)),
 	/**
-	 *  Lista la agenda con filtros opcionales: fecha (YYYY-MM-DD), estado y
-	 *  profesional.
+	 *  Lista la agenda de una ventana de fechas (`from`/`to` inclusive,
+	 *  YYYY-MM-DD) con filtros opcionales de estado y profesional.
 	 */
-	listAppointments: (date: string | null, status: string | null, professionalId: number | null) => typedError<AppointmentListItem[], AppError>(__TAURI_INVOKE("list_appointments", { date, status, professionalId })),
+	listAppointments: (from: string, to: string, status: string | null, professionalId: number | null) => typedError<AppointmentListItem[], AppError>(__TAURI_INVOKE("list_appointments", { from, to, status, professionalId })),
 	/**  Ficha completa de una cita. */
 	getAppointment: (id: number) => typedError<{
 	id: number,

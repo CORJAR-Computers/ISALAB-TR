@@ -15,8 +15,8 @@ import {
   formatHour,
   formatTime,
   parseScheduledAt,
+  weekRange,
 } from "./agenda-week";
-import { toast } from "sonner";
 import { useUiStore } from "@/stores/ui-store";
 import { usePermissions } from "@/hooks/use-permissions";
 import type { AppointmentListItem } from "@/bindings";
@@ -53,13 +53,17 @@ export function AppointmentCalendar() {
 
   const checkIn = useCheckInAppointment();
 
+  // Se piden solo los días visibles (domingo a sábado): el backend exige rango
+  // y así no viaja la agenda entera al mover de semana.
+  const { from, to } = useMemo(() => weekRange(viewDate), [viewDate]);
+
   const {
     data: appointments = [],
     isLoading,
     isError,
     error,
     refetch,
-  } = useAppointments(null, null, null, true);
+  } = useAppointments(from, to, null, null);
 
   // La semana (días, rango horario, agrupación y carriles) se calcula en
   // agenda-week.ts, que tiene sus propios tests.

@@ -510,11 +510,19 @@ export const api = {
     invoke<Invoice>("checkout_visit", { visitId, paymentMethod, notes }),
 
   // ---- Agenda generalizada (citas) ----
+  /** Citas de una ventana de fechas (`from`/`to` inclusive, YYYY-MM-DD). */
   listAppointments: (
-    date: string | null,
+    from: string,
+    to: string,
     status: string | null,
     professionalId: number | null,
-  ) => invoke<AppointmentListItem[]>("list_appointments", { date, status, professionalId }),
+  ) =>
+    invoke<AppointmentListItem[]>("list_appointments", {
+      from,
+      to,
+      status,
+      professionalId,
+    }),
   getAppointment: (id: number) => invoke<Appointment | null>("get_appointment", { id }),
   createAppointment: (input: CreateAppointmentInput) =>
     invoke<Appointment>("create_appointment", { input }),

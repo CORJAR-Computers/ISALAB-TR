@@ -62,11 +62,7 @@ export function GroomingPage() {
     isError: apptsError,
     error: apptsErrorObj,
     refetch: refetchAppts,
-  } = useAppointments(
-    date,
-    null,
-    null,
-  );
+  } = useAppointments(date, date, null, null);
   const { data: reminders = [] } = useGroomingReminders();
 
   const groomingAppointments = appointments.filter(
