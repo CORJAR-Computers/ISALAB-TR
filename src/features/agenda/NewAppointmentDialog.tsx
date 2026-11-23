@@ -159,11 +159,30 @@ export function NewAppointmentDialog({
                   ) : (
                     <Select
                       value={field.value ? String(field.value) : ""}
-                      onValueChange={(v) => field.onChange(Number(v))}
+                      // Radix emite "" cuando el valor seleccionado todavía no
+                      // está entre las opciones (alta rápida: el paciente se
+                      // fija antes de que la consulta se refresque) y ese
+                      // cambio nativo borraba la selección recién hecha.
+                      onValueChange={(v) => {
+                        if (v) field.onChange(Number(v));
+                      }}
                     >
                       <FormControl>
                         <SelectTrigger className="w-full">
-                          <SelectValue placeholder="Selecciona…" />
+                          {/* El texto se pinta desde el paciente elegido: con el
+                              alta rápida el valor se fija por código y
+                              `SelectValue` no conoce el ítem hasta abrir la
+                              lista, así que el campo parecía vacío. */}
+                          <SelectValue placeholder="Selecciona…">
+                            {(() => {
+                              const selected = patients.find(
+                                (p) => p.id === field.value,
+                              );
+                              return selected
+                                ? `${selected.name} · ${selected.speciesName} · ${selected.ownerName}`
+                                : undefined;
+                            })()}
+                          </SelectValue>
                         </SelectTrigger>
                       </FormControl>
                       <SelectContent className="max-h-64">

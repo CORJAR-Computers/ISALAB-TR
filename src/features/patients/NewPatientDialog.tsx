@@ -160,7 +160,17 @@ export function NewPatientDialog({
         </DialogHeader>
 
         <Form {...form}>
-          <form onSubmit={form.handleSubmit(onSubmit)} className="space-y-5">
+          {/* El diálogo vive en un portal, pero los eventos de React suben por
+              el árbol de componentes: sin cortar la propagación, guardar el
+              paciente también envía el formulario que abrió el alta (p. ej. el
+              de Nueva cita, que mostraba errores de paciente y servicio). */}
+          <form
+            onSubmit={(event) => {
+              event.stopPropagation();
+              void form.handleSubmit(onSubmit)(event);
+            }}
+            className="space-y-5"
+          >
             <fieldset className="space-y-3">
               <legend className="text-muted-foreground flex w-full items-center gap-2 text-xs font-semibold tracking-wide uppercase">
                 Propietario <Separator className="flex-1" />

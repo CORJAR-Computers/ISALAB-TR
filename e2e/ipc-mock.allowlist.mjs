@@ -24,7 +24,6 @@ export const allowlistedCommands = [
   "export_results_csv",
 
   // --- Pacientes y consultas -------------------------------------------------
-  "create_patient",
   "get_patient_by_code",
 
   // --- Citas -----------------------------------------------------------------

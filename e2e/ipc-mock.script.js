@@ -142,6 +142,24 @@
   ];
   let nextRangeId = 8;
 
+  // Contadores del alta rápida: las dos mascotas y el propietario sembrados
+  // ocupan 1–2 y 10; el siguiente paciente/propietario continúa la secuencia.
+  let nextPatientId = 3;
+  let nextOwnerId = 11;
+
+  // Meses cumplidos desde `birthDate` (misma idea que el DATEDIFF del SELECT).
+  const ageMonthsOf = (birthDate) => {
+    if (!birthDate) return 0;
+    const born = new Date(`${birthDate}T00:00:00`);
+    if (Number.isNaN(born.getTime())) return 0;
+    const now = new Date();
+    return Math.max(
+      0,
+      (now.getFullYear() - born.getFullYear()) * 12 +
+        (now.getMonth() - born.getMonth()),
+    );
+  };
+
   let samples = []; // { ...Sample, results: LabResult[] }
   let nextSampleId = 1;
   let nextResultId = 1;
@@ -183,6 +201,13 @@
     { id: 1, code: "CAN", name: "Canino" },
     { id: 2, code: "FEL", name: "Felino" },
     { id: 3, code: "EQU", name: "Equino" },
+  ];
+
+  // Razas del seed: el alta rápida resuelve con ellas el `breedName` del
+  // paciente creado (`list_breeds` sirve esta misma lista al formulario).
+  const breeds = [
+    { id: 1, speciesId: 1, name: "Labrador" },
+    { id: 2, speciesId: 1, name: "Criollo" },
   ];
 
   // Equipos del catálogo (id 1 = perfil GENERAL). rangeCount se calcula de
@@ -1564,6 +1589,63 @@
       );
     },
     get_patient: (args) => patientById(args.id) ?? null,
+    /** Alta de propietario+paciente (el diálogo de "Nuevo paciente"). */
+    create_patient: (args) => {
+      const { owner: ownerInput, ...input } = args.input;
+      // El backend reutiliza el propietario por (tipo, número) de documento.
+      const documentType = ownerInput.documentType;
+      const documentNumber = ownerInput.documentNumber;
+      let owner = owners.find(
+        (o) =>
+          o.documentType === documentType &&
+          o.documentNumber === documentNumber,
+      );
+      if (!owner) {
+        owner = {
+          id: nextOwnerId,
+          documentType,
+          documentNumber,
+          fullName: ownerInput.fullName,
+          phone: ownerInput.phone,
+          email: ownerInput.email,
+          address: ownerInput.address,
+          city: ownerInput.city,
+        };
+        nextOwnerId += 1;
+        owners.push(owner);
+      }
+      const speciesRow = speciesById(input.speciesId);
+      if (!speciesRow) {
+        throw { type: "Validation", data: "Especie inválida" };
+      }
+      const id = nextPatientId;
+      nextPatientId += 1;
+      const created = {
+        id,
+        // Mismo formato que el trigger BI_PATIENTS_CODE (PAC-YYYY-NNNN).
+        code: `PAC-${currentYear()}-${pad4(id)}`,
+        ownerId: owner.id,
+        speciesId: input.speciesId,
+        breedId: input.breedId ?? null,
+        name: input.name,
+        sex: input.sex,
+        birthDate: input.birthDate ?? null,
+        neutered: input.neutered,
+        color: input.color ?? null,
+        microchip: input.microchip ?? null,
+        active: true,
+        notes: input.notes ?? null,
+        preferredLogoId: null,
+        speciesName: speciesRow.name,
+        breedName:
+          breeds.find((b) => b.id === input.breedId)?.name ?? null,
+        ownerName: owner.fullName,
+        ownerPhone: owner.phone ?? null,
+        ageMonths: ageMonthsOf(input.birthDate),
+      };
+      patients.push(created);
+      return created;
+    },
     list_samples: (args) => {
       let list = samples.map(toListItem).reverse(); // más reciente primero
       if (args.status)
@@ -1874,10 +1956,7 @@
     // Necesarios para el test de viewport 1366x768, que navega por TODAS las
     // vistas: cada página debe montar sin datos y sin excepciones.
     list_species: () => species,
-    list_breeds: () => [
-      { id: 1, speciesId: 1, name: "Labrador" },
-      { id: 2, speciesId: 1, name: "Criollo" },
-    ],
+    list_breeds: () => breeds,
     list_owners: () => owners,
     list_users: () => {
       requireAdmin();
