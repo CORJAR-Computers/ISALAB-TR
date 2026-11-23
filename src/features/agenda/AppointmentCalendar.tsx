@@ -6,7 +6,8 @@ import { Skeleton } from "@/components/ui/skeleton";
 import { QueryErrorState } from "@/components/query-error-state";
 import { useAppointments, useCheckInAppointment } from "@/hooks/use-queries";
 import { NewAppointmentDialog } from "./NewAppointmentDialog";
-import { getErrorMessage } from "@/lib/api";
+import { AppointmentDetailDialog } from "./AppointmentDetailDialog";
+import { statusLabel } from "./appointment-actions";
 import { cn } from "@/lib/utils";
 import {
   addDays,
@@ -35,24 +36,14 @@ const STATUS_CLASS: Record<string, string> = {
   CANCELADA: "bg-muted text-muted-foreground border-muted/40",
 };
 
-const STATUS_LABEL: Record<string, string> = {
-  PROGRAMADA: "Programada",
-  CONFIRMADA: "Confirmada",
-  EN_ATENCION: "En atención",
-  ATENDIDA: "Atendida",
-  NO_ASISTIO: "No asistió",
-  CANCELADA: "Cancelada",
-};
-
-/** Estados en los que el clic hace check-in (crea la visita); el resto abre el historial. */
-const CHECK_IN_STATUSES = new Set(["PROGRAMADA", "CONFIRMADA"]);
-
 export function AppointmentCalendar() {
   const navigate = useUiStore((s) => s.navigate);
   const setActivePatient = useUiStore((s) => s.setActivePatient);
   const { canReceive } = usePermissions();
   const [viewDate, setViewDate] = useState(() => new Date());
   const [dialogOpen, setDialogOpen] = useState(false);
+  /** Cita abierta en el diálogo de detalle; `null` lo cierra. */
+  const [selectedId, setSelectedId] = useState<number | null>(null);
   // El check-in crea una visita, así que solo se dispara una vez por cita
   // mientras el listado no refleje el estado nuevo. Un `isPending` de la
   // mutación no sirve: con dos clics seguidos la primera petición puede
@@ -83,22 +74,29 @@ export function AppointmentCalendar() {
   );
   const gridHeight = hours.length * HOUR_HEIGHT;
 
-  const handleAppointmentClick = async (appt: AppointmentListItem) => {
-    if (!CHECK_IN_STATUSES.has(appt.status)) {
-      setActivePatient(appt.patientId);
-      navigate("clinical-history");
-      return;
-    }
+  // La cita se busca en el listado (y no se guarda en el estado) para que el
+  // diálogo muestre el estado nuevo en cuanto la mutación invalida la consulta.
+  const selected =
+    selectedId === null
+      ? null
+      : (appointments.find((appt) => appt.id === selectedId) ?? null);
+
+  const handleCheckIn = async (appt: AppointmentListItem) => {
     if (checkedIn.current.has(appt.id)) return;
     checkedIn.current.add(appt.id);
     try {
       await checkIn.mutateAsync(appt.id);
     } catch (e) {
       checkedIn.current.delete(appt.id);
-      toast.error("No se pudo hacer el check-in", {
-        description: getErrorMessage(e),
-      });
+      // El diálogo es quien informa del error; aquí solo se libera el guardián.
+      throw e;
     }
+  };
+
+  const openHistory = (appt: AppointmentListItem) => {
+    setSelectedId(null);
+    setActivePatient(appt.patientId);
+    navigate("clinical-history");
   };
 
   return (
@@ -109,8 +107,8 @@ export function AppointmentCalendar() {
             Agenda de citas
           </h2>
           <p className="text-muted-foreground text-sm">
-            Citas de cualquier servicio del catálogo. El check-in crea la
-            visita vinculada.
+            Citas de cualquier servicio del catálogo. Haz clic en una cita para
+            ver su detalle, confirmarla o anularla.
           </p>
         </div>
         <div className="flex items-end gap-2">
@@ -224,7 +222,7 @@ export function AppointmentCalendar() {
                   ) : (
                     (byDay.get(key) ?? []).map(({ appt, lane, lanes, span }) => {
                       const { minutes } = parseScheduledAt(appt.scheduledAt);
-                      const detail = `${formatTime(minutes)} · ${appt.code} · ${appt.patientName} · ${appt.serviceName} · ${STATUS_LABEL[appt.status] ?? appt.status}`;
+                      const detail = `${formatTime(minutes)} · ${appt.code} · ${appt.patientName} · ${appt.serviceName} · ${statusLabel(appt.status)}`;
                       const top =
                         ((minutes - startHour * 60) / 60) * HOUR_HEIGHT;
                       // Ancho del carril: las citas del mismo clúster se
@@ -253,9 +251,10 @@ export function AppointmentCalendar() {
                         <button
                           type="button"
                           key={appt.id}
-                          onClick={() => void handleAppointmentClick(appt)}
+                          onClick={() => setSelectedId(appt.id)}
                           title={detail}
                           aria-label={detail}
+                          aria-haspopup="dialog"
                           className={cn(
                             "absolute overflow-hidden rounded border py-px text-left shadow-sm transition-colors hover:brightness-95 focus-visible:ring-2 focus-visible:ring-ring focus-visible:outline-none",
                             compact ? "px-1" : "px-1.5",
@@ -305,6 +304,15 @@ export function AppointmentCalendar() {
       </Card>
 
       <NewAppointmentDialog open={dialogOpen} onOpenChange={setDialogOpen} />
+
+      <AppointmentDetailDialog
+        appointment={selected}
+        onOpenChange={(open) => {
+          if (!open) setSelectedId(null);
+        }}
+        onCheckIn={handleCheckIn}
+        onOpenHistory={openHistory}
+      />
     </div>
   );
 }

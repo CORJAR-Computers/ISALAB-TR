@@ -2,38 +2,43 @@ import { expect, test } from "./fixtures";
 import { openAgenda } from "./agenda";
 
 /**
- * Clic sobre una cita: check-in de una PROGRAMADA (que la deja ATENDIDA) e
- * historial de una ya ATENDIDA, con las citas que siembra el mock.
+ * Detalle de una cita y su historial: el check-in de una PROGRAMADA (que la
+ * deja ATENDIDA y crea la visita) y el salto al historial clínico desde una ya
+ * ATENDIDA, con las citas que siembra el mock.
  *
  * Las tarjetas se localizan por su nombre accesible (`HH:MM · código · paciente
  * · servicio · estado`); los patrones fijan código y estado y dejan el resto
  * abierto para no romperse por el copy ni por el año del código.
  */
 
-test("clic en una cita PROGRAMADA hace check-in y la deja ATENDIDA", async ({
+test("el check-in desde el detalle deja la cita ATENDIDA y crea la visita", async ({
   page,
 }) => {
   await openAgenda(page);
 
-  await page.getByRole("button", { name: /C-\d{4}-0001 .* Programada/ }).click();
+  await page
+    .getByRole("button", { name: /C-\d{4}-0001 .* Programada$/ })
+    .click();
+  const dialog = page.getByRole("dialog");
+  await dialog.getByRole("button", { name: "Hacer check-in" }).click();
 
-  // El check-in la deja ATENDIDA y la mutación repinta la tarjeta.
-  const atendida = page.getByRole("button", {
-    name: /C-\d{4}-0001 .* Atendida$/,
-  });
-  await expect(atendida).toBeVisible();
+  // El check-in la deja ATENDIDA y la mutación repinta el detalle.
+  await expect(page.getByText("Check-in realizado")).toBeVisible();
+  await expect(dialog.locator("dd").first()).toHaveText("Atendida");
 
-  // El check-in creó la visita: el segundo clic abre el historial con ella.
-  await atendida.click();
+  // La visita quedó creada: desde el detalle se abre el historial con ella.
+  await dialog.getByRole("button", { name: "Ver historial clínico" }).click();
   await expect(page.getByText(/^Visita V-\d{4}-\d{4}$/)).toBeVisible();
 });
 
-test("clic en una cita ATENDIDA abre el historial con sus datos", async ({
-  page,
-}) => {
+test("una cita ATENDIDA abre el historial con sus datos", async ({ page }) => {
   await openAgenda(page);
 
-  await page.getByRole("button", { name: /C-\d{4}-0002 .* Atendida/ }).click();
+  await page.getByRole("button", { name: /C-\d{4}-0002 .* Atendida$/ }).click();
+  await page
+    .getByRole("dialog")
+    .getByRole("button", { name: "Ver historial clínico" })
+    .click();
 
   // Ficha del paciente y propietario (`patient` y `owner` de la respuesta).
   const main = page.getByRole("main");
