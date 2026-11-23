@@ -482,6 +482,94 @@
     return { ...appt };
   };
 
+  // ----- Agenda de consultas (consultas ambulatorias) -----
+  // Cuatro consultas sembradas: dos pendientes de hoy (una por paciente), una
+  // completada y una cancelada de días atrás. Los contadores de las pestañas y
+  // la búsqueda por paciente/propietario/motivo se calculan sobre esta lista.
+  // La fecha se arma con el reloj para que el "hoy" no envejezca.
+  const consultations = [
+    {
+      id: 1,
+      patientId: 1,
+      veterinarianId: 1,
+      consultationDate: daysAgo(0, 7, 30),
+      reason: "Control posquirúrgico",
+      anamnesis: null,
+      physicalExam: null,
+      diagnosis: null,
+      treatmentPlan: null,
+      status: "PENDIENTE",
+    },
+    {
+      id: 2,
+      patientId: 2,
+      veterinarianId: null,
+      consultationDate: daysAgo(0, 9, 0),
+      reason: "Vómito recurrente",
+      anamnesis: null,
+      physicalExam: null,
+      diagnosis: null,
+      treatmentPlan: null,
+      status: "PENDIENTE",
+    },
+    {
+      id: 3,
+      patientId: 2,
+      veterinarianId: 2,
+      consultationDate: daysAgo(3, 11, 0),
+      reason: "Vacunación anual",
+      anamnesis: null,
+      physicalExam: null,
+      diagnosis: null,
+      treatmentPlan: null,
+      status: "COMPLETADA",
+    },
+    {
+      id: 4,
+      patientId: 1,
+      veterinarianId: 2,
+      consultationDate: daysAgo(6, 15, 30),
+      reason: "Revisión de oídos",
+      anamnesis: null,
+      physicalExam: null,
+      diagnosis: null,
+      treatmentPlan: null,
+      status: "CANCELADA",
+    },
+  ];
+  let nextConsultationId = 5;
+  /** Fila del listado: `ConsultationListItem` une paciente, especie y dueño. */
+  const toConsultationListItem = (c) => {
+    const p = patientById(c.patientId);
+    return {
+      id: c.id,
+      patientId: c.patientId,
+      patientName: p?.name ?? "?",
+      speciesName: p?.speciesName ?? "?",
+      ownerName: p?.ownerName ?? "?",
+      consultationDate: c.consultationDate,
+      reason: c.reason,
+      status: c.status,
+      veterinarianName:
+        mockUsers.find((u) => u.id === c.veterinarianId)?.fullName ?? null,
+    };
+  };
+  /** Consulta completa (`Consultation`), la que devuelve el alta. */
+  const toConsultation = (c) => ({
+    id: c.id,
+    patientId: c.patientId,
+    veterinarianId: c.veterinarianId,
+    consultationDate: c.consultationDate,
+    reason: c.reason,
+    anamnesis: c.anamnesis,
+    physicalExam: c.physicalExam,
+    diagnosis: c.diagnosis,
+    treatmentPlan: c.treatmentPlan,
+    status: c.status,
+    veterinarianName:
+      mockUsers.find((u) => u.id === c.veterinarianId)?.fullName ?? null,
+  });
+
   // Actividad clínica sembrada para que el historial tenga datos sin depender
   // de crear una visita durante el test. No vive en `money.visits` a propósito:
   // el tablero de recepción lo usan otros specs y su estado inicial sigue vacío.
@@ -1815,8 +1903,36 @@
       const limit = args.limit ?? rows.length;
       return rows.slice(offset, offset + limit).map((r) => ({ ...r }));
     },
-    list_consultations: () => [],
-    count_consultations: () => [],
+    list_consultations: (args = {}) => {
+      const q = String(args.search ?? "").trim().toLowerCase();
+      const rows = consultations.filter((c) => {
+        if (args.status && c.status !== args.status) return false;
+        if (!q) return true;
+        const p = patientById(c.patientId);
+        // Mismo alcance que el backend: paciente, propietario o motivo.
+        return [p?.name, p?.ownerName, c.reason].some((value) =>
+          String(value ?? "").toLowerCase().includes(q),
+        );
+      });
+      // Orden del backend: la más reciente primero (y su id como desempate).
+      return rows
+        .slice()
+        .sort(
+          (a, b) =>
+            b.consultationDate.localeCompare(a.consultationDate) ||
+            b.id - a.id,
+        )
+        .map(toConsultationListItem);
+    },
+    count_consultations: () => {
+      const byStatus = new Map();
+      for (const c of consultations) {
+        byStatus.set(c.status, (byStatus.get(c.status) ?? 0) + 1);
+      }
+      return [...byStatus.entries()]
+        .sort(([a], [b]) => a.localeCompare(b))
+        .map(([status, count]) => ({ status, count }));
+    },
     list_surgeries: () => [],
     count_surgeries: () => [],
     list_vaccines: () => [],
@@ -2223,6 +2339,50 @@
       const appt = appointmentById(args.id);
       if (!appt) throw { type: "NotFound", data: "Cita no encontrada" };
       return moveAppointment(appt, "CANCELADA", null);
+    },
+    /** Alta de consulta desde la agenda o el historial (rol veterinario). */
+    create_consultation: (args) => {
+      requireVetOrAdmin();
+      const { input } = args;
+      if (!patientById(input.patientId)) {
+        throw { type: "NotFound", data: "Paciente no encontrado" };
+      }
+      const id = nextConsultationId;
+      nextConsultationId += 1;
+      const created = {
+        id,
+        patientId: input.patientId,
+        // El INSERT del backend no asigna veterinario: queda NULL.
+        veterinarianId: null,
+        consultationDate: asStamp(input.consultationDate),
+        reason: input.reason,
+        anamnesis: input.anamnesis,
+        physicalExam: input.physicalExam,
+        diagnosis: input.diagnosis,
+        treatmentPlan: input.treatmentPlan,
+        status: input.status,
+      };
+      consultations.push(created);
+      return toConsultation(created);
+    },
+    /** Agenda: completa o cancela una consulta pendiente. */
+    set_consultation_status: (args) => {
+      requireVetOrAdmin();
+      const c = consultations.find((x) => x.id === args.id);
+      if (!c) {
+        throw { type: "NotFound", data: `Consulta ${args.id} no encontrada` };
+      }
+      const allowed =
+        (args.status === "COMPLETADA" || args.status === "CANCELADA") &&
+        c.status === "PENDIENTE";
+      if (!allowed) {
+        throw {
+          type: "Validation",
+          data: `Transición de estado no permitida: ${c.status} → ${args.status}`,
+        };
+      }
+      c.status = args.status;
+      return toConsultationListItem(c);
     },
     /** Historial clínico: ficha, propietario, actividad y cobros del paciente. */
     get_clinical_history: (args) => {

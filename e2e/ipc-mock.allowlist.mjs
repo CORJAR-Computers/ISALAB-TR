@@ -26,8 +26,6 @@ export const allowlistedCommands = [
   // --- Pacientes y consultas -------------------------------------------------
   "create_patient",
   "get_patient_by_code",
-  "create_consultation",
-  "set_consultation_status",
 
   // --- Citas -----------------------------------------------------------------
   "get_appointment",
