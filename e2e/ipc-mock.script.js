@@ -390,6 +390,87 @@
     nextVisitServiceId: 1,
   };
 
+  // ----- Agenda de citas -----
+  // Dos citas de hoy: la de Rocky sigue PROGRAMADA (el clic hace check-in y
+  // crea la visita vinculada) y la de Luna ya está ATENDIDA (el clic abre su
+  // historial clínico). Las horas se calculan al arrancar el mock para que
+  // caigan siempre en la semana que pinta la agenda. Los datos del paciente y
+  // del servicio salen de `patients`/`services` en vez de repetirlos aquí.
+  const consulta = services.find((s) => s.code === "CONS-GEN");
+  const appointment = (id, patientId, hours, minutes, status) => {
+    const patient = patientById(patientId);
+    return {
+      id,
+      code: `C-${currentYear()}-${String(id).padStart(4, "0")}`,
+      patientId,
+      patientName: patient.name,
+      ownerId: patient.ownerId,
+      ownerName: patient.ownerName,
+      serviceId: consulta.id,
+      serviceName: consulta.name,
+      categoryId: consulta.categoryId,
+      categoryName: consulta.categoryName,
+      scheduledAt: daysAgo(0, hours, minutes),
+      durationMin: consulta.durationMin,
+      status,
+      professionalName: null,
+    };
+  };
+  const agenda = {
+    appointments: [
+      appointment(1, 1, 9, 0, "PROGRAMADA"),
+      appointment(2, 2, 11, 0, "ATENDIDA"),
+    ],
+  };
+
+  // Actividad clínica sembrada para que el historial tenga datos sin depender
+  // de crear una visita durante el test. No vive en `money.visits` a propósito:
+  // el tablero de recepción lo usan otros specs y su estado inicial sigue vacío.
+  const clinicalFixtures = {
+    visits: [
+      {
+        id: 900,
+        code: `V-${currentYear()}-0900`,
+        patientId: 2,
+        patientName: "Luna",
+        ownerId: 10,
+        ownerName: "Juan Pérez",
+        arrivedAt: daysAgo(3, 10, 0),
+        priority: "NORMAL",
+        status: "FINALIZADA",
+        notes: null,
+        servicesSummary: consulta.name,
+        estimatedTotal: consulta.price,
+      },
+    ],
+    groomingSessions: [
+      {
+        id: 1,
+        visitServiceId: 1,
+        visitId: 900,
+        serviceName: "Baño completo",
+        patientId: 2,
+        patientName: "Luna",
+        ownerName: "Juan Pérez",
+        groomerId: null,
+        groomerName: "Andrea",
+        style: "Corte higiénico",
+        bathType: "Medicado",
+        coatCondition: "Bueno",
+        mattingLevel: 0,
+        weightKg: 12.5,
+        behavior: "Tranquilo",
+        productsUsed: null,
+        startedAt: daysAgo(3, 11, 0),
+        finishedAt: daysAgo(3, 12, 0),
+        nextSuggestedAt: null,
+        notes: null,
+        createdAt: daysAgo(3, 10, 45),
+        updatedAt: daysAgo(3, 12, 0),
+      },
+    ],
+  };
+
   // ----- Auditoría (append-only, más reciente primero) -----
   // El backend registra LOGIN, cambios de estado y pagos vía log_audit; aquí
   // solo se replican las acciones que ejercitan los flujos E2E.
@@ -787,7 +868,7 @@
     patientName: visit.patientName,
     ownerId: visit.ownerId,
     ownerName: visit.ownerName,
-    appointmentId: null,
+    appointmentId: visit.appointmentId ?? null,
     arrivedAt: visit.arrivedAt,
     priority: visit.priority,
     status: visit.status,
@@ -1694,7 +1775,17 @@
     // devuelve colecciones vacías para que las páginas pinten su estado vacío
     // en vez de un error. Si algún spec empieza a ejercitarlas, se modela el
     // estado aquí (no en la allowlist).
-    list_appointments: () => [],
+    list_appointments: (args) => {
+      let list = [...agenda.appointments];
+      if (args.date) {
+        list = list.filter((a) => a.scheduledAt.slice(0, 10) === args.date);
+      }
+      if (args.status) list = list.filter((a) => a.status === args.status);
+      // Ninguna cita del mock tiene profesional asignado, así que filtrar por
+      // `professionalId` devuelve vacío, como haría el backend.
+      if (args.professionalId != null) list = [];
+      return list;
+    },
     list_grooming_day: () => [],
     list_grooming_reminders: () => [],
     list_stays: () => [],
@@ -1994,6 +2085,63 @@
       const visit = visitById(args.id);
       return visit ? toVisit(visit) : null;
     },
+    /** Check-in de una cita: crea su visita y deja la cita EN_ATENCION. */
+    check_in_appointment: (args) => {
+      requireReceive();
+      const appt = agenda.appointments.find((a) => a.id === args.id);
+      if (!appt) throw { type: "NotFound", data: "Cita no encontrada" };
+      if (appt.status !== "PROGRAMADA" && appt.status !== "CONFIRMADA") {
+        throw { type: "Validation", data: "La cita ya no admite check-in" };
+      }
+      // Idempotente como el backend: si la cita ya tiene visita, se devuelve en
+      // vez de duplicarla.
+      const existing = money.visits.find((v) => v.appointmentId === appt.id);
+      if (existing) return toVisit(existing);
+      const id = money.nextVisitId;
+      money.nextVisitId += 1;
+      const visit = {
+        id,
+        code: `V-${currentYear()}-${String(id).padStart(4, "0")}`,
+        patientId: appt.patientId,
+        patientName: appt.patientName,
+        ownerId: appt.ownerId,
+        ownerName: appt.ownerName,
+        appointmentId: appt.id,
+        arrivedAt: stamp(),
+        priority: "NORMAL",
+        status: "EN_ESPERA",
+        notes: null,
+        services: [],
+      };
+      money.visits.push(visit);
+      appt.status = "EN_ATENCION";
+      return toVisit(visit);
+    },
+    /** Historial clínico: ficha, propietario, actividad y cobros del paciente. */
+    get_clinical_history: (args) => {
+      const patient = patientById(args.patientId);
+      if (!patient) throw { type: "NotFound", data: "Paciente no encontrado" };
+      return {
+        patient,
+        owner: owners.find((o) => o.id === patient.ownerId) ?? null,
+        consultations: [],
+        vaccines: [],
+        samples: [],
+        // Visitas reales (las crea el check-in) + las sembradas para el historial.
+        visits: [
+          ...money.visits
+            .filter((v) => v.patientId === patient.id)
+            .map(toVisitListItem),
+          ...clinicalFixtures.visits.filter((v) => v.patientId === patient.id),
+        ].sort((a, b) => b.arrivedAt.localeCompare(a.arrivedAt)),
+        groomingSessions: clinicalFixtures.groomingSessions.filter(
+          (g) => g.patientId === patient.id,
+        ),
+        charges: [],
+      };
+    },
+    /** Órdenes de laboratorio del paciente que pinta la ficha del historial. */
+    list_patient_lab_orders: () => [],
     create_visit: (args) => {
       requireReceive();
       const input = args.input ?? {};

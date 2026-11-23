@@ -26,7 +26,6 @@ export const allowlistedCommands = [
   // --- Pacientes y consultas -------------------------------------------------
   "create_patient",
   "get_patient_by_code",
-  "get_clinical_history",
   "create_consultation",
   "set_consultation_status",
 
@@ -35,7 +34,6 @@ export const allowlistedCommands = [
   "get_appointment",
   "set_appointment_status",
   "cancel_appointment",
-  "check_in_appointment",
 
   // --- Muestras: calidad, rechazo, correo crítico ----------------------------
   "set_sample_quality",
@@ -51,7 +49,6 @@ export const allowlistedCommands = [
   "set_lab_order_status",
   "accession_lab_order",
   "get_order_for_sample",
-  "list_patient_lab_orders",
   "preview_analyzer_import",
   "import_analyzer_results",
   "save_analyzer_source",
