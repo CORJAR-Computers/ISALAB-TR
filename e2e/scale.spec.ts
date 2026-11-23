@@ -24,6 +24,15 @@ const SCALE = 2_000;
 const RENDER_BUDGET_MS = 10_000;
 
 /**
+ * Cuánto se espera a que la tabla pinte las filas antes de medir.
+ *
+ * Mayor que el presupuesto a propósito: si el render se pasa, quien debe fallar
+ * es la aserción del presupuesto con el tiempo medido, no un timeout de locator
+ * que no distingue "tardó" de "no pintó nunca".
+ */
+const RENDER_WAIT_TIMEOUT_MS = 60_000;
+
+/**
  * Multiplica las facturas que devuelve el mock sin tocar su estado interno.
  *
  * Se envuelve `__TAURI_INTERNALS__.invoke` mediante un setter: el script del
@@ -126,6 +135,10 @@ async function commandStats(page: Page) {
 test("Facturación pinta 2.000 facturas dentro del presupuesto y sin N+1", async ({
   page,
 }) => {
+  // El test mide tiempos: se le da margen para que un render lento llegue a la
+  // aserción del presupuesto en vez de morir por el timeout del propio test.
+  test.slow();
+
   await installIpcMock(page);
   await installScaleData(page, SCALE);
   await login(page);
@@ -134,10 +147,14 @@ test("Facturación pinta 2.000 facturas dentro del presupuesto y sin N+1", async
 
   const startedAt = Date.now();
   await gotoView(page, "Facturación");
-  // La última fila del listado existe → el render terminó.
-  await expect(
-    page.getByText(`FAC-${String(SCALE).padStart(6, "0")}`, { exact: true }),
-  ).toBeVisible();
+  // Para saber si el render terminó basta con contar filas: es una consulta al
+  // DOM, mientras que buscar el texto de la última fila obligaba a barrer
+  // 20.000 celdas en cada sondeo y se comía el margen del presupuesto.
+  const rows = page.locator("tbody tr");
+  await expect(rows).toHaveCount(SCALE, { timeout: RENDER_WAIT_TIMEOUT_MS });
+  await expect(rows.last()).toContainText(
+    `FAC-${String(SCALE).padStart(6, "0")}`,
+  );
   const elapsed = Date.now() - startedAt;
 
   expect(
