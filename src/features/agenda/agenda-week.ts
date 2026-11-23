@@ -16,15 +16,21 @@ export const BASE_START_HOUR = 7;
 /** Última hora con etiqueta en la rejilla base (la rejilla llega hasta las 23:00). */
 export const BASE_END_HOUR = 22;
 /** Duración mínima con la que una cita ocupa sitio al repartir carriles. */
-export const MIN_SLOT_MINUTES = 15;
+const MIN_SLOT_MINUTES = 15;
 
 export type DaySlot = { date: Date; key: string };
 
 export type LanedAppointment = {
   appt: AppointmentListItem;
-  /** Carril (columna) dentro del grupo de citas que se solapan. */
+  /** Carril (columna) donde arranca la tarjeta dentro de su clúster. */
   lane: number;
-  /** Carriles que necesita ese grupo; define el ancho de cada tarjeta. */
+  /**
+   * Carriles que ocupa a lo ancho. Es 1 salvo que los carriles de su derecha
+   * queden libres durante toda su franja (sub-clúster), en cuyo caso la tarjeta
+   * se ensancha hasta el primero que sí está ocupado.
+   */
+  span: number;
+  /** Carriles totales del clúster: denominador del ancho de cada tarjeta. */
   lanes: number;
 };
 
@@ -66,16 +72,16 @@ export function parseScheduledAt(value: string): {
   return { day, minutes: hh * 60 + mm };
 }
 
-/** Minutos desde medianoche → `HH:00` (etiqueta de la columna de horas). */
-export function formatHour(hour: number): string {
-  return `${String(hour).padStart(2, "0")}:00`;
-}
-
 /** Minutos desde medianoche → `HH:MM`. */
 export function formatTime(minutes: number): string {
   return `${String(Math.floor(minutes / 60)).padStart(2, "0")}:${String(
     minutes % 60,
   ).padStart(2, "0")}`;
+}
+
+/** Hora del día (0–24) → `HH:00`, la etiqueta de la columna de horas. */
+export function formatHour(hour: number): string {
+  return formatTime(hour * 60);
 }
 
 /**
@@ -87,6 +93,14 @@ export function formatTime(minutes: number): string {
  * haya quedado libre (`fin <= inicio`), que es el reparto mínimo con orden por
  * hora de inicio. Una cita sin duración ocupa `MIN_SLOT_MINUTES` para no quedar
  * exactamente encima de otra a la misma hora.
+ *
+ * Después, cada cita se expande hacia la derecha mientras los carriles
+ * siguientes estén libres durante TODA su franja: así una cita de 30 min a las
+ * 09:30 no se queda con un tercio del ancho cuando el carril de su derecha se
+ * liberó a las 09:30. Esos carriles contiguos que una cita puede usar son su
+ * sub-clúster; el ancho se calcula como `span / lanes` y nunca invade otra
+ * tarjeta, porque un carril que aparece ocupado en cualquier instante de la
+ * franja corta la expansión.
  */
 export function assignLanes(appts: AppointmentListItem[]): LanedAppointment[] {
   const items = appts
@@ -107,7 +121,12 @@ export function assignLanes(appts: AppointmentListItem[]): LanedAppointment[] {
   const flush = () => {
     if (cluster.length === 0) return;
     const laneEnds: number[] = [];
-    const placed: { appt: AppointmentListItem; lane: number }[] = [];
+    const placed: {
+      appt: AppointmentListItem;
+      start: number;
+      end: number;
+      lane: number;
+    }[] = [];
     for (const item of cluster) {
       let lane = laneEnds.findIndex((end) => end <= item.start);
       if (lane === -1) {
@@ -116,10 +135,24 @@ export function assignLanes(appts: AppointmentListItem[]): LanedAppointment[] {
       } else {
         laneEnds[lane] = item.end;
       }
-      placed.push({ appt: item.appt, lane });
+      placed.push({ ...item, lane });
     }
     const lanes = laneEnds.length;
-    for (const p of placed) out.push({ ...p, lanes });
+    for (const item of placed) {
+      let span = 1;
+      for (let lane = item.lane + 1; lane < lanes; lane += 1) {
+        const busy = placed.some(
+          (other) =>
+            other !== item &&
+            other.lane === lane &&
+            other.start < item.end &&
+            other.end > item.start,
+        );
+        if (busy) break;
+        span += 1;
+      }
+      out.push({ appt: item.appt, lane: item.lane, lanes, span });
+    }
     cluster = [];
     clusterEnd = -1;
   };

@@ -222,18 +222,20 @@ export function AppointmentCalendar() {
                   {isLoading ? (
                     <Skeleton className="absolute top-24 left-1 right-1 h-12" />
                   ) : (
-                    (byDay.get(key) ?? []).map(({ appt, lane, lanes }) => {
+                    (byDay.get(key) ?? []).map(({ appt, lane, lanes, span }) => {
                       const { minutes } = parseScheduledAt(appt.scheduledAt);
                       const detail = `${formatTime(minutes)} · ${appt.code} · ${appt.patientName} · ${appt.serviceName} · ${STATUS_LABEL[appt.status] ?? appt.status}`;
                       const top =
                         ((minutes - startHour * 60) / 60) * HOUR_HEIGHT;
-                      // Ancho del carril: las citas del mismo grupo se reparten
-                      // el ancho de la columna en partes iguales.
+                      // Ancho del carril: las citas del mismo clúster se
+                      // reparten el ancho de la columna en partes iguales, y
+                      // cada tarjeta mide `span` carriles (los que quedaron
+                      // libres a su derecha durante toda su franja).
                       const laneWidth = 100 / lanes;
-                      // Con carriles estrechos la hora se trunca y deja de
+                      // Con tarjetas estrechas la hora se trunca y deja de
                       // leerse el nombre: ahí manda el nombre (la hora ya la da
                       // la posición vertical) y el resto va en el tooltip.
-                      const compact = lanes > 1;
+                      const compact = span / lanes <= 0.5;
                       // Una cita que termina después de la última hora de la
                       // rejilla (p. ej. 23:45 + 60 min) se recorta al borde
                       // inferior en vez de salirse del calendario.
@@ -264,7 +266,7 @@ export function AppointmentCalendar() {
                             top,
                             height,
                             left: `calc(${lane * laneWidth}% + 2px)`,
-                            width: `calc(${laneWidth}% - 4px)`,
+                            width: `calc(${span * laneWidth}% - 4px)`,
                           }}
                         >
                           {/* Una sola línea: en columnas de ~100px dos líneas se

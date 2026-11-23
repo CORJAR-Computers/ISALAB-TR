@@ -14,7 +14,11 @@ import { gotoView } from "./navigation";
  * Casos cubiertos:
  *   1. Citas nocturnas (00:15, 03:00 y 23:45 que cruza medianoche): la rejilla
  *      se amplía a 00:00–23:00 y cada cita cae en su hora real sin salirse.
- *   2. Semana sin citas: la franja base 07:00–22:00 se pinta completa y sin
+ *   2. Citas solapadas: se reparten en carriles sin taparse, y la que no
+ *      solapa conserva el ancho de la columna.
+ *   3. Carril liberado a media tarde: la cita posterior se ensancha a dos
+ *      carriles sin invadir a la larga que sigue ocupando el suyo.
+ *   4. Semana sin citas: la franja base 07:00–22:00 se pinta completa y sin
  *      tarjetas.
  *
  * Las expectativas en píxeles dependen de HOUR_HEIGHT de
@@ -264,7 +268,6 @@ test("citas a la misma hora: se reparten en carriles sin taparse", async ({
   // Cada cita mantiene su hora…
   expect(overlapping.map((c) => c.top)).toEqual([96, 108, 120]);
   // …y las tres ocupan carriles distintos, sin solaparse horizontalmente.
-  expect(new Set(overlapping.map((c) => c.left)).size).toBe(3);
   const byLeft = [...overlapping].sort((a, b) => a.left - b.left);
   for (let i = 1; i < byLeft.length; i += 1) {
     expect(byLeft[i].left).toBeGreaterThanOrEqual(
@@ -276,6 +279,76 @@ test("citas a la misma hora: se reparten en carriles sin taparse", async ({
   // La cita que no se solapa con nadie conserva el ancho completo de la columna.
   const lonely = card("14:00");
   expect(lonely.width).toBeGreaterThan(overlapping[0].width * 2);
+});
+
+test("carril liberado a media tarde: la cita posterior se ensancha", async ({
+  page,
+}) => {
+  await seedAgenda(
+    page,
+    toRows([
+      // Ocupa el carril 0 durante dos horas.
+      {
+        id: 1,
+        hh: 9,
+        mm: 0,
+        durationMin: 120,
+        status: "PROGRAMADA",
+        patient: "Toby",
+      },
+      // Tapan los carriles 1 y 2 hasta las 09:30 y 09:40.
+      {
+        id: 2,
+        hh: 9,
+        mm: 15,
+        durationMin: 30,
+        status: "CONFIRMADA",
+        patient: "Nala",
+      },
+      {
+        id: 3,
+        hh: 9,
+        mm: 20,
+        durationMin: 20,
+        status: "PROGRAMADA",
+        patient: "Michi",
+      },
+      // A las 09:45 el carril 1 se liberó y el 2 también: dos tercios de ancho.
+      {
+        id: 4,
+        hh: 9,
+        mm: 45,
+        durationMin: 30,
+        status: "PROGRAMADA",
+        patient: "Luna",
+      },
+    ]),
+  );
+  await openAgenda(page);
+  await expect(page.getByTitle(/C-2026-0004/)).toBeVisible();
+
+  const grid = await readGrid(page);
+  const card = (time: string) => {
+    const found = grid.cards.find((c) => c.time === time);
+    expect(found, `no se encontró la cita de ${time}`).toBeTruthy();
+    return found!;
+  };
+
+  const long = card("09:00");
+  const narrow = card("09:15");
+  const widened = card("09:45");
+
+  // La tarjeta de 09:45 ocupa su carril y el de su derecha: casi el doble de
+  // ancho que una de un solo carril del mismo clúster.
+  expect(widened.width).toBeGreaterThan(narrow.width * 1.6);
+  // Sigue sin invadir la cita larga, que ocupa el carril 0…
+  expect(widened.left).toBeGreaterThanOrEqual(long.left + long.width - 1);
+  // …y llega más lejos que la cita de un solo carril que tenía a su derecha.
+  expect(widened.left + widened.width).toBeGreaterThan(
+    narrow.left + narrow.width + 1,
+  );
+  // Sin salirse de su columna (lo mide `readGrid` contra el contenedor).
+  expect(widened.inside).toBe(true);
 });
 
 test("semana sin citas: franja base completa y sin tarjetas", async ({

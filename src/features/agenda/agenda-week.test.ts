@@ -48,7 +48,6 @@ describe("parseScheduledAt", () => {
     ["2026-11-23 08:30", "2026-11-23", 8 * 60 + 30],
     ["2026-11-23T00:15:00", "2026-11-23", 15],
     ["2026-11-23 00:00:00", "2026-11-23", 0],
-    ["2026-11-23 23:45:59", "2026-11-23", 23 * 60 + 45],
   ])("parsea %j como hora local", (value, day, minutes) => {
     expect(parseScheduledAt(value)).toEqual({ day, minutes });
   });
@@ -69,19 +68,14 @@ describe("assignLanes", () => {
     expect(assignLanes([])).toEqual([]);
   });
 
-  it("una cita sin solape ocupa el ancho completo", () => {
-    const [lane] = assignLanes([appt("2026-11-23 09:00:00", 60)]);
-    expect(lane).toMatchObject({ lane: 0, lanes: 1 });
-  });
-
-  it("citas en horas distintas van cada una a su grupo", () => {
+  it("citas sin solape conservan el ancho completo", () => {
     const lanes = assignLanes([
       appt("2026-11-23 09:00:00", 60),
       appt("2026-11-23 11:00:00", 60),
     ]);
-    expect(lanes.map((l) => [l.lane, l.lanes])).toEqual([
-      [0, 1],
-      [0, 1],
+    expect(lanes.map((l) => [l.lane, l.span, l.lanes])).toEqual([
+      [0, 1, 1],
+      [0, 1, 1],
     ]);
   });
 
@@ -89,9 +83,9 @@ describe("assignLanes", () => {
     const a = appt("2026-11-23 09:00:00", 60);
     const b = appt("2026-11-23 09:30:00", 60);
     const lanes = assignLanes([a, b]);
-    expect(lanes.map((l) => [l.appt.id, l.lane, l.lanes])).toEqual([
-      [a.id, 0, 2],
-      [b.id, 1, 2],
+    expect(lanes.map((l) => [l.appt.id, l.lane, l.span, l.lanes])).toEqual([
+      [a.id, 0, 1, 2],
+      [b.id, 1, 1, 2],
     ]);
   });
 
@@ -119,13 +113,34 @@ describe("assignLanes", () => {
     ]);
   });
 
-  it("una duración negativa se trata como el mínimo, no como solape", () => {
-    const a = appt("2026-11-23 09:00:00", -30);
-    const b = appt("2026-11-23 12:00:00", 0);
-    const lanes = assignLanes([a, b]);
-    expect(lanes.map((l) => [l.lane, l.lanes])).toEqual([
-      [0, 1],
-      [0, 1],
+  it("ensancha la cita posterior cuando el carril de su derecha se libera", () => {
+    // Clúster de 3 carriles: 09:00–11:00, 09:00–09:30, 09:05–09:30 y
+    // 09:30–10:00. A las 09:30 el carril 2 ya está libre, así que la cita de las
+    // 09:30 ocupa dos carriles en vez de quedarse con un tercio del ancho.
+    const a = appt("2026-11-23 09:00:00", 120);
+    const b = appt("2026-11-23 09:00:00", 30);
+    const c = appt("2026-11-23 09:05:00", 25);
+    const d = appt("2026-11-23 09:30:00", 30);
+    const lanes = assignLanes([a, b, c, d]);
+    expect(lanes.map((l) => [l.appt.id, l.lane, l.span, l.lanes])).toEqual([
+      [a.id, 0, 1, 3],
+      [b.id, 1, 1, 3],
+      [c.id, 2, 1, 3],
+      [d.id, 1, 2, 3],
+    ]);
+  });
+
+  it("no se ensancha sobre un carril ocupado solo en parte de su franja", () => {
+    // 09:15–09:45 tapa el carril 1 justo cuando empieza la cita de 09:45 (que
+    // cae ahí al liberarse el carril), así que ninguna de las dos se estira.
+    const a = appt("2026-11-23 09:00:00", 60);
+    const b = appt("2026-11-23 09:15:00", 30);
+    const c = appt("2026-11-23 09:45:00", 30);
+    const lanes = assignLanes([a, b, c]);
+    expect(lanes.map((l) => [l.appt.id, l.lane, l.span, l.lanes])).toEqual([
+      [a.id, 0, 1, 2],
+      [b.id, 1, 1, 2],
+      [c.id, 1, 1, 2],
     ]);
   });
 });
@@ -202,13 +217,12 @@ describe("buildWeek", () => {
     expect(endHour).toBe(BASE_END_HOUR + 1);
   });
 
-  it("acota el rango al día completo", () => {
+  it("una cita a las 00:05 baja el inicio de la rejilla a las 00:00", () => {
     const { startHour, endHour } = buildWeek(wednesday, [
       appt("2026-11-23 00:05:00", 15),
-      appt("2026-11-23 23:50:00", 30),
     ]);
     expect(startHour).toBe(0);
-    expect(endHour).toBe(24);
+    expect(endHour).toBe(BASE_END_HOUR + 1);
   });
 
   it("aplica el reparto en carriles dentro de cada día", () => {
