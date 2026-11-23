@@ -1,4 +1,4 @@
-import { useMemo, useState } from "react";
+import { useMemo, useRef, useState } from "react";
 import { ChevronLeft, ChevronRight, Clock, Plus } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
@@ -59,10 +59,11 @@ function startOfDay(date: Date) {
 /**
  * `scheduledAt` llega como `YYYY-MM-DD HH:MM:SS` (hora local, sin zona).
  * Se parsea a mano: `new Date("2026-11-23 08:30:00")` es dependiente del motor
- * (Safari lo rechaza) y el cálculo de la hora debe ser local, no UTC.
+ * (Safari lo rechaza) y el cálculo de la hora debe ser local, no UTC. Se acepta
+ * también el separador `T` por si el backend cambia a ISO 8601.
  */
 function parseScheduledAt(value: string): { day: string; minutes: number } {
-  const [day, time = "00:00:00"] = value.split(" ");
+  const [day, time = "00:00:00"] = value.split(/[T ]/);
   const [hh = 0, mm = 0] = time.split(":").map(Number);
   return { day, minutes: hh * 60 + mm };
 }
@@ -85,6 +86,12 @@ export function AppointmentCalendar() {
   const { canReceive } = usePermissions();
   const [viewDate, setViewDate] = useState(() => new Date());
   const [dialogOpen, setDialogOpen] = useState(false);
+  // El check-in crea una visita, así que solo se dispara una vez por cita
+  // mientras el listado no refleje el estado nuevo. Un `isPending` de la
+  // mutación no sirve: con dos clics seguidos la primera petición puede
+  // terminar antes del segundo y volvería a lanzarse. Si falla, se libera para
+  // permitir reintentar.
+  const checkedIn = useRef(new Set<number>());
 
   const checkIn = useCheckInAppointment();
 
@@ -103,14 +110,21 @@ export function AppointmentCalendar() {
    * El rango se amplía para incluir cualquier cita de la semana fuera de
    * 07:00–22:00: una cita de 06:30 o de 22:30 se dibuja en su hora real en vez
    * de recortarse a la primera/última franja. Con la agenda dentro de horario
-   * el rango es el base.
+   * el rango es el base y una semana sin citas pinta 07:00–22:00.
+   *
+   * La clave de cada día se calcula aquí una sola vez y la usan tanto la
+   * agrupación como el render, para que no puedan discrepar.
    */
   const { days, byDay, startHour, endHour } = useMemo(() => {
     const weekStart = startOfDay(addDays(viewDate, -viewDate.getDay()));
-    const days = Array.from({ length: 7 }, (_, i) => addDays(weekStart, i));
+    const days = Array.from({ length: 7 }, (_, i) => {
+      const date = addDays(weekStart, i);
+      return { date, key: localDateISO(date) };
+    });
 
-    const byDay = new Map<string, AppointmentListItem[]>();
-    for (const day of days) byDay.set(localDateISO(day), []);
+    const byDay = new Map<string, AppointmentListItem[]>(
+      days.map((d) => [d.key, []]),
+    );
 
     let firstHour = BASE_START_HOUR;
     let lastHour = BASE_END_HOUR + 1;
@@ -123,7 +137,7 @@ export function AppointmentCalendar() {
       firstHour = Math.min(firstHour, Math.floor(minutes / 60));
       lastHour = Math.max(
         lastHour,
-        Math.ceil((minutes + appt.durationMin) / 60),
+        Math.ceil((minutes + Math.max(appt.durationMin, 0)) / 60),
       );
     }
 
@@ -147,9 +161,12 @@ export function AppointmentCalendar() {
       navigate("clinical-history");
       return;
     }
+    if (checkedIn.current.has(appt.id)) return;
+    checkedIn.current.add(appt.id);
     try {
       await checkIn.mutateAsync(appt.id);
     } catch (e) {
+      checkedIn.current.delete(appt.id);
       toast.error("No se pudo hacer el check-in", {
         description: getErrorMessage(e),
       });
@@ -178,12 +195,12 @@ export function AppointmentCalendar() {
             <ChevronLeft className="size-4" />
           </button>
           <span className="mr-2 text-sm font-medium">
-            {days[0].toLocaleDateString("es-CO", {
+            {days[0].date.toLocaleDateString("es-CO", {
               weekday: "short",
               day: "numeric",
             })}{" "}
             -{" "}
-            {days[6].toLocaleDateString("es-CO", {
+            {days[6].date.toLocaleDateString("es-CO", {
               weekday: "short",
               day: "numeric",
               month: "short",
@@ -229,15 +246,15 @@ export function AppointmentCalendar() {
           <div className="flex border-b border-border">
             <div className="w-20 shrink-0 border-r border-border" />
             <div className="grid flex-1 grid-cols-7">
-              {days.map((day) => (
+              {days.map(({ date, key }) => (
                 <div
-                  key={localDateISO(day)}
+                  key={key}
                   className="border-r border-border p-1 text-center last:border-r-0"
                 >
                   <div className="text-[10px] font-medium text-muted-foreground">
-                    {day.toLocaleDateString("es-CO", { weekday: "short" })}
+                    {date.toLocaleDateString("es-CO", { weekday: "short" })}
                   </div>
-                  <div className="text-xs font-semibold">{day.getDate()}</div>
+                  <div className="text-xs font-semibold">{date.getDate()}</div>
                 </div>
               ))}
             </div>
@@ -258,9 +275,9 @@ export function AppointmentCalendar() {
             </div>
 
             <div className="grid flex-1 grid-cols-7">
-              {days.map((day) => (
+              {days.map(({ key }) => (
                 <div
-                  key={localDateISO(day)}
+                  key={key}
                   className="relative border-r border-border last:border-r-0"
                   style={{ height: gridHeight }}
                 >
@@ -276,9 +293,24 @@ export function AppointmentCalendar() {
                   {isLoading ? (
                     <Skeleton className="absolute top-24 left-1 right-1 h-12" />
                   ) : (
-                    (byDay.get(localDateISO(day)) ?? []).map((appt) => {
+                    (byDay.get(key) ?? []).map((appt) => {
                       const { minutes } = parseScheduledAt(appt.scheduledAt);
                       const detail = `${formatTime(minutes)} · ${appt.code} · ${appt.patientName} · ${appt.serviceName} · ${STATUS_LABEL[appt.status] ?? appt.status}`;
+                      const top =
+                        ((minutes - startHour * 60) / 60) * HOUR_HEIGHT;
+                      // Una cita que termina después de la última hora de la
+                      // rejilla (p. ej. 23:45 + 60 min) se recorta al borde
+                      // inferior en vez de salirse del calendario.
+                      const height = Math.max(
+                        Math.min(
+                          Math.max(
+                            (Math.max(appt.durationMin, 0) / 60) * HOUR_HEIGHT,
+                            MIN_CARD_HEIGHT,
+                          ),
+                          gridHeight - top,
+                        ),
+                        8,
+                      );
                       return (
                         <button
                           type="button"
@@ -291,14 +323,7 @@ export function AppointmentCalendar() {
                             STATUS_CLASS[appt.status] ??
                               "bg-secondary text-secondary-foreground border-secondary/40",
                           )}
-                          style={{
-                            top:
-                              ((minutes - startHour * 60) / 60) * HOUR_HEIGHT,
-                            height: Math.max(
-                              (appt.durationMin / 60) * HOUR_HEIGHT,
-                              MIN_CARD_HEIGHT,
-                            ),
-                          }}
+                          style={{ top, height }}
                         >
                           {/* Una línea: en columnas de ~100px dos líneas se
                               recortan a media altura en las citas cortas. El
