@@ -730,224 +730,9 @@
       "kind": "null"
      },
      {
-      "kind": "object",
-      "fields": {
-       "BYTES_PER_ELEMENT": {
-        "shape": {
-         "kind": "number"
-        }
-       },
-       "buffer": {
-        "shape": {
-         "kind": "object",
-         "fields": {
-          "byteLength": {
-           "shape": {
-            "kind": "number"
-           }
-          },
-          "slice": {
-           "shape": {
-            "kind": "object",
-            "fields": {}
-           }
-          },
-          "__@toStringTag@78": {
-           "shape": {
-            "kind": "unknown"
-           }
-          }
-         }
-        }
-       },
-       "byteLength": {
-        "shape": {
-         "kind": "number"
-        }
-       },
-       "byteOffset": {
-        "shape": {
-         "kind": "number"
-        }
-       },
-       "copyWithin": {
-        "shape": {
-         "kind": "object",
-         "fields": {}
-        }
-       },
-       "every": {
-        "shape": {
-         "kind": "object",
-         "fields": {}
-        }
-       },
-       "fill": {
-        "shape": {
-         "kind": "object",
-         "fields": {}
-        }
-       },
-       "filter": {
-        "shape": {
-         "kind": "object",
-         "fields": {}
-        }
-       },
-       "find": {
-        "shape": {
-         "kind": "object",
-         "fields": {}
-        }
-       },
-       "findIndex": {
-        "shape": {
-         "kind": "object",
-         "fields": {}
-        }
-       },
-       "forEach": {
-        "shape": {
-         "kind": "object",
-         "fields": {}
-        }
-       },
-       "indexOf": {
-        "shape": {
-         "kind": "object",
-         "fields": {}
-        }
-       },
-       "join": {
-        "shape": {
-         "kind": "object",
-         "fields": {}
-        }
-       },
-       "lastIndexOf": {
-        "shape": {
-         "kind": "object",
-         "fields": {}
-        }
-       },
-       "length": {
-        "shape": {
-         "kind": "number"
-        }
-       },
-       "map": {
-        "shape": {
-         "kind": "object",
-         "fields": {}
-        }
-       },
-       "reduce": {
-        "shape": {
-         "kind": "object",
-         "fields": {}
-        }
-       },
-       "reduceRight": {
-        "shape": {
-         "kind": "object",
-         "fields": {}
-        }
-       },
-       "reverse": {
-        "shape": {
-         "kind": "object",
-         "fields": {}
-        }
-       },
-       "set": {
-        "shape": {
-         "kind": "object",
-         "fields": {}
-        }
-       },
-       "slice": {
-        "shape": {
-         "kind": "object",
-         "fields": {}
-        }
-       },
-       "some": {
-        "shape": {
-         "kind": "object",
-         "fields": {}
-        }
-       },
-       "sort": {
-        "shape": {
-         "kind": "object",
-         "fields": {}
-        }
-       },
-       "subarray": {
-        "shape": {
-         "kind": "object",
-         "fields": {}
-        }
-       },
-       "toLocaleString": {
-        "shape": {
-         "kind": "object",
-         "fields": {}
-        }
-       },
-       "toString": {
-        "shape": {
-         "kind": "object",
-         "fields": {}
-        }
-       },
-       "valueOf": {
-        "shape": {
-         "kind": "object",
-         "fields": {}
-        }
-       },
-       "entries": {
-        "shape": {
-         "kind": "object",
-         "fields": {}
-        }
-       },
-       "keys": {
-        "shape": {
-         "kind": "object",
-         "fields": {}
-        }
-       },
-       "values": {
-        "shape": {
-         "kind": "object",
-         "fields": {}
-        }
-       },
-       "includes": {
-        "shape": {
-         "kind": "object",
-         "fields": {}
-        }
-       },
-       "at": {
-        "shape": {
-         "kind": "object",
-         "fields": {}
-        }
-       },
-       "__@iterator@24": {
-        "shape": {
-         "kind": "object",
-         "fields": {}
-        }
-       },
-       "__@toStringTag@78": {
-        "shape": {
-         "kind": "unknown"
-        }
-       }
+      "kind": "array",
+      "items": {
+       "kind": "number"
       }
      }
     ]
@@ -1297,54 +1082,22 @@
        },
        "subtotal": {
         "shape": {
-         "kind": "union",
-         "of": [
-          {
-           "kind": "null"
-          },
-          {
-           "kind": "number"
-          }
-         ]
+         "kind": "number"
         }
        },
        "taxRate": {
         "shape": {
-         "kind": "union",
-         "of": [
-          {
-           "kind": "null"
-          },
-          {
-           "kind": "number"
-          }
-         ]
+         "kind": "number"
         }
        },
        "taxAmount": {
         "shape": {
-         "kind": "union",
-         "of": [
-          {
-           "kind": "null"
-          },
-          {
-           "kind": "number"
-          }
-         ]
+         "kind": "number"
         }
        },
        "total": {
         "shape": {
-         "kind": "union",
-         "of": [
-          {
-           "kind": "null"
-          },
-          {
-           "kind": "number"
-          }
-         ]
+         "kind": "number"
         }
        },
        "status": {
@@ -1532,8 +1285,156 @@
       "kind": "null"
      },
      {
-      "kind": "ref",
-      "name": "CashSession"
+      "kind": "object",
+      "fields": {
+       "id": {
+        "shape": {
+         "kind": "number"
+        }
+       },
+       "code": {
+        "shape": {
+         "kind": "string"
+        }
+       },
+       "openedAt": {
+        "shape": {
+         "kind": "string"
+        }
+       },
+       "openedBy": {
+        "shape": {
+         "kind": "number"
+        }
+       },
+       "openedByName": {
+        "shape": {
+         "kind": "union",
+         "of": [
+          {
+           "kind": "null"
+          },
+          {
+           "kind": "string"
+          }
+         ]
+        }
+       },
+       "openingFloat": {
+        "shape": {
+         "kind": "number"
+        }
+       },
+       "status": {
+        "shape": {
+         "kind": "string"
+        }
+       },
+       "closedAt": {
+        "shape": {
+         "kind": "union",
+         "of": [
+          {
+           "kind": "null"
+          },
+          {
+           "kind": "string"
+          }
+         ]
+        }
+       },
+       "closedByName": {
+        "shape": {
+         "kind": "union",
+         "of": [
+          {
+           "kind": "null"
+          },
+          {
+           "kind": "string"
+          }
+         ]
+        }
+       },
+       "expectedCash": {
+        "shape": {
+         "kind": "union",
+         "of": [
+          {
+           "kind": "null"
+          },
+          {
+           "kind": "number"
+          }
+         ]
+        }
+       },
+       "countedCash": {
+        "shape": {
+         "kind": "union",
+         "of": [
+          {
+           "kind": "null"
+          },
+          {
+           "kind": "number"
+          }
+         ]
+        }
+       },
+       "difference": {
+        "shape": {
+         "kind": "union",
+         "of": [
+          {
+           "kind": "null"
+          },
+          {
+           "kind": "number"
+          }
+         ]
+        }
+       },
+       "totalBilled": {
+        "shape": {
+         "kind": "union",
+         "of": [
+          {
+           "kind": "null"
+          },
+          {
+           "kind": "number"
+          }
+         ]
+        }
+       },
+       "totalCollected": {
+        "shape": {
+         "kind": "union",
+         "of": [
+          {
+           "kind": "null"
+          },
+          {
+           "kind": "number"
+          }
+         ]
+        }
+       },
+       "notes": {
+        "shape": {
+         "kind": "union",
+         "of": [
+          {
+           "kind": "null"
+          },
+          {
+           "kind": "string"
+          }
+         ]
+        }
+       }
+      }
      }
     ]
    },
@@ -2034,224 +1935,9 @@
       "kind": "null"
      },
      {
-      "kind": "object",
-      "fields": {
-       "BYTES_PER_ELEMENT": {
-        "shape": {
-         "kind": "number"
-        }
-       },
-       "buffer": {
-        "shape": {
-         "kind": "object",
-         "fields": {
-          "byteLength": {
-           "shape": {
-            "kind": "number"
-           }
-          },
-          "slice": {
-           "shape": {
-            "kind": "object",
-            "fields": {}
-           }
-          },
-          "__@toStringTag@78": {
-           "shape": {
-            "kind": "unknown"
-           }
-          }
-         }
-        }
-       },
-       "byteLength": {
-        "shape": {
-         "kind": "number"
-        }
-       },
-       "byteOffset": {
-        "shape": {
-         "kind": "number"
-        }
-       },
-       "copyWithin": {
-        "shape": {
-         "kind": "object",
-         "fields": {}
-        }
-       },
-       "every": {
-        "shape": {
-         "kind": "object",
-         "fields": {}
-        }
-       },
-       "fill": {
-        "shape": {
-         "kind": "object",
-         "fields": {}
-        }
-       },
-       "filter": {
-        "shape": {
-         "kind": "object",
-         "fields": {}
-        }
-       },
-       "find": {
-        "shape": {
-         "kind": "object",
-         "fields": {}
-        }
-       },
-       "findIndex": {
-        "shape": {
-         "kind": "object",
-         "fields": {}
-        }
-       },
-       "forEach": {
-        "shape": {
-         "kind": "object",
-         "fields": {}
-        }
-       },
-       "indexOf": {
-        "shape": {
-         "kind": "object",
-         "fields": {}
-        }
-       },
-       "join": {
-        "shape": {
-         "kind": "object",
-         "fields": {}
-        }
-       },
-       "lastIndexOf": {
-        "shape": {
-         "kind": "object",
-         "fields": {}
-        }
-       },
-       "length": {
-        "shape": {
-         "kind": "number"
-        }
-       },
-       "map": {
-        "shape": {
-         "kind": "object",
-         "fields": {}
-        }
-       },
-       "reduce": {
-        "shape": {
-         "kind": "object",
-         "fields": {}
-        }
-       },
-       "reduceRight": {
-        "shape": {
-         "kind": "object",
-         "fields": {}
-        }
-       },
-       "reverse": {
-        "shape": {
-         "kind": "object",
-         "fields": {}
-        }
-       },
-       "set": {
-        "shape": {
-         "kind": "object",
-         "fields": {}
-        }
-       },
-       "slice": {
-        "shape": {
-         "kind": "object",
-         "fields": {}
-        }
-       },
-       "some": {
-        "shape": {
-         "kind": "object",
-         "fields": {}
-        }
-       },
-       "sort": {
-        "shape": {
-         "kind": "object",
-         "fields": {}
-        }
-       },
-       "subarray": {
-        "shape": {
-         "kind": "object",
-         "fields": {}
-        }
-       },
-       "toLocaleString": {
-        "shape": {
-         "kind": "object",
-         "fields": {}
-        }
-       },
-       "toString": {
-        "shape": {
-         "kind": "object",
-         "fields": {}
-        }
-       },
-       "valueOf": {
-        "shape": {
-         "kind": "object",
-         "fields": {}
-        }
-       },
-       "entries": {
-        "shape": {
-         "kind": "object",
-         "fields": {}
-        }
-       },
-       "keys": {
-        "shape": {
-         "kind": "object",
-         "fields": {}
-        }
-       },
-       "values": {
-        "shape": {
-         "kind": "object",
-         "fields": {}
-        }
-       },
-       "includes": {
-        "shape": {
-         "kind": "object",
-         "fields": {}
-        }
-       },
-       "at": {
-        "shape": {
-         "kind": "object",
-         "fields": {}
-        }
-       },
-       "__@iterator@24": {
-        "shape": {
-         "kind": "object",
-         "fields": {}
-        }
-       },
-       "__@toStringTag@78": {
-        "shape": {
-         "kind": "unknown"
-        }
-       }
+      "kind": "array",
+      "items": {
+       "kind": "number"
       }
      }
     ]
@@ -2295,28 +1981,12 @@
        },
        "costPrice": {
         "shape": {
-         "kind": "union",
-         "of": [
-          {
-           "kind": "null"
-          },
-          {
-           "kind": "number"
-          }
-         ]
+         "kind": "number"
         }
        },
        "salePrice": {
         "shape": {
-         "kind": "union",
-         "of": [
-          {
-           "kind": "null"
-          },
-          {
-           "kind": "number"
-          }
-         ]
+         "kind": "number"
         }
        },
        "taxRate": {
@@ -2403,28 +2073,12 @@
        },
        "mean": {
         "shape": {
-         "kind": "union",
-         "of": [
-          {
-           "kind": "null"
-          },
-          {
-           "kind": "number"
-          }
-         ]
+         "kind": "number"
         }
        },
        "sd": {
         "shape": {
-         "kind": "union",
-         "of": [
-          {
-           "kind": "null"
-          },
-          {
-           "kind": "number"
-          }
-         ]
+         "kind": "number"
         }
        },
        "points": {
@@ -2654,224 +2308,9 @@
       "kind": "null"
      },
      {
-      "kind": "object",
-      "fields": {
-       "BYTES_PER_ELEMENT": {
-        "shape": {
-         "kind": "number"
-        }
-       },
-       "buffer": {
-        "shape": {
-         "kind": "object",
-         "fields": {
-          "byteLength": {
-           "shape": {
-            "kind": "number"
-           }
-          },
-          "slice": {
-           "shape": {
-            "kind": "object",
-            "fields": {}
-           }
-          },
-          "__@toStringTag@78": {
-           "shape": {
-            "kind": "unknown"
-           }
-          }
-         }
-        }
-       },
-       "byteLength": {
-        "shape": {
-         "kind": "number"
-        }
-       },
-       "byteOffset": {
-        "shape": {
-         "kind": "number"
-        }
-       },
-       "copyWithin": {
-        "shape": {
-         "kind": "object",
-         "fields": {}
-        }
-       },
-       "every": {
-        "shape": {
-         "kind": "object",
-         "fields": {}
-        }
-       },
-       "fill": {
-        "shape": {
-         "kind": "object",
-         "fields": {}
-        }
-       },
-       "filter": {
-        "shape": {
-         "kind": "object",
-         "fields": {}
-        }
-       },
-       "find": {
-        "shape": {
-         "kind": "object",
-         "fields": {}
-        }
-       },
-       "findIndex": {
-        "shape": {
-         "kind": "object",
-         "fields": {}
-        }
-       },
-       "forEach": {
-        "shape": {
-         "kind": "object",
-         "fields": {}
-        }
-       },
-       "indexOf": {
-        "shape": {
-         "kind": "object",
-         "fields": {}
-        }
-       },
-       "join": {
-        "shape": {
-         "kind": "object",
-         "fields": {}
-        }
-       },
-       "lastIndexOf": {
-        "shape": {
-         "kind": "object",
-         "fields": {}
-        }
-       },
-       "length": {
-        "shape": {
-         "kind": "number"
-        }
-       },
-       "map": {
-        "shape": {
-         "kind": "object",
-         "fields": {}
-        }
-       },
-       "reduce": {
-        "shape": {
-         "kind": "object",
-         "fields": {}
-        }
-       },
-       "reduceRight": {
-        "shape": {
-         "kind": "object",
-         "fields": {}
-        }
-       },
-       "reverse": {
-        "shape": {
-         "kind": "object",
-         "fields": {}
-        }
-       },
-       "set": {
-        "shape": {
-         "kind": "object",
-         "fields": {}
-        }
-       },
-       "slice": {
-        "shape": {
-         "kind": "object",
-         "fields": {}
-        }
-       },
-       "some": {
-        "shape": {
-         "kind": "object",
-         "fields": {}
-        }
-       },
-       "sort": {
-        "shape": {
-         "kind": "object",
-         "fields": {}
-        }
-       },
-       "subarray": {
-        "shape": {
-         "kind": "object",
-         "fields": {}
-        }
-       },
-       "toLocaleString": {
-        "shape": {
-         "kind": "object",
-         "fields": {}
-        }
-       },
-       "toString": {
-        "shape": {
-         "kind": "object",
-         "fields": {}
-        }
-       },
-       "valueOf": {
-        "shape": {
-         "kind": "object",
-         "fields": {}
-        }
-       },
-       "entries": {
-        "shape": {
-         "kind": "object",
-         "fields": {}
-        }
-       },
-       "keys": {
-        "shape": {
-         "kind": "object",
-         "fields": {}
-        }
-       },
-       "values": {
-        "shape": {
-         "kind": "object",
-         "fields": {}
-        }
-       },
-       "includes": {
-        "shape": {
-         "kind": "object",
-         "fields": {}
-        }
-       },
-       "at": {
-        "shape": {
-         "kind": "object",
-         "fields": {}
-        }
-       },
-       "__@iterator@24": {
-        "shape": {
-         "kind": "object",
-         "fields": {}
-        }
-       },
-       "__@toStringTag@78": {
-        "shape": {
-         "kind": "unknown"
-        }
-       }
+      "kind": "array",
+      "items": {
+       "kind": "number"
       }
      }
     ]
@@ -2942,15 +2381,7 @@
        },
        "price": {
         "shape": {
-         "kind": "union",
-         "of": [
-          {
-           "kind": "null"
-          },
-          {
-           "kind": "number"
-          }
-         ]
+         "kind": "number"
         }
        },
        "taxRate": {
@@ -3170,15 +2601,7 @@
        },
        "dailyRate": {
         "shape": {
-         "kind": "union",
-         "of": [
-          {
-           "kind": "null"
-          },
-          {
-           "kind": "number"
-          }
-         ]
+         "kind": "number"
         }
        },
        "notes": {
@@ -3201,15 +2624,7 @@
        },
        "estimatedTotal": {
         "shape": {
-         "kind": "union",
-         "of": [
-          {
-           "kind": "null"
-          },
-          {
-           "kind": "number"
-          }
-         ]
+         "kind": "number"
         }
        }
       }
@@ -5684,15 +5099,7 @@
     },
     "taxRate": {
      "shape": {
-      "kind": "union",
-      "of": [
-       {
-        "kind": "null"
-       },
-       {
-        "kind": "number"
-       }
-      ]
+      "kind": "number"
      }
     },
     "currency": {
@@ -6182,15 +5589,7 @@
     },
     "avgProcessingHours": {
      "shape": {
-      "kind": "union",
-      "of": [
-       {
-        "kind": "null"
-       },
-       {
-        "kind": "number"
-       }
-      ]
+      "kind": "number"
      }
     },
     "turnaroundBySampleType": {
@@ -6204,15 +5603,7 @@
     },
     "abnormalRate": {
      "shape": {
-      "kind": "union",
-      "of": [
-       {
-        "kind": "null"
-       },
-       {
-        "kind": "number"
-       }
-      ]
+      "kind": "number"
      }
     },
     "weeklyVolume": {
@@ -6260,15 +5651,7 @@
     },
     "avgWaitMinutes": {
      "shape": {
-      "kind": "union",
-      "of": [
-       {
-        "kind": "null"
-       },
-       {
-        "kind": "number"
-       }
-      ]
+      "kind": "number"
      }
     },
     "appointmentsToday": {
@@ -6302,54 +5685,22 @@
     },
     "revenueTotal": {
      "shape": {
-      "kind": "union",
-      "of": [
-       {
-        "kind": "null"
-       },
-       {
-        "kind": "number"
-       }
-      ]
+      "kind": "number"
      }
     },
     "collectedToday": {
      "shape": {
-      "kind": "union",
-      "of": [
-       {
-        "kind": "null"
-       },
-       {
-        "kind": "number"
-       }
-      ]
+      "kind": "number"
      }
     },
     "collectedMonth": {
      "shape": {
-      "kind": "union",
-      "of": [
-       {
-        "kind": "null"
-       },
-       {
-        "kind": "number"
-       }
-      ]
+      "kind": "number"
      }
     },
     "receivableTotal": {
      "shape": {
-      "kind": "union",
-      "of": [
-       {
-        "kind": "null"
-       },
-       {
-        "kind": "number"
-       }
-      ]
+      "kind": "number"
      }
     },
     "receivableCount": {
@@ -7182,54 +6533,22 @@
     },
     "subtotal": {
      "shape": {
-      "kind": "union",
-      "of": [
-       {
-        "kind": "null"
-       },
-       {
-        "kind": "number"
-       }
-      ]
+      "kind": "number"
      }
     },
     "taxRate": {
      "shape": {
-      "kind": "union",
-      "of": [
-       {
-        "kind": "null"
-       },
-       {
-        "kind": "number"
-       }
-      ]
+      "kind": "number"
      }
     },
     "taxAmount": {
      "shape": {
-      "kind": "union",
-      "of": [
-       {
-        "kind": "null"
-       },
-       {
-        "kind": "number"
-       }
-      ]
+      "kind": "number"
      }
     },
     "total": {
      "shape": {
-      "kind": "union",
-      "of": [
-       {
-        "kind": "null"
-       },
-       {
-        "kind": "number"
-       }
-      ]
+      "kind": "number"
      }
     },
     "status": {
@@ -7334,28 +6653,12 @@
     },
     "unitPrice": {
      "shape": {
-      "kind": "union",
-      "of": [
-       {
-        "kind": "null"
-       },
-       {
-        "kind": "number"
-       }
-      ]
+      "kind": "number"
      }
     },
     "lineTotal": {
      "shape": {
-      "kind": "union",
-      "of": [
-       {
-        "kind": "null"
-       },
-       {
-        "kind": "number"
-       }
-      ]
+      "kind": "number"
      }
     }
    }
@@ -7398,15 +6701,7 @@
     },
     "total": {
      "shape": {
-      "kind": "union",
-      "of": [
-       {
-        "kind": "null"
-       },
-       {
-        "kind": "number"
-       }
-      ]
+      "kind": "number"
      }
     },
     "status": {
@@ -7786,15 +7081,7 @@
     },
     "value": {
      "shape": {
-      "kind": "union",
-      "of": [
-       {
-        "kind": "null"
-       },
-       {
-        "kind": "number"
-       }
-      ]
+      "kind": "number"
      }
     },
     "status": {
@@ -8405,15 +7692,7 @@
     },
     "total": {
      "shape": {
-      "kind": "union",
-      "of": [
-       {
-        "kind": "null"
-       },
-       {
-        "kind": "number"
-       }
-      ]
+      "kind": "number"
      }
     },
     "status": {
@@ -8679,28 +7958,12 @@
     },
     "costPrice": {
      "shape": {
-      "kind": "union",
-      "of": [
-       {
-        "kind": "null"
-       },
-       {
-        "kind": "number"
-       }
-      ]
+      "kind": "number"
      }
     },
     "salePrice": {
      "shape": {
-      "kind": "union",
-      "of": [
-       {
-        "kind": "null"
-       },
-       {
-        "kind": "number"
-       }
-      ]
+      "kind": "number"
      }
     },
     "taxRate": {
@@ -8762,15 +8025,7 @@
     },
     "stockValue": {
      "shape": {
-      "kind": "union",
-      "of": [
-       {
-        "kind": "null"
-       },
-       {
-        "kind": "number"
-       }
-      ]
+      "kind": "number"
      }
     }
    }
@@ -8813,28 +8068,12 @@
     },
     "value": {
      "shape": {
-      "kind": "union",
-      "of": [
-       {
-        "kind": "null"
-       },
-       {
-        "kind": "number"
-       }
-      ]
+      "kind": "number"
      }
     },
     "zScore": {
      "shape": {
-      "kind": "union",
-      "of": [
-       {
-        "kind": "null"
-       },
-       {
-        "kind": "number"
-       }
-      ]
+      "kind": "number"
      }
     },
     "violation": {
@@ -9039,15 +8278,7 @@
     },
     "value": {
      "shape": {
-      "kind": "union",
-      "of": [
-       {
-        "kind": "null"
-       },
-       {
-        "kind": "number"
-       }
-      ]
+      "kind": "number"
      }
     },
     "zScore": {
@@ -9116,28 +8347,12 @@
     },
     "mean": {
      "shape": {
-      "kind": "union",
-      "of": [
-       {
-        "kind": "null"
-       },
-       {
-        "kind": "number"
-       }
-      ]
+      "kind": "number"
      }
     },
     "sd": {
      "shape": {
-      "kind": "union",
-      "of": [
-       {
-        "kind": "null"
-       },
-       {
-        "kind": "number"
-       }
-      ]
+      "kind": "number"
      }
     }
    }
@@ -9218,28 +8433,12 @@
     },
     "minValue": {
      "shape": {
-      "kind": "union",
-      "of": [
-       {
-        "kind": "null"
-       },
-       {
-        "kind": "number"
-       }
-      ]
+      "kind": "number"
      }
     },
     "maxValue": {
      "shape": {
-      "kind": "union",
-      "of": [
-       {
-        "kind": "null"
-       },
-       {
-        "kind": "number"
-       }
-      ]
+      "kind": "number"
      }
     },
     "criticalMin": {
@@ -9430,15 +8629,7 @@
     },
     "revenue": {
      "shape": {
-      "kind": "union",
-      "of": [
-       {
-        "kind": "null"
-       },
-       {
-        "kind": "number"
-       }
-      ]
+      "kind": "number"
      }
     }
    }
@@ -9879,15 +9070,7 @@
     },
     "avgMinutes": {
      "shape": {
-      "kind": "union",
-      "of": [
-       {
-        "kind": "null"
-       },
-       {
-        "kind": "number"
-       }
-      ]
+      "kind": "number"
      }
     },
     "count": {
@@ -9983,15 +9166,7 @@
     },
     "price": {
      "shape": {
-      "kind": "union",
-      "of": [
-       {
-        "kind": "null"
-       },
-       {
-        "kind": "number"
-       }
-      ]
+      "kind": "number"
      }
     },
     "taxRate": {
@@ -10252,15 +9427,7 @@
     },
     "dailyRate": {
      "shape": {
-      "kind": "union",
-      "of": [
-       {
-        "kind": "null"
-       },
-       {
-        "kind": "number"
-       }
-      ]
+      "kind": "number"
      }
     },
     "notes": {
@@ -10283,15 +9450,7 @@
     },
     "estimatedTotal": {
      "shape": {
-      "kind": "union",
-      "of": [
-       {
-        "kind": "null"
-       },
-       {
-        "kind": "number"
-       }
-      ]
+      "kind": "number"
      }
     }
    }
@@ -10423,15 +9582,7 @@
     },
     "estimatedTotal": {
      "shape": {
-      "kind": "union",
-      "of": [
-       {
-        "kind": "null"
-       },
-       {
-        "kind": "number"
-       }
-      ]
+      "kind": "number"
      }
     }
    }
@@ -10674,15 +9825,7 @@
     },
     "value": {
      "shape": {
-      "kind": "union",
-      "of": [
-       {
-        "kind": "null"
-       },
-       {
-        "kind": "number"
-       }
-      ]
+      "kind": "number"
      }
     },
     "refMin": {
@@ -11208,15 +10351,7 @@
     },
     "estimatedTotal": {
      "shape": {
-      "kind": "union",
-      "of": [
-       {
-        "kind": "null"
-       },
-       {
-        "kind": "number"
-       }
-      ]
+      "kind": "number"
      }
     }
    }
@@ -11292,15 +10427,7 @@
     },
     "unitPrice": {
      "shape": {
-      "kind": "union",
-      "of": [
-       {
-        "kind": "null"
-       },
-       {
-        "kind": "number"
-       }
-      ]
+      "kind": "number"
      }
     },
     "taxRate": {

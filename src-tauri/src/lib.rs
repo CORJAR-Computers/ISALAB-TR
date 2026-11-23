@@ -148,6 +148,20 @@ fn fitted_size(cur: (f64, f64), wa: (f64, f64), min: (f64, f64)) -> Option<(f64,
 
 pub fn specta_builder() -> Builder<tauri::Wry> {
     Builder::<tauri::Wry>::new()
+        // Sin esto specta-typescript 0.0.12 imprime *todo* `f64` como
+        // `number | null` (aunque no sea `Option`), así que el bindings.ts
+        // regenerado no compila contra la UI (specta-rs/specta#569). La regla
+        // `enable_lossless_floats` remapea los primitivos float a
+        // `specta_typescript::Number`, que imprime `number`; los `Option<f64>`
+        // siguen siendo `number | null` porque el remapeo entra dentro del
+        // `Nullable`. Es seguro aquí: el IPC de Tauri pasa por serde_json y
+        // nunca transporta NaN ni ±Infinity.
+        // `empty()` (y no `default()`) para no arrastrar las reglas de
+        // bytes/Url/chrono, que cambiarían los tipos de esos campos y añadirían
+        // conversiones en runtime a los bindings: aquí solo queremos los floats.
+        .semantic_types(
+            specta_typescript::semantic::Configuration::empty().enable_lossless_floats(),
+        )
         .commands(collect_commands![
             db_health,
             log_frontend,

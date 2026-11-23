@@ -21,6 +21,7 @@
     "lint:e2e": "eslint e2e",
     "check:e2e-mock": "node scripts/check-e2e-mock.mjs",
     "check:bindings": "node scripts/check-bindings.mjs",
+    "check:bindings-compile": "node scripts/check-bindings-compile.mjs",
     "gen:ipc-shapes": "node scripts/gen-ipc-shapes.mjs --write",
     "check:ipc-shapes": "node scripts/gen-ipc-shapes.mjs",
     "verify-updater": "node scripts/verify-updater.mjs",

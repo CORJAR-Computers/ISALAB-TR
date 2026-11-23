@@ -1170,8 +1170,10 @@
         samplesFinished: count("FINALIZADA"),
         samplesCancelled: count("ANULADA"),
         abnormalResults: list.filter((s) => s.abnormalCount > 0).length,
-        avgProcessingHours: null,
-        abnormalRate: null,
+        // En Rust son f64 no opcionales (models/dashboard.rs): con cero
+        // muestras el repositorio devuelve 0.0, nunca null.
+        avgProcessingHours: 0,
+        abnormalRate: 0,
         turnaroundBySampleType: [],
         weeklyVolume,
         topAnalytes: [],

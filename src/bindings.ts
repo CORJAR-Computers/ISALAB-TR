@@ -11,9 +11,19 @@ export const commands = {
 	 *  comando lo refleja y limpia el pool para que la app se recupere sola.
 	 */
 	dbHealth: () => __TAURI_INVOKE<DbHealth>("db_health"),
-	/**  Reenvía al log en disco un error/aviso capturado en la UI. */
+	/**
+	 *  Reenvía al log un error o aviso capturado en la UI.
+	 * 
+	 *  Nunca falla la operación del usuario por no poder escribir el log: si el
+	 *  archivo no está disponible el mensaje se pierde, pero la acción sigue.
+	 */
 	logFrontend: (level: string, message: string, context: string | null) => __TAURI_INVOKE<void>("log_frontend", { level, message, context }),
-	/**  Escribe el diagnóstico (versión, esquema, Firebird y logs) en `dest_path`. */
+	/**
+	 *  Escribe el diagnóstico en `dest_path` y devuelve la ruta.
+	 * 
+	 *  `dest_path` lo elige el usuario con el diálogo de guardar; la extensión la
+	 *  pone la UI (`.zip`).
+	 */
 	exportDiagnostics: (destPath: string) => typedError<string, AppError>(__TAURI_INVOKE("export_diagnostics", { destPath })),
 	getDbConnection: () => __TAURI_INVOKE<DbConnectionInfo>("get_db_connection"),
 	/**
@@ -37,7 +47,16 @@ export const commands = {
 	 *  por código o nombre, con su destino de navegación en la UI.
 	 */
 	globalSearch: (query: string) => typedError<GlobalSearchResult[], AppError>(__TAURI_INVOKE("global_search", { query })),
+	/**
+	 *  Exporta la configuración local no sensible a un archivo JSON (sin secretos,
+	 *  sin certificados). Se usa para llevar la configuración de un PC a otro o
+	 *  como respaldo documental de los ajustes de la clínica.
+	 */
 	exportLocalConfig: (destPath: string) => typedError<string, AppError>(__TAURI_INVOKE("export_local_config", { destPath })),
+	/**
+	 *  Devuelve el estado del último backup del servidor Firebird.
+	 *  Lee las claves `ops.last_backup_at` y `ops.last_backup_file` de la tabla OPS.
+	 */
 	getServerBackupStatus: () => typedError<BackupStatus, AppError>(__TAURI_INVOKE("get_server_backup_status")),
 	/**
 	 *  Guarda el CSV de muestras (mesa de trabajo con filtros actuales) en
@@ -58,7 +77,7 @@ export const commands = {
 	/**  Da de baja una categoría (baja lógica si tiene servicios; ADMIN). */
 	deleteServiceCategory: (id: number) => typedError<null, AppError>(__TAURI_INVOKE("delete_service_category", { id })),
 	/**  Lista servicios del catálogo con filtros (lectura para toda la sesión). */
-	listServices: (categoryId: number | null, search: string | null, includeInactive: boolean | null) => typedError<Service[], AppError>(__TAURI_INVOKE("list_services", { categoryId, search, includeInactive })),
+	listServices: (categoryId: number | null, search: string | null, includeInactive: boolean | null) => typedError<Service[], AppError>(__TAURI_INVOKE("list_services", { categoryId, search, includeInactive })).then((v) => ((v.status === "ok" ? { ...v, data: v.data.map(i=>({...i,taxRate:i.taxRate==null?i.taxRate:i.taxRate})) } : v) as typeof v)),
 	/**  Obtiene un servicio por ID. */
 	getService: (id: number) => typedError<{
 	id: number,
@@ -68,7 +87,7 @@ export const commands = {
 	categoryName: string,
 	description: string | null,
 	durationMin: number,
-	price: number | null,
+	price: number,
 	/**  NULL = usa el IVA global de la clínica. */
 	taxRate: number | null,
 	requiresVet: boolean,
@@ -77,16 +96,16 @@ export const commands = {
 	speciesId: number | null,
 	sortOrder: number,
 	isActive: boolean,
-} | null, AppError>(__TAURI_INVOKE("get_service", { id })),
+} | null, AppError>(__TAURI_INVOKE("get_service", { id })).then((v) => ((v.status === "ok" ? { ...v, data: v.data==null?v.data:({...v.data,taxRate:v.data.taxRate==null?v.data.taxRate:v.data.taxRate}) } : v) as typeof v)),
 	/**  Crea o actualiza un servicio del catálogo (ADMIN). */
-	saveService: (input: SaveServiceInput) => typedError<Service, AppError>(__TAURI_INVOKE("save_service", { input })),
+	saveService: (input: SaveServiceInput) => typedError<Service, AppError>(__TAURI_INVOKE("save_service", { input: ({...input,taxRate:input.taxRate==null?input.taxRate:input.taxRate}) })).then((v) => ((v.status === "ok" ? { ...v, data: ({...v.data,taxRate:v.data.taxRate==null?v.data.taxRate:v.data.taxRate}) } : v) as typeof v)),
 	/**  Activa o desactiva un servicio (baja lógica; ADMIN). */
-	setServiceActive: (id: number, active: boolean) => typedError<Service, AppError>(__TAURI_INVOKE("set_service_active", { id, active })),
+	setServiceActive: (id: number, active: boolean) => typedError<Service, AppError>(__TAURI_INVOKE("set_service_active", { id, active })).then((v) => ((v.status === "ok" ? { ...v, data: ({...v.data,taxRate:v.data.taxRate==null?v.data.taxRate:v.data.taxRate}) } : v) as typeof v)),
 	/**
 	 *  Lista la cola de recepción con filtros: fecha (YYYY-MM-DD), estado y
 	 *  búsqueda libre. Urgentes primero.
 	 */
-	listVisits: (date: string | null, status: string | null, search: string | null) => typedError<VisitListItem[], AppError>(__TAURI_INVOKE("list_visits", { date, status, search })),
+	listVisits: (date: string | null, status: string | null, search: string | null) => typedError<VisitListItem[], AppError>(__TAURI_INVOKE("list_visits", { date, status, search })).then((v) => ((v.status === "ok" ? { ...v, data: v.data.map(i=>i) } : v) as typeof v)),
 	/**  Ficha completa de una visita (con sus líneas de servicio). */
 	getVisit: (id: number) => typedError<{
 	id: number,
@@ -106,31 +125,31 @@ export const commands = {
 	notes: string | null,
 	createdByName: string | null,
 	services: VisitService[],
-} | null, AppError>(__TAURI_INVOKE("get_visit", { id })),
+} | null, AppError>(__TAURI_INVOKE("get_visit", { id })).then((v) => ((v.status === "ok" ? { ...v, data: v.data==null?v.data:({...v.data,services:v.data.services.map(i=>({...i,taxRate:i.taxRate==null?i.taxRate:i.taxRate}))}) } : v) as typeof v)),
 	/**
 	 *  Check-in de un paciente: crea la visita con sus servicios iniciales
 	 *  (precios congelados del catálogo en este instante).
 	 */
-	createVisit: (input: CreateVisitInput) => typedError<Visit, AppError>(__TAURI_INVOKE("create_visit", { input })),
+	createVisit: (input: CreateVisitInput) => typedError<Visit, AppError>(__TAURI_INVOKE("create_visit", { input })).then((v) => ((v.status === "ok" ? { ...v, data: ({...v.data,services:v.data.services.map(i=>({...i,taxRate:i.taxRate==null?i.taxRate:i.taxRate}))}) } : v) as typeof v)),
 	/**
 	 *  Cambia el estado de la visita (EN_ESPERA → EN_ATENCION → FINALIZADA;
 	 *  CANCELADA posible desde estados no facturados).
 	 */
-	setVisitStatus: (id: number, status: string) => typedError<Visit, AppError>(__TAURI_INVOKE("set_visit_status", { id, status })),
+	setVisitStatus: (id: number, status: string) => typedError<Visit, AppError>(__TAURI_INVOKE("set_visit_status", { id, status })).then((v) => ((v.status === "ok" ? { ...v, data: ({...v.data,services:v.data.services.map(i=>({...i,taxRate:i.taxRate==null?i.taxRate:i.taxRate}))}) } : v) as typeof v)),
 	/**  Agrega un servicio a la visita (snapshot de precio del catálogo). */
-	addVisitService: (visitId: number, input: AddVisitServiceInput) => typedError<VisitService, AppError>(__TAURI_INVOKE("add_visit_service", { visitId, input })),
+	addVisitService: (visitId: number, input: AddVisitServiceInput) => typedError<VisitService, AppError>(__TAURI_INVOKE("add_visit_service", { visitId, input })).then((v) => ((v.status === "ok" ? { ...v, data: ({...v.data,taxRate:v.data.taxRate==null?v.data.taxRate:v.data.taxRate}) } : v) as typeof v)),
 	/**  Quita una línea PENDIENTE de la visita. */
 	removeVisitService: (visitId: number, lineId: number) => typedError<null, AppError>(__TAURI_INVOKE("remove_visit_service", { visitId, lineId })),
 	/**
 	 *  Cambia el estado de una línea (PENDIENTE → EN_PROCESO → COMPLETADA/CANCELADA).
 	 *  El peluquero/veterinario usa esto desde su bandeja.
 	 */
-	updateVisitServiceStatus: (visitId: number, lineId: number, input: UpdateVisitServiceStatusInput) => typedError<VisitService, AppError>(__TAURI_INVOKE("update_visit_service_status", { visitId, lineId, input })),
+	updateVisitServiceStatus: (visitId: number, lineId: number, input: UpdateVisitServiceStatusInput) => typedError<VisitService, AppError>(__TAURI_INVOKE("update_visit_service_status", { visitId, lineId, input })).then((v) => ((v.status === "ok" ? { ...v, data: ({...v.data,taxRate:v.data.taxRate==null?v.data.taxRate:v.data.taxRate}) } : v) as typeof v)),
 	/**
 	 *  Cobra la visita: genera la factura desde las líneas con precio congelado
 	 *  y marca la visita FACTURADA. Una sola factura por visita.
 	 */
-	checkoutVisit: (visitId: number, paymentMethod: string | null, notes: string | null) => typedError<Invoice, AppError>(__TAURI_INVOKE("checkout_visit", { visitId, paymentMethod, notes })),
+	checkoutVisit: (visitId: number, paymentMethod: string | null, notes: string | null) => typedError<Invoice, AppError>(__TAURI_INVOKE("checkout_visit", { visitId, paymentMethod, notes })).then((v) => ((v.status === "ok" ? { ...v, data: ({...v.data,items:v.data.items.map(i=>i)}) } : v) as typeof v)),
 	/**
 	 *  Lista la agenda con filtros opcionales: fecha (YYYY-MM-DD), estado y
 	 *  profesional.
@@ -171,7 +190,7 @@ export const commands = {
 	 *  Check-in: convierte la cita en visita (crea VISITA con APPOINTMENT_ID y
 	 *  la cita pasa a ATENDIDA).
 	 */
-	checkInAppointment: (id: number) => typedError<Visit, AppError>(__TAURI_INVOKE("check_in_appointment", { id })),
+	checkInAppointment: (id: number) => typedError<Visit, AppError>(__TAURI_INVOKE("check_in_appointment", { id })).then((v) => ((v.status === "ok" ? { ...v, data: ({...v.data,services:v.data.services.map(i=>({...i,taxRate:i.taxRate==null?i.taxRate:i.taxRate}))}) } : v) as typeof v)),
 	/**  Ficha de sesión de la línea de servicio, o `None` si aún no existe. */
 	getGroomingSession: (visitServiceId: number) => typedError<{
 	id: number,
@@ -203,33 +222,34 @@ export const commands = {
 	notes: string | null,
 	createdAt: string,
 	updatedAt: string,
-} | null, AppError>(__TAURI_INVOKE("get_grooming_session", { visitServiceId })),
+} | null, AppError>(__TAURI_INVOKE("get_grooming_session", { visitServiceId })).then((v) => ((v.status === "ok" ? { ...v, data: v.data==null?v.data:({...v.data,weightKg:v.data.weightKg==null?v.data.weightKg:v.data.weightKg}) } : v) as typeof v)),
 	/**  Crea o actualiza la sesión de peluquería de una línea (1 sesión por línea). */
-	upsertGroomingSession: (input: UpsertGroomingSessionInput) => typedError<GroomingSession, AppError>(__TAURI_INVOKE("upsert_grooming_session", { input })),
+	upsertGroomingSession: (input: UpsertGroomingSessionInput) => typedError<GroomingSession, AppError>(__TAURI_INVOKE("upsert_grooming_session", { input: ({...input,weightKg:input.weightKg==null?input.weightKg:input.weightKg}) })).then((v) => ((v.status === "ok" ? { ...v, data: ({...v.data,weightKg:v.data.weightKg==null?v.data.weightKg:v.data.weightKg}) } : v) as typeof v)),
 	/**
 	 *  Cierra la sesión (FINISHED_AT) y la línea de servicio pasa a COMPLETADA;
 	 *  sugiere el próximo turno con NEXT_SUGGESTED_AT.
 	 */
-	finishGroomingSession: (visitServiceId: number, input: FinishGroomingSessionInput) => typedError<GroomingSession, AppError>(__TAURI_INVOKE("finish_grooming_session", { visitServiceId, input })),
+	finishGroomingSession: (visitServiceId: number, input: FinishGroomingSessionInput) => typedError<GroomingSession, AppError>(__TAURI_INVOKE("finish_grooming_session", { visitServiceId, input })).then((v) => ((v.status === "ok" ? { ...v, data: ({...v.data,weightKg:v.data.weightKg==null?v.data.weightKg:v.data.weightKg}) } : v) as typeof v)),
 	/**  Tablero del día: líneas de peluquería de las visitas de una fecha. */
 	listGroomingDay: (date: string) => typedError<GroomingDayLine[], AppError>(__TAURI_INVOKE("list_grooming_day", { date })),
 	/**  Próximos turnos sugeridos por sesiones cerradas (recordatorios). */
 	listGroomingReminders: () => typedError<GroomingReminder[], AppError>(__TAURI_INVOKE("list_grooming_reminders")),
 	/**  Fotos antes/después (o documentos) de una visita, más recientes primero. */
 	listVisitAttachments: (visitId: number) => typedError<VisitAttachment[], AppError>(__TAURI_INVOKE("list_visit_attachments", { visitId })),
-	/**
-	 *  Lee un archivo adjunto de visita y lo almacena como BLOB en Firebird.
-	 */
+	/**  Lee un archivo adjunto de visita y lo guarda como BLOB en Firebird. */
 	addVisitAttachment: (sourcePath: string, input: AddVisitAttachmentInput) => typedError<VisitAttachment, AppError>(__TAURI_INVOKE("add_visit_attachment", { sourcePath, input })),
 	/**  Elimina un adjunto de visita: borra su registro y el BLOB almacenado en la base. */
 	deleteVisitAttachment: (id: number) => typedError<null, AppError>(__TAURI_INVOKE("delete_visit_attachment", { id })),
-	/**  Devuelve el contenido (BLOB) de un adjunto de visita como AttachmentContent. */
+	/**  Devuelve el contenido (BLOB) de un adjunto de visita como `data:` URL. */
 	getVisitAttachmentContent: (id: number) => typedError<AttachmentContent, AppError>(__TAURI_INVOKE("get_visit_attachment_content", { id })),
-	/**  Abre el adjunto de visita en el visor por defecto del SO. */
+	/**
+	 *  Abre el archivo adjunto de visita en el visor por defecto del SO
+	 *  (materializa el BLOB en %TEMP% y lo lanza).
+	 */
 	openVisitAttachment: (id: number) => typedError<null, AppError>(__TAURI_INVOKE("open_visit_attachment", { id })),
 	listSpecies: () => typedError<Species[], AppError>(__TAURI_INVOKE("list_species")),
 	listBreeds: (speciesId: number) => typedError<Breed[], AppError>(__TAURI_INVOKE("list_breeds", { speciesId })),
-	listSampleTypes: () => typedError<SampleType[], AppError>(__TAURI_INVOKE("list_sample_types")),
+	listSampleTypes: () => typedError<SampleType[], AppError>(__TAURI_INVOKE("list_sample_types")).then((v) => ((v.status === "ok" ? { ...v, data: v.data.map(i=>({...i,minVolumeMl:i.minVolumeMl==null?i.minVolumeMl:i.minVolumeMl})) } : v) as typeof v)),
 	listAnalytes: () => typedError<Analyte[], AppError>(__TAURI_INVOKE("list_analytes")),
 	/**
 	 *  Crea un analito nuevo en el catálogo de laboratorio (p. ej. desde
@@ -296,21 +316,21 @@ export const commands = {
 	ageMonths: number,
 } | null, AppError>(__TAURI_INVOKE("get_patient_by_code", { code })),
 	createPatient: (input: CreatePatientInput) => typedError<Patient, AppError>(__TAURI_INVOKE("create_patient", { input })),
-	getClinicalHistory: (patientId: number) => typedError<ClinicalHistory, AppError>(__TAURI_INVOKE("get_clinical_history", { patientId })),
+	getClinicalHistory: (patientId: number) => typedError<ClinicalHistory, AppError>(__TAURI_INVOKE("get_clinical_history", { patientId })).then((v) => ((v.status === "ok" ? { ...v, data: ({...v.data,samples:v.data.samples.map(i=>({...i,results:i.results.map(i=>({...i,refMin:i.refMin==null?i.refMin:i.refMin,refMax:i.refMax==null?i.refMax:i.refMax,customRefMin:i.customRefMin==null?i.customRefMin:i.customRefMin,customRefMax:i.customRefMax==null?i.customRefMax:i.customRefMax,deltaVariation:i.deltaVariation==null?i.deltaVariation:i.deltaVariation}))})),visits:v.data.visits.map(i=>i),groomingSessions:v.data.groomingSessions.map(i=>({...i,weightKg:i.weightKg==null?i.weightKg:i.weightKg})),charges:v.data.charges.map(i=>i)}) } : v) as typeof v)),
 	createConsultation: (input: CreateConsultationInput) => typedError<Consultation, AppError>(__TAURI_INVOKE("create_consultation", { input })),
 	/**  Recepción de muestra analítica (trazabilidad: código M-YYYY-NNNN, estado RECIBIDA). */
-	createSample: (input: CreateSampleInput) => typedError<Sample, AppError>(__TAURI_INVOKE("create_sample", { input })),
+	createSample: (input: CreateSampleInput) => typedError<Sample, AppError>(__TAURI_INVOKE("create_sample", { input })).then((v) => ((v.status === "ok" ? { ...v, data: ({...v.data,results:v.data.results.map(i=>({...i,refMin:i.refMin==null?i.refMin:i.refMin,refMax:i.refMax==null?i.refMax:i.refMax,customRefMin:i.customRefMin==null?i.customRefMin:i.customRefMin,customRefMax:i.customRefMax==null?i.customRefMax:i.customRefMax,deltaVariation:i.deltaVariation==null?i.deltaVariation:i.deltaVariation}))}) } : v) as typeof v)),
 	/**
 	 *  Carga un resultado de laboratorio; valida el rango de referencia por
 	 *  especie/edad/sexo vía stored procedure y finaliza la muestra.
 	 *  Invalida el cache de IA para esta muestra.
 	 */
-	registerLabResult: (input: RegisterResultInput) => typedError<LabResult, AppError>(__TAURI_INVOKE("register_lab_result", { input })),
+	registerLabResult: (input: RegisterResultInput) => typedError<LabResult, AppError>(__TAURI_INVOKE("register_lab_result", { input: ({...input,customRefMin:input.customRefMin==null?input.customRefMin:input.customRefMin,customRefMax:input.customRefMax==null?input.customRefMax:input.customRefMax}) })).then((v) => ((v.status === "ok" ? { ...v, data: ({...v.data,refMin:v.data.refMin==null?v.data.refMin:v.data.refMin,refMax:v.data.refMax==null?v.data.refMax:v.data.refMax,customRefMin:v.data.customRefMin==null?v.data.customRefMin:v.data.customRefMin,customRefMax:v.data.customRefMax==null?v.data.customRefMax:v.data.customRefMax,deltaVariation:v.data.deltaVariation==null?v.data.deltaVariation:v.data.deltaVariation}) } : v) as typeof v)),
 	/**
 	 *  Carga varios resultados de una misma muestra (grilla de panel o
 	 *  importación desde analizador) y devuelve todos los resultados.
 	 */
-	registerLabResults: (input: RegisterResultsInput) => typedError<LabResult[], AppError>(__TAURI_INVOKE("register_lab_results", { input })),
+	registerLabResults: (input: RegisterResultsInput) => typedError<LabResult[], AppError>(__TAURI_INVOKE("register_lab_results", { input: ({...input,results:input.results.map(i=>({...i,customRefMin:i.customRefMin==null?i.customRefMin:i.customRefMin,customRefMax:i.customRefMax==null?i.customRefMax:i.customRefMax}))}) })).then((v) => ((v.status === "ok" ? { ...v, data: v.data.map(i=>({...i,refMin:i.refMin==null?i.refMin:i.refMin,refMax:i.refMax==null?i.refMax:i.refMax,customRefMin:i.customRefMin==null?i.customRefMin:i.customRefMin,customRefMax:i.customRefMax==null?i.customRefMax:i.customRefMax,deltaVariation:i.deltaVariation==null?i.deltaVariation:i.deltaVariation})) } : v) as typeof v)),
 	/**  Elimina un resultado analítico de una muestra (por ID de muestra y analito). */
 	deleteLabResult: (sampleId: number, analyteId: number) => typedError<null, AppError>(__TAURI_INVOKE("delete_lab_result", { sampleId, analyteId })),
 	/**
@@ -356,15 +376,15 @@ export const commands = {
 	rejectedAt: string | null,
 	rejectedBy: string | null,
 	rejectionReason: string | null,
-} | null, AppError>(__TAURI_INVOKE("get_sample", { id })),
+} | null, AppError>(__TAURI_INVOKE("get_sample", { id })).then((v) => ((v.status === "ok" ? { ...v, data: v.data==null?v.data:({...v.data,results:v.data.results.map(i=>({...i,refMin:i.refMin==null?i.refMin:i.refMin,refMax:i.refMax==null?i.refMax:i.refMax,customRefMin:i.customRefMin==null?i.customRefMin:i.customRefMin,customRefMax:i.customRefMax==null?i.customRefMax:i.customRefMax,deltaVariation:i.deltaVariation==null?i.deltaVariation:i.deltaVariation}))}) } : v) as typeof v)),
 	/**  Cambia el estado de una muestra (RECIBIDA→EN_PROCESO, →ANULADA). */
-	setSampleStatus: (id: number, status: string) => typedError<Sample, AppError>(__TAURI_INVOKE("set_sample_status", { id, status })),
+	setSampleStatus: (id: number, status: string) => typedError<Sample, AppError>(__TAURI_INVOKE("set_sample_status", { id, status })).then((v) => ((v.status === "ok" ? { ...v, data: ({...v.data,results:v.data.results.map(i=>({...i,refMin:i.refMin==null?i.refMin:i.refMin,refMax:i.refMax==null?i.refMax:i.refMax,customRefMin:i.customRefMin==null?i.customRefMin:i.customRefMin,customRefMax:i.customRefMax==null?i.customRefMax:i.customRefMax,deltaVariation:i.deltaVariation==null?i.deltaVariation:i.deltaVariation}))}) } : v) as typeof v)),
 	/**  Registra la calidad preanalítica de una muestra (interferencia HIL). */
-	setSampleQuality: (id: number, qualityIndex: string | null, qualitySeverity: string | null, qualityNote: string | null) => typedError<Sample, AppError>(__TAURI_INVOKE("set_sample_quality", { id, qualityIndex, qualitySeverity, qualityNote })),
+	setSampleQuality: (id: number, qualityIndex: string | null, qualitySeverity: string | null, qualityNote: string | null) => typedError<Sample, AppError>(__TAURI_INVOKE("set_sample_quality", { id, qualityIndex, qualitySeverity, qualityNote })).then((v) => ((v.status === "ok" ? { ...v, data: ({...v.data,results:v.data.results.map(i=>({...i,refMin:i.refMin==null?i.refMin:i.refMin,refMax:i.refMax==null?i.refMax:i.refMax,customRefMin:i.customRefMin==null?i.customRefMin:i.customRefMin,customRefMax:i.customRefMax==null?i.customRefMax:i.customRefMax,deltaVariation:i.deltaVariation==null?i.deltaVariation:i.deltaVariation}))}) } : v) as typeof v)),
 	/**  Rechaza una muestra (RECIBIDA/EN_PROCESO → RECHAZADA) con motivo. */
-	rejectSample: (id: number, reason: string) => typedError<Sample, AppError>(__TAURI_INVOKE("reject_sample", { id, reason })),
+	rejectSample: (id: number, reason: string) => typedError<Sample, AppError>(__TAURI_INVOKE("reject_sample", { id, reason })).then((v) => ((v.status === "ok" ? { ...v, data: ({...v.data,results:v.data.results.map(i=>({...i,refMin:i.refMin==null?i.refMin:i.refMin,refMax:i.refMax==null?i.refMax:i.refMax,customRefMin:i.customRefMin==null?i.customRefMin:i.customRefMin,customRefMax:i.customRefMax==null?i.customRefMax:i.customRefMax,deltaVariation:i.deltaVariation==null?i.deltaVariation:i.deltaVariation}))}) } : v) as typeof v)),
 	/**  Reabre una muestra rechazada (RECHAZADA → RECIBIDA). */
-	reopenSample: (id: number) => typedError<Sample, AppError>(__TAURI_INVOKE("reopen_sample", { id })),
+	reopenSample: (id: number) => typedError<Sample, AppError>(__TAURI_INVOKE("reopen_sample", { id })).then((v) => ((v.status === "ok" ? { ...v, data: ({...v.data,results:v.data.results.map(i=>({...i,refMin:i.refMin==null?i.refMin:i.refMin,refMax:i.refMax==null?i.refMax:i.refMax,customRefMin:i.customRefMin==null?i.customRefMin:i.customRefMin,customRefMax:i.customRefMax==null?i.customRefMax:i.customRefMax,deltaVariation:i.deltaVariation==null?i.deltaVariation:i.deltaVariation}))}) } : v) as typeof v)),
 	/**  Historial de rechazos y reaperturas de una muestra (quién, cuándo, motivo). */
 	listSampleEvents: (sampleId: number) => typedError<SampleEvent[], AppError>(__TAURI_INVOKE("list_sample_events", { sampleId })),
 	/**  Historial de notificaciones de una muestra (quién, cuándo, canal, estado). */
@@ -411,7 +431,7 @@ export const commands = {
 	/**  Cambia el estado de la orden (RECIBIDA/EN_PROCESO/COMPLETADA/ANULADA). */
 	setLabOrderStatus: (id: number, status: string) => typedError<LabOrder, AppError>(__TAURI_INVOKE("set_lab_order_status", { id, status })),
 	/**  Accesiona la orden: crea una muestra ligada (tubo del tipo indicado). */
-	accessionLabOrder: (input: AccessionOrderInput) => typedError<Sample, AppError>(__TAURI_INVOKE("accession_lab_order", { input })),
+	accessionLabOrder: (input: AccessionOrderInput) => typedError<Sample, AppError>(__TAURI_INVOKE("accession_lab_order", { input })).then((v) => ((v.status === "ok" ? { ...v, data: ({...v.data,results:v.data.results.map(i=>({...i,refMin:i.refMin==null?i.refMin:i.refMin,refMax:i.refMax==null?i.refMax:i.refMax,customRefMin:i.customRefMin==null?i.customRefMin:i.customRefMin,customRefMax:i.customRefMax==null?i.customRefMax:i.customRefMax,deltaVariation:i.deltaVariation==null?i.deltaVariation:i.deltaVariation}))}) } : v) as typeof v)),
 	/**  Orden de la que proviene una muestra (para precargar paneles en la ficha). */
 	getOrderForSample: (sampleId: number) => typedError<{
 	id: number,
@@ -449,15 +469,15 @@ export const commands = {
 	/**  Lista los materiales de control activos. */
 	listQcMaterials: () => typedError<QcControlMaterial[], AppError>(__TAURI_INVOKE("list_qc_materials")),
 	/**  Objetivos (media/SD) de un material de control. */
-	listQcTargets: (controlMaterialId: number) => typedError<QcTarget[], AppError>(__TAURI_INVOKE("list_qc_targets", { controlMaterialId })),
+	listQcTargets: (controlMaterialId: number) => typedError<QcTarget[], AppError>(__TAURI_INVOKE("list_qc_targets", { controlMaterialId })).then((v) => ((v.status === "ok" ? { ...v, data: v.data.map(i=>i) } : v) as typeof v)),
 	/**  Crea o actualiza un material de control con sus objetivos. */
-	saveQcMaterial: (input: QcMaterialInput) => typedError<QcControlMaterial, AppError>(__TAURI_INVOKE("save_qc_material", { input })),
+	saveQcMaterial: (input: QcMaterialInput) => typedError<QcControlMaterial, AppError>(__TAURI_INVOKE("save_qc_material", { input: ({...input,targets:input.targets.map(i=>i)}) })),
 	/**  Elimina un material de control (cascade sobre objetivos, corridas y mediciones). */
 	deleteQcMaterial: (id: number) => typedError<null, AppError>(__TAURI_INVOKE("delete_qc_material", { id })),
 	/**  Registra una corrida de control evaluando las reglas de Westgard. */
-	recordQcRun: (input: QcRunInput) => typedError<QcRun, AppError>(__TAURI_INVOKE("record_qc_run", { input })),
+	recordQcRun: (input: QcRunInput) => typedError<QcRun, AppError>(__TAURI_INVOKE("record_qc_run", { input: ({...input,measurements:input.measurements.map(i=>i)}) })).then((v) => ((v.status === "ok" ? { ...v, data: ({...v.data,measurements:v.data.measurements.map(i=>({...i,zScore:i.zScore==null?i.zScore:i.zScore}))}) } : v) as typeof v)),
 	/**  Lista corridas de control (opcionalmente de un material). */
-	listQcRuns: (controlMaterialId: number | null) => typedError<QcRun[], AppError>(__TAURI_INVOKE("list_qc_runs", { controlMaterialId })),
+	listQcRuns: (controlMaterialId: number | null) => typedError<QcRun[], AppError>(__TAURI_INVOKE("list_qc_runs", { controlMaterialId })).then((v) => ((v.status === "ok" ? { ...v, data: v.data.map(i=>({...i,measurements:i.measurements.map(i=>({...i,zScore:i.zScore==null?i.zScore:i.zScore}))})) } : v) as typeof v)),
 	/**  Elimina una corrida de control (con sus mediciones). */
 	deleteQcRun: (id: number) => typedError<null, AppError>(__TAURI_INVOKE("delete_qc_run", { id })),
 	/**  Datos para el gráfico Levey-Jennings de un analito. */
@@ -466,10 +486,10 @@ export const commands = {
 	analyteId: number,
 	analyteName: string,
 	unit: string | null,
-	mean: number | null,
-	sd: number | null,
+	mean: number,
+	sd: number,
 	points: QcChartPoint[],
-} | null, AppError>(__TAURI_INVOKE("get_qc_chart", { controlMaterialId, analyteId })),
+} | null, AppError>(__TAURI_INVOKE("get_qc_chart", { controlMaterialId, analyteId })).then((v) => ((v.status === "ok" ? { ...v, data: v.data==null?v.data:({...v.data,points:v.data.points.map(i=>i)}) } : v) as typeof v)),
 	/**  Estado de la última corrida QC por analizador (badge de alerta). */
 	listQcAnalyzerStatus: () => typedError<QcAnalyzerStatus[], AppError>(__TAURI_INVOKE("list_qc_analyzer_status")),
 	/**
@@ -490,38 +510,29 @@ export const commands = {
 	getClinicSettings: () => typedError<ClinicSettings, AppError>(__TAURI_INVOKE("get_clinic_settings")),
 	saveClinicSettings: (input: ClinicSettings) => typedError<ClinicSettings, AppError>(__TAURI_INVOKE("save_clinic_settings", { input })),
 	/**
-	 *  Almacena el logo seleccionado como BLOB en CLINIC_ASSETS (KIND = LOGO).
-	 *  Devuelve los metadatos del activo (sin el contenido BLOB).
+	 *  Lee el archivo de logo y lo almacena como BLOB en `CLINIC_ASSETS` (KIND =
+	 *  LOGO). Los tres PCs ven el mismo logo (no depende de carpetas compartidas).
 	 */
 	importClinicLogo: (sourcePath: string) => typedError<ClinicAsset, AppError>(__TAURI_INVOKE("import_clinic_logo", { sourcePath })),
 	/**
-	 *  Elimina el logo principal de CLINIC_ASSETS.
-	 */
-	deleteClinicLogo: () => typedError<null, AppError>(__TAURI_INVOKE("delete_clinic_logo")),
-	/**
-	 *  Devuelve el contenido (BLOB) del logo principal como bytes.
-	 */
-	getClinicLogoContent: () => typedError<Uint8Array | null, AppError>(__TAURI_INVOKE("get_clinic_logo_content")),
-	/**
-	 *  Valida y almacena un certificado PKCS#12 como BLOB en CLINIC_ASSETS
-	 *  (KIND = CERT_P12). Guarda la contraseña solo en memoria.
+	 *  Importa un certificado PKCS#12 (.p12/.pfx) como BLOB en `CLINIC_ASSETS`
+	 *  (KIND = CERT_P12). Valida el contenedor y guarda la contraseña solo en
+	 *  memoria (state).
 	 */
 	importPkcs12: (sourcePath: string, password: string) => typedError<ClinicAsset, AppError>(__TAURI_INVOKE("import_pkcs12", { sourcePath, password })),
-	/**
-	 *  Elimina el certificado PKCS#12 de CLINIC_ASSETS y de la memoria.
-	 */
-	deletePkcs12: () => typedError<null, AppError>(__TAURI_INVOKE("delete_pkcs12")),
-	/**
-	 *  Devuelve el contenido (BLOB) del certificado PKCS#12 como bytes.
-	 */
-	getPkcs12Content: () => typedError<Uint8Array | null, AppError>(__TAURI_INVOKE("get_pkcs12_content")),
 	listSecondaryLogos: () => typedError<SecondaryLogo[], AppError>(__TAURI_INVOKE("list_secondary_logos")),
 	importSecondaryLogo: (name: string, sourcePath: string) => typedError<SecondaryLogo, AppError>(__TAURI_INVOKE("import_secondary_logo", { name, sourcePath })),
 	deleteSecondaryLogo: (id: number) => typedError<null, AppError>(__TAURI_INVOKE("delete_secondary_logo", { id })),
-	/**
-	 *  Devuelve el contenido (BLOB) de un logo secundario como bytes.
-	 */
-	getSecondaryLogoContent: (id: number) => typedError<Uint8Array | null, AppError>(__TAURI_INVOKE("get_secondary_logo_content", { id })),
+	/**  Devuelve el contenido (BLOB) del logo principal como `data:` URL. */
+	getClinicLogoContent: () => typedError<number[] | null, AppError>(__TAURI_INVOKE("get_clinic_logo_content")),
+	/**  Elimina el logo principal de `CLINIC_ASSETS`. */
+	deleteClinicLogo: () => typedError<null, AppError>(__TAURI_INVOKE("delete_clinic_logo")),
+	/**  Devuelve el contenido (BLOB) de un logo secundario como `data:` URL. */
+	getSecondaryLogoContent: (id: number) => typedError<number[] | null, AppError>(__TAURI_INVOKE("get_secondary_logo_content", { id })),
+	/**  Elimina el certificado PKCS#12 de `CLINIC_ASSETS` y de la memoria. */
+	deletePkcs12: () => typedError<null, AppError>(__TAURI_INVOKE("delete_pkcs12")),
+	/**  Devuelve el contenido (BLOB) del certificado PKCS#12 para firmar. */
+	getPkcs12Content: () => typedError<number[] | null, AppError>(__TAURI_INVOKE("get_pkcs12_content")),
 	/**
 	 *  Prueba la conexión con la API de Groq usando la clave configurada.
 	 *  Devuelve `Ok` con un mensaje breve si la clave es válida, o un `AppError`
@@ -610,9 +621,9 @@ export const commands = {
 	/**  Cambia el estado de una cirugía (PROGRAMADA→EN_CURSO/COMPLETADA/CANCELADA). */
 	setSurgeryStatus: (id: number, status: string) => typedError<Surgery, AppError>(__TAURI_INVOKE("set_surgery_status", { id, status })),
 	/**  Emite una factura con items; calcula subtotal, IVA y total en Rust. */
-	createInvoice: (input: CreateInvoiceInput) => typedError<Invoice, AppError>(__TAURI_INVOKE("create_invoice", { input })),
+	createInvoice: (input: CreateInvoiceInput) => typedError<Invoice, AppError>(__TAURI_INVOKE("create_invoice", { input: ({...input,taxRate:input.taxRate==null?input.taxRate:input.taxRate,items:input.items.map(i=>i)}) })).then((v) => ((v.status === "ok" ? { ...v, data: ({...v.data,items:v.data.items.map(i=>i)}) } : v) as typeof v)),
 	/**  Listado de facturas con filtros por estado y búsqueda. */
-	listInvoices: (status: string | null, search: string | null) => typedError<InvoiceListItem[], AppError>(__TAURI_INVOKE("list_invoices", { status, search })),
+	listInvoices: (status: string | null, search: string | null) => typedError<InvoiceListItem[], AppError>(__TAURI_INVOKE("list_invoices", { status, search })).then((v) => ((v.status === "ok" ? { ...v, data: v.data.map(i=>i) } : v) as typeof v)),
 	/**  Conteo de facturas por estado (sin cargar las filas completas). */
 	countInvoices: () => typedError<StatusCount[], AppError>(__TAURI_INVOKE("count_invoices")),
 	/**  Ficha completa de una factura (con items). */
@@ -628,60 +639,87 @@ export const commands = {
 	consultationId: number | null,
 	/**  YYYY-MM-DD HH:MM:SS */
 	issueDate: string,
-	subtotal: number | null,
-	taxRate: number | null,
-	taxAmount: number | null,
-	total: number | null,
+	subtotal: number,
+	taxRate: number,
+	taxAmount: number,
+	total: number,
 	/**  EMITIDA | PAGADA | ANULADA */
 	status: string,
 	paymentMethod: string | null,
 	notes: string | null,
 	items: InvoiceItem[],
-} | null, AppError>(__TAURI_INVOKE("get_invoice", { id })),
-	/**  Anula una factura sin pagos vigentes. El estado `PAGADA` solo lo produce el registro de pagos (`register_payment`), no este comando. */
-	setInvoiceStatus: (id: number, status: string) => typedError<Invoice, AppError>(__TAURI_INVOKE("set_invoice_status", { id, status })),
+} | null, AppError>(__TAURI_INVOKE("get_invoice", { id })).then((v) => ((v.status === "ok" ? { ...v, data: v.data==null?v.data:({...v.data,items:v.data.items.map(i=>i)}) } : v) as typeof v)),
+	/**
+	 *  Anula una factura sin pagos vigentes. El estado `PAGADA` solo lo produce
+	 *  el registro de pagos (`register_payment`), no este comando.
+	 */
+	setInvoiceStatus: (id: number, status: string) => typedError<Invoice, AppError>(__TAURI_INVOKE("set_invoice_status", { id, status })).then((v) => ((v.status === "ok" ? { ...v, data: ({...v.data,items:v.data.items.map(i=>i)}) } : v) as typeof v)),
 	/**  Catálogo de métodos de pago (para el diálogo de cobro). */
 	listPaymentMethods: (includeInactive: boolean | null) => typedError<PaymentMethod[], AppError>(__TAURI_INVOKE("list_payment_methods", { includeInactive })),
 	/**  Registra una recepción (abono o pago total) con formas de pago mixtas. */
-	registerPayment: (input: RegisterPaymentInput) => typedError<Payment, AppError>(__TAURI_INVOKE("register_payment", { input })),
+	registerPayment: (input: RegisterPaymentInput) => typedError<Payment, AppError>(__TAURI_INVOKE("register_payment", { input: ({...input,lines:input.lines.map(i=>i),allocations:input.allocations.map(i=>i)}) })).then((v) => ((v.status === "ok" ? { ...v, data: ({...v.data,lines:v.data.lines.map(i=>i),allocations:v.data.allocations.map(i=>i)}) } : v) as typeof v)),
+	/**
+	 *  Anula una recepción con motivo: revierte su efectivo en la caja abierta,
+	 *  libera las facturas y devuelve el saldo a su estado real.
+	 */
+	voidPayment: (paymentId: number, reason: string) => typedError<Payment, AppError>(__TAURI_INVOKE("void_payment", { paymentId, reason })).then((v) => ((v.status === "ok" ? { ...v, data: ({...v.data,lines:v.data.lines.map(i=>i),allocations:v.data.allocations.map(i=>i)}) } : v) as typeof v)),
+	/**  Reporte del período separando facturado (emisión) de cobrado (recepción). */
+	getBillingReport: (from: string, to: string) => typedError<BillingReport, AppError>(__TAURI_INVOKE("get_billing_report", { from, to })).then((v) => ((v.status === "ok" ? { ...v, data: ({...v.data,methods:v.data.methods.map(i=>i)}) } : v) as typeof v)),
 	/**  Saldo derivado de una factura (total, abonado, saldo y estado de cobro). */
 	getInvoiceBalance: (invoiceId: number) => typedError<InvoiceBalance, AppError>(__TAURI_INVOKE("get_invoice_balance", { invoiceId })),
 	/**  Historial de pagos aplicados a una factura. */
-	listInvoicePayments: (invoiceId: number) => typedError<Payment[], AppError>(__TAURI_INVOKE("list_invoice_payments", { invoiceId })),
-	/**  Anula una recepción con motivo: revierte su efectivo en la caja abierta, libera las facturas y devuelve el saldo a su estado real. */
-	voidPayment: (paymentId: number, reason: string) => typedError<Payment, AppError>(__TAURI_INVOKE("void_payment", { paymentId, reason })),
-	/**  Reporte del período separando facturado (emisión) de cobrado (recepción). */
-	getBillingReport: (from: string, to: string) => typedError<BillingReport, AppError>(__TAURI_INVOKE("get_billing_report", { from, to })),
+	listInvoicePayments: (invoiceId: number) => typedError<Payment[], AppError>(__TAURI_INVOKE("list_invoice_payments", { invoiceId })).then((v) => ((v.status === "ok" ? { ...v, data: v.data.map(i=>({...i,lines:i.lines.map(i=>i),allocations:i.allocations.map(i=>i)})) } : v) as typeof v)),
 	/**  Sesión de caja abierta actual, o `None` si no hay ninguna. */
-	getOpenCashSession: () => typedError<CashSession | null, AppError>(__TAURI_INVOKE("get_open_cash_session")),
+	getOpenCashSession: () => typedError<{
+	id: number,
+	/**  CAJ-00000001… */
+	code: string,
+	/**  YYYY-MM-DD HH:MM:SS */
+	openedAt: string,
+	openedBy: number,
+	openedByName: string | null,
+	openingFloat: number,
+	/**  ABIERTA | CERRADA */
+	status: string,
+	closedAt: string | null,
+	closedByName: string | null,
+	expectedCash: number | null,
+	countedCash: number | null,
+	difference: number | null,
+	totalBilled: number | null,
+	totalCollected: number | null,
+	notes: string | null,
+} | null, AppError>(__TAURI_INVOKE("get_open_cash_session")).then((v) => ((v.status === "ok" ? { ...v, data: v.data==null?v.data:({...v.data,expectedCash:v.data.expectedCash==null?v.data.expectedCash:v.data.expectedCash,countedCash:v.data.countedCash==null?v.data.countedCash:v.data.countedCash,difference:v.data.difference==null?v.data.difference:v.data.difference,totalBilled:v.data.totalBilled==null?v.data.totalBilled:v.data.totalBilled,totalCollected:v.data.totalCollected==null?v.data.totalCollected:v.data.totalCollected}) } : v) as typeof v)),
 	/**  Abre la caja con su base inicial. Falla si ya hay una abierta. */
-	openCashSession: (openingFloat: number, notes: string | null) => typedError<CashSession, AppError>(__TAURI_INVOKE("open_cash_session", { openingFloat, notes })),
+	openCashSession: (openingFloat: number, notes: string | null) => typedError<CashSession, AppError>(__TAURI_INVOKE("open_cash_session", { openingFloat, notes })).then((v) => ((v.status === "ok" ? { ...v, data: ({...v.data,expectedCash:v.data.expectedCash==null?v.data.expectedCash:v.data.expectedCash,countedCash:v.data.countedCash==null?v.data.countedCash:v.data.countedCash,difference:v.data.difference==null?v.data.difference:v.data.difference,totalBilled:v.data.totalBilled==null?v.data.totalBilled:v.data.totalBilled,totalCollected:v.data.totalCollected==null?v.data.totalCollected:v.data.totalCollected}) } : v) as typeof v)),
 	/**  Registra un gasto, retiro o ajuste en la caja abierta. */
 	addCashMovement: (input: AddCashMovementInput) => typedError<CashMovement, AppError>(__TAURI_INVOKE("add_cash_movement", { input })),
 	/**  Movimientos de una sesión (por defecto, la caja abierta). */
-	listCashMovements: (sessionId: number | null) => typedError<CashMovement[], AppError>(__TAURI_INVOKE("list_cash_movements", { sessionId })),
+	listCashMovements: (sessionId: number | null) => typedError<CashMovement[], AppError>(__TAURI_INVOKE("list_cash_movements", { sessionId })).then((v) => ((v.status === "ok" ? { ...v, data: v.data.map(i=>i) } : v) as typeof v)),
 	/**  Resumen de una sesión: cifras, métodos, movimientos y arqueo. */
-	getCashSessionSummary: (sessionId: number | null) => typedError<CashSessionSummary, AppError>(__TAURI_INVOKE("get_cash_session_summary", { sessionId })),
+	getCashSessionSummary: (sessionId: number | null) => typedError<CashSessionSummary, AppError>(__TAURI_INVOKE("get_cash_session_summary", { sessionId })).then((v) => ((v.status === "ok" ? { ...v, data: ({...v.data,session:({...v.data.session,expectedCash:v.data.session.expectedCash==null?v.data.session.expectedCash:v.data.session.expectedCash,countedCash:v.data.session.countedCash==null?v.data.session.countedCash:v.data.session.countedCash,difference:v.data.session.difference==null?v.data.session.difference:v.data.session.difference,totalBilled:v.data.session.totalBilled==null?v.data.session.totalBilled:v.data.session.totalBilled,totalCollected:v.data.session.totalCollected==null?v.data.session.totalCollected:v.data.session.totalCollected}),countedCash:v.data.countedCash==null?v.data.countedCash:v.data.countedCash,difference:v.data.difference==null?v.data.difference:v.data.difference,methods:v.data.methods.map(i=>i),movements:v.data.movements.map(i=>i),countLines:v.data.countLines.map(i=>i)}) } : v) as typeof v)),
 	/**  Cierra la caja abierta con el arqueo por denominación. */
-	closeCashSession: (input: CloseCashInput) => typedError<CashSessionSummary, AppError>(__TAURI_INVOKE("close_cash_session", { input })),
+	closeCashSession: (input: CloseCashInput) => typedError<CashSessionSummary, AppError>(__TAURI_INVOKE("close_cash_session", { input: ({...input,countLines:input.countLines.map(i=>i)}) })).then((v) => ((v.status === "ok" ? { ...v, data: ({...v.data,session:({...v.data.session,expectedCash:v.data.session.expectedCash==null?v.data.session.expectedCash:v.data.session.expectedCash,countedCash:v.data.session.countedCash==null?v.data.session.countedCash:v.data.session.countedCash,difference:v.data.session.difference==null?v.data.session.difference:v.data.session.difference,totalBilled:v.data.session.totalBilled==null?v.data.session.totalBilled:v.data.session.totalBilled,totalCollected:v.data.session.totalCollected==null?v.data.session.totalCollected:v.data.session.totalCollected}),countedCash:v.data.countedCash==null?v.data.countedCash:v.data.countedCash,difference:v.data.difference==null?v.data.difference:v.data.difference,methods:v.data.methods.map(i=>i),movements:v.data.movements.map(i=>i),countLines:v.data.countLines.map(i=>i)}) } : v) as typeof v)),
 	/**  Historial de sesiones de caja, más reciente primero. */
-	listCashSessions: (limit: number | null) => typedError<CashSession[], AppError>(__TAURI_INVOKE("list_cash_sessions", { limit })),
+	listCashSessions: (limit: number | null) => typedError<CashSession[], AppError>(__TAURI_INVOKE("list_cash_sessions", { limit })).then((v) => ((v.status === "ok" ? { ...v, data: v.data.map(i=>({...i,expectedCash:i.expectedCash==null?i.expectedCash:i.expectedCash,countedCash:i.countedCash==null?i.countedCash:i.countedCash,difference:i.difference==null?i.difference:i.difference,totalBilled:i.totalBilled==null?i.totalBilled:i.totalBilled,totalCollected:i.totalCollected==null?i.totalCollected:i.totalCollected})) } : v) as typeof v)),
 	/**  Genera el PDF de cierre de caja (arqueo, totales por método y movimientos). */
 	generateCashClosePdf: (sessionId: number) => typedError<ReportFile, AppError>(__TAURI_INVOKE("generate_cash_close_pdf", { sessionId })),
 	/**
 	 *  Métricas del panel de control: contadores, agenda de próximas citas y
 	 *  cirugías, refuerzos de vacunación y últimas muestras.
 	 */
-	getDashboardStats: () => typedError<DashboardStats, AppError>(__TAURI_INVOKE("get_dashboard_stats")),
+	getDashboardStats: () => typedError<DashboardStats, AppError>(__TAURI_INVOKE("get_dashboard_stats")).then((v) => ((v.status === "ok" ? { ...v, data: ({...v.data,turnaroundBySampleType:v.data.turnaroundBySampleType.map(i=>i),revenueByCategory:v.data.revenueByCategory.map(i=>i),lastCashDifference:v.data.lastCashDifference==null?v.data.lastCashDifference:v.data.lastCashDifference}) } : v) as typeof v)),
 	/**
-	 *  Copia una foto de placa, frotis o electroforesis a la carpeta de datos de
-	 *  la app (app_data/attachments) y la asocia al resultado. Devuelve el
-	 *  adjunto creado para refrescar la UI.
+	 *  Lee un archivo adjunto y lo guarda como BLOB en Firebird. Los tres PCs de
+	 *  la clínica ven el mismo archivo (no depende de carpetas compartidas).
 	 */
 	attachResultFile: (resultId: number, sourcePath: string) => typedError<ResultAttachment, AppError>(__TAURI_INVOKE("attach_result_file", { resultId, sourcePath })),
-	/**  Elimina un adjunto: borra el archivo de la carpeta de datos y su registro. */
+	/**  Elimina un adjunto: borra su registro y el BLOB almacenado en la base. */
 	deleteResultAttachment: (id: number) => typedError<null, AppError>(__TAURI_INVOKE("delete_result_attachment", { id })),
-	/**  Devuelve el contenido (BLOB) de un adjunto como AttachmentContent. */
+	/**
+	 *  Devuelve el contenido (BLOB) de un adjunto como `data:` URL listo para el
+	 *  webview (los tres PCs ven el mismo archivo).
+	 */
 	getResultAttachmentContent: (id: number) => typedError<AttachmentContent, AppError>(__TAURI_INVOKE("get_result_attachment_content", { id })),
 	/**
 	 *  Lista el registro de auditoría con paginación y filtros (solo ADMIN).
@@ -689,7 +727,7 @@ export const commands = {
 	 */
 	listAuditLog: (limit: number | null, offset: number | null, username: string | null, action: string | null, dateFrom: string | null, dateTo: string | null) => typedError<AuditLogEntry[], AppError>(__TAURI_INVOKE("list_audit_log", { limit, offset, username, action, dateFrom, dateTo })),
 	interpretLabResults: (sampleId: number) => typedError<string, AppError>(__TAURI_INVOKE("interpret_lab_results", { sampleId })),
-	getPatientLabTrends: (patientId: number, analyteId: number) => typedError<TrendPoint[], AppError>(__TAURI_INVOKE("get_patient_lab_trends", { patientId, analyteId })),
+	getPatientLabTrends: (patientId: number, analyteId: number) => typedError<TrendPoint[], AppError>(__TAURI_INVOKE("get_patient_lab_trends", { patientId, analyteId })).then((v) => ((v.status === "ok" ? { ...v, data: v.data.map(i=>({...i,refMin:i.refMin==null?i.refMin:i.refMin,refMax:i.refMax==null?i.refMax:i.refMax})) } : v) as typeof v)),
 	/**  Lista los equipos analizadores configurados (con su nº de rangos). */
 	listAnalyzers: () => typedError<Analyzer[], AppError>(__TAURI_INVOKE("list_analyzers")),
 	/**  Crea un equipo analizador (marca/modelo). */
@@ -701,11 +739,11 @@ export const commands = {
 	/**  Elimina un equipo que no tenga muestras asociadas (borra sus rangos). */
 	deleteAnalyzer: (id: number) => typedError<null, AppError>(__TAURI_INVOKE("delete_analyzer", { id })),
 	/**  Rangos de referencia de un equipo (o de todos si `analyzer_id` es NULL). */
-	listReferenceRanges: (analyzerId: number | null) => typedError<ReferenceRange[], AppError>(__TAURI_INVOKE("list_reference_ranges", { analyzerId })),
+	listReferenceRanges: (analyzerId: number | null) => typedError<ReferenceRange[], AppError>(__TAURI_INVOKE("list_reference_ranges", { analyzerId })).then((v) => ((v.status === "ok" ? { ...v, data: v.data.map(i=>({...i,criticalMin:i.criticalMin==null?i.criticalMin:i.criticalMin,criticalMax:i.criticalMax==null?i.criticalMax:i.criticalMax})) } : v) as typeof v)),
 	/**  Crea un rango de referencia para un equipo. */
-	createReferenceRange: (input: ReferenceRangeInput) => typedError<ReferenceRange, AppError>(__TAURI_INVOKE("create_reference_range", { input })),
+	createReferenceRange: (input: ReferenceRangeInput) => typedError<ReferenceRange, AppError>(__TAURI_INVOKE("create_reference_range", { input: ({...input,criticalMin:input.criticalMin==null?input.criticalMin:input.criticalMin,criticalMax:input.criticalMax==null?input.criticalMax:input.criticalMax}) })).then((v) => ((v.status === "ok" ? { ...v, data: ({...v.data,criticalMin:v.data.criticalMin==null?v.data.criticalMin:v.data.criticalMin,criticalMax:v.data.criticalMax==null?v.data.criticalMax:v.data.criticalMax}) } : v) as typeof v)),
 	/**  Actualiza un rango de referencia existente. */
-	updateReferenceRange: (id: number, input: ReferenceRangeInput) => typedError<ReferenceRange, AppError>(__TAURI_INVOKE("update_reference_range", { id, input })),
+	updateReferenceRange: (id: number, input: ReferenceRangeInput) => typedError<ReferenceRange, AppError>(__TAURI_INVOKE("update_reference_range", { id, input: ({...input,criticalMin:input.criticalMin==null?input.criticalMin:input.criticalMin,criticalMax:input.criticalMax==null?input.criticalMax:input.criticalMax}) })).then((v) => ((v.status === "ok" ? { ...v, data: ({...v.data,criticalMin:v.data.criticalMin==null?v.data.criticalMin:v.data.criticalMin,criticalMax:v.data.criticalMax==null?v.data.criticalMax:v.data.criticalMax}) } : v) as typeof v)),
 	/**  Elimina un rango de referencia. */
 	deleteReferenceRange: (id: number) => typedError<null, AppError>(__TAURI_INVOKE("delete_reference_range", { id })),
 	/**  Fuentes automáticas configuradas (carpeta vigilada por analizador). */
@@ -751,7 +789,7 @@ export const commands = {
 	/**  Crea o edita un recurso (solo ADMIN). */
 	saveResource: (input: SaveResourceInput) => typedError<Resource, AppError>(__TAURI_INVOKE("save_resource", { input })),
 	/**  Lista estancias con filtros opcionales (estado, tipo, paciente). */
-	listStays: (status: string | null, kind: string | null, patientId: number | null) => typedError<StayListItem[], AppError>(__TAURI_INVOKE("list_stays", { status, kind, patientId })),
+	listStays: (status: string | null, kind: string | null, patientId: number | null) => typedError<StayListItem[], AppError>(__TAURI_INVOKE("list_stays", { status, kind, patientId })).then((v) => ((v.status === "ok" ? { ...v, data: v.data.map(i=>i) } : v) as typeof v)),
 	/**  Estancia completa por id. */
 	getStay: (id: number) => typedError<{
 	id: number,
@@ -772,15 +810,15 @@ export const commands = {
 	/**  YYYY-MM-DD HH:MM:SS */
 	checkInAt: string,
 	checkOutAt: string | null,
-	dailyRate: number | null,
+	dailyRate: number,
 	notes: string | null,
 	/**  Días de estancia (mín. 1 mientras esté abierta). */
 	days: number,
 	/**  Valor estimado de la estancia hasta la fecha actual. */
-	estimatedTotal: number | null,
-} | null, AppError>(__TAURI_INVOKE("get_stay", { id })),
+	estimatedTotal: number,
+} | null, AppError>(__TAURI_INVOKE("get_stay", { id })).then((v) => ((v.status === "ok" ? { ...v, data: v.data==null?v.data:v.data } : v) as typeof v)),
 	/**  Ingreso de una estancia (guardería, hospedaje u hospitalización). */
-	createStay: (input: CreateStayInput) => typedError<Stay, AppError>(__TAURI_INVOKE("create_stay", { input })),
+	createStay: (input: CreateStayInput) => typedError<Stay, AppError>(__TAURI_INVOKE("create_stay", { input: ({...input,dailyRate:input.dailyRate==null?input.dailyRate:input.dailyRate}) })),
 	/**  Check-out de una estancia. */
 	checkOutStay: (id: number, input: CheckOutStayInput) => typedError<Stay, AppError>(__TAURI_INVOKE("check_out_stay", { id, input })),
 	/**  Cancela una estancia abierta. */
@@ -790,7 +828,7 @@ export const commands = {
 	/**  Bitácora de cuidados de una estancia. */
 	listStayEvents: (stayId: number) => typedError<StayEvent[], AppError>(__TAURI_INVOKE("list_stay_events", { stayId })),
 	/**  Catálogo de productos con su stock actual. */
-	listProducts: (search: string | null, category: string | null, includeInactive: boolean | null) => typedError<ProductStockItem[], AppError>(__TAURI_INVOKE("list_products", { search, category, includeInactive })),
+	listProducts: (search: string | null, category: string | null, includeInactive: boolean | null) => typedError<ProductStockItem[], AppError>(__TAURI_INVOKE("list_products", { search, category, includeInactive })).then((v) => ((v.status === "ok" ? { ...v, data: v.data.map(i=>({...i,product:({...i.product,taxRate:i.product.taxRate==null?i.product.taxRate:i.product.taxRate})})) } : v) as typeof v)),
 	/**  Producto del catálogo por id. */
 	getProduct: (id: number) => typedError<{
 	id: number,
@@ -801,23 +839,23 @@ export const commands = {
 	category: string,
 	/**  UNIDAD | KG | LT | PAQUETE | CAJA | BOLSA */
 	unit: string,
-	costPrice: number | null,
-	salePrice: number | null,
+	costPrice: number,
+	salePrice: number,
 	/**  IVA del producto; NULL = usa el IVA global de la clínica. */
 	taxRate: number | null,
 	/**  Stock mínimo para la alerta de reposición. */
 	minStock: number,
 	active: boolean,
 	notes: string | null,
-} | null, AppError>(__TAURI_INVOKE("get_product", { id })),
+} | null, AppError>(__TAURI_INVOKE("get_product", { id })).then((v) => ((v.status === "ok" ? { ...v, data: v.data==null?v.data:({...v.data,taxRate:v.data.taxRate==null?v.data.taxRate:v.data.taxRate}) } : v) as typeof v)),
 	/**  Crea o edita un producto del catálogo (solo ADMIN). */
-	saveProduct: (input: SaveProductInput) => typedError<Product, AppError>(__TAURI_INVOKE("save_product", { input })),
+	saveProduct: (input: SaveProductInput) => typedError<Product, AppError>(__TAURI_INVOKE("save_product", { input: ({...input,costPrice:input.costPrice==null?input.costPrice:input.costPrice,salePrice:input.salePrice==null?input.salePrice:input.salePrice,taxRate:input.taxRate==null?input.taxRate:input.taxRate}) })).then((v) => ((v.status === "ok" ? { ...v, data: ({...v.data,taxRate:v.data.taxRate==null?v.data.taxRate:v.data.taxRate}) } : v) as typeof v)),
 	/**  Activa o desactiva un producto del catálogo (solo ADMIN). */
-	setProductActive: (id: number, active: boolean) => typedError<Product, AppError>(__TAURI_INVOKE("set_product_active", { id, active })),
+	setProductActive: (id: number, active: boolean) => typedError<Product, AppError>(__TAURI_INVOKE("set_product_active", { id, active })).then((v) => ((v.status === "ok" ? { ...v, data: ({...v.data,taxRate:v.data.taxRate==null?v.data.taxRate:v.data.taxRate}) } : v) as typeof v)),
 	/**  Registra un movimiento de inventario (entrada, salida, consumo…). */
-	addStockMovement: (input: CreateStockMovementInput) => typedError<StockMovement, AppError>(__TAURI_INVOKE("add_stock_movement", { input })),
+	addStockMovement: (input: CreateStockMovementInput) => typedError<StockMovement, AppError>(__TAURI_INVOKE("add_stock_movement", { input: ({...input,unitCost:input.unitCost==null?input.unitCost:input.unitCost}) })).then((v) => ((v.status === "ok" ? { ...v, data: ({...v.data,unitCost:v.data.unitCost==null?v.data.unitCost:v.data.unitCost}) } : v) as typeof v)),
 	/**  Histórico de movimientos de inventario. */
-	listStockMovements: (productId: number | null, limit: number | null) => typedError<StockMovement[], AppError>(__TAURI_INVOKE("list_stock_movements", { productId, limit })),
+	listStockMovements: (productId: number | null, limit: number | null) => typedError<StockMovement[], AppError>(__TAURI_INVOKE("list_stock_movements", { productId, limit })).then((v) => ((v.status === "ok" ? { ...v, data: v.data.map(i=>({...i,unitCost:i.unitCost==null?i.unitCost:i.unitCost})) } : v) as typeof v)),
 };
 
 /* Types */
@@ -832,6 +870,15 @@ export type AccessionOrderInput = {
 	receivedAt: string | null,
 	collectedBy: string | null,
 	notes: string | null,
+};
+
+/**  Movimiento manual: gasto, retiro o ajuste con motivo obligatorio. */
+export type AddCashMovementInput = {
+	/**  GASTO | RETIRO | AJUSTE */
+	kind: string,
+	/**  Siempre positivo; el backend aplica el signo según el tipo. */
+	amount: number,
+	reason: string,
 };
 
 export type AddVisitAttachmentInput = {
@@ -971,6 +1018,20 @@ export type AppointmentListItem = {
 	professionalName: string | null,
 };
 
+/**
+ *  Contenido de un archivo almacenado como BLOB en Firebird.
+ * 
+ *  El backend lee el BLOB y lo entrega al webview como `data:` URL para que un
+ *  `<img>` lo muestre sin rutas locales (los tres PCs ven el mismo archivo).
+ */
+export type AttachmentContent = {
+	fileName: string,
+	mimeType: string | null,
+	sizeBytes: number,
+	/**  `data:<mime>;base64,<...>` listo para usar en el webview. */
+	dataUrl: string,
+};
+
 /**  Fila del registro de auditoría (USER_AUDIT_LOG). */
 export type AuditLogEntry = {
 	id: number,
@@ -981,10 +1042,118 @@ export type AuditLogEntry = {
 	createdAt: string,
 };
 
+/**  Estado del último backup del servidor Firebird. */
+export type BackupStatus = {
+	lastBackupAt: string | null,
+	lastBackupFile: string | null,
+};
+
+/**  Total cobrado con un método dentro de un período. */
+export type BillingMethodTotal = {
+	methodCode: string,
+	methodName: string,
+	amount: number,
+};
+
+/**
+ *  Reporte de facturación de un período: separa lo **facturado** (facturas
+ *  emitidas, sin anuladas) de lo **cobrado** (recepciones aplicadas) y deja el
+ *  saldo pendiente de las facturas emitidas en el rango.
+ */
+export type BillingReport = {
+	/**  YYYY-MM-DD (inclusive) */
+	fromDate: string,
+	/**  YYYY-MM-DD (inclusive) */
+	toDate: string,
+	billedTotal: number,
+	billedTax: number,
+	billedCount: number,
+	collectedTotal: number,
+	collectedCount: number,
+	/**  Saldo de las facturas emitidas en el período que sigue sin cobrarse. */
+	outstandingTotal: number,
+	methods: BillingMethodTotal[],
+};
+
 export type Breed = {
 	id: number,
 	speciesId: number,
 	name: string,
+};
+
+export type CashCountInput = {
+	denomination: number,
+	quantity: number,
+};
+
+/**  Línea de arqueo por denominación. */
+export type CashCountLine = {
+	denomination: number,
+	quantity: number,
+	subtotal: number,
+};
+
+/**  Total cobrado por método de pago dentro de una sesión. */
+export type CashMethodTotal = {
+	methodCode: string,
+	methodName: string,
+	amount: number,
+};
+
+/**  Movimiento manual o automático de caja. */
+export type CashMovement = {
+	id: number,
+	cashSessionId: number,
+	/**  PAGO_EFECTIVO | GASTO | RETIRO | DEVOLUCION | AJUSTE */
+	kind: string,
+	/**  Firmado: los ingresos son positivos y los egresos negativos. */
+	amount: number,
+	paymentId: number | null,
+	reason: string | null,
+	createdByName: string | null,
+	/**  YYYY-MM-DD HH:MM:SS */
+	createdAt: string,
+};
+
+/**  Sesión de caja (apertura/cierre). Solo puede haber una ABIERTA. */
+export type CashSession = {
+	id: number,
+	/**  CAJ-00000001… */
+	code: string,
+	/**  YYYY-MM-DD HH:MM:SS */
+	openedAt: string,
+	openedBy: number,
+	openedByName: string | null,
+	openingFloat: number,
+	/**  ABIERTA | CERRADA */
+	status: string,
+	closedAt: string | null,
+	closedByName: string | null,
+	expectedCash: number | null,
+	countedCash: number | null,
+	difference: number | null,
+	totalBilled: number | null,
+	totalCollected: number | null,
+	notes: string | null,
+};
+
+/**  Resumen completo de una sesión: cifras, movimientos y arqueo. */
+export type CashSessionSummary = {
+	session: CashSession,
+	openingFloat: number,
+	expectedCash: number,
+	countedCash: number | null,
+	difference: number | null,
+	totalBilled: number,
+	totalCollected: number,
+	/**  Suma de ingresos de caja (pagos en efectivo y ajustes positivos). */
+	cashIn: number,
+	/**  Suma de egresos de caja (gastos, retiros, devoluciones y ajustes negativos). */
+	cashOut: number,
+	paymentsCount: number,
+	methods: CashMethodTotal[],
+	movements: CashMovement[],
+	countLines: CashCountLine[],
 };
 
 export type ChangePasswordInput = {
@@ -997,6 +1166,21 @@ export type CheckOutStayInput = {
 	/**  YYYY-MM-DD HH:MM:SS (vacío = ahora). */
 	checkOutAt: string | null,
 	notes: string | null,
+};
+
+/**
+ *  Metadatos de un activo único de la clínica (`CLINIC_ASSETS`).
+ * 
+ *  El contenido (BLOB) se pide aparte con los comandos de contenido; el
+ *  formulario solo necesita saber qué hay y cuándo se actualizó.
+ */
+export type ClinicAsset = {
+	/**  LOGO | CERT_P12 */
+	kind: string,
+	fileName: string | null,
+	mimeType: string | null,
+	sizeBytes: number,
+	updatedAt: string,
 };
 
 /**
@@ -1019,17 +1203,17 @@ export type ClinicSettings = {
 	address: string | null,
 	phone: string | null,
 	city: string | null,
-	/**  Logo principal como metadatos de BLOB (NULL = sin logo personalizado). */
+	/**  Logo principal guardado como BLOB (NULL = logo de ISALAB). */
 	logo: ClinicAsset | null,
 	/**  IVA por defecto (%). */
-	taxRate: number | null,
+	taxRate: number,
 	currency: string,
 	/**  GRAPHIC (imagen) o DIGITAL (PKCS#12). */
 	signatureMode: string,
 	vetName: string,
 	vetLicense: string | null,
 	groqApiKey: string | null,
-	/**  Certificado PKCS#12 como metadatos de BLOB (solo ADMIN lo ve). */
+	/**  Certificado PKCS#12 guardado como BLOB (solo ADMIN lo ve). */
 	certificate: ClinicAsset | null,
 	/**  Contraseña del certificado PKCS#12 (solo en memoria, nunca se persiste). */
 	pkcs12Password: string | null,
@@ -1068,6 +1252,12 @@ export type ClinicalHistory = {
 	groomingSessions: GroomingSession[],
 	/**  Cobros (facturas) del paciente, de la más reciente (fase 5). */
 	charges: PatientChargeSummary[],
+};
+
+/**  Cierre de caja: arqueo por denominación y notas opcionales. */
+export type CloseCashInput = {
+	countLines: CashCountInput[],
+	notes: string | null,
 };
 
 export type Consultation = {
@@ -1155,7 +1345,7 @@ export type CreateInvoiceInput = {
 export type CreateInvoiceItemInput = {
 	description: string,
 	quantity: number,
-	unitPrice: number | null,
+	unitPrice: number,
 	/**
 	 *  Servicio del catálogo del que proviene la línea (opcional; las líneas
 	 *  manuales no lo traen). Solo rastreo: el precio de la línea es una copia.
@@ -1202,6 +1392,17 @@ export type CreatePatientInput = {
 	color: string | null,
 	microchip: string | null,
 	notes: string | null,
+};
+
+export type CreatePaymentAllocationInput = {
+	invoiceId: number,
+	amount: number,
+};
+
+export type CreatePaymentLineInput = {
+	methodCode: string,
+	amount: number,
+	reference: string | null,
 };
 
 export type CreateSampleInput = {
@@ -1316,14 +1517,14 @@ export type DashboardStats = {
 	samplesCancelled: number,
 	abnormalResults: number,
 	/**  Tiempo promedio recepción → finalización (en horas). */
-	avgProcessingHours: number | null,
+	avgProcessingHours: number,
 	/**
 	 *  Tiempo promedio de respuesta (recepción → finalización) por tipo de
 	 *  muestra, en minutos (ordenado de mayor a menor).
 	 */
 	turnaroundBySampleType: SampleTypeTurnaround[],
 	/**  Porcentaje de muestras finalizadas con al menos un valor fuera de rango (0-100). */
-	abnormalRate: number | null,
+	abnormalRate: number,
 	/**  Volumen de muestras recibidas en los últimos 7 días (tendencia). */
 	weeklyVolume: DailySampleVolume[],
 	/**  Analitos más solicitados (máx. 5). */
@@ -1340,7 +1541,7 @@ export type DashboardStats = {
 	 *  Espera promedio de las visitas de hoy que ya iniciaron atención
 	 *  (minutos entre ARRIVED_AT y el primer STARTED_AT de sus líneas).
 	 */
-	avgWaitMinutes: number | null,
+	avgWaitMinutes: number,
 	/**  Citas agendadas para hoy (todas las categorías). */
 	appointmentsToday: number,
 	/**  Líneas de estética (PELUQUERIA) en visitas de hoy. */
@@ -1352,18 +1553,18 @@ export type DashboardStats = {
 	/**  Facturas emitidas sin pagar. */
 	invoicesUnpaid: number,
 	/**  Ingresos totales (facturas PAGADA). */
-	revenueTotal: number | null,
+	revenueTotal: number,
 	/**  Cobrado hoy por fecha de recepción (pagos vigentes). */
-	collectedToday: number | null,
+	collectedToday: number,
 	/**  Cobrado en el mes en curso por fecha de recepción (pagos vigentes). */
-	collectedMonth: number | null,
+	collectedMonth: number,
 	/**  Saldo total pendiente de las facturas vigentes. */
-	receivableTotal: number | null,
+	receivableTotal: number,
 	/**  Facturas vigentes con saldo mayor que cero. */
 	receivableCount: number,
 	/**  Hay una sesión de caja abierta. */
 	cashSessionOpen: boolean,
-	/**  Diferencia del último cierre (contado − esperado); `null` sin cierres. */
+	/**  Diferencia del último cierre (contado − esperado); `None` sin cierres. */
 	lastCashDifference: number | null,
 	/**  Próximas consultas PENDIENTE (máx. 5). */
 	upcomingConsultations: ConsultationListItem[],
@@ -1586,10 +1787,10 @@ export type Invoice = {
 	consultationId: number | null,
 	/**  YYYY-MM-DD HH:MM:SS */
 	issueDate: string,
-	subtotal: number | null,
-	taxRate: number | null,
-	taxAmount: number | null,
-	total: number | null,
+	subtotal: number,
+	taxRate: number,
+	taxAmount: number,
+	total: number,
 	/**  EMITIDA | PAGADA | ANULADA */
 	status: string,
 	paymentMethod: string | null,
@@ -1597,13 +1798,26 @@ export type Invoice = {
 	items: InvoiceItem[],
 };
 
+/**  Saldo derivado de una factura (no se almacena en INVOICES). */
+export type InvoiceBalance = {
+	invoiceId: number,
+	invoiceNumber: string,
+	total: number,
+	paidAmount: number,
+	balance: number,
+	/**  PENDIENTE | ABONADA | PAGADA | ANULADA */
+	paymentStatus: string,
+	/**  Estado histórico de la factura (EMITIDA | PAGADA | ANULADA). */
+	status: string,
+};
+
 /**  Línea de detalle de una factura. */
 export type InvoiceItem = {
 	id: number,
 	description: string,
 	quantity: number,
-	unitPrice: number | null,
-	lineTotal: number | null,
+	unitPrice: number,
+	lineTotal: number,
 };
 
 /**  Fila del listado de facturas (sin items). */
@@ -1613,7 +1827,7 @@ export type InvoiceListItem = {
 	ownerName: string,
 	patientName: string | null,
 	issueDate: string,
-	total: number | null,
+	total: number,
 	/**  EMITIDA | PAGADA | ANULADA (estado histórico) */
 	status: string,
 	paymentMethod: string | null,
@@ -1684,7 +1898,7 @@ export type LabResult = {
 	analyteId: number,
 	analyteName: string,
 	unit: string | null,
-	value: number | null,
+	value: number,
 	/**
 	 *  BAJO | NORMAL | ALTO | SIN_RANGO | CRITICO_BAJO | CRITICO_ALTO
 	 *  (calculado por SP_VALIDATE_ANALYTICAL_RESULT)
@@ -1828,9 +2042,60 @@ export type PatientChargeSummary = {
 	invoiceNumber: string,
 	/**  YYYY-MM-DD HH:MM:SS */
 	issueDate: string,
-	total: number | null,
+	total: number,
 	/**  EMITIDA | PAGADA | ANULADA */
 	status: string,
+};
+
+/**  Recepción de pago completa, con líneas y facturas aplicadas. */
+export type Payment = {
+	id: number,
+	/**  REC-000001… */
+	code: string,
+	ownerId: number,
+	ownerName: string,
+	patientId: number | null,
+	patientName: string | null,
+	cashSessionId: number | null,
+	/**  YYYY-MM-DD HH:MM:SS */
+	receivedAt: string,
+	total: number,
+	/**  APLICADO | ANULADO */
+	status: string,
+	notes: string | null,
+	createdByName: string | null,
+	lines: PaymentLine[],
+	allocations: PaymentAllocation[],
+};
+
+/**  Aplicación de (parte de) una recepción a una factura. */
+export type PaymentAllocation = {
+	id: number,
+	invoiceId: number,
+	invoiceNumber: string,
+	amount: number,
+};
+
+/**  Línea de una recepción: un método y su importe. */
+export type PaymentLine = {
+	id: number,
+	methodCode: string,
+	methodName: string,
+	/**  EFECTIVO | ELECTRONICO | OTRO */
+	methodKind: string,
+	amount: number,
+	reference: string | null,
+};
+
+/**  Método de pago configurable (efectivo, transferencia, tarjeta…). */
+export type PaymentMethod = {
+	code: string,
+	name: string,
+	/**  EFECTIVO | ELECTRONICO | OTRO */
+	kind: string,
+	requiresReference: boolean,
+	active: boolean,
+	sortOrder: number,
 };
 
 /**  Producto del catálogo de comercio (alimentos, medicamentos, accesorios). */
@@ -1843,8 +2108,8 @@ export type Product = {
 	category: string,
 	/**  UNIDAD | KG | LT | PAQUETE | CAJA | BOLSA */
 	unit: string,
-	costPrice: number | null,
-	salePrice: number | null,
+	costPrice: number,
+	salePrice: number,
 	/**  IVA del producto; NULL = usa el IVA global de la clínica. */
 	taxRate: number | null,
 	/**  Stock mínimo para la alerta de reposición. */
@@ -1861,7 +2126,7 @@ export type ProductStockItem = {
 	/**  true si el stock está por debajo del mínimo configurado. */
 	lowStock: boolean,
 	/**  Valor del inventario a costo (stock × costo unitario). */
-	stockValue: number | null,
+	stockValue: number,
 };
 
 /**  Estado QC del último corrida por analizador (badge de alerta en la UI). */
@@ -1877,8 +2142,8 @@ export type QcChartData = {
 	analyteId: number,
 	analyteName: string,
 	unit: string | null,
-	mean: number | null,
-	sd: number | null,
+	mean: number,
+	sd: number,
 	points: QcChartPoint[],
 };
 
@@ -1886,8 +2151,8 @@ export type QcChartData = {
 export type QcChartPoint = {
 	runId: number,
 	runDate: string,
-	value: number | null,
-	zScore: number | null,
+	value: number,
+	zScore: number,
 	violation: string | null,
 };
 
@@ -1917,7 +2182,7 @@ export type QcMaterialInput = {
 
 export type QcMeasurementInput = {
 	analyteId: number,
-	value: number | null,
+	value: number,
 };
 
 /**  Corrida de control completa (una medición por analito objetivo). */
@@ -1949,7 +2214,7 @@ export type QcRunMeasurement = {
 	analyteId: number,
 	analyteName: string,
 	unit: string | null,
-	value: number | null,
+	value: number,
 	zScore: number | null,
 	/**  Reglas Westgard violadas (ej. "1_3s", "2_2s"), separadas por coma. */
 	violation: string | null,
@@ -1962,14 +2227,14 @@ export type QcTarget = {
 	analyteId: number,
 	analyteName: string,
 	unit: string | null,
-	mean: number | null,
-	sd: number | null,
+	mean: number,
+	sd: number,
 };
 
 export type QcTargetInput = {
 	analyteId: number,
-	mean: number | null,
-	sd: number | null,
+	mean: number,
+	sd: number,
 };
 
 /**
@@ -1988,8 +2253,8 @@ export type ReferenceRange = {
 	sex: string | null,
 	ageMinMonths: number,
 	ageMaxMonths: number,
-	minValue: number | null,
-	maxValue: number | null,
+	minValue: number,
+	maxValue: number,
 	criticalMin: number | null,
 	criticalMax: number | null,
 	notes: string | null,
@@ -2002,17 +2267,25 @@ export type ReferenceRangeInput = {
 	sex: string | null,
 	ageMinMonths: number,
 	ageMaxMonths: number,
-	minValue: number | null,
-	maxValue: number | null,
+	minValue: number,
+	maxValue: number,
 	criticalMin: number | null,
 	criticalMax: number | null,
 	notes: string | null,
 };
 
+export type RegisterPaymentInput = {
+	ownerId: number,
+	patientId: number | null,
+	notes: string | null,
+	lines: CreatePaymentLineInput[],
+	allocations: CreatePaymentAllocationInput[],
+};
+
 export type RegisterResultInput = {
 	sampleId: number,
 	analyteId: number,
-	value: number | null,
+	value: number,
 	/**
 	 *  Rango de referencia definido por el veterinario para este resultado
 	 *  (límites abiertos: solo uno de los dos). Ambos `None` = validar contra
@@ -2079,7 +2352,7 @@ export type ResultAttachment = {
 export type RevenueByCategory = {
 	categoryId: number,
 	categoryName: string,
-	revenue: number | null,
+	revenue: number,
 };
 
 export type Sample = {
@@ -2183,7 +2456,7 @@ export type SampleTypeTurnaround = {
 	sampleTypeId: number,
 	sampleTypeName: string,
 	/**  Promedio en minutos. */
-	avgMinutes: number | null,
+	avgMinutes: number,
 	/**  Muestras finalizadas consideradas. */
 	count: number,
 };
@@ -2254,7 +2527,7 @@ export type SaveServiceInput = {
 	categoryId: number,
 	description: string | null,
 	durationMin: number,
-	price: number | null,
+	price: number,
 	taxRate: number | null,
 	requiresVet: boolean,
 	requiresGroomer: boolean,
@@ -2283,7 +2556,7 @@ export type Service = {
 	categoryName: string,
 	description: string | null,
 	durationMin: number,
-	price: number | null,
+	price: number,
 	/**  NULL = usa el IVA global de la clínica. */
 	taxRate: number | null,
 	requiresVet: boolean,
@@ -2346,12 +2619,12 @@ export type Stay = {
 	/**  YYYY-MM-DD HH:MM:SS */
 	checkInAt: string,
 	checkOutAt: string | null,
-	dailyRate: number | null,
+	dailyRate: number,
 	notes: string | null,
 	/**  Días de estancia (mín. 1 mientras esté abierta). */
 	days: number,
 	/**  Valor estimado de la estancia hasta la fecha actual. */
-	estimatedTotal: number | null,
+	estimatedTotal: number,
 };
 
 /**  Evento de la bitácora de cuidados de una estancia. */
@@ -2379,7 +2652,7 @@ export type StayListItem = {
 	checkInAt: string,
 	checkOutAt: string | null,
 	days: number,
-	estimatedTotal: number | null,
+	estimatedTotal: number,
 };
 
 /**  Movimiento de inventario (entrada o salida). */
@@ -2423,7 +2696,7 @@ export type Surgery = {
 
 export type TrendPoint = {
 	date: string,
-	value: number | null,
+	value: number,
 	refMin: number | null,
 	refMax: number | null,
 	status: string,
@@ -2552,33 +2825,6 @@ export type VisitAttachment = {
 	createdAt: string,
 };
 
-/**  Contenido de un archivo almacenado como BLOB en Firebird, listo para el webview. */
-export type AttachmentContent = {
-	fileName: string,
-	mimeType: string | null,
-	/**  Tamaño en bytes. */
-	sizeBytes: number,
-	/**  data:<mime>;base64,<...> listo para usar en  o . */
-	dataUrl: string,
-};
-
-/**  Metadatos de un activo único de la clínica (CLINIC_ASSETS). */
-export type ClinicAsset = {
-	/**  LOGO | CERT_P12 */
-	kind: string,
-	fileName: string | null,
-	mimeType: string | null,
-	/**  Tamaño del BLOB en bytes. */
-	sizeBytes: number,
-	updatedAt: string,
-};
-
-/**  Estado del último backup del servidor Firebird. */
-export type BackupStatus = {
-	lastBackupAt: string | null,
-	lastBackupFile: string | null,
-};
-
 /**  Fila del listado de visitas de la cola de recepción (sin líneas). */
 export type VisitListItem = {
 	id: number,
@@ -2594,7 +2840,7 @@ export type VisitListItem = {
 	/**  Resumen "Baño + Consulta general". */
 	servicesSummary: string,
 	/**  Total estimado de las líneas no canceladas (precio congelado). */
-	estimatedTotal: number | null,
+	estimatedTotal: number,
 };
 
 /**  Línea de servicio dentro de una visita (precio congelado del catálogo). */
@@ -2610,7 +2856,7 @@ export type VisitService = {
 	professionalId: number | null,
 	professionalName: string | null,
 	quantity: number,
-	unitPrice: number | null,
+	unitPrice: number,
 	/**  NULL = IVA global de la clínica. */
 	taxRate: number | null,
 	/**  PENDIENTE | EN_PROCESO | COMPLETADA | CANCELADA */
@@ -2680,205 +2926,6 @@ export type WorklistSample = {
 	resultCount: number,
 	/**  Nº de resultados fuera de rango (ALTO/BAJO) — alerta visual. */
 	abnormalCount: number,
-};
-
-/**  Sesión de caja (apertura/cierre). Solo puede haber una ABIERTA. */
-export type CashSession = {
-	id: number,
-	/**  CAJ-00000001… */
-	code: string,
-	/**  YYYY-MM-DD HH:MM:SS */
-	openedAt: string,
-	openedBy: number,
-	openedByName: string | null,
-	openingFloat: number,
-	/**  ABIERTA | CERRADA */
-	status: string,
-	closedAt: string | null,
-	closedByName: string | null,
-	expectedCash: number | null,
-	countedCash: number | null,
-	difference: number | null,
-	totalBilled: number | null,
-	totalCollected: number | null,
-	notes: string | null,
-};
-
-export type AddCashMovementInput = {
-	/**  GASTO | RETIRO | AJUSTE */
-	kind: string,
-	/**  Siempre positivo; el backend aplica el signo según el tipo. */
-	amount: number,
-	reason: string,
-};
-
-/**  Línea de arqueo por denominación. */
-export type CashCountLine = {
-	denomination: number,
-	quantity: number,
-	subtotal: number,
-};
-
-export type CashCountInput = {
-	denomination: number,
-	quantity: number,
-};
-
-/**  Total cobrado por método de pago dentro de una sesión. */
-export type CashMethodTotal = {
-	methodCode: string,
-	methodName: string,
-	amount: number,
-};
-
-/**  Movimiento manual o automático de caja. */
-export type CashMovement = {
-	id: number,
-	cashSessionId: number,
-	/**  PAGO_EFECTIVO | GASTO | RETIRO | DEVOLUCION | AJUSTE */
-	kind: string,
-	/**  Firmado: los ingresos son positivos y los egresos negativos. */
-	amount: number,
-	paymentId: number | null,
-	reason: string | null,
-	createdByName: string | null,
-	/**  YYYY-MM-DD HH:MM:SS */
-	createdAt: string,
-};
-
-/**  Resumen completo de una sesión: cifras, movimientos y arqueo. */
-export type CashSessionSummary = {
-	session: CashSession,
-	openingFloat: number,
-	expectedCash: number,
-	countedCash: number | null,
-	difference: number | null,
-	totalBilled: number,
-	totalCollected: number,
-	/**  Suma de ingresos de caja (pagos en efectivo y ajustes positivos). */
-	cashIn: number,
-	/**  Suma de egresos de caja (gastos, retiros, devoluciones y ajustes negativos). */
-	cashOut: number,
-	paymentsCount: number,
-	methods: CashMethodTotal[],
-	movements: CashMovement[],
-	countLines: CashCountLine[],
-};
-
-/**  Cierre de caja: arqueo por denominación y notas opcionales. */
-export type CloseCashInput = {
-	countLines: CashCountInput[],
-	notes: string | null,
-};
-
-export type CreatePaymentAllocationInput = {
-	invoiceId: number,
-	amount: number,
-};
-
-export type CreatePaymentLineInput = {
-	methodCode: string,
-	amount: number,
-	reference: string | null,
-};
-
-/**  Saldo derivado de una factura (no se almacena en INVOICES). */
-export type InvoiceBalance = {
-	invoiceId: number,
-	invoiceNumber: string,
-	total: number,
-	paidAmount: number,
-	balance: number,
-	/**  PENDIENTE | ABONADA | PAGADA | ANULADA */
-	paymentStatus: string,
-	/**  Estado histórico de la factura (EMITIDA | PAGADA | ANULADA). */
-	status: string,
-};
-
-/**  Total cobrado con un método dentro de un período. */
-export type BillingMethodTotal = {
-	methodCode: string,
-	methodName: string,
-	amount: number,
-};
-
-/**
- *  Reporte de facturación de un período: separa lo **facturado** (facturas
- *  emitidas, sin anuladas) de lo **cobrado** (recepciones aplicadas) y deja el
- *  saldo pendiente de las facturas emitidas en el rango.
- */
-export type BillingReport = {
-	/**  YYYY-MM-DD (inclusive) */
-	fromDate: string,
-	/**  YYYY-MM-DD (inclusive) */
-	toDate: string,
-	billedTotal: number,
-	billedTax: number,
-	billedCount: number,
-	collectedTotal: number,
-	collectedCount: number,
-	/**  Saldo de las facturas emitidas en el período que sigue sin cobrarse. */
-	outstandingTotal: number,
-	methods: BillingMethodTotal[],
-};
-
-/**  Recepción de pago completa, con líneas y facturas aplicadas. */
-export type Payment = {
-	id: number,
-	/**  REC-000001… */
-	code: string,
-	ownerId: number,
-	ownerName: string,
-	patientId: number | null,
-	patientName: string | null,
-	cashSessionId: number | null,
-	/**  YYYY-MM-DD HH:MM:SS */
-	receivedAt: string,
-	total: number,
-	/**  APLICADO | ANULADO */
-	status: string,
-	notes: string | null,
-	createdByName: string | null,
-	lines: PaymentLine[],
-	allocations: PaymentAllocation[],
-};
-
-/**  Aplicación de (parte de) una recepción a una factura. */
-export type PaymentAllocation = {
-	id: number,
-	invoiceId: number,
-	invoiceNumber: string,
-	amount: number,
-};
-
-/**  Línea de una recepción: un método y su importe. */
-export type PaymentLine = {
-	id: number,
-	methodCode: string,
-	methodName: string,
-	/**  EFECTIVO | ELECTRONICO | OTRO */
-	methodKind: string,
-	amount: number,
-	reference: string | null,
-};
-
-/**  Método de pago configurable (efectivo, transferencia, tarjeta…). */
-export type PaymentMethod = {
-	code: string,
-	name: string,
-	/**  EFECTIVO | ELECTRONICO | OTRO */
-	kind: string,
-	requiresReference: boolean,
-	active: boolean,
-	sortOrder: number,
-};
-
-export type RegisterPaymentInput = {
-	ownerId: number,
-	patientId: number | null,
-	notes: string | null,
-	lines: CreatePaymentLineInput[],
-	allocations: CreatePaymentAllocationInput[],
 };
 
 /* Tauri Specta runtime */

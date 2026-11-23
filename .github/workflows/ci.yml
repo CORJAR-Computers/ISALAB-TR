@@ -203,6 +203,25 @@ jobs:
         timeout-minutes: 25
         run: cargo test
         working-directory: ./src-tauri
+      # Los bindings los genera specta a partir de las firmas Rust. Si el
+      # generador emitiera tipos que la UI no acepta (pasó con `f64` ->
+      # `number | null`, specta-rs/specta#569), el rojo aparece aquí y no al
+      # regenerar en una máquina de desarrollo. El paso regenera el archivo,
+      # pasa `tsc -b --force` y restaura el original: no ensucia el runner.
+      - name: Setup Node.js for bindings check
+        uses: actions/setup-node@v7
+        with:
+          node-version: 24
+          cache: 'npm'
+      - name: Install frontend dependencies for bindings check
+        uses: nick-fields/retry@v3
+        with:
+          timeout_minutes: 10
+          max_attempts: 3
+          command: npm ci
+      - name: Check generated bindings compile
+        run: npm run check:bindings-compile
+
       - name: Install cargo-audit
         uses: taiki-e/install-action@v2
         with:
