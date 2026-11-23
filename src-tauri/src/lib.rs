@@ -256,7 +256,6 @@ pub fn specta_builder() -> Builder<tauri::Wry> {
             get_clinic_logo_content,
             delete_clinic_logo,
             get_secondary_logo_content,
-            import_pkcs12,
             delete_pkcs12,
             get_pkcs12_content,
             test_groq_connection,
