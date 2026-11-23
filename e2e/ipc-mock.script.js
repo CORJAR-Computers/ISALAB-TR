@@ -435,6 +435,13 @@
     const spaced = value.replace("T", " ");
     return spaced.length === 16 ? `${spaced}:00` : spaced;
   };
+  /** Sello `YYYY-MM-DD HH:MM:SS` → minutos de reloj (sin zona ni DST). */
+  const stampMinutes = (value) => {
+    const [datePart, timePart] = value.split(" ");
+    const [year, month, day] = datePart.split("-").map(Number);
+    const [hours, minutes] = timePart.split(":").map(Number);
+    return Date.UTC(year, month - 1, day, hours, minutes) / 60000;
+  };
   /** Cita completa (`Appointment`); la usan las sembradas y las creadas. */
   const buildAppointment = ({
     id,
@@ -492,6 +499,33 @@
     ...row
   }) => row;
   const appointmentById = (id) => agenda.appointments.find((a) => a.id === id);
+  /**
+   * Solapamiento con las citas existentes, con el criterio de `has_conflict`
+   * del repositorio: mismo paciente o mismo profesional, sin las anuladas, e
+   * intervalos semiabiertos [inicio, inicio + duración) que se cruzan (dos
+   * citas pegadas, una que acaba cuando la otra empieza, no chocan).
+   */
+  const hasAppointmentConflict = ({
+    patientId,
+    professionalId,
+    start,
+    durationMin,
+  }) => {
+    const startMin = stampMinutes(start);
+    return agenda.appointments.some((appt) => {
+      if (appt.status === "CANCELADA") return false;
+      // Sin profesional no se compara contra las citas sin él: el repositorio
+      // busca con PROFESSIONAL_ID = 0, que nunca coincide.
+      const sameProfessional =
+        professionalId != null && appt.professionalId === professionalId;
+      if (appt.patientId !== patientId && !sameProfessional) return false;
+      const otherStart = stampMinutes(appt.scheduledAt);
+      return (
+        otherStart < startMin + durationMin &&
+        startMin < otherStart + appt.durationMin
+      );
+    });
+  };
   /** Cambia el estado, validando la transición como el backend. */
   const moveAppointment = (appt, status, notes) => {
     if (!(APPOINTMENT_FROM[status] ?? []).includes(appt.status)) {
@@ -2389,14 +2423,31 @@
       if (!patient || !service) {
         throw { type: "Validation", data: "Paciente o servicio inválido" };
       }
+      const scheduledAt = asStamp(input.scheduledAt);
+      // La duración positiva del input manda; si no, la del catálogo.
+      const durationMin =
+        input.durationMin > 0 ? input.durationMin : service.durationMin;
+      if (
+        hasAppointmentConflict({
+          patientId: patient.id,
+          professionalId: input.professionalId,
+          start: scheduledAt,
+          durationMin,
+        })
+      ) {
+        throw {
+          type: "Validation",
+          data: "Ya existe una cita solapada para este paciente o profesional en ese horario",
+        };
+      }
       const id = agenda.nextId;
       agenda.nextId += 1;
       const appt = buildAppointment({
         id,
         patient,
         service,
-        scheduledAt: asStamp(input.scheduledAt),
-        durationMin: input.durationMin,
+        scheduledAt,
+        durationMin,
         professionalId: input.professionalId,
         notes: input.notes,
         status: "PROGRAMADA",
